@@ -1,0 +1,147 @@
+name: CI & Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  PHP_VERSION: '8.4'
+  SSH_HOST: ${{ vars.SSH_HOST }}
+  SSH_USER: ${{ vars.SSH_USER }}
+  SSH_PORT: ${{ vars.SSH_PORT }}
+  APP_DIR: ${{ vars.APP_DIR }}
+  # Binaire PHP CLI sur le mutualisé Infomaniak. `php` seul peut pointer sur une
+  # version plus ancienne que celle du site : on force la 8.4 explicitement.
+  REMOTE_PHP: ${{ vars.REMOTE_PHP }}
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: ctype, iconv, intl, pdo_mysql
+          coverage: none
+          tools: composer:v2
+
+      - name: Valider composer.json
+        run: composer validate --strict
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      # --no-scripts : les auto-scripts lancent cache:clear, qui compilerait le
+      # conteneur avec les chemins absolus du runner. Le cache prod est construit
+      # sur le serveur, à la fin du déploiement.
+      - name: Installer les dépendances de prod
+        run: composer install --no-dev --no-interaction --no-progress --prefer-dist --optimize-autoloader --no-scripts
+        env:
+          APP_ENV: prod
+
+      - name: Compiler les assets
+        run: |
+          php bin/console assets:install public --no-interaction
+          php bin/console importmap:install --no-interaction
+          php bin/console asset-map:compile --no-interaction
+        env:
+          APP_ENV: prod
+          APP_DEBUG: '0'
+
+      - name: Empaqueter la release
+        run: |
+          tar -czf release.tar.gz \
+            --exclude='./.git' \
+            --exclude='./.github' \
+            --exclude='./.idea' \
+            --exclude='./var' \
+            --exclude='./tests' \
+            --exclude='./release.tar.gz' \
+            .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release.tar.gz
+          retention-days: 5
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: ctype, iconv, intl, pdo_mysql
+          coverage: none
+          tools: composer:v2
+
+      - name: Installer les dépendances
+        run: composer install --no-interaction --no-progress --prefer-dist
+        env:
+          APP_ENV: test
+
+      - name: PHPUnit
+        run: vendor/bin/phpunit
+        env:
+          APP_ENV: test
+
+  deploy:
+    name: Deploy production
+    needs: [build, test]
+    runs-on: ubuntu-latest
+    # Le gate manuel. Le job reste en "Waiting" jusqu'à ton approbation dans
+    # l'onglet Actions. Sans approbation : pas de mise en prod, et rien de cassé.
+    environment:
+      name: production
+      url: ${{ vars.APP_URL }}
+    # Un nouveau push sur main annule un déploiement encore en attente
+    # d'approbation, au lieu de le laisser s'empiler.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: true
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+
+      - name: Déballer la release
+        run: |
+          mkdir -p release
+          tar -xzf release.tar.gz -C release
+
+      - name: Configurer SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      # -rlptz et non -a : -a implique -og (owner/group), refusé sur mutualisé.
+      # --delete nettoie les fichiers supprimés du dépôt, mais les chemins
+      # --exclude sont protégés (pas de --delete-excluded).
+      - name: Synchroniser le code
+        run: |
+          rsync -rlptz --delete \
+            --exclude='.env.local' \
+            --exclude='var/' \
+            -e "ssh -i ~/.ssh/id_deploy -p $SSH_PORT" \
+            release/ "$SSH_USER@$SSH_HOST:$APP_DIR/"
+
+      - name: Cache prod et migrations
+        run: |
+          ssh -i ~/.ssh/id_deploy -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "set -e; cd '$APP_DIR'; \
+             export APP_ENV=prod APP_DEBUG=0; \
+             $REMOTE_PHP bin/console cache:clear --no-interaction; \
+             $REMOTE_PHP bin/console cache:warmup --no-interaction; \
+             $REMOTE_PHP bin/console doctrine:migrations:migrate --no-interaction --allow-no-migration"
