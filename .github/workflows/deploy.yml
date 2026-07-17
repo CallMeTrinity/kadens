@@ -55,21 +55,23 @@ jobs:
           APP_ENV: prod
           APP_DEBUG: '0'
 
+      # L'archive doit être écrite hors de l'arborescence source : si elle est
+      # créée dans le dossier qu'on archive, sa création modifie le mtime de
+      # "." pendant que tar le parcourt (erreur "file changed as we read it").
       - name: Empaqueter la release
         run: |
-          tar -czf release.tar.gz \
+          tar -czf "$RUNNER_TEMP/release.tar.gz" \
             --exclude='./.git' \
             --exclude='./.github' \
             --exclude='./.idea' \
             --exclude='./var' \
             --exclude='./tests' \
-            --exclude='./release.tar.gz' \
             .
 
       - uses: actions/upload-artifact@v4
         with:
           name: release
-          path: release.tar.gz
+          path: ${{ runner.temp }}/release.tar.gz
           retention-days: 5
 
   test:
