@@ -1,3 +1,29 @@
+@import 'tokens.css';
+
+/* ============================================================================
+   Kadens — feuille de style de base
+   Applique l'identité « Carnet clair » au document. Les composants et vues
+   consomment les tokens sémantiques définis dans tokens.css.
+
+   Rappel police : les familles Space Grotesk / Instrument Sans / JetBrains Mono
+   doivent être chargées dans base.html.twig (voir docs/design-system.md
+   § Chargement des polices). Sans ce chargement, seules les fallbacks system-ui
+   s'appliquent.
+   ============================================================================ */
+
 body {
-    background-color: skyblue;
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: var(--color-primary);
+}
+
+a:hover {
+  color: var(--color-primary-hover);
 }
