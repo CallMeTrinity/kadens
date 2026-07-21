@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Exercise;
+use App\Enum\ActivityType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -16,28 +17,29 @@ class ExerciseRepository extends ServiceEntityRepository
         parent::__construct($registry, Exercise::class);
     }
 
-    //    /**
-    //     * @return Exercise[] Returns an array of Exercise objects
-    //     */
-    //    public function findByExampleField($value): array
-    //    {
-    //        return $this->createQueryBuilder('e')
-    //            ->andWhere('e.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->orderBy('e.id', 'ASC')
-    //            ->setMaxResults(10)
-    //            ->getQuery()
-    //            ->getResult()
-    //        ;
-    //    }
+    /**
+     * @return Exercise[]
+     */
+    public function findByActivity(ActivityType $activity): array
+    {
+        return $this->createQueryBuilder('e')
+            ->andWhere('e.activity = :activity')
+            ->setParameter('activity', $activity)
+            ->orderBy('e.name', 'ASC')
+            ->getQuery()
+            ->getResult()
+        ;
+    }
 
-    //    public function findOneBySomeField($value): ?Exercise
-    //    {
-    //        return $this->createQueryBuilder('e')
-    //            ->andWhere('e.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->getQuery()
-    //            ->getOneOrNullResult()
-    //        ;
-    //    }
+    /**
+     * @return Exercise[]
+     */
+    public function findAllOrderedByName(): array
+    {
+        return $this->createQueryBuilder('e')
+            ->orderBy('e.name', 'ASC')
+            ->getQuery()
+            ->getResult()
+        ;
+    }
 }

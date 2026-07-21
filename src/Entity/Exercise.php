@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Enum\ActivityType;
+use App\Enum\TargetArea;
 use App\Repository\ExerciseRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -10,6 +11,7 @@ use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ExerciseRepository::class)]
+#[ORM\HasLifecycleCallbacks]
 class Exercise
 {
     #[ORM\Id]
@@ -29,8 +31,11 @@ class Exercise
     #[ORM\Column(enumType: ActivityType::class)]
     private ?ActivityType $activity = null;
 
-    #[ORM\Column(nullable: true)]
-    private ?array $targetAreas = null;
+    /**
+     * @var TargetArea[]|null
+     */
+    #[ORM\Column(type: Types::SIMPLE_ARRAY, nullable: true, enumType: TargetArea::class)]
+    private ?array $targetAreas = [];
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $mediaUrl = null;
@@ -50,6 +55,18 @@ class Exercise
     public function __construct()
     {
         $this->prescribedExercises = new ArrayCollection();
+    }
+
+    #[ORM\PrePersist]
+    public function onPrePersist(): void
+    {
+        $this->createdAt = new \DateTimeImmutable();
+    }
+
+    #[ORM\PreUpdate]
+    public function onPreUpdate(): void
+    {
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function getId(): ?int
@@ -105,11 +122,18 @@ class Exercise
         return $this;
     }
 
+
+    /**
+     * @return TargetArea[]|null
+     */
     public function getTargetAreas(): ?array
     {
         return $this->targetAreas;
     }
 
+    /**
+     * @param TargetArea[]|null $targetAreas
+     */
     public function setTargetAreas(?array $targetAreas): static
     {
         $this->targetAreas = $targetAreas;
