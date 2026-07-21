@@ -3,6 +3,8 @@
 namespace App\Entity;
 
 use App\Repository\UserRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
@@ -33,6 +35,38 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
+
+    /**
+     * @var Collection<int, Exercise>
+     */
+    #[ORM\OneToMany(targetEntity: Exercise::class, mappedBy: 'owner')]
+    private Collection $exercises;
+
+    /**
+     * @var Collection<int, Workout>
+     */
+    #[ORM\OneToMany(targetEntity: Workout::class, mappedBy: 'owner')]
+    private Collection $workouts;
+
+    /**
+     * @var Collection<int, PlanTemplate>
+     */
+    #[ORM\OneToMany(targetEntity: PlanTemplate::class, mappedBy: 'owner')]
+    private Collection $planTemplates;
+
+    /**
+     * @var Collection<int, ScheduledWorkout>
+     */
+    #[ORM\OneToMany(targetEntity: ScheduledWorkout::class, mappedBy: 'owner')]
+    private Collection $scheduledWorkouts;
+
+    public function __construct()
+    {
+        $this->exercises = new ArrayCollection();
+        $this->workouts = new ArrayCollection();
+        $this->planTemplates = new ArrayCollection();
+        $this->scheduledWorkouts = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -117,6 +151,126 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setCreatedAt(\DateTimeImmutable $createdAt): static
     {
         $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Exercise>
+     */
+    public function getExercises(): Collection
+    {
+        return $this->exercises;
+    }
+
+    public function addExercise(Exercise $exercise): static
+    {
+        if (!$this->exercises->contains($exercise)) {
+            $this->exercises->add($exercise);
+            $exercise->setOwner($this);
+        }
+
+        return $this;
+    }
+
+    public function removeExercise(Exercise $exercise): static
+    {
+        if ($this->exercises->removeElement($exercise)) {
+            // set the owning side to null (unless already changed)
+            if ($exercise->getOwner() === $this) {
+                $exercise->setOwner(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Workout>
+     */
+    public function getWorkouts(): Collection
+    {
+        return $this->workouts;
+    }
+
+    public function addWorkout(Workout $workout): static
+    {
+        if (!$this->workouts->contains($workout)) {
+            $this->workouts->add($workout);
+            $workout->setOwner($this);
+        }
+
+        return $this;
+    }
+
+    public function removeWorkout(Workout $workout): static
+    {
+        if ($this->workouts->removeElement($workout)) {
+            // set the owning side to null (unless already changed)
+            if ($workout->getOwner() === $this) {
+                $workout->setOwner(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, PlanTemplate>
+     */
+    public function getPlanTemplates(): Collection
+    {
+        return $this->planTemplates;
+    }
+
+    public function addPlanTemplate(PlanTemplate $planTemplate): static
+    {
+        if (!$this->planTemplates->contains($planTemplate)) {
+            $this->planTemplates->add($planTemplate);
+            $planTemplate->setOwner($this);
+        }
+
+        return $this;
+    }
+
+    public function removePlanTemplate(PlanTemplate $planTemplate): static
+    {
+        if ($this->planTemplates->removeElement($planTemplate)) {
+            // set the owning side to null (unless already changed)
+            if ($planTemplate->getOwner() === $this) {
+                $planTemplate->setOwner(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, ScheduledWorkout>
+     */
+    public function getScheduledWorkouts(): Collection
+    {
+        return $this->scheduledWorkouts;
+    }
+
+    public function addScheduledWorkout(ScheduledWorkout $scheduledWorkout): static
+    {
+        if (!$this->scheduledWorkouts->contains($scheduledWorkout)) {
+            $this->scheduledWorkouts->add($scheduledWorkout);
+            $scheduledWorkout->setOwner($this);
+        }
+
+        return $this;
+    }
+
+    public function removeScheduledWorkout(ScheduledWorkout $scheduledWorkout): static
+    {
+        if ($this->scheduledWorkouts->removeElement($scheduledWorkout)) {
+            // set the owning side to null (unless already changed)
+            if ($scheduledWorkout->getOwner() === $this) {
+                $scheduledWorkout->setOwner(null);
+            }
+        }
 
         return $this;
     }
