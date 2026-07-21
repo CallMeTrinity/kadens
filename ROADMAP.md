@@ -354,18 +354,28 @@ Chaque phase se termine par un jalon vérifiable. On ne passe à la suivante qu'
 2. Créer `ImportExercisesCommand` dans `src/Command/` : lit un fichier JSON, valide, crée les `Exercise` pour un `owner` donné, ignore/skip les doublons par nom.
 3. Générer le JSON via des sessions de chat externes, l'importer avec la commande.
 
-**Format JSON cible (à figer) :**
+**Format JSON figé** (fichier de référence : `data/exercises.json`) :
 ```json
 [
   {
-    "name": "Squat barre",
+    "name": "Squat",
     "description": "...",
     "activity": "gym",
-    "targetAreas": ["quadriceps", "fessiers"],
+    "targetAreas": ["legs", "core"],
     "mediaUrl": null
   }
 ]
 ```
+- `activity` : valeur de l'enum `ActivityType` (`gym`, `running`, `swimming`,
+  `cycling`, `mobility`, `other`).
+- `targetAreas` : valeurs de l'enum `TargetArea`, granularité muscle par muscle —
+  `chest`, `back`, `lower_back`, `traps`, `shoulders`, `biceps`, `triceps`,
+  `forearms`, `abs`, `obliques`, `glutes`, `quadriceps`, `hamstrings`,
+  `adductors`, `calves`, `full_body`. Nullable.
+
+**Commande :** `php bin/console app:import-exercises [fichier] [--owner=email]`.
+Sans argument, lit `data/exercises.json`. Sans `--owner`, crée une biblio
+globale (`owner` null). Ignore les doublons par `name`, idempotente.
 
 **Jalon :** je remplis ma biblio en masse via import, aucune IA dans l'app.
 
@@ -484,7 +494,7 @@ Chaque phase se termine par un jalon vérifiable. On ne passe à la suivante qu'
 5. [ ] Enum BlockRole + Workout/Block/PrescribedExercise
 6. [ ] SlugGenerator + éditeur de séance
 7. [ ] PlanFlattener + vue consultation auto-suffisante
-8. [ ] Format JSON + ImportExercisesCommand
+8. [x] Format JSON + ImportExercisesCommand
 9. [ ] PublicShareController + vues slug lecture seule
 10. [ ] PlanTemplate/PlanItem + éditeur de plan + duplication
 11. [ ] Enum ScheduledStatus + ScheduledWorkout + PlanInstantiator + calendrier
