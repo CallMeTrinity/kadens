@@ -506,13 +506,13 @@ globale (`owner` null). Ignore les doublons par `name`, idempotente.
 
 ## 6. Ordre de construction résumé (checklist rapide)
 
-1. [ ] Setup Symfony + AssetMapper + Docker + PostgreSQL + CI/CD
-2. [ ] User + sécurité
-3. [ ] Enum PrescriptionType
-4. [ ] Exercise + CRUD + import filtrage
-5. [ ] Enum BlockRole + Workout/Block/PrescribedExercise
-6. [ ] SlugGenerator + éditeur de séance
-7. [ ] PlanFlattener + vue consultation auto-suffisante
+1. [x] Setup Symfony + AssetMapper + Docker + PostgreSQL + CI/CD
+2. [x] User + sécurité
+3. [x] Enum PrescriptionType
+4. [x] Exercise + CRUD + import filtrage
+5. [x] Enum BlockRole + Workout/Block/PrescribedExercise
+6. [x] SlugGenerator + éditeur de séance
+7. [x] PlanFlattener + vue consultation auto-suffisante
 8. [x] Format JSON + ImportExercisesCommand
 9. [ ] PublicShareController + vues slug lecture seule
 10. [ ] PlanTemplate/PlanItem + éditeur de plan + duplication

@@ -107,10 +107,19 @@ Règles non négociables :
 
 ## 6. État d'avancement
 
-Socle Symfony en place (Docker, MariaDB, CI/CD). Design tokens posés. Le
-développement fonctionnel suit les phases de `ROADMAP.md §4`, en commençant par
-la **Phase 1 — bibliothèque d'exercices**. Rien du modèle de données n'est encore
-implémenté (pas d'entités, pas de contrôleurs métier).
+Socle Symfony en place (Docker, MariaDB, CI/CD). Design tokens posés.
+
+- **Phase 1 — bibliothèque d'exercices : faite.** `Exercise` + CRUD, `ExerciseVoter`
+  (perso vs global), auth, `ImportExercisesCommand`.
+- **Phase 2 — séances : faite.** `Workout`/`Block`/`PrescribedExercise` (cascade +
+  `orphanRemoval`), `SlugGenerator`, `WorkoutVoter`, éditeur de séance server-driven
+  (mutations blocs/exercices via **Turbo Streams**, réordonnancement monter/descendre,
+  affichage dynamique des champs par `prescriptionType` via le contrôleur Stimulus
+  `prescription_fields`), et `PlanFlattener` (source unique de mise à plat) consommé
+  par la vue de consultation auto-suffisante. Source unique des champs pertinents par
+  type : `PrescriptionType::fields()`.
+
+Prochaine étape : **Phase 4 — partage lecture publique** (Phase 3 import déjà faite).
 
 ---
 

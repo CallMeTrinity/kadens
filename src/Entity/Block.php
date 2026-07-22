@@ -34,7 +34,8 @@ class Block
     /**
      * @var Collection<int, PrescribedExercise>
      */
-    #[ORM\OneToMany(targetEntity: PrescribedExercise::class, mappedBy: 'block')]
+    #[ORM\OrderBy(['position' => 'ASC'])]
+    #[ORM\OneToMany(targetEntity: PrescribedExercise::class, mappedBy: 'block', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $prescribedExercises;
 
     public function __construct()

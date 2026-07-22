@@ -6,6 +6,7 @@ use App\Entity\Exercise;
 use App\Entity\User;
 use App\Enum\ActivityType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -40,12 +41,22 @@ class ExerciseRepository extends ServiceEntityRepository
      */
     public function findLibraryForUser(User $user): array
     {
+        return $this->createLibraryQueryBuilder($user)
+            ->getQuery()
+            ->getResult()
+        ;
+    }
+
+    /**
+     * QueryBuilder de la bibliothèque visible par un utilisateur (perso +
+     * global), réutilisé par le form de prescription pour limiter les choix.
+     */
+    public function createLibraryQueryBuilder(User $user): QueryBuilder
+    {
         return $this->createQueryBuilder('e')
             ->andWhere('e.owner = :user OR e.owner IS NULL')
             ->setParameter('user', $user)
             ->orderBy('e.name', 'ASC')
-            ->getQuery()
-            ->getResult()
         ;
     }
 }

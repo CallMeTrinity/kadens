@@ -1,0 +1,41 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Mes séances{% endblock %}
+
+{% block body %}
+    {% for message in app.flashes('success') %}
+        <p role="status">{{ message }}</p>
+    {% endfor %}
+
+    <h1>Mes séances</h1>
+
+    <p><a href="{{ path('app_workout_new') }}">Nouvelle séance</a></p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Titre</th>
+                <th>Durée estimée</th>
+                <th>Blocs</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for workout in workouts %}
+            <tr>
+                <td>{{ workout.title }}</td>
+                <td>{{ workout.estimatedDurationMinutes ? workout.estimatedDurationMinutes ~ ' min' : '—' }}</td>
+                <td>{{ workout.blocks|length }}</td>
+                <td>
+                    <a href="{{ path('app_workout_show', {id: workout.id}) }}">Voir</a>
+                    <a href="{{ path('app_workout_edit', {id: workout.id}) }}">Éditer</a>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="4">Aucune séance pour l'instant.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

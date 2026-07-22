@@ -1,0 +1,8 @@
+{# Réponse Turbo Stream d'une mutation de l'éditeur : on remplace intégralement
+   le conteneur des blocs par sa version fraîchement rendue. Contexte fourni par
+   blocksContext(). #}
+<turbo-stream action="replace" target="workout-blocks">
+    <template>
+        {{ include('workout/_blocks.html.twig') }}
+    </template>
+</turbo-stream>

@@ -1,0 +1,7 @@
+{# Petit formulaire POST autonome (déplacer / supprimer un bloc ou un exercice).
+   Chaque action renvoie un Turbo Stream qui remplace #workout-blocks.
+   Paramètres : action (URL), token (CSRF), label, confirm (optionnel). #}
+<form method="post" action="{{ action }}"{% if confirm is defined %} onsubmit="return confirm('{{ confirm }}');"{% endif %} style="display:inline">
+    <input type="hidden" name="_token" value="{{ token }}">
+    <button type="submit">{{ label }}</button>
+</form>

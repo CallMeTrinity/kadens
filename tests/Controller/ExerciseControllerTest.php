@@ -4,6 +4,7 @@ namespace App\Tests\Controller;
 
 use App\Entity\Exercise;
 use App\Entity\User;
+use App\Entity\Workout;
 use App\Enum\ActivityType;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -20,7 +21,11 @@ final class ExerciseControllerTest extends WebTestCase
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine.orm.entity_manager');
 
-        // Base de test propre : on repart d'exercices et d'utilisateurs vides.
+        // Base de test propre : d'abord les séances et exercices (clé étrangère
+        // owner), puis les utilisateurs.
+        foreach ($this->em->getRepository(Workout::class)->findAll() as $workout) {
+            $this->em->remove($workout);
+        }
         foreach ($this->em->getRepository(Exercise::class)->findAll() as $exercise) {
             $this->em->remove($exercise);
         }

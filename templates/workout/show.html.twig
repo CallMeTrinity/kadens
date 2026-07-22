@@ -1,0 +1,52 @@
+{% extends 'base.html.twig' %}
+
+{% set workout = flat.workout %}
+
+{% block title %}{{ workout.title }}{% endblock %}
+
+{% block body %}
+    {# Vue de consultation auto-suffisante : aucun chargement AJAX post-rendu,
+       condition du cache offline (Phase 9). Consomme la sortie de PlanFlattener. #}
+    <p>
+        <a href="{{ path('app_workout_index') }}">Retour aux séances</a>
+        {% if is_granted('WORKOUT_EDIT', workout) %}
+            · <a href="{{ path('app_workout_edit', {id: workout.id}) }}">Éditer</a>
+        {% endif %}
+    </p>
+
+    <h1>{{ workout.title }}</h1>
+
+    {% if workout.estimatedDurationMinutes %}
+        <p>Durée estimée : {{ workout.estimatedDurationMinutes }} min</p>
+    {% endif %}
+
+    {% if workout.description %}
+        <p>{{ workout.description|nl2br }}</p>
+    {% endif %}
+
+    {% for entry in flat.blocks %}
+        {% set block = entry.block %}
+        <section>
+            <h2>
+                {{ block.role.label }}
+                {% if block.label %} — {{ block.label }}{% endif %}
+                {% if block.rounds > 1 %} <small>× {{ block.rounds }} tours</small>{% endif %}
+            </h2>
+
+            <ol>
+            {% for ex in entry.exercises %}
+                <li>
+                    <strong>{{ ex.exercise ? ex.exercise.name : '—' }}</strong>
+                    {% if ex.summary %}<span> · {{ ex.summary }}</span>{% endif %}
+                    {% if ex.rest %}<span> · repos {{ ex.rest }} s</span>{% endif %}
+                    {% if ex.notes %}<p>{{ ex.notes|nl2br }}</p>{% endif %}
+                </li>
+            {% else %}
+                <li>Aucun exercice.</li>
+            {% endfor %}
+            </ol>
+        </section>
+    {% else %}
+        <p>Cette séance est encore vide.</p>
+    {% endfor %}
+{% endblock %}

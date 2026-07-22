@@ -19,6 +19,16 @@
         {% endblock %}
     </head>
     <body>
+        {% if app.user %}
+            <header>
+                <nav>
+                    <a href="{{ path('app_exercise_index') }}">Exercices</a>
+                    <a href="{{ path('app_workout_index') }}">Séances</a>
+                    <span>{{ app.user.userIdentifier }}</span>
+                    <a href="{{ path('app_logout') }}">Déconnexion</a>
+                </nav>
+            </header>
+        {% endif %}
         {% block body %}{% endblock %}
     </body>
 </html>

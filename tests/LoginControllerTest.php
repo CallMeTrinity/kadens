@@ -4,6 +4,7 @@ namespace App\Tests;
 
 use App\Entity\Exercise;
 use App\Entity\User;
+use App\Entity\Workout;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -19,8 +20,11 @@ class LoginControllerTest extends WebTestCase
         $em = $container->get('doctrine.orm.entity_manager');
         $userRepository = $em->getRepository(User::class);
 
-        // Repartir d'une base vide : d'abord les exercices (clé étrangère owner),
-        // puis les utilisateurs.
+        // Repartir d'une base vide : d'abord les entités portant une clé
+        // étrangère owner (séances, exercices), puis les utilisateurs.
+        foreach ($em->getRepository(Workout::class)->findAll() as $workout) {
+            $em->remove($workout);
+        }
         foreach ($em->getRepository(Exercise::class)->findAll() as $exercise) {
             $em->remove($exercise);
         }

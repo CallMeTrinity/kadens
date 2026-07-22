@@ -10,6 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 
 #[ORM\Entity(repositoryClass: WorkoutRepository::class)]
+#[ORM\HasLifecycleCallbacks]
 #[UniqueEntity(fields: ['slug'], message: 'Ce slug est déjà utilisé.')]
 class Workout
 {
@@ -43,7 +44,7 @@ class Workout
      * @var Collection<int, Block>
      */
     #[ORM\OrderBy(['position' => 'ASC'])]
-    #[ORM\OneToMany(targetEntity: Block::class, mappedBy: 'workout')]
+    #[ORM\OneToMany(targetEntity: Block::class, mappedBy: 'workout', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $blocks;
 
     /**
@@ -63,6 +64,18 @@ class Workout
         $this->blocks = new ArrayCollection();
         $this->planItems = new ArrayCollection();
         $this->scheduledWorkouts = new ArrayCollection();
+    }
+
+    #[ORM\PrePersist]
+    public function onPrePersist(): void
+    {
+        $this->createdAt = new \DateTimeImmutable();
+    }
+
+    #[ORM\PreUpdate]
+    public function onPreUpdate(): void
+    {
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function getId(): ?int
