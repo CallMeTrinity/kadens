@@ -31,8 +31,12 @@
                     {% endfor %}
                 </td>
                 <td>
-                    <a href="{{ path('app_exercise_show', {id: exercise.id}) }}">Voir</a>
-                    <a href="{{ path('app_exercise_edit', {id: exercise.id}) }}">Éditer</a>
+                    {% if is_granted('VIEW', exercise) %}
+                        <a href="{{ path('app_exercise_show', {id: exercise.id}) }}">Voir</a>
+                    {% endif %}
+                    {% if is_granted('EDIT', exercise) %}
+                        <a href="{{ path('app_exercise_edit', {id: exercise.id}) }}">Éditer</a>
+                    {% endif %}
                 </td>
             </tr>
         {% else %}

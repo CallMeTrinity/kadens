@@ -9,6 +9,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: ExerciseRepository::class)]
 #[ORM\HasLifecycleCallbacks]
@@ -23,12 +24,15 @@ class Exercise
     private ?User $owner = null;
 
     #[ORM\Column(length: 255)]
+    #[Assert\NotBlank(message: 'Le nom est obligatoire.')]
+    #[Assert\Length(max: 255)]
     private ?string $name = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
 
     #[ORM\Column(enumType: ActivityType::class)]
+    #[Assert\NotNull(message: 'Choisis une activité.')]
     private ?ActivityType $activity = null;
 
     /**
@@ -38,6 +42,8 @@ class Exercise
     private ?array $targetAreas = [];
 
     #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Url(message: 'Le lien média doit être une URL valide.')]
+    #[Assert\Length(max: 255)]
     private ?string $mediaUrl = null;
 
     #[ORM\Column]

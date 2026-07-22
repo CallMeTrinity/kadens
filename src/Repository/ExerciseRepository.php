@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Exercise;
+use App\Entity\User;
 use App\Enum\ActivityType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -34,9 +35,11 @@ class ExerciseRepository extends ServiceEntityRepository
     /**
      * @return Exercise[]
      */
-    public function findAllOrderedByName(): array
+    public function findByOwnerOrderedByName(User $owner): array
     {
         return $this->createQueryBuilder('e')
+            ->andWhere('e.owner = :owner')
+            ->setParameter('owner', $owner)
             ->orderBy('e.name', 'ASC')
             ->getQuery()
             ->getResult()

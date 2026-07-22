@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Exercise;
 use App\Form\ExerciseType;
 use App\Repository\ExerciseRepository;
+use App\Security\Voter\ExerciseVoter;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -18,7 +19,7 @@ final class ExerciseController extends AbstractController
     public function index(ExerciseRepository $exerciseRepository): Response
     {
         return $this->render('exercise/index.html.twig', [
-            'exercises' => $exerciseRepository->findAllOrderedByName(),
+            'exercises' => $exerciseRepository->findByOwnerOrderedByName($this->getUser()),
         ]);
     }
 
@@ -30,7 +31,7 @@ final class ExerciseController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            // TODO Phase 1 étape 9 : $exercise->setOwner($this->getUser()) une fois l'auth branchée.
+            $exercise->setOwner($this->getUser());
             $entityManager->persist($exercise);
             $entityManager->flush();
 
@@ -48,6 +49,8 @@ final class ExerciseController extends AbstractController
     #[Route('/{id}', name: 'app_exercise_show', methods: ['GET'], requirements: ['id' => '\d+'])]
     public function show(Exercise $exercise): Response
     {
+        $this->denyAccessUnlessGranted(ExerciseVoter::VIEW, $exercise);
+
         return $this->render('exercise/show.html.twig', [
             'exercise' => $exercise,
         ]);
@@ -56,6 +59,8 @@ final class ExerciseController extends AbstractController
     #[Route('/{id}/edit', name: 'app_exercise_edit', methods: ['GET', 'POST'], requirements: ['id' => '\d+'])]
     public function edit(Request $request, Exercise $exercise, EntityManagerInterface $entityManager): Response
     {
+        $this->denyAccessUnlessGranted(ExerciseVoter::EDIT, $exercise);
+
         $form = $this->createForm(ExerciseType::class, $exercise);
         $form->handleRequest($request);
 
@@ -76,6 +81,8 @@ final class ExerciseController extends AbstractController
     #[Route('/{id}', name: 'app_exercise_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function delete(Request $request, Exercise $exercise, EntityManagerInterface $entityManager): Response
     {
+        $this->denyAccessUnlessGranted(ExerciseVoter::DELETE, $exercise);
+
         if ($this->isCsrfTokenValid('delete'.$exercise->getId(), $request->getPayload()->getString('_token'))) {
             $entityManager->remove($exercise);
             $entityManager->flush();
