@@ -118,6 +118,39 @@ final class ScheduledWorkoutController extends AbstractController
         return $this->redirectToMonth($scheduled->getScheduledDate());
     }
 
+    /**
+     * Boucle « prévu vs réalisé » (Phase 7) : marque une séance planifiée comme
+     * faite / manquée / à nouveau prévue, avec une note d'écart léger optionnelle.
+     * Pas de log détaillé de séries — Strava fait le suivi, ici on ne fait que
+     * boucler sur la prévision.
+     */
+    #[Route('/{id}/status', name: 'app_scheduled_workout_status', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function updateStatus(Request $request, ScheduledWorkout $scheduled): Response
+    {
+        $this->denyAccessUnlessGranted(ScheduledWorkoutVoter::EDIT, $scheduled);
+
+        $payload = $request->getPayload();
+
+        if ($this->isCsrfTokenValid('status'.$scheduled->getId(), $payload->getString('_token'))) {
+            $status = ScheduledStatus::tryFrom($payload->getString('status'));
+
+            if (null !== $status) {
+                $scheduled->setStatus($status);
+
+                $notes = trim($payload->getString('completionNotes'));
+                $scheduled->setCompletionNotes('' === $notes ? null : $notes);
+
+                $this->entityManager->flush();
+
+                $this->addFlash('success', 'Statut mis à jour.');
+            } else {
+                $this->addFlash('error', 'Statut invalide.');
+            }
+        }
+
+        return $this->redirectToMonth($scheduled->getScheduledDate());
+    }
+
     #[Route('/{id}/delete', name: 'app_scheduled_workout_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function delete(Request $request, ScheduledWorkout $scheduled): Response
     {

@@ -63,10 +63,28 @@
                     {% for scheduled in cell.scheduled %}
                         <div style="border-left:3px solid {{ statusColors[scheduled.status.value] }}; background:var(--color-fill); border-radius:0 var(--kd-radius-md) var(--kd-radius-md) 0; padding:.15rem .35rem; margin-top:.25rem; font-size:.75rem">
                             <a href="{{ path('app_workout_show', {id: scheduled.workout.id}) }}">{{ scheduled.workout.title }}</a>
-                            <span style="font-family:var(--font-mono); color:var(--color-text-faint)"> · {{ scheduled.status.label }}</span>
+                            <span style="font-family:var(--font-mono); color:{{ statusColors[scheduled.status.value] }}"> · {{ scheduled.status.label }}</span>
+
+                            {% if scheduled.completionNotes %}
+                                <p style="margin:.2rem 0 0; color:var(--color-text-secondary); font-style:italic">{{ scheduled.completionNotes }}</p>
+                            {% endif %}
+
+                            {# Prévu vs réalisé : cocher fait/manqué et noter un écart léger. #}
+                            <form method="post" action="{{ path('app_scheduled_workout_status', {id: scheduled.id}) }}" style="margin:.25rem 0">
+                                <input type="hidden" name="_token" value="{{ csrf_token('status' ~ scheduled.id) }}">
+                                <label style="display:block; font-family:var(--font-mono); font-size:.65rem; color:var(--color-text-faint)">Statut
+                                    <select name="status" style="width:100%">
+                                        {% for status in statuses %}
+                                            <option value="{{ status.value }}"{{ status == scheduled.status ? ' selected' : '' }}>{{ status.label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </label>
+                                <textarea name="completionNotes" rows="2" placeholder="Écart / ressenti (optionnel)" style="width:100%; margin-top:.2rem">{{ scheduled.completionNotes }}</textarea>
+                                <button type="submit">Enregistrer</button>
+                            </form>
 
                             <details>
-                                <summary style="cursor:pointer; font-size:.7rem; color:var(--color-text-faint)">Modifier</summary>
+                                <summary style="cursor:pointer; font-size:.7rem; color:var(--color-text-faint)">Déplacer / retirer</summary>
                                 <form method="post" action="{{ path('app_scheduled_workout_move', {id: scheduled.id}) }}" style="margin:.25rem 0">
                                     <input type="hidden" name="_token" value="{{ csrf_token('move' ~ scheduled.id) }}">
                                     <input type="date" name="scheduledDate" value="{{ scheduled.scheduledDate|date('Y-m-d') }}" required>

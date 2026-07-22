@@ -148,9 +148,22 @@ Socle Symfony en place (Docker, MariaDB, CI/CD). Design tokens posés.
   `owner`/`workout` CASCADE (une séance datée n'a pas de sens sans eux),
   `sourcePlanTemplate` SET NULL (supprimer un plan garde le planning matérialisé,
   oublie juste la provenance).
+- **Phase 7 — prévu vs réalisé : faite.** Boucle sur la prévision, pas de tracking
+  détaillé. Depuis chaque case du calendrier : formulaire de statut (`PLANNED`/`DONE`/
+  `MISSED` via `<select>`) + `completionNotes` (écart léger), posté vers
+  `ScheduledWorkoutController::updateStatus` (`POST /schedule/{id}/status`, CSRF,
+  redirect vers le mois — pas de Turbo Stream, cohérent avec le reste du calendrier).
+  Vue de synthèse `SummaryController` (`/summary`, `/summary/{year}/{month}`,
+  `access_control` `^/summary` en `ROLE_USER`) : observance du mois + par plan
+  instancié (bucket « hors plan » pour `sourcePlanTemplate` null). Agrégats SQL dans
+  `ScheduledWorkoutRepository` (`countByStatusForOwnerBetween`, `statusCountsByPlanForOwner`,
+  `GROUP BY` — pas d'hydratation d'entités). Observance = `done / (done + missed)`,
+  les séances encore prévues sont exclues du ratio. Fragment réutilisable
+  `templates/components/_status_stats.html.twig` (barre proportionnelle + compteurs).
+  Pas de migration : `status` et `completionNotes` existaient déjà sur l'entité.
 
-Prochaine étape : **Phase 7 — prévu vs réalisé** (usage de `status` depuis le
-calendrier + `completionNotes` + vue de synthèse).
+Prochaine étape : **Phase 8 — export Excel** (PhpSpreadsheet + `ExcelExporter`
+consommant `PlanFlattener` + `ExportController`).
 
 ---
 

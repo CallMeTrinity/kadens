@@ -78,6 +78,7 @@ final class CalendarController extends AbstractController
             'next' => ['year' => (int) $next->format('Y'), 'month' => (int) $next->format('n')],
             'scheduleForm' => $scheduleForm,
             'instantiateForm' => $instantiateForm,
+            'statuses' => \App\Enum\ScheduledStatus::cases(),
         ]);
     }
 
