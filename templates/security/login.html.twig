@@ -1,33 +1,66 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Log in!{% endblock %}
+{% block title %}Connexion — Kadens{% endblock %}
+
+{# Écran centré plein hauteur, hors chrome applicatif (pas de header : anonyme). #}
+{% block main_class %}kd-auth{% endblock %}
 
 {% block body %}
-    <form method="post">
-        {% if error %}
-            <div class="alert alert-danger">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
-        {% endif %}
+    <a href="{{ path('app_home') }}" class="kd-auth__brand">
+        <span class="kd-auth__mark">K</span>
+        <span class="kd-auth__wordmark">Kadens</span>
+    </a>
 
-        {% if app.user %}
-            <div class="mb-3">
-                You are logged in as {{ app.user.userIdentifier }}, <a href="{{ logout_path() }}">Logout</a>
+    <div class="kd-auth__card">
+        <div class="kd-auth__head">
+            <h1 class="kd-auth__title">Connexion</h1>
+            <p class="kd-auth__sub">Reprends ta planification là où tu l'as laissée.</p>
+        </div>
+
+        {% if error %}
+            <div class="kd-auth__error" role="alert">
+                {{ ux_icon('lucide:circle-dot') }}
+                <span>{{ error.messageKey|trans(error.messageData, 'security') }}</span>
             </div>
         {% endif %}
 
-        <h1 class="h3 mb-3 font-weight-normal">Please sign in</h1>
-        <label for="username">Email</label>
-        <input type="email" value="{{ last_username }}" name="_username" id="username" class="form-control" autocomplete="email" required autofocus>
-        <label for="password">Password</label>
-        <input type="password" name="_password" id="password" class="form-control" autocomplete="current-password" required>
-        <input type="hidden" name="_csrf_token" data-controller="csrf-protection" value="{{ csrf_token('authenticate') }}">
+        {% if app.user %}
+            <div class="kd-auth__error" role="status" style="background:var(--color-primary-tint); color:var(--color-primary-on-tint); border-color:color-mix(in srgb, var(--color-primary) 20%, transparent);">
+                <span>Déjà connecté en tant que {{ app.user.userIdentifier }}. <a href="{{ path('app_logout') }}">Se déconnecter</a></span>
+            </div>
+        {% endif %}
 
-        <div class="checkbox mb-3">
-            <input type="checkbox" name="_remember_me" id="_remember_me" checked>
-            <label for="_remember_me">Se souvenir de moi</label>
-        </div>
+        <form method="post" class="kd-form">
+            <div class="kd-field">
+                <label class="kd-label" for="username">Email</label>
+                <div class="kd-inputgroup">
+                    {{ ux_icon('lucide:at-sign') }}
+                    <input type="email" value="{{ last_username }}" name="_username" id="username"
+                           class="kd-input" autocomplete="email" placeholder="toi@exemple.fr" required autofocus>
+                </div>
+            </div>
 
-        <button class="btn btn-lg btn-primary" type="submit">
-            Sign in
-        </button>
-    </form>
+            <div class="kd-field">
+                <label class="kd-label" for="password">Mot de passe</label>
+                <div class="kd-inputgroup">
+                    {{ ux_icon('lucide:lock') }}
+                    <input type="password" name="_password" id="password"
+                           class="kd-input" autocomplete="current-password" placeholder="••••••••" required>
+                </div>
+            </div>
+
+            <label class="kd-check">
+                <input type="checkbox" name="_remember_me" checked>
+                Se souvenir de moi
+            </label>
+
+            <input type="hidden" name="_csrf_token" data-controller="csrf-protection" value="{{ csrf_token('authenticate') }}">
+
+            <button class="kd-btn kd-btn--primary kd-btn--block" type="submit">
+                {{ ux_icon('lucide:log-in') }} Se connecter
+            </button>
+        </form>
+    </div>
+
+    <p class="kd-auth__foot">Kadens · planification d'entraînement</p>
 {% endblock %}

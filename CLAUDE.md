@@ -226,9 +226,25 @@ navigateur (non automatisable ici).
   `modifier`, source unique icône↔couleur par `ActivityType`). Classes ajoutées à
   `components.css` : `.kd-libcard`, `.kd-tag(s)`, `.kd-deflist`, `.kd-toolbar`/
   `.kd-search`/`.kd-count`, `.kd-flash`, `.kd-backlink`, `.kd-btn--danger`, la
-  couche formulaire. **Reste à styler** : séances (index/show/éditeur), plans, calendrier,
-  synthèse, login. Composant **modale** réutilisable à créer quand une vue en aura
-  besoin (ex. confirmation suppression, qui passe encore par `confirm()` natif).
+  couche formulaire. **Page de connexion stylée** : `<main>` à classe surchargeable
+  (bloc `main_class` dans `base.html.twig`, défaut `kd-page`) pour sortir le login du
+  chrome applicatif ; couche `.kd-auth` dans `components.css` (écran centré plein
+  hauteur, carte, champ à icône `.kd-inputgroup`, case `.kd-check`, `.kd-btn--block`,
+  bloc erreur d'auth) ; template `security/login.html.twig` réécrit. **Séances stylées** :
+  index (grille de `.kd-libcard` + recherche offline-safe via `filter`), consultation
+  (`_workout_read.html.twig` refait : en-tête `.kd-workouthead` avec badges durée/blocs/
+  activités distinctes, blocs en cartes `.kd-block` + liste d'exercices numérotée
+  `.kd-exlist`, rôle de bloc différencié par icône seule — couleur neutre pour ne pas
+  empiéter sur terracotta/olive ; partagé par `workout/show` et la page publique),
+  `show` (barre `.kd-actionbar` : retour + éditer/Excel/copier-lien/page publique),
+  new (carte formulaire), éditeur (`.kd-editblock`, champs role/rounds/label alignés
+  `.kd-fieldrow`, actions déplacer/supprimer en boutons-icônes `.kd-iconbtn` via
+  `_action_form` refait icône+variant, ajout d'exercice en `<details>` `.kd-adddetails`,
+  carte d'ajout de bloc `.kd-addblock`). Icônes importées : `flame`/`activity`/`wind`
+  (rôles), `clock`, `chevron-up`/`chevron-down`, `x`, `save`, `link-2`, `file-down`.
+  **Reste à styler** : plans, calendrier, synthèse. Composant **modale** réutilisable
+  à créer quand une vue en aura besoin (ex. confirmation suppression, qui passe encore
+  par `confirm()` natif).
 
 ---
 

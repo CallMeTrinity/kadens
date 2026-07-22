@@ -28,7 +28,7 @@
         {% if app.user %}
             {{ include('components/_header.html.twig') }}
         {% endif %}
-        <main class="kd-page">
+        <main class="{% block main_class %}kd-page{% endblock %}">
             {% block body %}{% endblock %}
         </main>
     </body>

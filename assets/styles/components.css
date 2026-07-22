@@ -536,12 +536,14 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
 .kd-libcard__meta {
   display: flex;
   align-items: center;
-  gap: var(--kd-space-3);
+  gap: var(--kd-space-2);
   margin-top: var(--kd-space-2);
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--color-text-faint);
 }
+.kd-libcard__meta svg { width: 13px; height: 13px; }
+.kd-libcard__meta .kd-dot { color: var(--color-text-placeholder); margin: 0 2px; }
 
 .kd-libcard__foot {
   margin-top: auto;
@@ -736,3 +738,453 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
 }
 .kd-backlink:hover { color: var(--color-primary); }
 .kd-backlink svg { width: 14px; height: 14px; }
+
+/* ----------------------------------------------------------------------------
+   Authentification (login) — écran centré plein hauteur, hors chrome applicatif.
+   Le <main> prend la classe .kd-auth (bloc main_class dans base.html.twig).
+   ---------------------------------------------------------------------------- */
+.kd-auth {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kd-space-8);
+  padding: var(--kd-space-13) var(--kd-space-8);
+}
+
+.kd-auth__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-4);
+  text-decoration: none;
+  color: var(--color-text-strong);
+}
+.kd-auth__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px; height: 38px;
+  border-radius: var(--kd-radius-md);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 20px;
+  box-shadow: var(--shadow-accent);
+}
+.kd-auth__wordmark {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 20px;
+  letter-spacing: -.01em;
+}
+
+.kd-auth__card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-xl);
+  box-shadow: var(--shadow-card);
+  padding: var(--kd-space-12) var(--kd-space-11);
+}
+.kd-auth__head { text-align: center; margin-bottom: var(--kd-space-11); }
+.kd-auth__title {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 22px;
+  color: var(--color-text-strong);
+  margin: 0;
+}
+.kd-auth__sub {
+  font-size: 13px;
+  color: var(--color-text-soft);
+  margin: var(--kd-space-3) 0 0;
+}
+
+/* Champ avec icône enchâssée à gauche */
+.kd-inputgroup { position: relative; }
+.kd-inputgroup > svg {
+  position: absolute;
+  left: var(--kd-space-5);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px; height: 16px;
+  color: var(--color-text-placeholder);
+  pointer-events: none;
+}
+.kd-inputgroup .kd-input { padding-left: 40px; }
+
+/* Ligne "se souvenir de moi" — case à cocher sobre */
+.kd-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.kd-check input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 17px; height: 17px;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--kd-radius-xs);
+  background: var(--color-surface-raised);
+  cursor: pointer;
+  transition: background-color .12s ease, border-color .12s ease;
+}
+.kd-check input[type="checkbox"]:checked {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+.kd-check input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-primary-tint);
+}
+
+.kd-btn--block { width: 100%; justify-content: center; padding: 12px var(--kd-space-6); }
+
+/* Message d'erreur d'authentification */
+.kd-auth__error {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  padding: var(--kd-space-4) var(--kd-space-6);
+  border-radius: var(--kd-radius-md);
+  font-size: 13px;
+  margin-bottom: var(--kd-space-8);
+  background: color-mix(in srgb, var(--color-status-missed) 9%, transparent);
+  color: var(--color-status-missed);
+  border: 1px solid color-mix(in srgb, var(--color-status-missed) 22%, transparent);
+}
+.kd-auth__error svg { width: 16px; height: 16px; flex: 0 0 auto; }
+
+.kd-auth__foot {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+/* ----------------------------------------------------------------------------
+   Séance — barre utilitaire de consultation (retour + actions à droite)
+   ---------------------------------------------------------------------------- */
+.kd-actionbar {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--kd-space-9);
+}
+.kd-actionbar .kd-backlink { margin-bottom: 0; }
+.kd-actionbar__end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  flex-wrap: wrap;
+}
+/* Retour d'action inline (copie de lien) */
+.kd-actionbar__feedback {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-activity-gym-text);
+}
+
+/* ----------------------------------------------------------------------------
+   Séance — en-tête de lecture (titre + méta + description)
+   ---------------------------------------------------------------------------- */
+.kd-workouthead { margin-bottom: var(--kd-space-11); }
+.kd-workouthead__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kd-space-3);
+  margin-top: var(--kd-space-5);
+}
+.kd-workouthead__desc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-soft);
+  margin: var(--kd-space-6) 0 0;
+  max-width: 68ch;
+}
+
+/* ----------------------------------------------------------------------------
+   Séance — blocs en lecture
+   Rôles de bloc différenciés par l'icône seule : la couleur reste neutre (la
+   règle « la couleur porte du sens » réserve terracotta/olive aux activités).
+   ---------------------------------------------------------------------------- */
+.kd-blocks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-8);
+}
+.kd-block {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-8) var(--kd-space-9);
+}
+.kd-block__head {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-4);
+  padding-bottom: var(--kd-space-6);
+  margin-bottom: var(--kd-space-6);
+  border-bottom: 1px solid var(--color-divider);
+}
+.kd-block__role {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  background: var(--color-fill);
+  border-radius: var(--kd-radius-pill);
+  padding: 5px var(--kd-space-4);
+}
+.kd-block__role svg { width: 13px; height: 13px; }
+.kd-block__label {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 15px;
+  color: var(--color-text-strong);
+}
+.kd-block__rounds {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-primary);
+  background: var(--color-primary-tint);
+  border-radius: var(--kd-radius-pill);
+  padding: 4px var(--kd-space-4);
+  white-space: nowrap;
+}
+
+/* Liste d'exercices d'un bloc — numérotée (counter mono) */
+.kd-exlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: kd-ex;
+}
+.kd-exrow {
+  display: flex;
+  gap: var(--kd-space-5);
+  padding: var(--kd-space-5) 0;
+  border-top: 1px solid var(--color-divider);
+}
+.kd-exrow:first-child { border-top: 0; padding-top: 0; }
+.kd-exrow:last-child { padding-bottom: 0; }
+.kd-exrow::before {
+  counter-increment: kd-ex;
+  content: counter(kd-ex);
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  border-radius: var(--kd-radius-full);
+  background: var(--color-fill);
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+}
+.kd-exrow__body { flex: 1 1 auto; min-width: 0; }
+.kd-exrow__name {
+  font-size: 14px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-strong);
+}
+.kd-exrow__params {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kd-space-2);
+  margin-left: var(--kd-space-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.kd-exrow__params .kd-dot { color: var(--color-text-placeholder); }
+.kd-exrow__rest { color: var(--color-text-faint); }
+.kd-exrow__notes {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-soft);
+  margin: var(--kd-space-2) 0 0;
+}
+.kd-exrow--empty {
+  padding: var(--kd-space-5) 0;
+  color: var(--color-text-placeholder);
+  font-size: 13px;
+}
+
+/* ----------------------------------------------------------------------------
+   Séance — éditeur (formulaires server-driven + Turbo Streams)
+   ---------------------------------------------------------------------------- */
+.kd-editsection { margin-top: var(--kd-space-11); }
+.kd-editsection__title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin: 0 0 var(--kd-space-6);
+}
+
+/* Bloc en édition */
+.kd-editblock {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-8) var(--kd-space-9);
+  margin-bottom: var(--kd-space-7);
+}
+.kd-editblock__head {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--kd-space-5);
+  flex-wrap: wrap;
+  padding-bottom: var(--kd-space-6);
+  margin-bottom: var(--kd-space-6);
+  border-bottom: 1px solid var(--color-divider);
+}
+/* Champs role/rounds/label alignés horizontalement */
+.kd-fieldrow {
+  display: flex;
+  gap: var(--kd-space-5);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.kd-fieldrow .kd-field { margin: 0; }
+.kd-fieldrow--tight .kd-field:nth-child(2) { flex: 0 0 90px; }
+.kd-fieldrow--tight .kd-field:nth-child(1) { flex: 0 0 190px; }
+.kd-fieldrow--tight .kd-field:last-child { flex: 1 1 160px; }
+
+/* Barre d'actions d'un bloc / exercice (déplacer, supprimer) */
+.kd-microactions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-1);
+}
+.kd-microactions form { display: inline-flex; margin: 0; }
+.kd-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--kd-radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: border-color .12s ease, color .12s ease, background-color .12s ease;
+}
+.kd-iconbtn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.kd-iconbtn svg { width: 15px; height: 15px; }
+.kd-iconbtn--danger:hover {
+  border-color: var(--color-status-missed);
+  color: var(--color-status-missed);
+  background: color-mix(in srgb, var(--color-status-missed) 8%, transparent);
+}
+.kd-iconbtn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Exercices prescrits en édition */
+.kd-editexlist {
+  list-style: none;
+  margin: 0 0 var(--kd-space-6);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-5);
+}
+.kd-editex {
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-md);
+  padding: var(--kd-space-7) var(--kd-space-8);
+}
+.kd-editex__head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--kd-space-4);
+  margin-bottom: var(--kd-space-5);
+}
+.kd-editex__pos {
+  margin-right: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-editex--empty {
+  color: var(--color-text-placeholder);
+  font-size: 13px;
+  padding: var(--kd-space-5) 0;
+}
+
+/* Repli "Ajouter un exercice" */
+.kd-adddetails {
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--kd-radius-md);
+  padding: 0 var(--kd-space-7);
+}
+.kd-adddetails[open] { padding-bottom: var(--kd-space-7); }
+.kd-adddetails > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  padding: var(--kd-space-5) 0;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-primary);
+}
+.kd-adddetails > summary::-webkit-details-marker { display: none; }
+.kd-adddetails > summary svg { width: 15px; height: 15px; }
+
+/* Carte "Ajouter un bloc" */
+.kd-addblock {
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-8) var(--kd-space-9);
+  background: var(--color-surface);
+}
+.kd-addblock__title {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--kd-space-6);
+}
+.kd-addblock__title svg { width: 14px; height: 14px; }
