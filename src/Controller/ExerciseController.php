@@ -19,7 +19,7 @@ final class ExerciseController extends AbstractController
     public function index(ExerciseRepository $exerciseRepository): Response
     {
         return $this->render('exercise/index.html.twig', [
-            'exercises' => $exerciseRepository->findByOwnerOrderedByName($this->getUser()),
+            'exercises' => $exerciseRepository->findLibraryForUser($this->getUser()),
         ]);
     }
 

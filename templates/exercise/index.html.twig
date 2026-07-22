@@ -23,7 +23,10 @@
         <tbody>
         {% for exercise in exercises %}
             <tr>
-                <td>{{ exercise.name }}</td>
+                <td>
+                    {{ exercise.name }}
+                    {% if exercise.owner is null %}<small>(bibliothèque)</small>{% endif %}
+                </td>
                 <td>{{ exercise.activity ? exercise.activity.label : '' }}</td>
                 <td>
                     {% for area in exercise.targetAreas %}

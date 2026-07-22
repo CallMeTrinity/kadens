@@ -39,6 +39,7 @@ Ces choix conditionnent tout le reste. Ils ne se rediscutent pas en cours de rou
 ### 1.3 Règles de modélisation (le cœur, à ne jamais violer)
 
 - **Exercise = définition réutilisable, SANS paramètres.** La bibliothèque décrit *ce que c'est* (nom, description, zones travaillées, média), jamais *combien* (séries, reps, charge, distance).
+- **Bibliothèque globale vs perso via `owner`.** Un `Exercise` **sans owner (null)** est la bibliothèque globale de l'app : visible par tous en lecture, éditable/supprimable uniquement par un **`ROLE_ADMIN`** (sinon alimentée par l'import console). Un `Exercise` **avec owner** est perso : visible/éditable par son seul propriétaire. La liste d'un utilisateur = ses exos perso + le global. *(Cette règle "global = éditable par l'admin" vaudra aussi pour les futures ressources de bibliothèque : Workout, PlanTemplate.)*
 - **Les paramètres vivent sur le lien séance↔exercice**, porté par l'entité `PrescribedExercise`. C'est ce qui permet de réutiliser le même exercice dans plusieurs séances avec des paramètres différents (même squat, charge différente).
 - **Modèle d'exercice unique et flexible.** Pas d'héritage par activité. Un enum `PrescriptionType` décrit le format d'effort ; les champs de valeurs sont nullable et seul le sous-ensemble pertinent est rempli. Cela absorbe muscu, isométrie, AMRAP, "30 burpees en 1 min", course distance/allure, vélo durée/zone, natation, etc. sans jamais créer de nouvelle classe.
 - **Blocs avec `rounds` et `role`.** Une séance est une liste ordonnée de blocs. Un bloc contient des exercices prescrits ordonnés et a un nombre de tours (`rounds`) et un rôle (`WARMUP`/`MAIN`/`COOLDOWN`). Une seule mécanique couvre séance plate (blocs à 1 exercice, rounds=1), superset (1 bloc, 2 exos, rounds=N), circuit (1 bloc, N exos, rounds=N) et échauffement (bloc de rôle WARMUP).
@@ -124,6 +125,22 @@ ScheduledWorkout (N) >── (0..1) PlanTemplate  d'où vient l'instanciation (n
 - `mediaUrl` (string, nullable — lien vidéo/image de démonstration)
 - `createdAt`, `updatedAt`
 - **Aucun champ de séries/reps/charge/distance ici.** C'est la règle absolue.
+
+> **Variantes = entrées distinctes (choix de modèle assumé).** La biblio est
+> faite de variantes déjà spécifiées : l'équipement, la prise, la posture sont
+> **dans le nom** de l'exercice ("Curl biceps poulie basse", "Front squat
+> kettlebell"), pas dans un champ structuré. Conséquences décidées :
+> - **Pas de champ `equipment`.** Redondant avec le nom, et il ne capturerait
+>   qu'une facette des variantes. Rejeté sur `Exercise` comme sur
+>   `PrescribedExercise`.
+> - **Regroupement `family` différé** (petite entité `ExerciseFamily`, FK
+>   nullable sur `Exercise`) pour replier les variantes d'un même mouvement :
+>   non bloquant, ajoutable plus tard sans rien casser. Pour l'usage actuel, le
+>   filtrage `activity` + `targetAreas` suffit.
+> - La feature "proposer des alternatives en séance" se dérivera des
+>   `targetAreas`, **pas** d'un lien variant.
+> - La latéralité (unilatéral/bilatéral) n'est **pas** une variante : soit
+>   exercices distincts, soit un futur booléen si ça pèse sur la prescription.
 
 **`Workout`** (séance)
 - `id`
@@ -241,6 +258,8 @@ project/
 │   │
 │   ├── Enum/                          ← TOUTES les enums PHP ici
 │   │   ├── PrescriptionType.php
+│   │   ├── ActivityType.php
+│   │   ├── TargetArea.php
 │   │   ├── BlockRole.php
 │   │   └── ScheduledStatus.php
 │   │

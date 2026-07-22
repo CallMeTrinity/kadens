@@ -33,13 +33,16 @@ class ExerciseRepository extends ServiceEntityRepository
     }
 
     /**
+     * Bibliothèque visible par un utilisateur : ses exercices perso + la
+     * bibliothèque globale de l'app (owner null).
+     *
      * @return Exercise[]
      */
-    public function findByOwnerOrderedByName(User $owner): array
+    public function findLibraryForUser(User $user): array
     {
         return $this->createQueryBuilder('e')
-            ->andWhere('e.owner = :owner')
-            ->setParameter('owner', $owner)
+            ->andWhere('e.owner = :user OR e.owner IS NULL')
+            ->setParameter('user', $user)
             ->orderBy('e.name', 'ASC')
             ->getQuery()
             ->getResult()

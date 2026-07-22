@@ -41,6 +41,13 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
 
 - **`Exercise` = définition réutilisable SANS paramètres** (nom, description,
   activité, zones, média). Jamais de séries/reps/charge/distance ici.
+- **Bibliothèque globale vs perso** : `Exercise` sans `owner` (null) = biblio
+  globale de l'app, visible par tous en lecture, éditable/supprimable uniquement
+  par un `ROLE_ADMIN` (sinon alimentée par l'import console). Avec `owner` =
+  perso, réservé à son propriétaire. Voir `ROADMAP.md §1.3`.
+- **Variantes = entrées distinctes, pas de champ `equipment`** : l'équipement,
+  la prise, la posture sont dans le nom de l'exercice. Regroupement `family`
+  différé, alternatives dérivées des `targetAreas`. Détail dans `ROADMAP.md §2.3`.
 - **Les paramètres vivent sur `PrescribedExercise`** (le lien bloc↔exercice).
   C'est ce qui rend un exercice réutilisable avec des paramètres différents.
 - **Modèle d'exercice unique et flexible**, piloté par l'enum `PrescriptionType`
