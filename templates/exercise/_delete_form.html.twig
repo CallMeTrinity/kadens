@@ -1,4 +1,7 @@
-<form method="post" action="{{ path('app_exercise_delete', {id: exercise.id}) }}" onsubmit="return confirm('Supprimer cet exercice ?');">
+<form method="post" action="{{ path('app_exercise_delete', {id: exercise.id}) }}"
+      onsubmit="return confirm('Supprimer cet exercice ?');" style="display:inline;">
     <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ exercise.id) }}">
-    <button type="submit">Supprimer</button>
+    <button type="submit" class="kd-btn kd-btn--danger">
+        {{ ux_icon('lucide:trash-2') }} Supprimer
+    </button>
 </form>

@@ -216,9 +216,19 @@ navigateur (non automatisable ici).
   redirige vers login si anonyme), dashboard `templates/home/index.html.twig`
   (prochaines séances sur 14 j via `findByOwnerBetween`, observance du mois via
   `countByStatusForOwnerBetween`, compteurs biblio, raccourcis sections). Rendu
-  auto-suffisant (cachable offline). **Reste à styler** : index (tables brutes),
-  formulaires, show, éditeurs, calendrier, synthèse, login. Composant **modale**
-  réutilisable à créer quand une vue en aura besoin (ex. confirmation suppression).
+  auto-suffisant (cachable offline). **Bibliothèque d'exercices stylée** : index
+  (grille de `.kd-libcard`, recherche client offline-safe via contrôleur Stimulus
+  `filter`), show (`.kd-deflist`), new/edit + suppression. **Formulaires stylés
+  globalement** : thème `templates/form/kadens_theme.html.twig` (enregistré dans
+  `config/packages/twig.yaml`) applique les classes `.kd-*` à tous les champs du
+  site — les nouvelles vues n'ont plus à styler leurs champs. Nouveau composant
+  Twig transverse `templates/components/_activity.html.twig` (macros `badge`/`icon`/
+  `modifier`, source unique icône↔couleur par `ActivityType`). Classes ajoutées à
+  `components.css` : `.kd-libcard`, `.kd-tag(s)`, `.kd-deflist`, `.kd-toolbar`/
+  `.kd-search`/`.kd-count`, `.kd-flash`, `.kd-backlink`, `.kd-btn--danger`, la
+  couche formulaire. **Reste à styler** : séances (index/show/éditeur), plans, calendrier,
+  synthèse, login. Composant **modale** réutilisable à créer quand une vue en aura
+  besoin (ex. confirmation suppression, qui passe encore par `confirm()` natif).
 
 ---
 

@@ -1,11 +1,20 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Éditer un exercice{% endblock %}
+{% block title %}Éditer {{ exercise.name }}{% endblock %}
 
 {% block body %}
-    <h1>Éditer « {{ exercise.name }} »</h1>
+    <a href="{{ path('app_exercise_show', {id: exercise.id}) }}" class="kd-backlink">
+        {{ ux_icon('lucide:arrow-left') }} {{ exercise.name }}
+    </a>
 
-    {{ include('exercise/_form.html.twig', {button_label: 'Mettre à jour'}) }}
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Bibliothèque</p>
+            <h1 class="kd-title">Éditer « {{ exercise.name }} »</h1>
+        </div>
+    </div>
 
-    <p><a href="{{ path('app_exercise_index') }}">Retour à la liste</a></p>
+    <div class="kd-card" style="max-width:640px;">
+        {{ include('exercise/_form.html.twig', {button_label: 'Mettre à jour'}) }}
+    </div>
 {% endblock %}

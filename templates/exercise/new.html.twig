@@ -3,9 +3,19 @@
 {% block title %}Nouvel exercice{% endblock %}
 
 {% block body %}
-    <h1>Nouvel exercice</h1>
+    <a href="{{ path('app_exercise_index') }}" class="kd-backlink">
+        {{ ux_icon('lucide:arrow-left') }} Bibliothèque
+    </a>
 
-    {{ include('exercise/_form.html.twig', {button_label: 'Créer'}) }}
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Bibliothèque</p>
+            <h1 class="kd-title">Nouvel exercice</h1>
+            <p class="kd-lead">Une définition réutilisable : nom, activité, zones. Les séries et charges se règlent plus tard, dans les séances.</p>
+        </div>
+    </div>
 
-    <p><a href="{{ path('app_exercise_index') }}">Retour à la liste</a></p>
+    <div class="kd-card" style="max-width:640px;">
+        {{ include('exercise/_form.html.twig', {button_label: 'Créer l\'exercice'}) }}
+    </div>
 {% endblock %}

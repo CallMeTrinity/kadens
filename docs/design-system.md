@@ -142,10 +142,33 @@ ne référence plus aucune police externe.
 
 Descriptions de référence pour l'implémentation Twig/CSS. Une partie est désormais
 codée dans `assets/styles/components.css` (source des classes `.kd-*` : header,
-`.kd-btn`, `.kd-card`, `.kd-badge`, `.kd-navcard`, `.kd-stat`, grilles) et
-`templates/components/_header.html.twig`. Les composants encore décrits mais non
-codés (tuile de séance, cellule de grille, anneau de progression, histogramme)
-restent des cibles.
+`.kd-btn` (dont `--danger`), `.kd-card`, `.kd-badge`, `.kd-navcard`, `.kd-stat`,
+grilles, plus la couche « bibliothèque & formulaires » : `.kd-libcard` (carte
+d'entrée listée, filet gauche à la couleur de l'activité), `.kd-tag` (valeur
+neutre), `.kd-deflist` (consultation), `.kd-toolbar` + `.kd-search` + `.kd-count`
+(barre d'index), `.kd-flash`, `.kd-backlink`, et les classes de formulaire
+`.kd-form` / `.kd-field` / `.kd-label` / `.kd-input` / `.kd-select` /
+`.kd-choicegrid` / `.kd-errors` / `.kd-help` / `.kd-formactions`) et
+`templates/components/_header.html.twig`. Deux composants Twig transverses :
+`templates/components/_activity.html.twig` (macros `badge` / `icon` / `modifier`,
+**source unique** du couple icône Lucide ↔ couleur par `ActivityType`) et le
+**thème de formulaire global** `templates/form/kadens_theme.html.twig` (enregistré
+dans `config/packages/twig.yaml`, applique les classes `.kd-*` à tous les champs du
+site — aucune vue n'a besoin de styler ses champs à la main). Filtrage client des
+index (recherche offline-safe) via le contrôleur Stimulus `filter`. Les composants
+encore décrits mais non codés (tuile de séance, cellule de grille, anneau de
+progression, histogramme) restent des cibles.
+
+- **Carte de bibliothèque** (`.kd-libcard`) : carte à filet gauche `3px` coloré par
+  l'activité (course = terracotta, muscu = olive, autres = neutre), tuile d'icône
+  d'activité, nom + méta (activité, portée biblio/perso), tags de zones, pied
+  d'actions. Sert la bibliothèque d'exercices (écran `2a`) et se réutilise pour
+  d'autres index.
+- **Champs de formulaire** : label mono capitale (`.kd-label`), input/textarea/select
+  à bordure `--color-border-strong` + focus terracotta (`--color-primary-tint` en
+  halo). Les choix multiples « expanded » deviennent des **pastilles
+  sélectionnables** (`.kd-choicegrid`, checkbox masqué, état coché = tint
+  terracotta).
 
 - **Carte** : `--color-surface-raised`, bordure `1px --color-border`, rayon
   `--kd-radius-lg`, en-tête séparé par un filet `--color-divider`.

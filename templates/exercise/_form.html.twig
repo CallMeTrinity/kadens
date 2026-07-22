@@ -1,4 +1,9 @@
-{{ form_start(form) }}
+{{ form_start(form, {attr: {class: 'kd-form', novalidate: 'novalidate'}}) }}
     {{ form_widget(form) }}
-    <button type="submit">{{ button_label|default('Enregistrer') }}</button>
+    <div class="kd-formactions">
+        <button type="submit" class="kd-btn kd-btn--primary">
+            {{ ux_icon('lucide:check') }} {{ button_label|default('Enregistrer') }}
+        </button>
+        <a href="{{ path('app_exercise_index') }}" class="kd-btn kd-btn--ghost">Annuler</a>
+    </div>
 {{ form_end(form) }}
