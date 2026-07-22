@@ -161,9 +161,24 @@ Socle Symfony en place (Docker, MariaDB, CI/CD). Design tokens posés.
   les séances encore prévues sont exclues du ratio. Fragment réutilisable
   `templates/components/_status_stats.html.twig` (barre proportionnelle + compteurs).
   Pas de migration : `status` et `completionNotes` existaient déjà sur l'entité.
+- **Phase 8 — export Excel : faite.** PhpSpreadsheet installé. `ExcelExporter`
+  (service) consomme `PlanFlattener` (aucune mise à plat réimplémentée) et produit
+  un `Spreadsheet` pour une séance, un plan ou un planning daté. Le champ `summary`
+  du flattener porte déjà le rendu lisible (mm:ss, allure, distance) grâce aux
+  unités normalisées : l'export est un pur mapping, pas de parsing. Un unique
+  writer privé (`writeWorkoutSection`) est réutilisé par les trois exports.
+  Couleurs de l'identité « Carnet clair » reprises en dur en ARGB (les tokens CSS
+  ne s'appliquant pas à un classeur). `ExportController` (mince) autorise via les
+  voters existants (`WorkoutVoter::VIEW`, `PlanTemplateVoter::VIEW`) puis streame
+  via `StreamedResponse` (writer -> `php://output`, pas de fichier temporaire) :
+  `/export/workout/{id}`, `/export/plan-template/{id}`, `/export/schedule/{year}/{month}`
+  (planning owner-only sur un mois, borné comme calendrier/synthèse). `access_control`
+  `^/export` en `ROLE_USER`. Liens « Exporter en Excel » sur `workout/show`,
+  `plan_template/show` et l'en-tête du calendrier. Pas de migration (aucun changement
+  de schéma).
 
-Prochaine étape : **Phase 8 — export Excel** (PhpSpreadsheet + `ExcelExporter`
-consommant `PlanFlattener` + `ExportController`).
+Prochaine étape : **Phase 9 — PWA** (service worker manuel, cache offline des pages
+de consultation, self-hébergement des polices).
 
 ---
 

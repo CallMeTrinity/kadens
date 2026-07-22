@@ -46,6 +46,7 @@ security:
         - { path: ^/calendar, roles: ROLE_USER }
         - { path: ^/schedule, roles: ROLE_USER }
         - { path: ^/summary, roles: ROLE_USER }
+        - { path: ^/export, roles: ROLE_USER }
         # - { path: ^/admin, roles: ROLE_ADMIN }
 
 when@test:

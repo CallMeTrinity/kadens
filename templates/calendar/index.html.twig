@@ -23,6 +23,7 @@
             <a href="{{ path('app_calendar_month', {year: prev.year, month: prev.month}) }}">← Mois précédent</a>
             <a href="{{ path('app_calendar_index') }}">Aujourd'hui</a>
             <a href="{{ path('app_calendar_month', {year: next.year, month: next.month}) }}">Mois suivant →</a>
+            <a href="{{ path('app_export_schedule', {year: year, month: month}) }}">Exporter le mois en Excel</a>
         </nav>
     </header>
 

@@ -12,6 +12,7 @@
         {% if is_granted('WORKOUT_EDIT', workout) %}
             · <a href="{{ path('app_workout_edit', {id: workout.id}) }}">Éditer</a>
         {% endif %}
+        · <a href="{{ path('app_export_workout', {id: workout.id}) }}">Exporter en Excel</a>
     </p>
 
     {# Partage lecture publique (Phase 4) : lien slug ouvert sans authentification. #}
