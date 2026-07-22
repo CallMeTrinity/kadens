@@ -28,6 +28,10 @@ tracking détaillé** (Strava couvre déjà ça).
   partiels). Pas de SPA.
 - **AssetMapper** (pas de Webpack Encore, pas de bundling). Conséquence : le
   service worker PWA (Phase 9) sera écrit **à la main**.
+- **Symfony UX Icons** (`symfony/ux-icons`) pour les icônes, jeu **Lucide**
+  (traits fins, cohérent « Carnet clair »). Icônes **figées en local** dans
+  `assets/icons/lucide/` (`php bin/console ux:icons:import lucide:<nom>`) : pas de
+  fetch réseau en prod/offline. Toute nouvelle icône doit être importée localement.
 - **Doctrine ORM** + **MariaDB 10.4** (même version dev et prod).
 - **Docker** en dev uniquement. Prod = **hébergement mutualisé Infomaniak**
   (`kadens.antoninpamart.fr`), pas de conteneurs, pas de root.
@@ -198,6 +202,23 @@ Toutes les phases du ROADMAP sont livrées. Prochaines pistes hors-roadmap : pre
 déploiement PWA sur `kadens.antoninpamart.fr` (HTTPS requis pour le service worker) et
 vérification manuelle Lighthouse/installabilité + navigation offline réelle en
 navigateur (non automatisable ici).
+
+- **Design & finitions (en cours).** Ouverture de la couche visuelle « Carnet
+  clair » sur des vues jusqu'ici brutes. **Fondation CSS réutilisable** :
+  `assets/styles/components.css` (importé par `app.css`) porte les composants
+  partagés — header, boutons (`.kd-btn--primary/secondary/ghost`), cartes
+  (`.kd-card`), badges/statuts (`.kd-badge--run/gym/done/planned/missed`), stats,
+  cartes de nav (`.kd-navcard`), grilles (`.kd-grid--2/3/4`), page (`.kd-page`).
+  Tout piloté par les tokens, zéro couleur/police en dur. **Header réutilisable**
+  `templates/components/_header.html.twig` (marque + nav à icônes Lucide + état
+  actif déduit du préfixe de route + user/déconnexion), inclus par `base.html.twig`
+  sous `if app.user`. **Page d'accueil** : `HomeController` (route `/` = `app_home`,
+  redirige vers login si anonyme), dashboard `templates/home/index.html.twig`
+  (prochaines séances sur 14 j via `findByOwnerBetween`, observance du mois via
+  `countByStatusForOwnerBetween`, compteurs biblio, raccourcis sections). Rendu
+  auto-suffisant (cachable offline). **Reste à styler** : index (tables brutes),
+  formulaires, show, éditeurs, calendrier, synthèse, login. Composant **modale**
+  réutilisable à créer quand une vue en aura besoin (ex. confirmation suppression).
 
 ---
 

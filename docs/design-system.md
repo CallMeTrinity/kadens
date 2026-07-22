@@ -140,8 +140,12 @@ ne référence plus aucune police externe.
 
 ## 5. Patterns de composants (tirés des maquettes)
 
-Descriptions de référence pour l'implémentation Twig/CSS. Aucun de ces composants
-n'est encore codé — ce sont des cibles.
+Descriptions de référence pour l'implémentation Twig/CSS. Une partie est désormais
+codée dans `assets/styles/components.css` (source des classes `.kd-*` : header,
+`.kd-btn`, `.kd-card`, `.kd-badge`, `.kd-navcard`, `.kd-stat`, grilles) et
+`templates/components/_header.html.twig`. Les composants encore décrits mais non
+codés (tuile de séance, cellule de grille, anneau de progression, histogramme)
+restent des cibles.
 
 - **Carte** : `--color-surface-raised`, bordure `1px --color-border`, rayon
   `--kd-radius-lg`, en-tête séparé par un filet `--color-divider`.

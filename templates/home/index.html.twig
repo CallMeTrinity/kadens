@@ -1,0 +1,133 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Accueil — Kadens{% endblock %}
+
+{% set month_abbr = {1:'JAN',2:'FÉV',3:'MAR',4:'AVR',5:'MAI',6:'JUIN',7:'JUIL',8:'AOÛT',9:'SEP',10:'OCT',11:'NOV',12:'DÉC'} %}
+{% set status_class = {'done':'kd-badge--done','planned':'kd-badge--planned','missed':'kd-badge--missed'} %}
+
+{% set sections = [
+    { label: 'Exercices',  icon: 'lucide:dumbbell',       path: 'app_exercise_index',      desc: 'Ta bibliothèque de mouvements, perso et globale.' },
+    { label: 'Séances',    icon: 'lucide:clipboard-list', path: 'app_workout_index',       desc: 'Blocs, séries et paramètres. La brique de base.' },
+    { label: 'Plans',      icon: 'lucide:layers',         path: 'app_plan_template_index', desc: 'Trames multi-semaines réutilisables.' },
+    { label: 'Calendrier', icon: 'lucide:calendar-days',  path: 'app_calendar_index',      desc: 'Pose tes séances à des dates réelles.' },
+    { label: 'Synthèse',   icon: 'lucide:trending-up',    path: 'app_summary_index',       desc: 'Prévu vs réalisé, mois par mois.' },
+] %}
+
+{% block body %}
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Tableau de bord</p>
+            <h1 class="kd-title">Ta semaine d'entraînement</h1>
+            <p class="kd-lead">Planifie en amont : bibliothèque, séances, plans, calendrier. Le suivi détaillé reste à Strava.</p>
+        </div>
+        <div style="display:flex; gap:var(--kd-space-4); flex-wrap:wrap;">
+            <a href="{{ path('app_workout_new') }}" class="kd-btn kd-btn--primary">
+                {{ ux_icon('lucide:plus') }} Nouvelle séance
+            </a>
+            <a href="{{ path('app_calendar_index') }}" class="kd-btn kd-btn--secondary">
+                {{ ux_icon('lucide:calendar-plus') }} Planifier
+            </a>
+        </div>
+    </div>
+
+    <div class="kd-grid kd-grid--2" style="margin-bottom:var(--kd-space-6); align-items:start;">
+        {# Prochaines séances #}
+        <section class="kd-card">
+            <div class="kd-card__head">
+                <h2 class="kd-card__title">Prochaines séances</h2>
+                <a href="{{ path('app_calendar_index') }}" class="kd-btn kd-btn--ghost kd-btn--sm">
+                    Calendrier {{ ux_icon('lucide:arrow-right') }}
+                </a>
+            </div>
+
+            {% if upcoming is empty %}
+                <div class="kd-empty">
+                    {{ ux_icon('lucide:calendar-x') }}
+                    <div>Rien de prévu d'ici {{ 14 }} jours.</div>
+                </div>
+            {% else %}
+                <ul class="kd-list">
+                    {% for sw in upcoming %}
+                        <li class="kd-list__row">
+                            <div class="kd-list__date">
+                                <div class="kd-list__date-day">{{ sw.scheduledDate|date('j') }}</div>
+                                <div class="kd-list__date-mon">{{ month_abbr[sw.scheduledDate|date('n')] }}</div>
+                            </div>
+                            <div class="kd-list__main">
+                                <a class="kd-list__title" href="{{ path('app_workout_show', {id: sw.workout.id}) }}">
+                                    {{ sw.workout.title }}
+                                </a>
+                                <div class="kd-list__meta">
+                                    {{ sw.scheduledDate|date('l')|capitalize }}
+                                    {%- if sw.workout.estimatedDurationMinutes %} · {{ sw.workout.estimatedDurationMinutes }} min{% endif %}
+                                </div>
+                            </div>
+                            <span class="kd-badge {{ status_class[sw.status.value] }}">
+                                <span class="kd-badge__dot"></span>{{ sw.status.label }}
+                            </span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </section>
+
+        {# Observance du mois #}
+        <section class="kd-card">
+            <div class="kd-card__head">
+                <h2 class="kd-card__title">Ce mois</h2>
+                <a href="{{ path('app_summary_index') }}" class="kd-btn kd-btn--ghost kd-btn--sm">
+                    Synthèse {{ ux_icon('lucide:arrow-right') }}
+                </a>
+            </div>
+
+            <div style="display:flex; align-items:baseline; gap:var(--kd-space-3);">
+                <span class="kd-stat__value">{{ monthStats.adherence is null ? '—' : monthStats.adherence ~ '%' }}</span>
+                <span class="kd-stat__label" style="margin-top:0;">Observance</span>
+            </div>
+
+            <ul class="kd-list" style="margin-top:var(--kd-space-7);">
+                <li class="kd-list__row" style="padding:var(--kd-space-3) 0;">
+                    <span class="kd-badge kd-badge--done"><span class="kd-badge__dot"></span>Faites</span>
+                    <span style="margin-left:auto; font-family:var(--font-mono); color:var(--color-text-strong);">{{ monthStats.done }}</span>
+                </li>
+                <li class="kd-list__row" style="padding:var(--kd-space-3) 0;">
+                    <span class="kd-badge kd-badge--planned"><span class="kd-badge__dot"></span>Prévues</span>
+                    <span style="margin-left:auto; font-family:var(--font-mono); color:var(--color-text-strong);">{{ monthStats.planned }}</span>
+                </li>
+                <li class="kd-list__row" style="padding:var(--kd-space-3) 0;">
+                    <span class="kd-badge kd-badge--missed"><span class="kd-badge__dot"></span>Manquées</span>
+                    <span style="margin-left:auto; font-family:var(--font-mono); color:var(--color-text-strong);">{{ monthStats.missed }}</span>
+                </li>
+            </ul>
+        </section>
+    </div>
+
+    {# Compteurs bibliothèque #}
+    <div class="kd-grid kd-grid--3" style="margin-bottom:var(--kd-space-10);">
+        <div class="kd-card" style="display:flex; align-items:center; gap:var(--kd-space-6);">
+            <span class="kd-navcard__icon">{{ ux_icon('lucide:clipboard-list') }}</span>
+            <div><div class="kd-stat__value">{{ counts.workouts }}</div><div class="kd-stat__label">Séances</div></div>
+        </div>
+        <div class="kd-card" style="display:flex; align-items:center; gap:var(--kd-space-6);">
+            <span class="kd-navcard__icon">{{ ux_icon('lucide:layers') }}</span>
+            <div><div class="kd-stat__value">{{ counts.plans }}</div><div class="kd-stat__label">Plans</div></div>
+        </div>
+        <div class="kd-card" style="display:flex; align-items:center; gap:var(--kd-space-6);">
+            <span class="kd-navcard__icon">{{ ux_icon('lucide:dumbbell') }}</span>
+            <div><div class="kd-stat__value">{{ counts.exercises }}</div><div class="kd-stat__label">Exercices</div></div>
+        </div>
+    </div>
+
+    {# Raccourcis sections #}
+    <p class="kd-eyebrow" style="margin-bottom:var(--kd-space-6);">Explorer</p>
+    <div class="kd-grid kd-grid--3">
+        {% for s in sections %}
+            <a href="{{ path(s.path) }}" class="kd-navcard">
+                <span class="kd-navcard__icon">{{ ux_icon(s.icon) }}</span>
+                <span class="kd-navcard__title">{{ s.label }}</span>
+                <span class="kd-navcard__desc">{{ s.desc }}</span>
+                <span class="kd-navcard__more">Ouvrir {{ ux_icon('lucide:arrow-right') }}</span>
+            </a>
+        {% endfor %}
+    </div>
+{% endblock %}
