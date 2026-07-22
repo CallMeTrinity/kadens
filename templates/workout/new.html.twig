@@ -1,0 +1,14 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Nouvelle séance{% endblock %}
+
+{% block body %}
+    <h1>Nouvelle séance</h1>
+
+    {{ form_start(form) }}
+        {{ form_widget(form) }}
+        <button type="submit">Créer</button>
+    {{ form_end(form) }}
+
+    <p><a href="{{ path('app_workout_index') }}">Retour aux séances</a></p>
+{% endblock %}

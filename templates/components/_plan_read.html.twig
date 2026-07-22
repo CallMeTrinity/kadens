@@ -1,0 +1,35 @@
+{# Rendu lecture seule d'un plan mis à plat par PlanFlattener::flattenPlanTemplate.
+   Auto-suffisant : aucun AJAX post-rendu, condition du cache offline (Phase 9).
+   Attend une variable `flat` (grille dense semaines × jours). #}
+{% set template = flat.template %}
+{% set dayNames = {1: 'Lundi', 2: 'Mardi', 3: 'Mercredi', 4: 'Jeudi', 5: 'Vendredi', 6: 'Samedi', 7: 'Dimanche'} %}
+
+<h1>{{ template.title }}</h1>
+<p>{{ template.durationWeeks }} semaines</p>
+
+{% if template.description %}
+    <p>{{ template.description|nl2br }}</p>
+{% endif %}
+
+{% for week in flat.weeks %}
+    <section>
+        <h2>Semaine {{ week.weekNumber }}</h2>
+        <div style="display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:.5rem">
+        {% for day in week.days %}
+            <div style="border:1px solid var(--color-border); padding:.5rem">
+                <strong>{{ dayNames[day.dayOfWeek] }}</strong>
+                <ul>
+                {% for entry in day.items %}
+                    <li>
+                        <a href="{{ path('app_workout_show', {id: entry.item.workout.id}) }}">{{ entry.workout.workout.title }}</a>
+                        {% if entry.item.notes %}<p>{{ entry.item.notes|nl2br }}</p>{% endif %}
+                    </li>
+                {% else %}
+                    <li>—</li>
+                {% endfor %}
+                </ul>
+            </div>
+        {% endfor %}
+        </div>
+    </section>
+{% endfor %}

@@ -1,0 +1,52 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Bibliothèque d'exercices{% endblock %}
+
+{% block body %}
+    {% for message in app.flashes('success') %}
+        <p role="status">{{ message }}</p>
+    {% endfor %}
+
+    <h1>Bibliothèque d'exercices</h1>
+
+    <p><a href="{{ path('app_exercise_new') }}">Nouvel exercice</a></p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>Activité</th>
+                <th>Zones travaillées</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for exercise in exercises %}
+            <tr>
+                <td>
+                    {{ exercise.name }}
+                    {% if exercise.owner is null %}<small>(bibliothèque)</small>{% endif %}
+                </td>
+                <td>{{ exercise.activity ? exercise.activity.label : '' }}</td>
+                <td>
+                    {% for area in exercise.targetAreas %}
+                        {{ area.label }}{{ not loop.last ? ', ' }}
+                    {% endfor %}
+                </td>
+                <td>
+                    {% if is_granted('VIEW', exercise) %}
+                        <a href="{{ path('app_exercise_show', {id: exercise.id}) }}">Voir</a>
+                    {% endif %}
+                    {% if is_granted('EDIT', exercise) %}
+                        <a href="{{ path('app_exercise_edit', {id: exercise.id}) }}">Éditer</a>
+                    {% endif %}
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="4">Aucun exercice pour l'instant.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

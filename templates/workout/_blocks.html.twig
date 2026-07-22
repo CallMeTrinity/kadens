@@ -1,0 +1,17 @@
+{# Contenu de #workout-blocks. Contexte attendu (fourni par blocksContext) :
+   workout, addBlockForm, blockForms, addExerciseForms, prescribedForms. #}
+{% for block in workout.blocks %}
+    {{ include('workout/_block.html.twig', { block: block }) }}
+{% else %}
+    <p>Aucun bloc pour l'instant. Ajoute le premier ci-dessous.</p>
+{% endfor %}
+
+<section>
+    <h3>Ajouter un bloc</h3>
+    {{ form_start(addBlockForm) }}
+        {{ form_row(addBlockForm.role) }}
+        {{ form_row(addBlockForm.rounds) }}
+        {{ form_row(addBlockForm.label) }}
+        <button type="submit">Ajouter le bloc</button>
+    {{ form_end(addBlockForm) }}
+</section>

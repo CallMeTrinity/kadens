@@ -1,0 +1,13 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ flat.template.title }}{% endblock %}
+
+{% block body %}
+    <p>
+        <a href="{{ path('app_plan_template_index') }}">Retour aux plans</a>
+        · <a href="{{ path('app_plan_template_edit', {id: flat.template.id}) }}">Éditer</a>
+        · <a href="{{ path('app_export_plan_template', {id: flat.template.id}) }}">Exporter en Excel</a>
+    </p>
+
+    {{ include('components/_plan_read.html.twig') }}
+{% endblock %}

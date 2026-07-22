@@ -1,3 +1,29 @@
+@import 'tokens.css';
+@import 'fonts.css';
+
+/* ============================================================================
+   Kadens — feuille de style de base
+   Applique l'identité « Carnet clair » au document. Les composants et vues
+   consomment les tokens sémantiques définis dans tokens.css.
+
+   Polices : self-hostées depuis la Phase 9 (offline-first). Les @font-face sont
+   dans fonts.css (importé ci-dessus, subsets latin + latin-ext), les woff2 dans
+   assets/fonts/. Plus aucune dépendance à Google Fonts.
+   ============================================================================ */
+
 body {
-    background-color: skyblue;
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: var(--color-primary);
+}
+
+a:hover {
+  color: var(--color-primary-hover);
 }

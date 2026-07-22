@@ -1,0 +1,5 @@
+{# Suppression d'un plan (POST + CSRF). #}
+<form method="post" action="{{ path('app_plan_template_delete', {id: template.id}) }}" onsubmit="return confirm('Supprimer définitivement ce plan et sa trame ?');">
+    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ template.id) }}">
+    <button type="submit">Supprimer le plan</button>
+</form>

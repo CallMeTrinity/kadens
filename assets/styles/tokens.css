@@ -1,0 +1,171 @@
+/* ============================================================================
+   Kadens — Design tokens
+   Identité : « Carnet clair » — papier & encre, accent terracotta.
+   Source de vérité des couleurs, typo, espacements, rayons et ombres.
+
+   Deux couches :
+     1. Primitives  (--kd-*)      : valeurs brutes, ne pas utiliser directement
+                                      dans les composants.
+     2. Sémantique  (--color-*, --font-*, …) : à consommer dans le CSS des vues.
+
+   Toute évolution visuelle passe par ce fichier, puis se répercute dans
+   docs/design-system.md et CLAUDE.md (§ Design). Ne jamais coder une couleur
+   en dur dans un template ou un composant.
+   ============================================================================ */
+
+:root {
+  /* ------------------------------------------------------------------------
+     1. PRIMITIVES
+     ------------------------------------------------------------------------ */
+
+  /* Neutres papier (chauds, du plus foncé "page" au plus clair "surface haute") */
+  --kd-page:        #e9e6df; /* fond de page global */
+  --kd-paper-50:    #f7f5f0; /* fond de carte / conteneur principal */
+  --kd-paper-0:     #fffdf9; /* surface haute : en-têtes, cartes, cellules */
+  --kd-paper-100:   #f2ede3; /* remplissage discret (encart, slug) */
+  --kd-paper-150:   #f0ebe1; /* fond de tag / badge neutre */
+  --kd-paper-200:   #efe8dc; /* piste de barre de progression, séparateurs */
+
+  /* Encre (texte) — du primaire au plus estompé */
+  --kd-ink-900:     #1a1712; /* texte principal */
+  --kd-ink-800:     #2a2318; /* texte fort sur carte */
+  --kd-ink-800-alt: #2a1c14; /* texte sur tuile accentuée */
+  --kd-ink-700:     #3a3226; /* texte de bouton secondaire */
+  --kd-ink-500:     #5a5346; /* texte de liste inactif */
+  --kd-ink-muted:   #7a7264; /* texte secondaire */
+  --kd-ink-soft:    #8a8272; /* texte tertiaire / descriptions */
+  --kd-ink-faint:   #a99f8d; /* labels, libellés mono, texte estompé */
+  --kd-ink-placeholder: #b0a794; /* placeholders, valeurs très estompées */
+  --kd-ink-weekend: #c0a68f; /* numéros de week-end au calendrier */
+  --kd-ink-outside: #c9bfab; /* jours hors du mois courant */
+
+  /* Bordures */
+  --kd-border:        #e3ddd1; /* bordure de carte par défaut */
+  --kd-border-strong: #ddd3c2; /* champs, boutons, contours nets */
+  --kd-border-cell:   #e6e0d4; /* cellules de grille (matrice, calendrier) */
+  --kd-border-pill:   #e0d9cb; /* contour de puce/pill */
+  --kd-border-muted:  #d8d1c3; /* bordure de bouton secondaire */
+  --kd-divider:       #efe8dc; /* filet de séparation dans une carte */
+  --kd-divider-soft:  #f2ece1; /* filet très léger entre lignes */
+
+  /* Terracotta — accent primaire + code activité « course / trail » */
+  --kd-terracotta:        #b7532e; /* accent principal, boutons, liens */
+  --kd-terracotta-dark:   #8f3f22; /* survol / texte fort sur tint */
+  --kd-terracotta-text:   #a2694c; /* méta sur fond tint */
+  --kd-terracotta-tint:   #fbeee7; /* fond teinté terracotta */
+
+  /* Olive — accent secondaire + code activité « muscu / renfo » */
+  --kd-olive:       #5c6b3a; /* accent activité gym */
+  --kd-olive-tint:  #eef1e3; /* fond teinté olive */
+  --kd-olive-text:  #6a7541; /* méta sur fond olive */
+  --kd-olive-dark:  #2c3218; /* texte fort sur tint olive */
+  --kd-olive-label: #4c5730; /* label de légende olive */
+
+  /* Statuts prévu / réalisé */
+  --kd-status-done:    #4c7a3a; /* fait */
+  --kd-status-planned: #a99f8d; /* prévu (= ink-faint) */
+  --kd-status-missed:  #c0392b; /* manqué */
+
+  /* Pistes de graphiques */
+  --kd-chart-track: #e8e0d2; /* piste de l'anneau de synthèse */
+  --kd-chart-todo:  #e0d7c7; /* barre "à venir" (histogramme) */
+
+  /* Ombres */
+  --kd-shadow-card:   0 6px 28px rgba(0, 0, 0, .09);
+  --kd-shadow-accent: 0 2px 8px rgba(183, 83, 46, .35);
+
+  /* Rayons */
+  --kd-radius-xs:   4px;
+  --kd-radius-sm:   6px;
+  --kd-radius-md:   8px;  /* boutons, champs */
+  --kd-radius-lg:   11px; /* cartes */
+  --kd-radius-xl:   12px; /* grandes cartes */
+  --kd-radius-pill: 20px;
+  --kd-radius-full: 50%;
+
+  /* Familles de polices */
+  --kd-font-display: 'Space Grotesk', system-ui, sans-serif;   /* titres, gros chiffres */
+  --kd-font-sans:    'Instrument Sans', system-ui, sans-serif; /* corps de texte */
+  --kd-font-mono:    'JetBrains Mono', ui-monospace, Menlo, monospace; /* labels, méta, badges */
+
+  /* Échelle d'espacement (base 4px, valeurs réellement utilisées dans les maquettes) */
+  --kd-space-1:  4px;
+  --kd-space-2:  6px;
+  --kd-space-3:  8px;
+  --kd-space-4:  10px;
+  --kd-space-5:  12px;
+  --kd-space-6:  14px;
+  --kd-space-7:  16px;
+  --kd-space-8:  20px;
+  --kd-space-9:  22px;
+  --kd-space-10: 24px;
+  --kd-space-11: 26px;
+  --kd-space-12: 28px;
+  --kd-space-13: 30px;
+
+  /* Graisses */
+  --kd-weight-regular:  400;
+  --kd-weight-medium:   500;
+  --kd-weight-semibold: 600;
+  --kd-weight-bold:     700;
+
+  /* Interlettrage des labels mono en capitales (eyebrows) */
+  --kd-tracking-eyebrow:  .06em;
+  --kd-tracking-eyebrow-lg: .1em;
+  --kd-tracking-eyebrow-xl: .16em;
+
+  /* ------------------------------------------------------------------------
+     2. TOKENS SÉMANTIQUES — à consommer dans les vues
+     ------------------------------------------------------------------------ */
+
+  /* Surfaces & fonds */
+  --color-bg:              var(--kd-page);
+  --color-surface:         var(--kd-paper-50);
+  --color-surface-raised:  var(--kd-paper-0);
+  --color-surface-subtle:  var(--kd-paper-100);
+  --color-fill:            var(--kd-paper-150);
+  --color-track:           var(--kd-paper-200);
+
+  /* Texte */
+  --color-text:            var(--kd-ink-900);
+  --color-text-strong:     var(--kd-ink-800);
+  --color-text-secondary:  var(--kd-ink-muted);
+  --color-text-soft:       var(--kd-ink-soft);
+  --color-text-faint:      var(--kd-ink-faint);
+  --color-text-placeholder: var(--kd-ink-placeholder);
+
+  /* Bordures & filets */
+  --color-border:          var(--kd-border);
+  --color-border-strong:   var(--kd-border-strong);
+  --color-border-cell:     var(--kd-border-cell);
+  --color-divider:         var(--kd-divider);
+
+  /* Primaire (terracotta) */
+  --color-primary:         var(--kd-terracotta);
+  --color-primary-hover:   var(--kd-terracotta-dark);
+  --color-primary-tint:    var(--kd-terracotta-tint);
+  --color-primary-on-tint: var(--kd-terracotta-dark);
+  --color-on-primary:      #ffffff;
+
+  /* Accents d'activité (code couleur métier) */
+  --color-activity-run:       var(--kd-terracotta); /* course / trail */
+  --color-activity-run-tint:  var(--kd-terracotta-tint);
+  --color-activity-run-text:  var(--kd-terracotta-text);
+  --color-activity-gym:       var(--kd-olive);       /* muscu / renfo */
+  --color-activity-gym-tint:  var(--kd-olive-tint);
+  --color-activity-gym-text:  var(--kd-olive-text);
+
+  /* Statuts prévu / réalisé */
+  --color-status-done:     var(--kd-status-done);
+  --color-status-planned:  var(--kd-status-planned);
+  --color-status-missed:   var(--kd-status-missed);
+
+  /* Élévation */
+  --shadow-card:           var(--kd-shadow-card);
+  --shadow-accent:         var(--kd-shadow-accent);
+
+  /* Typo sémantique */
+  --font-display:          var(--kd-font-display);
+  --font-body:             var(--kd-font-sans);
+  --font-mono:             var(--kd-font-mono);
+}

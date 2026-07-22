@@ -1,0 +1,26 @@
+{% extends 'base.html.twig' %}
+
+{% set workout = flat.workout %}
+
+{% block title %}{{ workout.title }}{% endblock %}
+
+{% block body %}
+    {# Vue de consultation auto-suffisante : aucun chargement AJAX post-rendu,
+       condition du cache offline (Phase 9). Consomme la sortie de PlanFlattener. #}
+    <p>
+        <a href="{{ path('app_workout_index') }}">Retour aux séances</a>
+        {% if is_granted('WORKOUT_EDIT', workout) %}
+            · <a href="{{ path('app_workout_edit', {id: workout.id}) }}">Éditer</a>
+        {% endif %}
+        · <a href="{{ path('app_export_workout', {id: workout.id}) }}">Exporter en Excel</a>
+    </p>
+
+    {# Partage lecture publique (Phase 4) : lien slug ouvert sans authentification. #}
+    <div data-controller="clipboard" data-clipboard-url-value="{{ url('app_public_share', {slug: workout.slug}) }}">
+        <button type="button" data-action="clipboard#copy">Copier le lien de partage</button>
+        <a href="{{ path('app_public_share', {slug: workout.slug}) }}" target="_blank" rel="noopener">Ouvrir la page publique</a>
+        <span data-clipboard-target="feedback" role="status" aria-live="polite"></span>
+    </div>
+
+    {% include 'components/_workout_read.html.twig' with { flat: flat } only %}
+{% endblock %}

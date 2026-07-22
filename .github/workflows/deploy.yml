@@ -77,6 +77,25 @@ jobs:
   test:
     name: Tests
     runs-on: ubuntu-latest
+    # Même version de SGBD qu'en dev et en prod (MariaDB 10.4) pour éviter tout
+    # écart de SQL généré (cf. ROADMAP §1.2).
+    services:
+      mariadb:
+        image: mariadb:10.4
+        env:
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: kadens
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      # Doctrine ajoute le suffixe `_test` en env de test : la base réelle est
+      # `kadens_test`, créée par doctrine:schema:create ci-dessous.
+      DATABASE_URL: mysql://root:root@127.0.0.1:3306/kadens?serverVersion=mariadb-10.4.34&charset=utf8mb4
     steps:
       - uses: actions/checkout@v4
 
@@ -89,6 +108,13 @@ jobs:
 
       - name: Installer les dépendances
         run: composer install --no-interaction --no-progress --prefer-dist
+        env:
+          APP_ENV: test
+
+      - name: Préparer le schéma de test
+        run: |
+          php bin/console doctrine:database:create --if-not-exists --no-interaction
+          php bin/console doctrine:schema:create --no-interaction
         env:
           APP_ENV: test
 

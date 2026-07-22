@@ -1,0 +1,36 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Éditer — {{ workout.title }}{% endblock %}
+
+{% block body %}
+    {% for message in app.flashes('success') %}
+        <p role="status">{{ message }}</p>
+    {% endfor %}
+
+    <p>
+        <a href="{{ path('app_workout_index') }}">Retour aux séances</a>
+        · <a href="{{ path('app_workout_show', {id: workout.id}) }}">Voir la séance</a>
+    </p>
+
+    <h1>Éditer la séance</h1>
+
+    <section>
+        <h2>Informations</h2>
+        {{ form_start(form) }}
+            {{ form_widget(form) }}
+            <button type="submit">Enregistrer</button>
+        {{ form_end(form) }}
+    </section>
+
+    <section>
+        <h2>Blocs & exercices</h2>
+        {# Conteneur cible des Turbo Streams : chaque mutation le remplace. #}
+        <div id="workout-blocks">
+            {{ include('workout/_blocks.html.twig') }}
+        </div>
+    </section>
+
+    <section>
+        {{ include('workout/_delete_form.html.twig') }}
+    </section>
+{% endblock %}

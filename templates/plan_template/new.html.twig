@@ -1,0 +1,14 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Nouveau plan{% endblock %}
+
+{% block body %}
+    <h1>Nouveau plan</h1>
+
+    {{ form_start(form) }}
+        {{ form_widget(form) }}
+        <button type="submit">Créer</button>
+    {{ form_end(form) }}
+
+    <p><a href="{{ path('app_plan_template_index') }}">Retour aux plans</a></p>
+{% endblock %}

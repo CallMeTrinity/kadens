@@ -1,24 +1,43 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
     <head>
         <meta charset="UTF-8">
-        <title>{% block title %}Welcome!{% endblock %}</title>
-        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.2em%22 font-size=%2296%22>⚫️</text><text y=%221.3em%22 x=%220.2em%22 font-size=%2276%22 fill=%22%23fff%22>sf</text></svg>">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>{% block title %}Kadens{% endblock %}</title>
+        <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.1em%22 font-size=%22104%22>📓</text></svg>">
+
+        {# PWA (Phase 9) — installabilité + consultation offline. #}
+        <meta name="theme-color" content="#b7532e">
+        <link rel="manifest" href="/manifest.json">
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-title" content="Kadens">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
         {% block stylesheets %}
+            {# Polices « Carnet clair » self-hostées : chargées via AssetMapper
+               (app.css → fonts.css). Plus de dépendance Google Fonts. #}
         {% endblock %}
 
         {% block javascripts %}
             {% block importmap %}{{ importmap('app') }}{% endblock %}
         {% endblock %}
-
-        {% set frankenphp_hot_reload = app.request.server.get('FRANKENPHP_HOT_RELOAD') %}
-        {% if frankenphp_hot_reload %}
-        <meta name="frankenphp-hot-reload:url" content="{{ frankenphp_hot_reload }}">
-        <script src="https://cdn.jsdelivr.net/npm/idiomorph"></script>
-        <script src="https://cdn.jsdelivr.net/npm/frankenphp-hot-reload/+esm" type="module"></script>
-        {% endif %}
     </head>
     <body>
+        {% if app.user %}
+            <header>
+                <nav>
+                    <a href="{{ path('app_exercise_index') }}">Exercices</a>
+                    <a href="{{ path('app_workout_index') }}">Séances</a>
+                    <a href="{{ path('app_plan_template_index') }}">Plans</a>
+                    <a href="{{ path('app_calendar_index') }}">Calendrier</a>
+                    <a href="{{ path('app_summary_index') }}">Synthèse</a>
+                    <span>{{ app.user.userIdentifier }}</span>
+                    <a href="{{ path('app_logout') }}">Déconnexion</a>
+                </nav>
+            </header>
+        {% endif %}
         {% block body %}{% endblock %}
     </body>
 </html>

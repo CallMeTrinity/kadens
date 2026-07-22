@@ -1,0 +1,72 @@
+{# Un bloc en édition : entête (rôle/tours/libellé + déplacer/supprimer),
+   liste des exercices prescrits, puis formulaire d'ajout d'exercice.
+   Contexte hérité : workout, blockForms, addExerciseForms, prescribedForms. #}
+<article style="border:1px solid var(--color-border); padding:1rem; margin-block:1rem">
+    <header>
+        {% set blockForm = blockForms[block.id] %}
+        {{ form_start(blockForm) }}
+            {{ form_row(blockForm.role) }}
+            {{ form_row(blockForm.rounds) }}
+            {{ form_row(blockForm.label) }}
+            <button type="submit">Enregistrer le bloc</button>
+        {{ form_end(blockForm) }}
+
+        <div>
+            {{ include('workout/_action_form.html.twig', {
+                action: path('app_workout_block_move', {id: workout.id, blockId: block.id, direction: 'up'}),
+                token: csrf_token('block_move' ~ block.id),
+                label: '↑ Monter'
+            }) }}
+            {{ include('workout/_action_form.html.twig', {
+                action: path('app_workout_block_move', {id: workout.id, blockId: block.id, direction: 'down'}),
+                token: csrf_token('block_move' ~ block.id),
+                label: '↓ Descendre'
+            }) }}
+            {{ include('workout/_action_form.html.twig', {
+                action: path('app_workout_block_delete', {id: workout.id, blockId: block.id}),
+                token: csrf_token('block_delete' ~ block.id),
+                label: 'Supprimer le bloc',
+                confirm: 'Supprimer ce bloc et ses exercices ?'
+            }) }}
+        </div>
+    </header>
+
+    <ol>
+    {% for prescribed in block.prescribedExercises %}
+        <li>
+            {{ include('workout/_prescribed_form.html.twig', {
+                form: prescribedForms[prescribed.id],
+                submit_label: 'Enregistrer l\'exercice'
+            }) }}
+            <div>
+                {{ include('workout/_action_form.html.twig', {
+                    action: path('app_workout_prescribed_move', {id: workout.id, prescribedId: prescribed.id, direction: 'up'}),
+                    token: csrf_token('prescribed_move' ~ prescribed.id),
+                    label: '↑'
+                }) }}
+                {{ include('workout/_action_form.html.twig', {
+                    action: path('app_workout_prescribed_move', {id: workout.id, prescribedId: prescribed.id, direction: 'down'}),
+                    token: csrf_token('prescribed_move' ~ prescribed.id),
+                    label: '↓'
+                }) }}
+                {{ include('workout/_action_form.html.twig', {
+                    action: path('app_workout_prescribed_delete', {id: workout.id, prescribedId: prescribed.id}),
+                    token: csrf_token('prescribed_delete' ~ prescribed.id),
+                    label: 'Supprimer',
+                    confirm: 'Retirer cet exercice du bloc ?'
+                }) }}
+            </div>
+        </li>
+    {% else %}
+        <li>Aucun exercice dans ce bloc.</li>
+    {% endfor %}
+    </ol>
+
+    <details>
+        <summary>Ajouter un exercice</summary>
+        {{ include('workout/_prescribed_form.html.twig', {
+            form: addExerciseForms[block.id],
+            submit_label: 'Ajouter l\'exercice'
+        }) }}
+    </details>
+</article>

@@ -7,4 +7,16 @@ import './stimulus_bootstrap.js';
  */
 import './styles/app.css';
 
-console.log('This log comes from assets/app.js - welcome to AssetMapper! 🎉');
+/*
+ * PWA (Phase 9) : enregistrement du service worker manuel.
+ * Servi depuis la racine (/sw.js) pour couvrir tout le scope de l'app. Le SW
+ * n'est actif qu'en contexte sécurisé (https ou localhost) ; ailleurs on ignore
+ * silencieusement.
+ */
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch((error) => {
+            console.error('Service worker registration failed:', error);
+        });
+    });
+}
