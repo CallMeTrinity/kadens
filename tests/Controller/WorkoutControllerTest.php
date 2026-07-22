@@ -4,6 +4,7 @@ namespace App\Tests\Controller;
 
 use App\Entity\Block;
 use App\Entity\Exercise;
+use App\Entity\PlanTemplate;
 use App\Entity\PrescribedExercise;
 use App\Entity\User;
 use App\Entity\Workout;
@@ -25,6 +26,9 @@ final class WorkoutControllerTest extends WebTestCase
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine.orm.entity_manager');
 
+        foreach ($this->em->getRepository(PlanTemplate::class)->findAll() as $template) {
+            $this->em->remove($template);
+        }
         foreach ($this->em->getRepository(Workout::class)->findAll() as $workout) {
             $this->em->remove($workout);
         }

@@ -4,6 +4,8 @@ namespace App\Tests\Service;
 
 use App\Entity\Block;
 use App\Entity\Exercise;
+use App\Entity\PlanItem;
+use App\Entity\PlanTemplate;
 use App\Entity\PrescribedExercise;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
@@ -37,6 +39,36 @@ final class PlanFlattenerTest extends TestCase
         $flat = $this->flattener->flattenWorkout($workout);
 
         self::assertSame($expected, $flat['blocks'][0]['exercises'][0]['summary']);
+    }
+
+    public function testFlattenPlanTemplateProducesDenseGrid(): void
+    {
+        $workout = (new Workout())->setTitle('Sortie longue')->setSlug('sortie-longue');
+
+        $item = (new PlanItem())->setWeekNumber(1)->setDayOfWeek(3)->setNotes('en Z2');
+        $item->setWorkout($workout);
+
+        $template = (new PlanTemplate())->setTitle('Plan 5k')->setDurationWeeks(2);
+        $template->addPlanItem($item);
+
+        $flat = $this->flattener->flattenPlanTemplate($template);
+
+        // Grille dense : autant de semaines que déclarées, 7 jours chacune.
+        self::assertCount(2, $flat['weeks']);
+        self::assertCount(7, $flat['weeks'][0]['days']);
+        self::assertSame(1, $flat['weeks'][0]['weekNumber']);
+        self::assertSame(4, $flat['weeks'][0]['days'][3]['dayOfWeek']);
+
+        // La séance est bien placée en semaine 1, jour 3 (index 2).
+        $cell = $flat['weeks'][0]['days'][2];
+        self::assertSame(3, $cell['dayOfWeek']);
+        self::assertCount(1, $cell['items']);
+        self::assertSame('Sortie longue', $cell['items'][0]['workout']['workout']->getTitle());
+        self::assertSame('en Z2', $cell['items'][0]['item']->getNotes());
+
+        // Les autres cases sont vides.
+        self::assertSame([], $flat['weeks'][0]['days'][0]['items']);
+        self::assertSame([], $flat['weeks'][1]['days'][2]['items']);
     }
 
     public static function summaryCases(): iterable

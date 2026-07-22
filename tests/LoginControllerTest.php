@@ -3,6 +3,7 @@
 namespace App\Tests;
 
 use App\Entity\Exercise;
+use App\Entity\PlanTemplate;
 use App\Entity\User;
 use App\Entity\Workout;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -20,8 +21,12 @@ class LoginControllerTest extends WebTestCase
         $em = $container->get('doctrine.orm.entity_manager');
         $userRepository = $em->getRepository(User::class);
 
-        // Repartir d'une base vide : d'abord les entités portant une clé
-        // étrangère owner (séances, exercices), puis les utilisateurs.
+        // Repartir d'une base vide : d'abord les plans (référencent séances et
+        // owner), puis les entités portant une clé étrangère owner (séances,
+        // exercices), puis les utilisateurs.
+        foreach ($em->getRepository(PlanTemplate::class)->findAll() as $template) {
+            $em->remove($template);
+        }
         foreach ($em->getRepository(Workout::class)->findAll() as $workout) {
             $em->remove($workout);
         }

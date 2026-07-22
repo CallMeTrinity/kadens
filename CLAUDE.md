@@ -123,8 +123,19 @@ Socle Symfony en place (Docker, MariaDB, CI/CD). Design tokens posés.
   lecture), rendu lecture seule extrait dans `templates/components/_workout_read.html.twig`
   (partagé par `workout/show` et `public_share/workout`), bouton « copier le lien »
   via le contrôleur Stimulus `clipboard`.
+- **Phase 5 — templates de plans multi-semaines : faite.** `PlanTemplate`/`PlanItem`
+  (cascade + `orphanRemoval` + `OrderBy` semaine/jour, lifecycle `createdAt`/`updatedAt`),
+  `PlanTemplateVoter` (même logique perso/global que `WorkoutVoter`),
+  `PlanTemplateController` (CRUD + duplication). Éditeur de trame server-driven :
+  grille dense `durationWeeks` × 7 jours (ISO 1=lundi..7=dimanche), placement/retrait
+  de `Workout` par case via **Turbo Streams** (position semaine/jour portée par la
+  route, séances préchargées une fois pour toutes les cases). `PlanFlattener::flattenPlanTemplate`
+  produit la grille dense (source unique consommée par le rendu et le futur export),
+  rendu lecture dans `templates/components/_plan_read.html.twig`. Pas de migration :
+  les tables existaient déjà, les ajouts sont purement ORM.
 
-Prochaine étape : **Phase 5 — templates de plans multi-semaines**.
+Prochaine étape : **Phase 6 — calendrier & instanciation** (`ScheduledWorkout` +
+`PlanInstantiator` + `CalendarController`).
 
 ---
 

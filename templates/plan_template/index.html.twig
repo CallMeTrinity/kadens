@@ -1,0 +1,41 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Mes plans{% endblock %}
+
+{% block body %}
+    {% for message in app.flashes('success') %}
+        <p role="status">{{ message }}</p>
+    {% endfor %}
+
+    <h1>Mes plans</h1>
+
+    <p><a href="{{ path('app_plan_template_new') }}">Nouveau plan</a></p>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Titre</th>
+                <th>Semaines</th>
+                <th>Séances placées</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for template in planTemplates %}
+            <tr>
+                <td>{{ template.title }}</td>
+                <td>{{ template.durationWeeks }}</td>
+                <td>{{ template.planItems|length }}</td>
+                <td>
+                    <a href="{{ path('app_plan_template_show', {id: template.id}) }}">Voir</a>
+                    <a href="{{ path('app_plan_template_edit', {id: template.id}) }}">Éditer</a>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="4">Aucun plan pour l'instant.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}

@@ -3,12 +3,14 @@
 namespace App\Service;
 
 use App\Entity\Block;
+use App\Entity\PlanItem;
+use App\Entity\PlanTemplate;
 use App\Entity\PrescribedExercise;
 use App\Entity\Workout;
 use App\Enum\PrescriptionType;
 
 /**
- * Source unique de mise à plat d'une séance (et, à terme, d'un plan complet).
+ * Source unique de mise à plat d'une séance ET d'un plan complet.
  *
  * Produit une structure « plate » traversable, indépendante du rendu. La vue de
  * consultation Twig ET le futur export Excel (Phase 8) consomment cette même
@@ -20,9 +22,59 @@ use App\Enum\PrescriptionType;
  * @phpstan-type FlatPrescribed array{prescribed: PrescribedExercise, exercise: \App\Entity\Exercise|null, type: PrescriptionType|null, summary: string, rest: ?int, notes: ?string}
  * @phpstan-type FlatBlock array{block: Block, exercises: list<FlatPrescribed>}
  * @phpstan-type FlatWorkout array{workout: Workout, blocks: list<FlatBlock>}
+ * @phpstan-type FlatItem array{item: PlanItem, workout: FlatWorkout}
+ * @phpstan-type FlatDay array{dayOfWeek: int, items: list<FlatItem>}
+ * @phpstan-type FlatWeek array{weekNumber: int, days: list<FlatDay>}
+ * @phpstan-type FlatPlan array{template: PlanTemplate, weeks: list<FlatWeek>}
  */
 final class PlanFlattener
 {
+    /**
+     * Mise à plat d'un plan complet : une grille semaines × jours (1..7, ISO :
+     * 1=lundi..7=dimanche), chaque case portant la liste des séances placées,
+     * elles-mêmes aplaties. La grille est dense (toutes les cases existent,
+     * même vides) pour que le rendu et l'export n'aient aucun trou à gérer.
+     *
+     * @return FlatPlan
+     */
+    public function flattenPlanTemplate(PlanTemplate $template): array
+    {
+        // Indexation des items par semaine/jour pour un accès direct par case.
+        $byCell = [];
+        foreach ($template->getPlanItems() as $item) {
+            $byCell[$item->getWeekNumber()][$item->getDayOfWeek()][] = $item;
+        }
+
+        $weeks = [];
+        for ($week = 1; $week <= (int) $template->getDurationWeeks(); ++$week) {
+            $days = [];
+            for ($day = 1; $day <= 7; ++$day) {
+                $items = [];
+                foreach ($byCell[$week][$day] ?? [] as $item) {
+                    $items[] = [
+                        'item' => $item,
+                        'workout' => $this->flattenWorkout($item->getWorkout()),
+                    ];
+                }
+
+                $days[] = [
+                    'dayOfWeek' => $day,
+                    'items' => $items,
+                ];
+            }
+
+            $weeks[] = [
+                'weekNumber' => $week,
+                'days' => $days,
+            ];
+        }
+
+        return [
+            'template' => $template,
+            'weeks' => $weeks,
+        ];
+    }
+
     /**
      * @return FlatWorkout
      */

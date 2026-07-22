@@ -3,6 +3,7 @@
 namespace App\Tests\Controller;
 
 use App\Entity\Exercise;
+use App\Entity\PlanTemplate;
 use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
@@ -21,8 +22,12 @@ final class ExerciseControllerTest extends WebTestCase
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine.orm.entity_manager');
 
-        // Base de test propre : d'abord les séances et exercices (clé étrangère
+        // Base de test propre : d'abord les plans (référencent séances via
+        // PlanItem et owner), puis les séances et exercices (clé étrangère
         // owner), puis les utilisateurs.
+        foreach ($this->em->getRepository(PlanTemplate::class)->findAll() as $template) {
+            $this->em->remove($template);
+        }
         foreach ($this->em->getRepository(Workout::class)->findAll() as $workout) {
             $this->em->remove($workout);
         }
