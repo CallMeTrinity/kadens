@@ -516,7 +516,7 @@ globale (`owner` null). Ignore les doublons par `name`, idempotente.
 8. [x] Format JSON + ImportExercisesCommand
 9. [x] PublicShareController + vues slug lecture seule
 10. [x] PlanTemplate/PlanItem + éditeur de plan + duplication
-11. [ ] Enum ScheduledStatus + ScheduledWorkout + PlanInstantiator + calendrier
+11. [x] Enum ScheduledStatus + ScheduledWorkout + PlanInstantiator + calendrier
 12. [ ] Statut prévu/réalisé + synthèse
 13. [ ] PhpSpreadsheet + ExcelExporter + ExportController
 14. [ ] manifest.json + sw.js manuel + installabilité + offline lecture

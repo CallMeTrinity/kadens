@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\ScheduledWorkout;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -16,28 +17,27 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
         parent::__construct($registry, ScheduledWorkout::class);
     }
 
-    //    /**
-    //     * @return ScheduledWorkout[] Returns an array of ScheduledWorkout objects
-    //     */
-    //    public function findByExampleField($value): array
-    //    {
-    //        return $this->createQueryBuilder('s')
-    //            ->andWhere('s.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->orderBy('s.id', 'ASC')
-    //            ->setMaxResults(10)
-    //            ->getQuery()
-    //            ->getResult()
-    //        ;
-    //    }
-
-    //    public function findOneBySomeField($value): ?ScheduledWorkout
-    //    {
-    //        return $this->createQueryBuilder('s')
-    //            ->andWhere('s.exampleField = :val')
-    //            ->setParameter('val', $value)
-    //            ->getQuery()
-    //            ->getOneOrNullResult()
-    //        ;
-    //    }
+    /**
+     * Séances planifiées d'un utilisateur dans une fenêtre de dates (bornes
+     * incluses). Sert au rendu d'une grille de calendrier : on charge d'un coup
+     * tout ce que couvre le mois affiché (débords des semaines compris) et on
+     * jointe la séance pour éviter N requêtes au rendu.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findByOwnerBetween(User $owner, \DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        return $this->createQueryBuilder('s')
+            ->addSelect('w')
+            ->join('s.workout', 'w')
+            ->andWhere('s.owner = :owner')
+            ->andWhere('s.scheduledDate BETWEEN :start AND :end')
+            ->setParameter('owner', $owner)
+            ->setParameter('start', $start, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE)
+            ->setParameter('end', $end, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE)
+            ->orderBy('s.scheduledDate', 'ASC')
+            ->addOrderBy('s.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
 }

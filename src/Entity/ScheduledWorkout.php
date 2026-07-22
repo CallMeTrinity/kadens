@@ -8,6 +8,7 @@ use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ScheduledWorkoutRepository::class)]
+#[ORM\HasLifecycleCallbacks]
 class ScheduledWorkout
 {
     #[ORM\Id]
@@ -16,12 +17,18 @@ class ScheduledWorkout
     private ?int $id = null;
 
     #[ORM\ManyToOne(inversedBy: 'scheduledWorkouts')]
+    #[ORM\JoinColumn(onDelete: 'CASCADE')]
     private ?User $owner = null;
 
+    // La séance datée n'a pas de sens sans sa séance source : on cascade.
     #[ORM\ManyToOne(inversedBy: 'scheduledWorkouts')]
+    #[ORM\JoinColumn(onDelete: 'CASCADE')]
     private ?Workout $workout = null;
 
+    // Le plan source n'est qu'une provenance : le supprimer ne doit pas effacer
+    // un planning déjà matérialisé, seulement en oublier l'origine.
     #[ORM\ManyToOne(inversedBy: 'scheduledWorkouts')]
+    #[ORM\JoinColumn(onDelete: 'SET NULL')]
     private ?PlanTemplate $sourcePlanTemplate = null;
 
     #[ORM\Column(type: Types::DATE_IMMUTABLE)]
@@ -38,6 +45,18 @@ class ScheduledWorkout
 
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $updatedAt = null;
+
+    #[ORM\PrePersist]
+    public function onPrePersist(): void
+    {
+        $this->createdAt = new \DateTimeImmutable();
+    }
+
+    #[ORM\PreUpdate]
+    public function onPreUpdate(): void
+    {
+        $this->updatedAt = new \DateTimeImmutable();
+    }
 
     public function getId(): ?int
     {

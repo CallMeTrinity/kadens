@@ -133,9 +133,24 @@ Socle Symfony en place (Docker, MariaDB, CI/CD). Design tokens posés.
   produit la grille dense (source unique consommée par le rendu et le futur export),
   rendu lecture dans `templates/components/_plan_read.html.twig`. Pas de migration :
   les tables existaient déjà, les ajouts sont purement ORM.
+- **Phase 6 — calendrier & instanciation : faite.** `ScheduledWorkout` (lifecycle
+  `createdAt`/`updatedAt` ajoutés) + enum `ScheduledStatus`, `ScheduledWorkoutVoter`
+  (owner-only, pas de biblio globale ici). `PlanInstantiator` (service) projette une
+  trame `PlanTemplate` sur des dates réelles : **ancrage au lundi ISO** de la semaine
+  contenant la date de départ (un item « mercredi » retombe un mercredi) ; non
+  idempotent (déclenchement explicite). `CalendarController` (vue mois navigable
+  `/calendar/{year}/{month}`, grille dense semaines ISO lundi→dimanche construite
+  côté contrôleur) + `ScheduledWorkoutController` (poser une séance isolée,
+  instancier un plan, déplacer, retirer — chaque mutation redirige vers le mois
+  concerné, pas de Turbo Stream ici). Forms `ScheduleWorkoutType` / `PlanInstantiationType`.
+  Nav + `access_control` (`^/calendar`, `^/schedule` en `ROLE_USER`).
+  **Migration** `Version20260722163844` : FK `ScheduledWorkout` en `ON DELETE` —
+  `owner`/`workout` CASCADE (une séance datée n'a pas de sens sans eux),
+  `sourcePlanTemplate` SET NULL (supprimer un plan garde le planning matérialisé,
+  oublie juste la provenance).
 
-Prochaine étape : **Phase 6 — calendrier & instanciation** (`ScheduledWorkout` +
-`PlanInstantiator` + `CalendarController`).
+Prochaine étape : **Phase 7 — prévu vs réalisé** (usage de `status` depuis le
+calendrier + `completionNotes` + vue de synthèse).
 
 ---
 

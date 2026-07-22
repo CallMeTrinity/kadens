@@ -43,6 +43,8 @@ security:
         - { path: ^/exercise, roles: ROLE_USER }
         - { path: ^/workout, roles: ROLE_USER }
         - { path: ^/plan-template, roles: ROLE_USER }
+        - { path: ^/calendar, roles: ROLE_USER }
+        - { path: ^/schedule, roles: ROLE_USER }
         # - { path: ^/admin, roles: ROLE_ADMIN }
 
 when@test:
