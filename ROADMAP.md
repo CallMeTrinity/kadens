@@ -519,4 +519,4 @@ globale (`owner` null). Ignore les doublons par `name`, idempotente.
 11. [x] Enum ScheduledStatus + ScheduledWorkout + PlanInstantiator + calendrier
 12. [x] Statut prévu/réalisé + synthèse
 13. [x] PhpSpreadsheet + ExcelExporter + ExportController
-14. [ ] manifest.json + sw.js manuel + installabilité + offline lecture
+14. [x] manifest.json + sw.js manuel + installabilité + offline lecture

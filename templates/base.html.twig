@@ -6,12 +6,18 @@
         <title>{% block title %}Kadens{% endblock %}</title>
         <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 128 128%22><text y=%221.1em%22 font-size=%22104%22>📓</text></svg>">
 
+        {# PWA (Phase 9) — installabilité + consultation offline. #}
+        <meta name="theme-color" content="#b7532e">
+        <link rel="manifest" href="/manifest.json">
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-title" content="Kadens">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+
         {% block stylesheets %}
-            {# Polices « Carnet clair » — voir docs/design-system.md §3.
-               À self-héberger en Phase 9 (PWA) pour la consultation offline. #}
-            <link rel="preconnect" href="https://fonts.googleapis.com">
-            <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-            <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+            {# Polices « Carnet clair » self-hostées : chargées via AssetMapper
+               (app.css → fonts.css). Plus de dépendance Google Fonts. #}
         {% endblock %}
 
         {% block javascripts %}

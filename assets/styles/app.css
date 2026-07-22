@@ -1,14 +1,14 @@
 @import 'tokens.css';
+@import 'fonts.css';
 
 /* ============================================================================
    Kadens — feuille de style de base
    Applique l'identité « Carnet clair » au document. Les composants et vues
    consomment les tokens sémantiques définis dans tokens.css.
 
-   Rappel police : les familles Space Grotesk / Instrument Sans / JetBrains Mono
-   doivent être chargées dans base.html.twig (voir docs/design-system.md
-   § Chargement des polices). Sans ce chargement, seules les fallbacks system-ui
-   s'appliquent.
+   Polices : self-hostées depuis la Phase 9 (offline-first). Les @font-face sont
+   dans fonts.css (importé ci-dessus, subsets latin + latin-ext), les woff2 dans
+   assets/fonts/. Plus aucune dépendance à Google Fonts.
    ============================================================================ */
 
 body {

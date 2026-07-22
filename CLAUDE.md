@@ -176,9 +176,28 @@ Socle Symfony en place (Docker, MariaDB, CI/CD). Design tokens posés.
   `^/export` en `ROLE_USER`. Liens « Exporter en Excel » sur `workout/show`,
   `plan_template/show` et l'en-tête du calendrier. Pas de migration (aucun changement
   de schéma).
+- **Phase 9 — PWA : faite.** App installable + consultation hors ligne. Fichiers
+  statiques servis à la racine (hors AssetMapper, pour le scope) : `public/manifest.json`
+  (nom, icônes 192/512 `any` + `maskable`, `theme_color` terracotta, `background_color`
+  page, `display: standalone`), `public/sw.js` (service worker **écrit à la main**,
+  pas de Workbox) et `public/offline.html` (repli autonome, styles inline). Icônes
+  `public/icons/` : monogramme « K » crème sur terracotta, générées via GD (script
+  jetable, non commité). **Service worker** : les assets digestés `/assets/*` sont
+  immuables → **cache-first** ; les pages de consultation (`/workout/{id}`,
+  `/plan-template/{id}`, `/s/{slug}`) → **stale-while-revalidate** (instantané +
+  fraîcheur en fond, cohérent avec la « référence vivante ») ; autres navigations →
+  **network-first** avec repli `offline.html` ; non-GET et cross-origin jamais
+  interceptés. S'appuie sur la discipline « pages auto-suffisantes » tenue depuis la
+  Phase 2. Enregistrement dans `app.js` (contexte sécurisé uniquement). **Polices
+  self-hostées** : `assets/fonts/*.woff2` (subsets latin + latin-ext, 3 familles ×
+  graisses déclarées) + `assets/styles/fonts.css` (`@font-face`, importé par `app.css`,
+  `url()` réécrites par AssetMapper) ; plus aucune dépendance Google Fonts (liens
+  retirés de `base.html.twig`, remplacés par les métas PWA). Pas de migration.
 
-Prochaine étape : **Phase 9 — PWA** (service worker manuel, cache offline des pages
-de consultation, self-hébergement des polices).
+Toutes les phases du ROADMAP sont livrées. Prochaines pistes hors-roadmap : premier
+déploiement PWA sur `kadens.antoninpamart.fr` (HTTPS requis pour le service worker) et
+vérification manuelle Lighthouse/installabilité + navigation offline réelle en
+navigateur (non automatisable ici).
 
 ---
 

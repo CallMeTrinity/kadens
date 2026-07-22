@@ -109,20 +109,19 @@ Les eyebrows en mono capitales sont une signature de l'identité : sections de
 filtre, rôles de bloc (`ÉCHAUFFEMENT`, `CORPS DE SÉANCE`), légendes de synthèse.
 
 ### Chargement des polices
-Les maquettes chargent les polices via Google Fonts. À la mise en place du
-`base.html.twig`, ajouter dans le `<head>` (bloc `stylesheets`) :
+**Self-hostées depuis la Phase 9** (offline-first, aucune dépendance Google
+Fonts). Les fichiers `woff2` sont dans `assets/fonts/` (subsets latin +
+latin-ext), les `@font-face` dans `assets/styles/fonts.css`, importé par
+`app.css` et donc chargé via AssetMapper (`importmap('app')` émet le `<link>`
+CSS ; les `url()` sont réécrites vers les chemins digestés). Le `base.html.twig`
+ne référence plus aucune police externe.
 
-```html
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-```
-
-> Piège offline (Phase 9 — PWA) : un lien Google Fonts externe ne sera pas
-> disponible hors ligne. Si la consultation offline doit garder sa typo, il
-> faudra **self-héberger les polices** (fichiers `woff2` dans `assets/fonts/`,
-> `@font-face` local) et les précacher dans le service worker. À trancher au
-> moment de la Phase 9 ; sans ça, l'offline retombera sur les fallbacks system.
+> Régénération : les `woff2` et `fonts.css` sont produits par un script de fetch
+> jetable (récupère le CSS Google Fonts en UA Chrome pour obtenir du woff2, filtre
+> latin/latin-ext, télécharge et réécrit les `url()` en local). À relancer si les
+> familles ou graisses déclarées changent. Le service worker les met en cache au
+> runtime (cache-first sur `/assets/*`, immuables car digestés) : pas besoin de les
+> lister dans le précache.
 
 ---
 
