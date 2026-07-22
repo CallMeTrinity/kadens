@@ -14,39 +14,12 @@
         {% endif %}
     </p>
 
-    <h1>{{ workout.title }}</h1>
+    {# Partage lecture publique (Phase 4) : lien slug ouvert sans authentification. #}
+    <div data-controller="clipboard" data-clipboard-url-value="{{ url('app_public_share', {slug: workout.slug}) }}">
+        <button type="button" data-action="clipboard#copy">Copier le lien de partage</button>
+        <a href="{{ path('app_public_share', {slug: workout.slug}) }}" target="_blank" rel="noopener">Ouvrir la page publique</a>
+        <span data-clipboard-target="feedback" role="status" aria-live="polite"></span>
+    </div>
 
-    {% if workout.estimatedDurationMinutes %}
-        <p>Durée estimée : {{ workout.estimatedDurationMinutes }} min</p>
-    {% endif %}
-
-    {% if workout.description %}
-        <p>{{ workout.description|nl2br }}</p>
-    {% endif %}
-
-    {% for entry in flat.blocks %}
-        {% set block = entry.block %}
-        <section>
-            <h2>
-                {{ block.role.label }}
-                {% if block.label %} — {{ block.label }}{% endif %}
-                {% if block.rounds > 1 %} <small>× {{ block.rounds }} tours</small>{% endif %}
-            </h2>
-
-            <ol>
-            {% for ex in entry.exercises %}
-                <li>
-                    <strong>{{ ex.exercise ? ex.exercise.name : '—' }}</strong>
-                    {% if ex.summary %}<span> · {{ ex.summary }}</span>{% endif %}
-                    {% if ex.rest %}<span> · repos {{ ex.rest }} s</span>{% endif %}
-                    {% if ex.notes %}<p>{{ ex.notes|nl2br }}</p>{% endif %}
-                </li>
-            {% else %}
-                <li>Aucun exercice.</li>
-            {% endfor %}
-            </ol>
-        </section>
-    {% else %}
-        <p>Cette séance est encore vide.</p>
-    {% endfor %}
+    {% include 'components/_workout_read.html.twig' with { flat: flat } only %}
 {% endblock %}

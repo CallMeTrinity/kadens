@@ -1,0 +1,42 @@
+{# Rendu lecture seule d'une séance mise à plat par PlanFlattener.
+   Partagé par la vue propriétaire (workout/show) et la vue publique
+   (public_share/workout). Auto-suffisant : aucun AJAX post-rendu, condition
+   du cache offline (Phase 9). Attend une variable `flat` (sortie de
+   PlanFlattener::flattenWorkout). #}
+{% set workout = flat.workout %}
+
+<h1>{{ workout.title }}</h1>
+
+{% if workout.estimatedDurationMinutes %}
+    <p>Durée estimée : {{ workout.estimatedDurationMinutes }} min</p>
+{% endif %}
+
+{% if workout.description %}
+    <p>{{ workout.description|nl2br }}</p>
+{% endif %}
+
+{% for entry in flat.blocks %}
+    {% set block = entry.block %}
+    <section>
+        <h2>
+            {{ block.role.label }}
+            {% if block.label %} — {{ block.label }}{% endif %}
+            {% if block.rounds > 1 %} <small>× {{ block.rounds }} tours</small>{% endif %}
+        </h2>
+
+        <ol>
+        {% for ex in entry.exercises %}
+            <li>
+                <strong>{{ ex.exercise ? ex.exercise.name : '—' }}</strong>
+                {% if ex.summary %}<span> · {{ ex.summary }}</span>{% endif %}
+                {% if ex.rest %}<span> · repos {{ ex.rest }} s</span>{% endif %}
+                {% if ex.notes %}<p>{{ ex.notes|nl2br }}</p>{% endif %}
+            </li>
+        {% else %}
+            <li>Aucun exercice.</li>
+        {% endfor %}
+        </ol>
+    </section>
+{% else %}
+    <p>Cette séance est encore vide.</p>
+{% endfor %}

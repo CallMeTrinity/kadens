@@ -1,0 +1,11 @@
+{% extends 'base.html.twig' %}
+
+{% set workout = flat.workout %}
+
+{% block title %}{{ workout.title }}{% endblock %}
+
+{% block body %}
+    {# Page publique en lecture seule : réutilise le composant de rendu, sans
+       aucune action d'édition ni navigation propriétaire. #}
+    {% include 'components/_workout_read.html.twig' with { flat: flat } only %}
+{% endblock %}

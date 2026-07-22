@@ -118,8 +118,13 @@ Socle Symfony en place (Docker, MariaDB, CI/CD). Design tokens posés.
   `prescription_fields`), et `PlanFlattener` (source unique de mise à plat) consommé
   par la vue de consultation auto-suffisante. Source unique des champs pertinents par
   type : `PrescriptionType::fields()`.
+- **Phase 4 — partage lecture publique : faite.** `PublicShareController` (route
+  publique `/s/{slug}`, hors `WorkoutVoter` : le lien slug vaut autorisation de
+  lecture), rendu lecture seule extrait dans `templates/components/_workout_read.html.twig`
+  (partagé par `workout/show` et `public_share/workout`), bouton « copier le lien »
+  via le contrôleur Stimulus `clipboard`.
 
-Prochaine étape : **Phase 4 — partage lecture publique** (Phase 3 import déjà faite).
+Prochaine étape : **Phase 5 — templates de plans multi-semaines**.
 
 ---
 
