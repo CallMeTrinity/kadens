@@ -1,8 +1,12 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Éditer — {{ workout.title }}{% endblock %}
+{% block title %}Composer — {{ workout.title }}{% endblock %}
+
+{% block main_class %}kd-page kd-page--wide{% endblock %}
 
 {% block body %}
+    {% import 'components/_activity.html.twig' as activity %}
+
     {% for message in app.flashes('success') %}
         <p class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }} {{ message }}</p>
     {% endfor %}
@@ -13,42 +17,81 @@
         </a>
         <div class="kd-actionbar__end">
             <a href="{{ path('app_workout_show', {id: workout.id}) }}" class="kd-btn kd-btn--secondary kd-btn--sm">
-                {{ ux_icon('lucide:arrow-right') }} Voir la séance
+                {{ ux_icon('lucide:eye') }} Voir la séance
+            </a>
+            <a href="{{ path('app_export_workout', {id: workout.id}) }}" class="kd-btn kd-btn--secondary kd-btn--sm">
+                {{ ux_icon('lucide:file-down') }} Excel
             </a>
         </div>
     </div>
 
-    <div class="kd-pagehead">
-        <div>
-            <p class="kd-eyebrow">Éditeur de séance</p>
-            <h1 class="kd-title">{{ workout.title }}</h1>
-        </div>
-    </div>
+    {% set exCount = 0 %}
+    {% for b in workout.blocks %}{% set exCount = exCount + b.prescribedExercises|length %}{% endfor %}
 
-    {# Informations générales #}
-    <section class="kd-card" style="max-width:640px;">
-        <div class="kd-card__head">
-            <h2 class="kd-card__title">Informations</h2>
-        </div>
-        {{ form_start(form) }}
-            {{ form_widget(form) }}
-            <div class="kd-formactions">
+    {# data-turbo="false" : Turbo n'intercepte aucun formulaire ici ; le contrôleur
+       `composer` applique lui-même les Turbo Streams via fetch (voir le contrôleur). #}
+    <section class="kd-composer" data-controller="composer" data-turbo="false">
+
+        {# ---- En-tête : titre éditable + méta + enregistrer ---- #}
+        {{ form_start(form, { attr: { class: 'kd-composer__head' } }) }}
+            <div class="kd-composer__headmain">
+                <p class="kd-eyebrow kd-eyebrow--accent">Compositeur de séance</p>
+                {{ form_widget(form.title, { attr: {
+                    class: 'kd-composer__title',
+                    placeholder: 'Titre de la séance',
+                } }) }}
+                <p class="kd-composer__meta">
+                    {{ workout.blocks|length }} blocs · {{ exCount }} exercices
+                    {%- if workout.estimatedDurationMinutes %} · ≈ {{ workout.estimatedDurationMinutes }} min estimées{% endif -%}
+                </p>
+                <details class="kd-composer__details">
+                    <summary>{{ ux_icon('lucide:settings-2') }} Détails de la séance</summary>
+                    <div class="kd-composer__detailsbody">
+                        {{ form_row(form.description) }}
+                        {{ form_row(form.estimatedDurationMinutes) }}
+                    </div>
+                </details>
+            </div>
+            <div class="kd-composer__headactions">
                 <button type="submit" class="kd-btn kd-btn--primary">
-                    {{ ux_icon('lucide:save') }} Enregistrer
+                    {{ ux_icon('lucide:save') }} Enregistrer la séance
                 </button>
             </div>
         {{ form_end(form) }}
-    </section>
 
-    {# Blocs & exercices — conteneur cible des Turbo Streams #}
-    <section class="kd-editsection">
-        <p class="kd-editsection__title">Blocs &amp; exercices</p>
-        <div id="workout-blocks">
-            {{ include('workout/_blocks.html.twig') }}
+        {# ---- Corps : bibliothèque (gauche) + blocs (droite) ---- #}
+        <div class="kd-composer__body">
+            <aside class="kd-composer__lib">
+                {{ include('workout/_composer_library.html.twig') }}
+            </aside>
+
+            <div class="kd-composer__main">
+                {# Cible des Turbo Streams. Toute mutation met à jour le contenu de
+                   ce conteneur (action="update") sans recharger la page. #}
+                <div id="workout-blocks">
+                    {{ include('workout/_blocks.html.twig') }}
+                </div>
+            </div>
         </div>
+
+        {# ---- Formulaires cachés (hors #workout-blocks, donc préservés par la
+               mise à jour) : porteurs du jeton CSRF + URL, soumis par le JS ---- #}
+        <form method="post" data-composer-target="quickAddForm"
+              action="{{ path('app_workout_prescribed_quick_add', {id: workout.id}) }}" hidden>
+            <input type="hidden" name="_token" value="{{ csrf_token('prescribed_quick_add' ~ workout.id) }}">
+            <input type="hidden" name="exerciseId" value="">
+            <input type="hidden" name="blockId" value="">
+        </form>
+        <form method="post" data-composer-target="reorderForm"
+              action="{{ path('app_workout_prescribed_reorder', {id: workout.id}) }}" hidden>
+            <input type="hidden" name="_token" value="{{ csrf_token('prescribed_reorder' ~ workout.id) }}">
+            <input type="hidden" name="prescribedId" value="">
+            <input type="hidden" name="targetBlockId" value="">
+            <input type="hidden" name="afterId" value="">
+        </form>
     </section>
 
-    {# Zone dangereuse #}
+    {# ---- Zone dangereuse ---- #}
     <section class="kd-editsection">
         <p class="kd-editsection__title">Zone dangereuse</p>
         {{ include('workout/_delete_form.html.twig') }}

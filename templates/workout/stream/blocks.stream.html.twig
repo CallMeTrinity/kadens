@@ -1,7 +1,8 @@
-{# Réponse Turbo Stream d'une mutation de l'éditeur : on remplace intégralement
-   le conteneur des blocs par sa version fraîchement rendue. Contexte fourni par
-   blocksContext(). #}
-<turbo-stream action="replace" target="workout-blocks">
+{# Réponse Turbo Stream d'une mutation de l'éditeur. action="update" : on remplace
+   le CONTENU de #workout-blocks (le conteneur et son id sont conservés, donc les
+   mutations suivantes retrouvent toujours la cible). Contexte fourni par
+   blocksContext(). Appliqué côté client par le contrôleur `composer`. #}
+<turbo-stream action="update" target="workout-blocks">
     <template>
         {{ include('workout/_blocks.html.twig') }}
     </template>

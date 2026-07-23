@@ -1,23 +1,41 @@
-{# Un bloc en édition : entête (rôle/tours/libellé + déplacer/supprimer),
-   liste des exercices prescrits, puis formulaire d'ajout d'exercice.
-   Contexte hérité : workout, blockForms, addExerciseForms, prescribedForms. #}
+{# Un bloc dans le compositeur (style 3a). En-tête inline (rôle / libellé / tours,
+   déplacer, supprimer) puis les exercices en lignes compactes. Le corps du bloc
+   est une zone de dépôt (glisser depuis la bibliothèque ou réordonner une ligne).
+   Contexte hérité : workout, blockForms, prescribedForms, summaries. #}
+{% import 'components/_activity.html.twig' as activity %}
 {% set blockForm = blockForms[block.id] %}
-<article class="kd-editblock">
-    <div class="kd-editblock__head">
-        {{ form_start(blockForm, { attr: { style: 'flex:1 1 auto; min-width:0;' } }) }}
-            <div class="kd-fieldrow kd-fieldrow--tight">
-                {{ form_row(blockForm.role) }}
-                {{ form_row(blockForm.rounds) }}
-                {{ form_row(blockForm.label) }}
-            </div>
-            <div class="kd-formactions" style="border:0; padding-top:0; margin-top:var(--kd-space-5);">
-                <button type="submit" class="kd-btn kd-btn--secondary kd-btn--sm">
-                    {{ ux_icon('lucide:save') }} Enregistrer le bloc
-                </button>
+
+<article class="kd-cblock"
+         data-composer-target="block"
+         data-block-id="{{ block.id }}"
+         data-action="click->composer#activateBlock dragover->composer#blockDragOver dragleave->composer#blockDragLeave drop->composer#blockDrop">
+
+    <div class="kd-cblock__head">
+        {{ form_start(blockForm, { attr: { class: 'kd-cblock__form' } }) }}
+            <span class="kd-cblock__dot"></span>
+            {{ form_widget(blockForm.role, { attr: {
+                class: 'kd-cblock__role',
+                'data-action': 'change->composer#submitForm',
+            } }) }}
+            {{ form_widget(blockForm.label, { attr: {
+                class: 'kd-cblock__label',
+                placeholder: 'intitulé libre',
+                'data-action': 'change->composer#submitForm',
+            } }) }}
+            <div class="kd-cblock__rounds">
+                <button type="button" class="kd-cblock__step" data-action="composer#roundsDec" aria-label="Moins de tours">−</button>
+                {{ ux_icon('lucide:repeat') }}
+                {{ form_widget(blockForm.rounds, { attr: {
+                    class: 'kd-cblock__roundsval',
+                    'data-action': 'change->composer#submitForm',
+                    'aria-label': 'Nombre de tours',
+                } }) }}
+                <span class="kd-cblock__roundslabel">tours</span>
+                <button type="button" class="kd-cblock__step" data-action="composer#roundsInc" aria-label="Plus de tours">+</button>
             </div>
         {{ form_end(blockForm) }}
 
-        <div class="kd-microactions">
+        <div class="kd-cblock__actions">
             {{ include('workout/_action_form.html.twig', {
                 action: path('app_workout_block_move', {id: workout.id, blockId: block.id, direction: 'up'}),
                 token: csrf_token('block_move' ~ block.id),
@@ -33,7 +51,7 @@
             {{ include('workout/_action_form.html.twig', {
                 action: path('app_workout_block_delete', {id: workout.id, blockId: block.id}),
                 token: csrf_token('block_delete' ~ block.id),
-                icon: 'lucide:trash-2',
+                icon: 'lucide:x',
                 variant: 'danger',
                 label: 'Supprimer le bloc',
                 confirm: 'Supprimer ce bloc et ses exercices ?'
@@ -41,15 +59,45 @@
         </div>
     </div>
 
-    {% if block.prescribedExercises is empty %}
-        <p class="kd-editex--empty">Aucun exercice dans ce bloc.</p>
-    {% else %}
-        <ol class="kd-editexlist">
+    <div class="kd-cblock__items">
         {% for prescribed in block.prescribedExercises %}
-            <li class="kd-editex">
-                <div class="kd-editex__head">
-                    <span class="kd-editex__pos">Exercice {{ loop.index }}</span>
-                    <div class="kd-microactions">
+            {% set ex = prescribed.exercise %}
+            {% set mod = ex ? activity.modifier(ex.activity) : '' %}
+            <div class="kd-cexo"
+                 draggable="true"
+                 data-composer-target="exo"
+                 data-prescribed-id="{{ prescribed.id }}"
+                 data-block-id="{{ block.id }}"
+                 data-action="dragstart->composer#exoDragStart dragover->composer#exoDragOver dragleave->composer#blockDragLeave dragend->composer#dragEnd drop->composer#exoDrop">
+                <div class="kd-cexo__row">
+                    <span class="kd-cexo__handle" title="Glisser pour réordonner">{{ ux_icon('lucide:grip-vertical') }}</span>
+                    <span class="kd-cexo__code{{ mod ? ' kd-cexo__code--' ~ mod }}">{{ ex ? ex.name|slice(0, 2)|upper : '??' }}</span>
+                    <div class="kd-cexo__body">
+                        <div class="kd-cexo__name">{{ ex ? ex.name : 'Exercice supprimé' }}</div>
+                        <div class="kd-cexo__type">{{ prescribed.prescriptionType ? prescribed.prescriptionType.label }}</div>
+                    </div>
+                    {% if summaries[prescribed.id]|default('') is not empty %}
+                        <span class="kd-cexo__pill">{{ summaries[prescribed.id] }}</span>
+                    {% endif %}
+                    <button type="button" class="kd-cexo__btn" data-action="composer#toggleParams" title="Paramètres" aria-label="Paramètres">
+                        {{ ux_icon('lucide:sliders-horizontal') }}
+                    </button>
+                    {{ include('workout/_action_form.html.twig', {
+                        action: path('app_workout_prescribed_delete', {id: workout.id, prescribedId: prescribed.id}),
+                        token: csrf_token('prescribed_delete' ~ prescribed.id),
+                        icon: 'lucide:x',
+                        variant: 'danger',
+                        label: 'Retirer l\'exercice',
+                        confirm: 'Retirer cet exercice du bloc ?'
+                    }) }}
+                </div>
+
+                <div class="kd-cexo__params" hidden>
+                    {{ include('workout/_prescribed_form.html.twig', {
+                        form: prescribedForms[prescribed.id],
+                        submit_label: 'Enregistrer l\'exercice'
+                    }) }}
+                    <div class="kd-cexo__reorder">
                         {{ include('workout/_action_form.html.twig', {
                             action: path('app_workout_prescribed_move', {id: workout.id, prescribedId: prescribed.id, direction: 'up'}),
                             token: csrf_token('prescribed_move' ~ prescribed.id),
@@ -62,30 +110,11 @@
                             icon: 'lucide:chevron-down',
                             label: 'Descendre l\'exercice'
                         }) }}
-                        {{ include('workout/_action_form.html.twig', {
-                            action: path('app_workout_prescribed_delete', {id: workout.id, prescribedId: prescribed.id}),
-                            token: csrf_token('prescribed_delete' ~ prescribed.id),
-                            icon: 'lucide:x',
-                            variant: 'danger',
-                            label: 'Retirer l\'exercice',
-                            confirm: 'Retirer cet exercice du bloc ?'
-                        }) }}
                     </div>
                 </div>
-                {{ include('workout/_prescribed_form.html.twig', {
-                    form: prescribedForms[prescribed.id],
-                    submit_label: 'Enregistrer l\'exercice'
-                }) }}
-            </li>
+            </div>
+        {% else %}
+            <div class="kd-cblock__drop">Déposez un exercice ici</div>
         {% endfor %}
-        </ol>
-    {% endif %}
-
-    <details class="kd-adddetails">
-        <summary>{{ ux_icon('lucide:plus') }} Ajouter un exercice</summary>
-        {{ include('workout/_prescribed_form.html.twig', {
-            form: addExerciseForms[block.id],
-            submit_label: 'Ajouter l\'exercice'
-        }) }}
-    </details>
+    </div>
 </article>

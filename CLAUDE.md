@@ -180,7 +180,17 @@ Socle Symfony en place (Docker, MariaDB, CI/CD). Design tokens posés.
   `^/export` en `ROLE_USER`. Liens « Exporter en Excel » sur `workout/show`,
   `plan_template/show` et l'en-tête du calendrier. Pas de migration (aucun changement
   de schéma).
-- **Phase 9 — PWA : faite.** App installable + consultation hors ligne. Fichiers
+- **Phase 9 — PWA : SUSPENDUE (mode hors connexion mis de côté).** La contrainte
+  offline (« pages auto-suffisantes, zéro AJAX post-chargement ») bridait la
+  dynamisation des vues : on la lève pour l'instant. `app.js` **n'enregistre plus**
+  de service worker et **désenregistre** ceux déjà installés + purge leurs caches
+  `kadens-*` (un SW obsolète servait une page en cache et donnait l'illusion qu'il
+  fallait recharger). `manifest`/métas PWA retirées de `base.html.twig` (seule la
+  `theme-color` reste). Les fichiers `public/sw.js`, `public/manifest.json`,
+  `public/offline.html`, `public/icons/` restent sur disque, inertes, pour une
+  réactivation ultérieure. Les polices self-hostées et le reste sont conservés.
+  *Ci-dessous, la description d'origine, à titre de référence pour la reprise.*
+- **Phase 9 — PWA (référence, inactive).** App installable + consultation hors ligne. Fichiers
   statiques servis à la racine (hors AssetMapper, pour le scope) : `public/manifest.json`
   (nom, icônes 192/512 `any` + `maskable`, `theme_color` terracotta, `background_color`
   page, `display: standalone`), `public/sw.js` (service worker **écrit à la main**,
@@ -282,6 +292,47 @@ navigateur (non automatisable ici).
   `.kd-obar` dimensionnée par `flex`, légende `.kd-olegend` pastille+compteur ;
   couleur = statut fait/prévu/manqué, seul cas hors activité). Icônes importées :
   `calendar-check`, `calendar-off`, `calendar`. Toutes les vues sont désormais stylées.
+  **Compositeur de séance (éditeur refait, maquette 3a « création rapide par
+  glisser-déposer »).** L'éditeur `workout/edit` passe d'une pile de formulaires à
+  un compositeur deux volets, **sans changer le modèle server-driven**. Mise à jour
+  dynamique **par Turbo Stream appliqué à la main** : la `<section>` porte
+  `data-turbo="false"` (Turbo n'intercepte aucun formulaire du compositeur), et le
+  contrôleur `composer` capte toute soumission (bouton réel OU `requestSubmit` des
+  formulaires cachés), fait un `fetch` explicite en `Accept: text/vnd.turbo-stream.html`,
+  puis `renderStreamMessage` applique le flux au DOM. On ne dépend PAS du routage de
+  formulaire de Turbo (les frames échouaient sur les formulaires hors conteneur : une
+  soumission out-of-frame dégénérait en visite de page). `blocksResponse` renvoie un
+  `<turbo-stream action="update" target="workout-blocks">` (`update` = on remplace le
+  CONTENU du `<div id="workout-blocks">`, l'id survit à chaque mutation) quand
+  `getPreferredFormat()` vaut stream, sinon redirection (repli sans JS).
+  **Piège majeur corrigé (« il faut recharger pour voir l'ajout ») :** les endpoints
+  d'ajout ne posaient que le côté propriétaire (`$prescribed->setBlock($block)`,
+  `$block->setWorkout($workout)`), donc la collection inverse en mémoire restait
+  périmée et le stream re-rendu dans la foulée ne montrait pas l'élément (visible
+  seulement après rechargement, quand Doctrine relit la base). On passe désormais par
+  `Block::addPrescribedExercise` / `Workout::addBlock` qui maintiennent **les deux
+  côtés**. Vaut pour `addBlock`, `addPrescribed` et `quickAddPrescribed`. Volet gauche = bibliothèque
+  (`_composer_library.html.twig`, exercices perso+globaux via `findLibraryForUser`) :
+  recherche + filtres d'activité **100 % client offline-safe** (portés par le
+  contrôleur Stimulus `composer`, pas par `filter`), et ajout par bouton `+` (bloc
+  actif) **ou glisser-déposer** dans un bloc. Volet droit = les blocs en cartes
+  `.kd-cblock` : en-tête inline (rôle `<select>` + libellé auto-soumis sur `change`,
+  stepper de tours `− ↻ N +`, monter/descendre, supprimer) ; exercices en lignes
+  compactes `.kd-cexo` (poignée, code 2 lettres teinté par activité, nom, pastille
+  résumé issue de `PlanFlattener`, `⚙` dépliant le panneau de paramètres = form
+  prescrit inline + réordonner). Deux nouveaux endpoints minces sur `WorkoutController`,
+  tous deux renvoyant le stream des blocs : `prescribed_quick_add` (POST exerciseId+
+  blockId, type par défaut `SETS_REPS`, à affiner ensuite) et `prescribed_reorder`
+  (POST prescribedId+targetBlockId+afterId, gère le déplacement intra/inter-blocs et
+  renumérote les positions de 0..n). Le glisser-déposer et le stepper sont de la
+  **progressive enhancement** (contrôleur `composer_controller.js`, deux formulaires
+  cachés hors `#workout-blocks` — donc préservés par la mise à jour — porteurs du
+  jeton CSRF + URL, soumis par le JS) : sans JS, monter/descendre
+  et les boutons de sauvegarde restent le repli fonctionnel. `PlanFlattener` reste la
+  source unique du résumé (aucune mise à plat réimplémentée). Couche CSS `.kd-composer*`
+  / `.kd-libpanel*` / `.kd-libx*` / `.kd-cblock*` / `.kd-cexo*` + `.kd-page--wide`
+  ajoutée à `components.css`, tout tokenisé. Icônes importées : `repeat`,
+  `grip-vertical`, `sliders-horizontal`, `eye`, `settings-2`. Pas de migration.
 
 ---
 

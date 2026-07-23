@@ -1,0 +1,65 @@
+{# Bibliothèque du compositeur (colonne gauche). Purement client pour la
+   recherche/filtre (offline-safe) ; l'ajout passe par le contrôleur composer
+   (« + » = bloc actif, ou glisser-déposer dans un bloc). Contexte : library,
+   libraryCount, libraryActivities. #}
+{% import 'components/_activity.html.twig' as activity %}
+
+<div class="kd-libpanel">
+    <div class="kd-libpanel__head">
+        <div class="kd-libpanel__title">
+            <span>Bibliothèque</span>
+            <span class="kd-libpanel__count">{{ libraryCount }} exos</span>
+        </div>
+
+        <div class="kd-libsearch">
+            {{ ux_icon('lucide:search') }}
+            <input type="search" placeholder="Rechercher un exercice…"
+                   data-composer-target="search"
+                   data-action="input->composer#filterLib">
+        </div>
+
+        <div class="kd-libfilters">
+            <button type="button" class="kd-libfilter kd-libfilter--on"
+                    data-activity-pill data-activity="all"
+                    data-action="composer#pickActivity">Tous · {{ libraryCount }}</button>
+            {% for act in libraryActivities %}
+                <button type="button" class="kd-libfilter"
+                        data-activity-pill data-activity="{{ act.value }}"
+                        data-action="composer#pickActivity">{{ act.label }} · {{ act.count }}</button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="kd-libpanel__list">
+        {% for ex in library %}
+            {% set mod = activity.modifier(ex.activity) %}
+            <div class="kd-libx{{ mod ? ' kd-libx--' ~ mod }}"
+                 draggable="true"
+                 data-composer-target="libcard"
+                 data-exercise-id="{{ ex.id }}"
+                 data-activity="{{ ex.activity.value }}"
+                 data-filter-text="{{ ex.name }} {{ ex.activity.label }}{% for a in ex.targetAreas %} {{ a.label }}{% endfor %}"
+                 data-action="dragstart->composer#libDragStart dragend->composer#dragEnd">
+                <span class="kd-libx__code">{{ ex.name|slice(0, 2)|upper }}</span>
+                <div class="kd-libx__body">
+                    <div class="kd-libx__name">{{ ex.name }}</div>
+                    <div class="kd-libx__meta">{{ ux_icon(activity.icon(ex.activity)|trim) }} {{ ex.activity.label }}</div>
+                    {% if ex.targetAreas %}
+                        <div class="kd-tags">
+                            {% for a in ex.targetAreas %}<span class="kd-tag">{{ a.label }}</span>{% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+                <button type="button" class="kd-libx__add" title="Ajouter au bloc actif"
+                        data-exercise-id="{{ ex.id }}"
+                        data-action="composer#quickAdd">{{ ux_icon('lucide:plus') }}</button>
+            </div>
+        {% else %}
+            <p class="kd-libpanel__empty">Ta bibliothèque est vide. Crée un exercice d'abord.</p>
+        {% endfor %}
+    </div>
+
+    <p class="kd-libpanel__hint">
+        Glisse une carte dans un bloc, ou <strong>+</strong> pour l'ajouter au bloc actif.
+    </p>
+</div>

@@ -1,28 +1,27 @@
-{# Contenu de #workout-blocks. Contexte attendu (fourni par blocksContext) :
-   workout, addBlockForm, blockForms, addExerciseForms, prescribedForms. #}
-{% if workout.blocks is empty %}
-    <div class="kd-card kd-empty">
-        {{ ux_icon('lucide:layers') }}
-        <div>Aucun bloc pour l'instant. Ajoute le premier ci-dessous.</div>
-    </div>
-{% else %}
-    {% for block in workout.blocks %}
-        {{ include('workout/_block.html.twig', { block: block }) }}
-    {% endfor %}
-{% endif %}
+{# Colonne droite du compositeur : les blocs. Cible des Turbo Streams (#workout-blocks).
+   Contexte (blocksContext) : workout, addBlockForm, blockForms, prescribedForms,
+   summaries. #}
+<div class="kd-cblocks">
+    {% if workout.blocks is empty %}
+        <div class="kd-cblocks__empty">
+            {{ ux_icon('lucide:layers') }}
+            <p>Aucun bloc. Ajoute-en un, puis glisse des exercices depuis la bibliothèque.</p>
+        </div>
+    {% else %}
+        {% for block in workout.blocks %}
+            {{ include('workout/_block.html.twig', { block: block }) }}
+        {% endfor %}
+    {% endif %}
 
-<section class="kd-addblock">
-    <p class="kd-addblock__title">{{ ux_icon('lucide:plus') }} Ajouter un bloc</p>
-    {{ form_start(addBlockForm) }}
-        <div class="kd-fieldrow kd-fieldrow--tight">
+    {# Ajout d'un bloc : rôle/tours par défaut (Corps de séance, 1 tour), affinés ensuite. #}
+    {{ form_start(addBlockForm, { attr: { class: 'kd-cblocks__add' } }) }}
+        <div hidden>
             {{ form_row(addBlockForm.role) }}
             {{ form_row(addBlockForm.rounds) }}
             {{ form_row(addBlockForm.label) }}
         </div>
-        <div class="kd-formactions">
-            <button type="submit" class="kd-btn kd-btn--primary kd-btn--sm">
-                {{ ux_icon('lucide:plus') }} Ajouter le bloc
-            </button>
-        </div>
+        <button type="submit" class="kd-cblocks__addbtn">
+            {{ ux_icon('lucide:plus') }} Ajouter un bloc
+        </button>
     {{ form_end(addBlockForm) }}
-</section>
+</div>

@@ -8,15 +8,18 @@ import './stimulus_bootstrap.js';
 import './styles/app.css';
 
 /*
- * PWA (Phase 9) : enregistrement du service worker manuel.
- * Servi depuis la racine (/sw.js) pour couvrir tout le scope de l'app. Le SW
- * n'est actif qu'en contexte sécurisé (https ou localhost) ; ailleurs on ignore
- * silencieusement.
+ * Mode hors connexion suspendu (voir CLAUDE.md §6). On n'enregistre plus de
+ * service worker et on désenregistre ceux déjà installés + purge leurs caches,
+ * pour lever les interférences de cache pendant le dev (une page servie depuis
+ * le cache donnait l'impression qu'il fallait recharger). À réactiver plus tard.
  */
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch((error) => {
-            console.error('Service worker registration failed:', error);
-        });
-    });
+    navigator.serviceWorker.getRegistrations()
+        .then((registrations) => registrations.forEach((registration) => registration.unregister()))
+        .catch(() => {});
+}
+if ('caches' in window) {
+    caches.keys()
+        .then((keys) => keys.filter((key) => key.startsWith('kadens-')).forEach((key) => caches.delete(key)))
+        .catch(() => {});
 }
