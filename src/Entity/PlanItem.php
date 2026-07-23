@@ -17,7 +17,10 @@ class PlanItem
     #[ORM\ManyToOne(inversedBy: 'planItems')]
     private ?PlanTemplate $planTemplate = null;
 
+    // Un PlanItem n'est qu'un placement de séance dans la trame : il n'a aucun
+    // sens sans elle. Supprimer une séance la retire donc de toutes les cases.
     #[ORM\ManyToOne(inversedBy: 'planItems')]
+    #[ORM\JoinColumn(onDelete: 'CASCADE')]
     private ?Workout $workout = null;
 
     #[ORM\Column]
