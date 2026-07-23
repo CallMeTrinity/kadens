@@ -3,42 +3,66 @@
 {% block title %}Synthèse — {{ monthLabel }}{% endblock %}
 
 {% block body %}
-    <header style="display:flex; align-items:baseline; gap:1rem; flex-wrap:wrap">
-        <h1 style="font-family:var(--font-display)">Prévu vs réalisé</h1>
-        <a href="{{ path('app_calendar_month', {year: year, month: month}) }}">← Retour au calendrier</a>
-    </header>
-
-    <section style="margin:1.5rem 0">
-        <div style="display:flex; align-items:baseline; gap:1rem">
-            <h2 style="font-family:var(--font-display)">{{ monthLabel }}</h2>
-            <nav style="display:flex; gap:.75rem; font-size:.85rem">
-                <a href="{{ path('app_summary_month', {year: prev.year, month: prev.month}) }}">← Mois précédent</a>
-                <a href="{{ path('app_summary_index') }}">Ce mois-ci</a>
-                <a href="{{ path('app_summary_month', {year: next.year, month: next.month}) }}">Mois suivant →</a>
-            </nav>
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Synthèse</p>
+            <h1 class="kd-title">Prévu vs réalisé</h1>
+            <p class="kd-lead">La part de séances tenues sur les échues. On boucle sur la prévision, sans tracking détaillé.</p>
         </div>
-        {{ include('components/_status_stats.html.twig', {stats: monthStats}) }}
+
+        <nav class="kd-actionbar__end" aria-label="Navigation de la synthèse">
+            <a class="kd-btn kd-btn--secondary kd-btn--sm" href="{{ path('app_summary_month', {year: prev.year, month: prev.month}) }}" aria-label="Mois précédent">
+                {{ ux_icon('lucide:arrow-left') }}
+            </a>
+            <a class="kd-btn kd-btn--ghost kd-btn--sm" href="{{ path('app_summary_index') }}">Ce mois-ci</a>
+            <a class="kd-btn kd-btn--secondary kd-btn--sm" href="{{ path('app_summary_month', {year: next.year, month: next.month}) }}" aria-label="Mois suivant">
+                {{ ux_icon('lucide:arrow-right') }}
+            </a>
+            <a class="kd-btn kd-btn--secondary kd-btn--sm" href="{{ path('app_calendar_month', {year: year, month: month}) }}">
+                {{ ux_icon('lucide:calendar-days') }} Calendrier
+            </a>
+        </nav>
+    </div>
+
+    {# Observance du mois — bloc mis en avant. #}
+    <section class="kd-card kd-summonth">
+        <div class="kd-card__head">
+            <h2 class="kd-card__title">{{ ux_icon('lucide:calendar-check') }} {{ monthLabel }}</h2>
+        </div>
+        {{ include('components/_status_stats.html.twig', {stats: monthStats, hero: true}) }}
     </section>
 
-    <section style="margin:1.5rem 0">
-        <h2 style="font-family:var(--font-display)">Par plan instancié</h2>
-        <p style="color:var(--color-text-faint); font-size:.85rem">Toutes dates confondues, sur l'ensemble de votre planning.</p>
+    {# Détail par plan instancié — toutes dates confondues. #}
+    <div class="kd-pagehead kd-pagehead--sub">
+        <div>
+            <p class="kd-eyebrow">Par plan instancié</p>
+            <h2 class="kd-title kd-title--sm">Sur l'ensemble du planning</h2>
+        </div>
+    </div>
 
-        {% if plans is empty %}
-            <p style="color:var(--color-text-faint)">Aucune séance planifiée pour l'instant.</p>
-        {% else %}
+    {% if plans is empty %}
+        <div class="kd-empty">
+            {{ ux_icon('lucide:layers') }}
+            <div>Aucune séance planifiée pour l'instant.</div>
+        </div>
+    {% else %}
+        <div class="kd-grid kd-grid--2">
             {% for plan in plans %}
-                <article style="border:1px solid var(--color-border-cell); border-radius:var(--kd-radius-md); padding:1rem; margin-top:1rem">
-                    <h3 style="font-family:var(--font-display); margin:0 0 .5rem">
+                <article class="kd-card kd-summplan">
+                    <div class="kd-summplan__head">
                         {% if plan.planId %}
-                            <a href="{{ path('app_plan_template_show', {id: plan.planId}) }}">{{ plan.planTitle }}</a>
+                            <a class="kd-summplan__title" href="{{ path('app_plan_template_show', {id: plan.planId}) }}">
+                                {{ ux_icon('lucide:layers') }} {{ plan.planTitle }}
+                            </a>
                         {% else %}
-                            Séances hors plan
+                            <span class="kd-summplan__title kd-summplan__title--loose">
+                                {{ ux_icon('lucide:calendar') }} Séances hors plan
+                            </span>
                         {% endif %}
-                    </h3>
+                    </div>
                     {{ include('components/_status_stats.html.twig', {stats: plan.stats}) }}
                 </article>
             {% endfor %}
-        {% endif %}
-    </section>
+        </div>
+    {% endif %}
 {% endblock %}

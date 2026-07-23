@@ -1625,3 +1625,124 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   flex-wrap: wrap;
 }
 .kd-modal__inline .kd-field { flex: 1 1 160px; margin: 0; }
+
+/* ----------------------------------------------------------------------------
+   Synthèse « prévu vs réalisé » (Phase 7)
+   Observance = part des séances échues effectivement faites. La couleur code ici
+   le statut (fait / prévu / manqué), seul cas où elle ne code pas l'activité.
+   ---------------------------------------------------------------------------- */
+
+/* Bloc du mois mis en avant : filet terracotta à gauche */
+.kd-summonth {
+  border-left: 3px solid var(--color-primary);
+  margin-bottom: var(--kd-space-11);
+}
+.kd-card__title svg { width: 16px; height: 16px; vertical-align: -3px; color: var(--color-text-faint); }
+
+/* Titre de sous-section (réutilise .kd-pagehead resserré) */
+.kd-pagehead--sub { margin-bottom: var(--kd-space-7); align-items: baseline; }
+.kd-title--sm { font-size: 18px; }
+
+/* Composant observance : grand chiffre + barre proportionnelle + légende */
+.kd-observance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-6);
+}
+.kd-observance__figure {
+  display: flex;
+  align-items: baseline;
+  gap: var(--kd-space-4);
+  flex-wrap: wrap;
+}
+.kd-observance__pct {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 34px;
+  line-height: 1;
+  color: var(--color-text-strong);
+  letter-spacing: -.02em;
+}
+.kd-observance--hero .kd-observance__pct { font-size: 52px; }
+.kd-observance__cap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-observance__sub {
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--color-text-placeholder);
+}
+.kd-observance__empty {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-size: 13px;
+  color: var(--color-text-faint);
+  margin: 0;
+}
+.kd-observance__empty svg { width: 15px; height: 15px; }
+
+/* Barre proportionnelle : segments dimensionnés par flex (= part du total) */
+.kd-obar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  border-radius: var(--kd-radius-pill);
+  overflow: hidden;
+  background: var(--color-surface-subtle);
+}
+.kd-observance--hero .kd-obar { height: 11px; }
+.kd-obar__seg { display: block; min-width: 3px; }
+.kd-obar__seg--done    { background: var(--color-status-done); }
+.kd-obar__seg--missed  { background: var(--color-status-missed); }
+.kd-obar__seg--planned { background: var(--color-status-planned); }
+
+/* Légende : pastille de couleur + compteur */
+.kd-olegend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kd-space-3) var(--kd-space-6);
+}
+.kd-olegend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+.kd-olegend__dot {
+  width: 8px; height: 8px;
+  border-radius: var(--kd-radius-full);
+  background: currentColor;
+}
+.kd-olegend__item--done    { color: var(--color-status-done); }
+.kd-olegend__item--missed  { color: var(--color-status-missed); }
+.kd-olegend__item--planned { color: var(--color-status-planned); }
+
+/* Carte de plan instancié */
+.kd-summplan__head { margin-bottom: var(--kd-space-6); }
+.kd-summplan__title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 15px;
+  color: var(--color-text-strong);
+  text-decoration: none;
+}
+a.kd-summplan__title:hover { color: var(--color-primary); }
+.kd-summplan__title svg { width: 15px; height: 15px; color: var(--color-text-faint); }
+.kd-summplan__title--loose { color: var(--color-text-secondary); }

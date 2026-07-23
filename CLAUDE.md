@@ -272,7 +272,16 @@ navigateur (non automatisable ici).
   Classes `.kd-modal*` dans `components.css`. Suppression toujours par `confirm()`
   natif (dans la modale). Icône importée : `calendar-clock` (déplacer). Variante
   `.kd-flash--error` ajoutée.
-  **Reste à styler** : synthèse.
+  **Synthèse stylée** : `summary/index.html.twig` refait. En-tête `.kd-pagehead`
+  (eyebrow « Synthèse » + titre + `.kd-lead`) avec nav prev/ce mois/suivant +
+  retour calendrier en `.kd-btn`. Observance du mois en carte mise en avant
+  `.kd-summonth` (filet terracotta), détail par plan instancié en grille
+  `.kd-grid--2` de cartes `.kd-summplan` (bucket « hors plan » différencié).
+  **Composant `_status_stats` refait** : passe des styles inline aux classes
+  `.kd-observance*` (grand pourcentage `--hero` pour le mois, barre proportionnelle
+  `.kd-obar` dimensionnée par `flex`, légende `.kd-olegend` pastille+compteur ;
+  couleur = statut fait/prévu/manqué, seul cas hors activité). Icônes importées :
+  `calendar-check`, `calendar-off`, `calendar`. Toutes les vues sont désormais stylées.
 
 ---
 

@@ -1,36 +1,36 @@
-{# Synthèse prévu vs réalisé pour un jeu de compteurs (Phase 7).
-   Paramètre : stats = {done, missed, planned, total, adherence}.
-   adherence = done / (done + missed), ou null si rien d'échu. #}
-{% set statusColors = {
-    'planned': 'var(--color-status-planned)',
-    'done': 'var(--color-status-done)',
-    'missed': 'var(--color-status-missed)'
-} %}
+{# Synthèse « prévu vs réalisé » pour un jeu de compteurs (Phase 7).
+   Paramètres :
+     - stats = {done, missed, planned, total, adherence}
+       adherence = done / (done + missed), ou null si rien d'échu.
+     - hero (bool, défaut false) : grand format pour le bloc du mois.
+   Couleur = statut (fait/prévu/manqué), seul cas où elle ne code pas l'activité. #}
+{% set settled = stats.done + stats.missed %}
 
 {% if stats.total == 0 %}
-    <p style="color:var(--color-text-faint)">Aucune séance planifiée.</p>
+    <p class="kd-observance__empty">{{ ux_icon('lucide:calendar-off') }} Aucune séance planifiée.</p>
 {% else %}
-    <div style="display:flex; align-items:baseline; gap:1rem; flex-wrap:wrap">
-        <strong style="font-family:var(--font-display); font-size:1.75rem">
-            {{ stats.adherence is null ? '—' : (stats.adherence * 100)|round ~ '%' }}
-        </strong>
-        <span style="font-family:var(--font-mono); font-size:.8rem; color:var(--color-text-faint)">
-            observance ({{ stats.done }} faite{{ stats.done > 1 ? 's' : '' }} / {{ stats.done + stats.missed }} échue{{ (stats.done + stats.missed) > 1 ? 's' : '' }})
-        </span>
-    </div>
+    <div class="kd-observance{{ hero|default(false) ? ' kd-observance--hero' }}">
+        <div class="kd-observance__figure">
+            <span class="kd-observance__pct">{{ stats.adherence is null ? '—' : (stats.adherence * 100)|round ~ '%' }}</span>
+            <span class="kd-observance__cap">
+                Observance
+                <span class="kd-observance__sub">{{ stats.done }}/{{ settled }} séance{{ settled > 1 ? 's' : '' }} échue{{ settled > 1 ? 's' : '' }}</span>
+            </span>
+        </div>
 
-    {# Barre proportionnelle faite / manquée / prévue. #}
-    <div style="display:flex; height:.6rem; border-radius:var(--kd-radius-md); overflow:hidden; margin:.5rem 0; background:var(--color-surface-subtle)">
-        {% for key, count in {'done': stats.done, 'missed': stats.missed, 'planned': stats.planned} %}
-            {% if count > 0 %}
-                <div style="width:{{ (count / stats.total * 100)|round(2) }}%; background:{{ statusColors[key] }}"></div>
-            {% endif %}
-        {% endfor %}
-    </div>
+        {# Barre proportionnelle faite / manquée / prévue. #}
+        <div class="kd-obar" role="img" aria-label="{{ stats.done }} faites, {{ stats.missed }} manquées, {{ stats.planned }} prévues">
+            {% for key, count in {'done': stats.done, 'missed': stats.missed, 'planned': stats.planned} %}
+                {% if count > 0 %}
+                    <span class="kd-obar__seg kd-obar__seg--{{ key }}" style="flex:{{ count }}"></span>
+                {% endif %}
+            {% endfor %}
+        </div>
 
-    <ul style="list-style:none; padding:0; margin:0; display:flex; gap:1.25rem; flex-wrap:wrap; font-family:var(--font-mono); font-size:.8rem">
-        <li><span style="color:{{ statusColors.done }}">■</span> {{ stats.done }} faite{{ stats.done > 1 ? 's' : '' }}</li>
-        <li><span style="color:{{ statusColors.missed }}">■</span> {{ stats.missed }} manquée{{ stats.missed > 1 ? 's' : '' }}</li>
-        <li><span style="color:{{ statusColors.planned }}">■</span> {{ stats.planned }} prévue{{ stats.planned > 1 ? 's' : '' }}</li>
-    </ul>
+        <ul class="kd-olegend">
+            <li class="kd-olegend__item kd-olegend__item--done"><span class="kd-olegend__dot"></span>{{ stats.done }} faite{{ stats.done > 1 ? 's' : '' }}</li>
+            <li class="kd-olegend__item kd-olegend__item--missed"><span class="kd-olegend__dot"></span>{{ stats.missed }} manquée{{ stats.missed > 1 ? 's' : '' }}</li>
+            <li class="kd-olegend__item kd-olegend__item--planned"><span class="kd-olegend__dot"></span>{{ stats.planned }} prévue{{ stats.planned > 1 ? 's' : '' }}</li>
+        </ul>
+    </div>
 {% endif %}
