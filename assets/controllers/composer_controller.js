@@ -1,5 +1,6 @@
 import { Controller } from '@hotwired/stimulus';
 import { renderStreamMessage } from '@hotwired/turbo';
+import Sortable from 'sortablejs';
 
 /*
  * Compositeur de séance (éditeur). La persistance reste 100 % côté serveur :
@@ -14,19 +15,36 @@ import { renderStreamMessage } from '@hotwired/turbo';
  * au routage de formulaire de Turbo (c'est lui qui échouait sur les formulaires
  * hors conteneur).
  *
+ * Glisser-déposer : délégué à SortableJS (tactile + retour visuel + tri
+ * inter-listes), il ne fait QUE la mécanique client. Sur dépôt, on remplit les
+ * formulaires cachés et on soumet (quick-add / reorder). Comme #workout-blocks
+ * est re-rendu à chaque mutation, chaque conteneur d'exercices détruit son
+ * instance Sortable à la déconnexion et la recrée à la connexion (via les hooks
+ * de cible Stimulus itemsTargetConnected/Disconnected). Groupe partagé
+ * « kd-exercises » : la bibliothèque est source en clone (pull:'clone', put:false),
+ * les blocs sont sources ET cibles.
+ *
  *   - bloc actif : cible du « + » de la bibliothèque
  *   - glisser une carte de bibliothèque -> l'ajouter dans un bloc (quick-add)
  *   - glisser une ligne d'exercice -> la réordonner / changer de bloc (reorder)
  *   - stepper de tours, dépliage des paramètres, filtre de bibliothèque (client)
  */
 export default class extends Controller {
-    static targets = ['block', 'libcard', 'search', 'quickAddForm', 'reorderForm'];
+    static targets = ['block', 'items', 'library', 'libcard', 'search', 'quickAddForm', 'reorderForm'];
 
-    connect() {
+    static SORTABLE_GROUP = 'kd-exercises';
+
+    // initialize() tourne AVANT les callbacks xTargetConnected (eux-mêmes avant
+    // connect()). L'état lu par ces callbacks doit donc être posé ici, sinon
+    // this.sortables / this.activeBlockId sont undefined au premier target.
+    initialize() {
         this.libQuery = '';
         this.libActivity = 'all';
         this.activeBlockId = null;
-        this.drag = null;
+        this.sortables = new WeakMap();
+    }
+
+    connect() {
         this.onSubmit = this.onSubmit.bind(this);
         this.element.addEventListener('submit', this.onSubmit);
         this.applyLibFilter();
@@ -94,7 +112,7 @@ export default class extends Controller {
             || null;
     }
 
-    // ---- Ajout depuis la bibliothèque -------------------------------------
+    // ---- Ajout depuis la bibliothèque (bouton +) --------------------------
 
     quickAdd(event) {
         const block = this.activeBlock();
@@ -102,11 +120,15 @@ export default class extends Controller {
         this.submitQuickAdd(event.currentTarget.dataset.exerciseId, block.dataset.blockId);
     }
 
-    submitQuickAdd(exerciseId, blockId) {
+    submitQuickAdd(exerciseId, blockId, afterId) {
         if (!this.hasQuickAddFormTarget || !exerciseId || !blockId) return;
         const form = this.quickAddFormTarget;
         form.querySelector('[name="exerciseId"]').value = exerciseId;
         form.querySelector('[name="blockId"]').value = blockId;
+        // afterId absent -> ajout en fin de bloc (bouton +). afterId défini (0 = tête,
+        // sinon id du voisin précédent) -> placement précis du glisser-déposer.
+        form.querySelector('[name="afterId"]').value =
+            (afterId === undefined || afterId === null) ? '' : String(afterId);
         form.requestSubmit();
     }
 
@@ -119,83 +141,98 @@ export default class extends Controller {
         form.requestSubmit();
     }
 
-    // ---- Glisser-déposer ---------------------------------------------------
+    // ---- Glisser-déposer (SortableJS) -------------------------------------
 
-    libDragStart(event) {
-        this.drag = { mode: 'lib', exerciseId: event.currentTarget.dataset.exerciseId };
-        event.dataTransfer.effectAllowed = 'copy';
-        event.dataTransfer.setData('text/plain', 'lib');
+    /** Bibliothèque : source uniquement, en clone. Connectée une seule fois
+     *  (hors #workout-blocks, jamais re-rendue). */
+    libraryTargetConnected(el) {
+        this.sortables.set(el, Sortable.create(el, {
+            group: { name: this.constructor.SORTABLE_GROUP, pull: 'clone', put: false },
+            sort: false,
+            draggable: '.kd-libx',
+            filter: '.kd-libx__add',   // ne pas démarrer un drag depuis le bouton +
+            preventOnFilter: false,    // ... mais laisser le clic passer
+            animation: 150,
+            ghostClass: 'kd-drag-ghost',
+            chosenClass: 'kd-drag-chosen',
+            dragClass: 'kd-drag-active',
+            onEnd: (evt) => this.onLibDrop(evt),
+        }));
     }
 
-    exoDragStart(event) {
-        event.stopPropagation();
-        const row = event.currentTarget;
-        this.drag = { mode: 'exo', prescribedId: row.dataset.prescribedId };
-        row.classList.add('kd-cexo--dragging');
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('text/plain', 'exo');
+    libraryTargetDisconnected(el) {
+        this.destroySortable(el);
     }
 
-    dragEnd() {
-        this.drag = null;
-        this.element.querySelectorAll('.kd-cblock--drop, .kd-cexo--dragging, .kd-cexo--dropafter')
-            .forEach((el) => el.classList.remove('kd-cblock--drop', 'kd-cexo--dragging', 'kd-cexo--dropafter'));
+    /** Chaque conteneur d'exercices d'un bloc : source ET cible. Re-rendu à
+     *  chaque mutation, donc (dé)connecté en boucle. */
+    itemsTargetConnected(el) {
+        this.sortables.set(el, Sortable.create(el, {
+            group: { name: this.constructor.SORTABLE_GROUP, pull: true, put: true },
+            handle: '.kd-cexo__handle',
+            draggable: '.kd-cexo',
+            animation: 150,
+            ghostClass: 'kd-drag-ghost',
+            chosenClass: 'kd-drag-chosen',
+            dragClass: 'kd-drag-active',
+            onEnd: (evt) => this.onExoDrop(evt),
+        }));
     }
 
-    blockDragOver(event) {
-        if (!this.drag) return;
-        event.preventDefault();
-        event.currentTarget.classList.add('kd-cblock--drop');
+    itemsTargetDisconnected(el) {
+        this.destroySortable(el);
     }
 
-    blockDragLeave(event) {
-        event.currentTarget.classList.remove('kd-cblock--drop', 'kd-cexo--dropafter');
-    }
-
-    exoDragOver(event) {
-        if (!this.drag) return;
-        event.preventDefault();
-        event.stopPropagation();
-        event.currentTarget.classList.add('kd-cexo--dropafter');
-    }
-
-    blockDrop(event) {
-        if (!this.drag) return;
-        event.preventDefault();
-        const block = event.currentTarget;
-        // Dépôt dans le corps du bloc (hors ligne) -> à la fin du bloc.
-        const rows = block.querySelectorAll('[data-composer-target="exo"]');
-        const afterId = rows.length ? rows[rows.length - 1].dataset.prescribedId : 0;
-        this.performDrop(block.dataset.blockId, afterId);
-    }
-
-    exoDrop(event) {
-        if (!this.drag) return;
-        event.preventDefault();
-        event.stopPropagation();
-        const row = event.currentTarget;
-        this.performDrop(row.dataset.blockId, row.dataset.prescribedId);
-    }
-
-    performDrop(targetBlockId, afterId) {
-        const drag = this.drag;
-        this.dragEnd();
-        if (!drag) return;
-
-        // Soumettre un formulaire pendant le cycle de l'événement `drop` est ignoré
-        // par le navigateur tant que le glisser n'est pas complètement terminé (la
-        // 1re action « ne faisait rien », la 2e passait). On diffère au tick suivant.
-        if (drag.mode === 'lib') {
-            this.defer(() => this.submitQuickAdd(drag.exerciseId, targetBlockId));
-        } else if (drag.mode === 'exo') {
-            // Dépôt sur soi-même = aucun changement.
-            if (String(afterId) === String(drag.prescribedId)) return;
-            this.defer(() => this.submitReorder(drag.prescribedId, targetBlockId, afterId));
+    destroySortable(el) {
+        const instance = this.sortables.get(el);
+        if (instance) {
+            instance.destroy();
+            this.sortables.delete(el);
         }
     }
 
-    defer(fn) {
-        window.setTimeout(fn, 0);
+    /** Dépôt d'une carte de bibliothèque (clone) dans un bloc -> quick-add au
+     *  point de dépôt. */
+    onLibDrop(evt) {
+        const clone = evt.item;
+        const target = evt.to;
+        // Retombé dans la bibliothèque, ou ailleurs qu'un conteneur de bloc : rien.
+        if (target === evt.from || !target.matches('[data-composer-target="items"]')) {
+            clone.remove();
+            return;
+        }
+        const exerciseId = clone.dataset.exerciseId;
+        const blockId = target.dataset.blockId;
+        const afterId = this.prevPrescribedId(clone);
+        // Le serveur re-render le bloc avec la vraie ligne : on retire le clone.
+        clone.remove();
+        this.submitQuickAdd(exerciseId, blockId, afterId);
+    }
+
+    /** Dépôt d'une ligne d'exercice existante -> reorder (intra ou inter-blocs). */
+    onExoDrop(evt) {
+        const row = evt.item;
+        const target = evt.to;
+        // Pas de déplacement réel : on n'envoie rien.
+        if (target === evt.from && evt.oldIndex === evt.newIndex) return;
+
+        const prescribedId = row.dataset.prescribedId;
+        const targetBlockId = target.dataset.blockId;
+        const afterId = this.prevPrescribedId(row);
+        this.submitReorder(prescribedId, targetBlockId, afterId);
+    }
+
+    /** Id de l'exercice prescrit précédent dans le conteneur (0 si en tête).
+     *  Ignore le placeholder « déposez ici » et l'élément lui-même. */
+    prevPrescribedId(el) {
+        let sib = el.previousElementSibling;
+        while (sib) {
+            if (sib.matches('.kd-cexo') && sib.dataset.prescribedId) {
+                return sib.dataset.prescribedId;
+            }
+            sib = sib.previousElementSibling;
+        }
+        return 0;
     }
 
     // ---- Petits contrôles inline ------------------------------------------

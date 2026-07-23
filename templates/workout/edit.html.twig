@@ -81,6 +81,7 @@
             <input type="hidden" name="_token" value="{{ csrf_token('prescribed_quick_add' ~ workout.id) }}">
             <input type="hidden" name="exerciseId" value="">
             <input type="hidden" name="blockId" value="">
+            <input type="hidden" name="afterId" value="">
         </form>
         <form method="post" data-composer-target="reorderForm"
               action="{{ path('app_workout_prescribed_reorder', {id: workout.id}) }}" hidden>

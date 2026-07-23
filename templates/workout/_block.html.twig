@@ -8,7 +8,7 @@
 <article class="kd-cblock"
          data-composer-target="block"
          data-block-id="{{ block.id }}"
-         data-action="click->composer#activateBlock dragover->composer#blockDragOver dragleave->composer#blockDragLeave drop->composer#blockDrop">
+         data-action="click->composer#activateBlock">
 
     <div class="kd-cblock__head">
         {{ form_start(blockForm, { attr: { class: 'kd-cblock__form' } }) }}
@@ -59,16 +59,18 @@
         </div>
     </div>
 
-    <div class="kd-cblock__items">
-        {% for prescribed in block.prescribedExercises %}
+    <div class="kd-cblock__items" data-composer-target="items" data-block-id="{{ block.id }}">
+        {# Tri par position en mémoire : après une mutation (ajout/réordonnancement),
+           la PersistentCollection Doctrine garde son ordre de chargement, le #[OrderBy]
+           ne s'appliquant qu'au load DB. On mirroir donc l'ordre « position ASC » ici,
+           sinon le re-render du stream montre l'ordre périmé (correct au rechargement). #}
+        {% for prescribed in block.prescribedExercises|sort((a, b) => a.position <=> b.position) %}
             {% set ex = prescribed.exercise %}
             {% set mod = ex ? activity.modifier(ex.activity) : '' %}
             <div class="kd-cexo"
-                 draggable="true"
                  data-composer-target="exo"
                  data-prescribed-id="{{ prescribed.id }}"
-                 data-block-id="{{ block.id }}"
-                 data-action="dragstart->composer#exoDragStart dragover->composer#exoDragOver dragleave->composer#blockDragLeave dragend->composer#dragEnd drop->composer#exoDrop">
+                 data-block-id="{{ block.id }}">
                 <div class="kd-cexo__row">
                     <span class="kd-cexo__handle" title="Glisser pour réordonner">{{ ux_icon('lucide:grip-vertical') }}</span>
                     <span class="kd-cexo__code{{ mod ? ' kd-cexo__code--' ~ mod }}">{{ ex ? ex.name|slice(0, 2)|upper : '??' }}</span>

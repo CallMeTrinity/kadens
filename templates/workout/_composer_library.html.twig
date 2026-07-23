@@ -30,16 +30,14 @@
         </div>
     </div>
 
-    <div class="kd-libpanel__list">
+    <div class="kd-libpanel__list" data-composer-target="library">
         {% for ex in library %}
             {% set mod = activity.modifier(ex.activity) %}
             <div class="kd-libx{{ mod ? ' kd-libx--' ~ mod }}"
-                 draggable="true"
                  data-composer-target="libcard"
                  data-exercise-id="{{ ex.id }}"
                  data-activity="{{ ex.activity.value }}"
-                 data-filter-text="{{ ex.name }} {{ ex.activity.label }}{% for a in ex.targetAreas %} {{ a.label }}{% endfor %}"
-                 data-action="dragstart->composer#libDragStart dragend->composer#dragEnd">
+                 data-filter-text="{{ ex.name }} {{ ex.activity.label }}{% for a in ex.targetAreas %} {{ a.label }}{% endfor %}">
                 <span class="kd-libx__code">{{ ex.name|slice(0, 2)|upper }}</span>
                 <div class="kd-libx__body">
                     <div class="kd-libx__name">{{ ex.name }}</div>

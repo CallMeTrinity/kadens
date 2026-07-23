@@ -239,6 +239,15 @@ final class WorkoutController extends AbstractController
                 $block->addPrescribedExercise($prescribed);
                 $this->entityManager->persist($prescribed);
                 $this->entityManager->flush();
+
+                // Placement précis si le glisser-déposer fournit un point de dépôt
+                // (afterId = 0 -> tête du bloc, sinon juste après cet exercice).
+                // Champ absent/vide (bouton +) -> l'exercice reste en fin de bloc.
+                $afterRaw = $payload->get('afterId');
+                if (null !== $afterRaw && '' !== $afterRaw) {
+                    $this->repositionPrescribed($prescribed, $block, (int) $afterRaw);
+                    $this->entityManager->flush();
+                }
             }
         }
 
