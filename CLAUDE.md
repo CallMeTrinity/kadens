@@ -254,9 +254,25 @@ navigateur (non automatisable ici).
   suppression `.kd-btn--danger`). La grille bascule en agenda vertical (jour en ligne) :
   à 1024px en édition, 880px en lecture. Couleur neutre (trame multi-activités). Icônes
   importées : `copy`, `calendar-range`.
-  **Reste à styler** : calendrier, synthèse. Composant **modale** réutilisable
-  à créer quand une vue en aura besoin (ex. confirmation suppression, qui passe encore
-  par `confirm()` natif).
+  **Calendrier stylé** : `calendar/index.html.twig` refait. En-tête `.kd-pagehead`
+  (eyebrow « Planning » + mois) avec nav prev/aujourd'hui/suivant + export en
+  `.kd-btn`. Ajout (poser une séance / instancier un plan) en deux replis
+  `.kd-caladd` (`.kd-calbar`). Grille mensuelle `.kd-cal__grid` (7 colonnes, cadre
+  `overflow-x` défilable + `min-width` : la structure hebdo tient sur mobile plutôt
+  que de s'écraser) : en-têtes `.kd-cal__dow`, cases `.kd-calday` (`--out` hors mois,
+  `--today` = numéro en pastille terracotta). Séances datées en pastilles
+  `.kd-calevent--planned/done/missed` (filet gauche = statut : **seul cas où la
+  couleur code l'état, pas l'activité** ; fait = titre barré). Chaque pastille est
+  un bouton ouvrant la **modale** d'édition (statut prévu/fait/manqué +
+  `completionNotes`, déplacer, retirer) — les cases restent lisibles malgré la
+  densité. **Composant modale réutilisable créé** : élément natif `<dialog>` +
+  contrôleur Stimulus `dialog` (`assets/controllers/dialog_controller.js` :
+  open/close/backdrop, promotion en top-layer donc non rognée par l'`overflow` de la
+  grille) ; purement client, aucun AJAX, formulaires déjà dans la page (offline-safe).
+  Classes `.kd-modal*` dans `components.css`. Suppression toujours par `confirm()`
+  natif (dans la modale). Icône importée : `calendar-clock` (déplacer). Variante
+  `.kd-flash--error` ajoutée.
+  **Reste à styler** : synthèse.
 
 ---
 

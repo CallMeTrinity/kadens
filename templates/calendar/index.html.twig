@@ -3,105 +3,137 @@
 {% block title %}Calendrier — {{ monthLabel }}{% endblock %}
 
 {% block body %}
+    {% set dayNames = {1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Jeu', 5: 'Ven', 6: 'Sam', 7: 'Dim'} %}
+
     {% for message in app.flashes('success') %}
-        <p role="status">{{ message }}</p>
+        <div class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }}{{ message }}</div>
     {% endfor %}
     {% for message in app.flashes('error') %}
-        <p role="alert" style="color:var(--color-status-missed)">{{ message }}</p>
+        <div class="kd-flash kd-flash--error" role="alert">{{ ux_icon('lucide:calendar-x') }}{{ message }}</div>
     {% endfor %}
 
-    {% set dayNames = {1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Jeu', 5: 'Ven', 6: 'Sam', 7: 'Dim'} %}
-    {% set statusColors = {
-        'planned': 'var(--color-status-planned)',
-        'done': 'var(--color-status-done)',
-        'missed': 'var(--color-status-missed)'
-    } %}
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Planning</p>
+            <h1 class="kd-title">{{ monthLabel }}</h1>
+        </div>
 
-    <header style="display:flex; align-items:baseline; gap:1rem">
-        <h1 style="font-family:var(--font-display)">{{ monthLabel }}</h1>
-        <nav style="display:flex; gap:.75rem">
-            <a href="{{ path('app_calendar_month', {year: prev.year, month: prev.month}) }}">← Mois précédent</a>
-            <a href="{{ path('app_calendar_index') }}">Aujourd'hui</a>
-            <a href="{{ path('app_calendar_month', {year: next.year, month: next.month}) }}">Mois suivant →</a>
-            <a href="{{ path('app_export_schedule', {year: year, month: month}) }}">Exporter le mois en Excel</a>
+        <nav class="kd-actionbar__end" aria-label="Navigation du calendrier">
+            <a class="kd-btn kd-btn--secondary kd-btn--sm" href="{{ path('app_calendar_month', {year: prev.year, month: prev.month}) }}" aria-label="Mois précédent">
+                {{ ux_icon('lucide:arrow-left') }}
+            </a>
+            <a class="kd-btn kd-btn--ghost kd-btn--sm" href="{{ path('app_calendar_index') }}">Aujourd'hui</a>
+            <a class="kd-btn kd-btn--secondary kd-btn--sm" href="{{ path('app_calendar_month', {year: next.year, month: next.month}) }}" aria-label="Mois suivant">
+                {{ ux_icon('lucide:arrow-right') }}
+            </a>
+            <a class="kd-btn kd-btn--secondary kd-btn--sm" href="{{ path('app_export_schedule', {year: year, month: month}) }}">
+                {{ ux_icon('lucide:file-down') }} Exporter
+            </a>
         </nav>
-    </header>
+    </div>
 
-    <section style="display:flex; gap:2rem; flex-wrap:wrap; margin:1rem 0">
-        <details>
-            <summary>Poser une séance</summary>
-            {{ form_start(scheduleForm) }}
+    <div class="kd-calbar">
+        <details class="kd-caladd">
+            <summary>{{ ux_icon('lucide:calendar-plus') }} Poser une séance</summary>
+            {{ form_start(scheduleForm, {attr: {class: 'kd-caladd__form'}}) }}
                 {{ form_row(scheduleForm.workout) }}
                 {{ form_row(scheduleForm.scheduledDate) }}
-                <button type="submit">Planifier</button>
+                <button type="submit" class="kd-btn kd-btn--primary">Planifier</button>
             {{ form_end(scheduleForm) }}
         </details>
 
-        <details>
-            <summary>Instancier un plan</summary>
-            {{ form_start(instantiateForm) }}
+        <details class="kd-caladd">
+            <summary>{{ ux_icon('lucide:layers') }} Instancier un plan</summary>
+            {{ form_start(instantiateForm, {attr: {class: 'kd-caladd__form'}}) }}
                 {{ form_row(instantiateForm.planTemplate) }}
                 {{ form_row(instantiateForm.startDate) }}
-                <button type="submit">Instancier</button>
+                <button type="submit" class="kd-btn kd-btn--primary">Instancier</button>
             {{ form_end(instantiateForm) }}
         </details>
-    </section>
+    </div>
 
-    <div style="display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:1px">
-        {% for iso, label in dayNames %}
-            <div style="font-family:var(--font-mono); text-transform:uppercase; font-size:.7rem; color:var(--color-text-faint); padding:.25rem .5rem">{{ label }}</div>
-        {% endfor %}
-
-        {% for week in weeks %}
-            {% for cell in week %}
-                <div style="min-height:6rem; border:1px solid var(--color-border-cell); padding:.35rem;
-                            {{ cell.inMonth ? 'background:var(--color-surface-raised)' : 'background:var(--color-surface-subtle)' }}
-                            {{ cell.isToday ? '; outline:2px solid var(--color-primary)' : '' }}">
-                    <div style="font-family:var(--font-mono); font-size:.75rem; {{ cell.inMonth ? 'color:var(--color-text-secondary)' : 'color:var(--color-text-faint)' }}">
-                        {{ cell.date|date('j') }}
-                    </div>
-
-                    {% for scheduled in cell.scheduled %}
-                        <div style="border-left:3px solid {{ statusColors[scheduled.status.value] }}; background:var(--color-fill); border-radius:0 var(--kd-radius-md) var(--kd-radius-md) 0; padding:.15rem .35rem; margin-top:.25rem; font-size:.75rem">
-                            <a href="{{ path('app_workout_show', {id: scheduled.workout.id}) }}">{{ scheduled.workout.title }}</a>
-                            <span style="font-family:var(--font-mono); color:{{ statusColors[scheduled.status.value] }}"> · {{ scheduled.status.label }}</span>
-
-                            {% if scheduled.completionNotes %}
-                                <p style="margin:.2rem 0 0; color:var(--color-text-secondary); font-style:italic">{{ scheduled.completionNotes }}</p>
-                            {% endif %}
-
-                            {# Prévu vs réalisé : cocher fait/manqué et noter un écart léger. #}
-                            <form method="post" action="{{ path('app_scheduled_workout_status', {id: scheduled.id}) }}" style="margin:.25rem 0">
-                                <input type="hidden" name="_token" value="{{ csrf_token('status' ~ scheduled.id) }}">
-                                <label style="display:block; font-family:var(--font-mono); font-size:.65rem; color:var(--color-text-faint)">Statut
-                                    <select name="status" style="width:100%">
-                                        {% for status in statuses %}
-                                            <option value="{{ status.value }}"{{ status == scheduled.status ? ' selected' : '' }}>{{ status.label }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </label>
-                                <textarea name="completionNotes" rows="2" placeholder="Écart / ressenti (optionnel)" style="width:100%; margin-top:.2rem">{{ scheduled.completionNotes }}</textarea>
-                                <button type="submit">Enregistrer</button>
-                            </form>
-
-                            <details>
-                                <summary style="cursor:pointer; font-size:.7rem; color:var(--color-text-faint)">Déplacer / retirer</summary>
-                                <form method="post" action="{{ path('app_scheduled_workout_move', {id: scheduled.id}) }}" style="margin:.25rem 0">
-                                    <input type="hidden" name="_token" value="{{ csrf_token('move' ~ scheduled.id) }}">
-                                    <input type="date" name="scheduledDate" value="{{ scheduled.scheduledDate|date('Y-m-d') }}" required>
-                                    <button type="submit">Déplacer</button>
-                                </form>
-                                {{ include('workout/_action_form.html.twig', {
-                                    action: path('app_scheduled_workout_delete', {id: scheduled.id}),
-                                    token: csrf_token('delete' ~ scheduled.id),
-                                    label: 'Retirer',
-                                    confirm: 'Retirer cette séance du planning ?'
-                                }) }}
-                            </details>
-                        </div>
-                    {% endfor %}
-                </div>
+    <div class="kd-cal">
+        <div class="kd-cal__grid">
+            {% for iso, label in dayNames %}
+                <div class="kd-cal__dow">{{ label }}</div>
             {% endfor %}
-        {% endfor %}
+
+            {% for week in weeks %}
+                {% for cell in week %}
+                    <div class="kd-calday{{ not cell.inMonth ? ' kd-calday--out' }}{{ cell.isToday ? ' kd-calday--today' }}">
+                        <span class="kd-calday__num">{{ cell.date|date('j') }}</span>
+
+                        {% if cell.scheduled|length %}
+                            <div class="kd-calday__events">
+                                {% for scheduled in cell.scheduled %}
+                                    {% set st = scheduled.status.value %}
+                                    <div data-controller="dialog">
+                                        <button type="button" class="kd-calevent kd-calevent--{{ st }}" data-action="dialog#open">
+                                            <span class="kd-calevent__dot"></span>
+                                            <span class="kd-calevent__title">{{ scheduled.workout.title }}</span>
+                                        </button>
+
+                                        <dialog class="kd-modal" data-dialog-target="dialog" data-action="click->dialog#backdrop">
+                                            <div class="kd-modal__card">
+                                                <div class="kd-modal__head">
+                                                    <div>
+                                                        <h2 class="kd-modal__title">{{ scheduled.workout.title }}</h2>
+                                                        <p class="kd-modal__sub">{{ scheduled.scheduledDate|date('d/m/Y') }} · {{ scheduled.status.label }}</p>
+                                                    </div>
+                                                    <button type="button" class="kd-modal__close" data-action="dialog#close" aria-label="Fermer">
+                                                        {{ ux_icon('lucide:x') }}
+                                                    </button>
+                                                </div>
+
+                                                <a class="kd-btn kd-btn--secondary kd-btn--block" href="{{ path('app_workout_show', {id: scheduled.workout.id}) }}">
+                                                    {{ ux_icon('lucide:external-link') }} Voir la séance
+                                                </a>
+
+                                                {# Prévu vs réalisé : marquer fait/manqué et noter un écart léger. #}
+                                                <div class="kd-modal__section">
+                                                    <p class="kd-modal__section-title">Statut</p>
+                                                    <form method="post" action="{{ path('app_scheduled_workout_status', {id: scheduled.id}) }}" class="kd-modal__form">
+                                                        <input type="hidden" name="_token" value="{{ csrf_token('status' ~ scheduled.id) }}">
+                                                        <div class="kd-field">
+                                                            <select name="status" class="kd-input kd-select">
+                                                                {% for status in statuses %}
+                                                                    <option value="{{ status.value }}"{{ status == scheduled.status ? ' selected' }}>{{ status.label }}</option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </div>
+                                                        <div class="kd-field">
+                                                            <textarea name="completionNotes" rows="2" class="kd-input kd-input--area" placeholder="Écart / ressenti (optionnel)">{{ scheduled.completionNotes }}</textarea>
+                                                        </div>
+                                                        <button type="submit" class="kd-btn kd-btn--primary">{{ ux_icon('lucide:save') }} Enregistrer</button>
+                                                    </form>
+                                                </div>
+
+                                                <div class="kd-modal__section">
+                                                    <p class="kd-modal__section-title">Déplacer</p>
+                                                    <form method="post" action="{{ path('app_scheduled_workout_move', {id: scheduled.id}) }}" class="kd-modal__inline">
+                                                        <input type="hidden" name="_token" value="{{ csrf_token('move' ~ scheduled.id) }}">
+                                                        <div class="kd-field">
+                                                            <input type="date" name="scheduledDate" value="{{ scheduled.scheduledDate|date('Y-m-d') }}" class="kd-input" required>
+                                                        </div>
+                                                        <button type="submit" class="kd-btn kd-btn--secondary">{{ ux_icon('lucide:calendar-clock') }} Déplacer</button>
+                                                    </form>
+                                                </div>
+
+                                                <div class="kd-modal__section">
+                                                    <form method="post" action="{{ path('app_scheduled_workout_delete', {id: scheduled.id}) }}" onsubmit="return confirm('Retirer cette séance du planning ?');">
+                                                        <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ scheduled.id) }}">
+                                                        <button type="submit" class="kd-btn kd-btn--danger">{{ ux_icon('lucide:trash-2') }} Retirer du planning</button>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </dialog>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% endfor %}
+        </div>
     </div>
 {% endblock %}

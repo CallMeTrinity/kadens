@@ -615,6 +615,11 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
   border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
 }
 .kd-flash svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.kd-flash--error {
+  background: color-mix(in srgb, var(--color-status-missed) 9%, transparent);
+  color: var(--color-status-missed);
+  border-color: color-mix(in srgb, var(--color-status-missed) 22%, transparent);
+}
 
 /* ----------------------------------------------------------------------------
    Formulaires — stylés globalement via le thème form/kadens_theme.html.twig.
@@ -1392,3 +1397,231 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   .kd-plangrid:not(.kd-plangrid--edit) .kd-planday__name { flex: 0 0 44px; padding-top: 4px; }
   .kd-plangrid:not(.kd-plangrid--edit) .kd-planday.is-empty { border-style: solid; }
 }
+
+/* ----------------------------------------------------------------------------
+   Calendrier — grille mensuelle dense (semaines ISO lundi→dimanche)
+   Chaque case porte ses séances datées en pastilles colorées par statut
+   (prévu / fait / manqué : seul cas où la couleur ne code pas l'activité mais
+   l'état). L'édition d'une séance (statut, déplacer, retirer) passe par une
+   modale, pour garder les cases lisibles malgré la densité.
+   ---------------------------------------------------------------------------- */
+
+/* Barre d'ajout : poser une séance / instancier un plan (deux replis) */
+.kd-calbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kd-space-5);
+  margin-bottom: var(--kd-space-9);
+}
+.kd-caladd {
+  flex: 1 1 260px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--kd-radius-lg);
+  background: var(--color-surface);
+  padding: 0 var(--kd-space-8);
+}
+.kd-caladd[open] { padding-bottom: var(--kd-space-8); background: var(--color-surface-raised); }
+.kd-caladd > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  padding: var(--kd-space-6) 0;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-strong);
+}
+.kd-caladd > summary::-webkit-details-marker { display: none; }
+.kd-caladd > summary svg { width: 16px; height: 16px; color: var(--color-primary); }
+.kd-caladd__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-6);
+}
+
+/* Cadre défilable : le mois garde ses 7 colonnes et défile plutôt que de
+   s'écraser sur petit écran (la structure hebdomadaire reste lisible). */
+.kd-cal { overflow-x: auto; }
+.kd-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  min-width: 720px;
+  background: var(--color-border-cell);
+  border: 1px solid var(--color-border-cell);
+  border-radius: var(--kd-radius-lg);
+  overflow: hidden;
+}
+.kd-cal__dow {
+  background: var(--color-surface-subtle);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  text-align: center;
+  padding: var(--kd-space-4) var(--kd-space-3);
+}
+
+.kd-calday {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-3);
+  min-height: 116px;
+  padding: var(--kd-space-4);
+  background: var(--color-surface-raised);
+}
+.kd-calday--out { background: var(--color-surface-subtle); }
+.kd-calday__num {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text-secondary);
+}
+.kd-calday--out .kd-calday__num { color: var(--color-text-placeholder); }
+.kd-calday--today .kd-calday__num {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-radius: var(--kd-radius-full);
+  font-weight: var(--kd-weight-bold);
+}
+.kd-calday__events {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-2);
+  min-width: 0;
+}
+
+/* Pastille de séance datée — bouton ouvrant la modale d'édition.
+   Filet gauche = statut (prévu / fait / manqué). */
+.kd-calevent {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: var(--kd-weight-medium);
+  line-height: 1.25;
+  color: var(--color-text-strong);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-status-planned);
+  border-radius: var(--kd-radius-sm);
+  padding: var(--kd-space-2) var(--kd-space-3);
+  cursor: pointer;
+  transition: border-color .12s ease, background-color .12s ease;
+}
+.kd-calevent:hover { background: var(--color-surface-raised); border-color: var(--color-border-strong); }
+.kd-calevent--planned { border-left-color: var(--color-status-planned); }
+.kd-calevent--done    { border-left-color: var(--color-status-done); }
+.kd-calevent--missed  { border-left-color: var(--color-status-missed); }
+.kd-calevent__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-calevent__dot {
+  flex: 0 0 auto;
+  width: 6px; height: 6px;
+  border-radius: var(--kd-radius-full);
+  background: var(--color-status-planned);
+}
+.kd-calevent--done .kd-calevent__dot   { background: var(--color-status-done); }
+.kd-calevent--missed .kd-calevent__dot { background: var(--color-status-missed); }
+.kd-calevent--done .kd-calevent__title { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--color-status-done) 55%, transparent); }
+
+/* ----------------------------------------------------------------------------
+   Modale réutilisable (élément natif <dialog> + contrôleur Stimulus `dialog`)
+   ---------------------------------------------------------------------------- */
+.kd-modal {
+  width: min(440px, calc(100vw - 2 * var(--kd-space-8)));
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-xl);
+  background: var(--color-surface-raised);
+  color: var(--color-text-strong);
+  box-shadow: var(--shadow-card);
+}
+.kd-modal::backdrop { background: color-mix(in srgb, var(--kd-ink-900) 42%, transparent); }
+.kd-modal__card { padding: var(--kd-space-9) var(--kd-space-10) var(--kd-space-10); }
+.kd-modal__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kd-space-4);
+  margin-bottom: var(--kd-space-7);
+}
+.kd-modal__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 17px;
+  line-height: 1.25;
+  color: var(--color-text-strong);
+  margin: 0;
+}
+.kd-modal__sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin: var(--kd-space-2) 0 0;
+}
+.kd-modal__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px; height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--kd-radius-sm);
+  background: transparent;
+  color: var(--color-text-faint);
+  cursor: pointer;
+  transition: color .12s ease, background-color .12s ease;
+}
+.kd-modal__close:hover { color: var(--color-primary); background: var(--color-surface-subtle); }
+.kd-modal__close svg { width: 17px; height: 17px; }
+.kd-modal__section {
+  padding-top: var(--kd-space-7);
+  margin-top: var(--kd-space-7);
+  border-top: 1px solid var(--color-divider);
+}
+.kd-modal__section:first-of-type { padding-top: 0; margin-top: 0; border-top: 0; }
+.kd-modal__section-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin: 0 0 var(--kd-space-5);
+}
+/* Formulaire compact dans une section de modale (statut) */
+.kd-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-5);
+}
+/* Ligne « déplacer » : champ date + bouton alignés */
+.kd-modal__inline {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--kd-space-4);
+  flex-wrap: wrap;
+}
+.kd-modal__inline .kd-field { flex: 1 1 160px; margin: 0; }
