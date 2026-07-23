@@ -2067,7 +2067,11 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
 .kd-cblock__role {
   flex: none;
   width: auto;
-  padding: var(--kd-space-1) var(--kd-space-3);
+  /* Assez de place à droite pour la flèche du <select> (héritée de .kd-select :
+     posée à 12px du bord, 16px de large) : sinon le libellé « Corps de séance »
+     passe sous la flèche et paraît tronqué. min-width évite tout écrasement. */
+  min-width: fit-content;
+  padding: var(--kd-space-1) var(--kd-space-10) var(--kd-space-1) var(--kd-space-3);
   border: 1px solid transparent;
   border-radius: var(--kd-radius-sm);
   background: transparent;

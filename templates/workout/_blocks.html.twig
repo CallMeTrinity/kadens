@@ -8,7 +8,10 @@
             <p>Aucun bloc. Ajoute-en un, puis glisse des exercices depuis la bibliothèque.</p>
         </div>
     {% else %}
-        {% for block in workout.blocks %}
+        {# Tri par position en mémoire : après un déplacement, la PersistentCollection
+           garde son ordre de chargement (le #[OrderBy] ne joue qu'au load DB). Sans
+           ce tri, le re-render du stream montre l'ordre périmé (corrigé au rechargement). #}
+        {% for block in workout.blocks|sort((a, b) => a.position <=> b.position) %}
             {{ include('workout/_block.html.twig', { block: block }) }}
         {% endfor %}
     {% endif %}

@@ -17,6 +17,7 @@ use App\Repository\WorkoutRepository;
 use App\Security\Voter\WorkoutVoter;
 use App\Service\PlanFlattener;
 use App\Service\SlugGenerator;
+use App\Service\WorkoutEstimator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormFactoryInterface;
@@ -43,6 +44,7 @@ final class WorkoutController extends AbstractController
         private readonly FormFactoryInterface $formFactory,
         private readonly PlanFlattener $planFlattener,
         private readonly ExerciseRepository $exerciseRepository,
+        private readonly WorkoutEstimator $estimator,
     ) {
     }
 
@@ -122,6 +124,46 @@ final class WorkoutController extends AbstractController
         }
 
         return $this->redirectToRoute('app_workout_index');
+    }
+
+    #[Route('/{id}/duplicate', name: 'app_workout_duplicate', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function duplicate(Request $request, Workout $workout, SlugGenerator $slugGenerator): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::VIEW, $workout);
+
+        if (!$this->isCsrfTokenValid('duplicate'.$workout->getId(), $request->getPayload()->getString('_token'))) {
+            return $this->redirectToRoute('app_workout_show', ['id' => $workout->getId()]);
+        }
+
+        $copy = (new Workout())
+            ->setOwner($this->getUser())
+            ->setTitle($workout->getTitle().' (copie)')
+            ->setDescription($workout->getDescription())
+            ->setEstimatedDurationMinutes($workout->getEstimatedDurationMinutes());
+        $copy->setSlug($slugGenerator->generate($copy->getTitle(), Workout::class));
+
+        // Copie profonde blocs -> exercices prescrits. La cascade persist de
+        // Workout::blocks / Block::prescribedExercises persiste l'arbre entier.
+        foreach ($workout->getBlocks() as $block) {
+            $blockCopy = (new Block())
+                ->setRole($block->getRole())
+                ->setRounds($block->getRounds() ?? 1)
+                ->setPosition($block->getPosition())
+                ->setLabel($block->getLabel());
+
+            foreach ($block->getPrescribedExercises() as $prescribed) {
+                $blockCopy->addPrescribedExercise($this->copyPrescribed($prescribed));
+            }
+
+            $copy->addBlock($blockCopy);
+        }
+
+        $this->entityManager->persist($copy);
+        $this->entityManager->flush();
+
+        $this->addFlash('success', 'Séance dupliquée. Compose-la maintenant.');
+
+        return $this->redirectToRoute('app_workout_edit', ['id' => $copy->getId()]);
     }
 
     // ---- Édition des blocs -------------------------------------------------
@@ -227,11 +269,12 @@ final class WorkoutController extends AbstractController
             $exercise = $this->findLibraryExercise($payload->getInt('exerciseId'));
 
             if (null !== $exercise) {
-                // Ajout express : type par défaut « séries × répétitions », à affiner
-                // ensuite via le panneau de paramètres. Aucune valeur n'est posée.
+                // Ajout express : type par défaut déduit de l'activité (distance ×
+                // allure pour course/vélo/natation, séries × répétitions sinon), à
+                // affiner ensuite via le panneau de paramètres. Aucune valeur n'est posée.
                 $prescribed = (new PrescribedExercise())
                     ->setExercise($exercise)
-                    ->setPrescriptionType(PrescriptionType::SETS_REPS)
+                    ->setPrescriptionType($this->defaultPrescriptionType($exercise))
                     ->setPosition($this->nextPosition($block->getPrescribedExercises()->toArray()));
                 // addPrescribedExercise maintient les DEUX côtés de la relation :
                 // sans ça, la collection en mémoire reste vide et le stream re-rendu
@@ -356,6 +399,42 @@ final class WorkoutController extends AbstractController
         $owner = $exercise->getOwner();
 
         return (null === $owner || $owner === $this->getUser()) ? $exercise : null;
+    }
+
+    /**
+     * Type d'effort par défaut à l'ajout express, déduit de l'activité : les
+     * activités d'endurance (course, vélo, natation) partent sur « distance ×
+     * allure », les autres sur « séries × répétitions ».
+     */
+    private function defaultPrescriptionType(Exercise $exercise): PrescriptionType
+    {
+        return match ($exercise->getActivity()) {
+            ActivityType::RUNNING, ActivityType::CYCLING, ActivityType::SWIMMING => PrescriptionType::DISTANCE_PACE,
+            default => PrescriptionType::SETS_REPS,
+        };
+    }
+
+    /**
+     * Duplique un exercice prescrit avec tous ses paramètres (hors identité et
+     * bloc, posés par l'appelant). La position est reprise telle quelle.
+     */
+    private function copyPrescribed(PrescribedExercise $source): PrescribedExercise
+    {
+        return (new PrescribedExercise())
+            ->setExercise($source->getExercise())
+            ->setPrescriptionType($source->getPrescriptionType())
+            ->setPosition($source->getPosition())
+            ->setSets($source->getSets())
+            ->setReps($source->getReps())
+            ->setWeightKg($source->getWeightKg())
+            ->setDurationSeconds($source->getDurationSeconds())
+            ->setDistanceMeters($source->getDistanceMeters())
+            ->setPaceSecondsPerKm($source->getPaceSecondsPerKm())
+            ->setTargetReps($source->getTargetReps())
+            ->setCapSeconds($source->getCapSeconds())
+            ->setIntensityZone($source->getIntensityZone())
+            ->setRestSeconds($source->getRestSeconds())
+            ->setNotes($source->getNotes());
     }
 
     /**
@@ -535,7 +614,14 @@ final class WorkoutController extends AbstractController
         $summaries = [];
         foreach ($this->planFlattener->flattenWorkout($workout)['blocks'] as $flatBlock) {
             foreach ($flatBlock['exercises'] as $flat) {
-                $summaries[$flat['prescribed']->getId()] = $flat['summary'];
+                // On expose aussi le repos dans la pastille de l'éditeur : sans ça
+                // il n'apparaissait nulle part pendant la composition.
+                $summary = $flat['summary'];
+                if (null !== $flat['rest']) {
+                    $rest = 'repos '.$flat['rest'].' s';
+                    $summary = '' !== $summary ? $summary.' · '.$rest : $rest;
+                }
+                $summaries[$flat['prescribed']->getId()] = $summary;
             }
         }
 
@@ -586,6 +672,11 @@ final class WorkoutController extends AbstractController
      */
     private function blocksResponse(Request $request, Workout $workout): Response
     {
+        // La durée estimée est toujours dérivée du contenu : on la recalcule après
+        // chaque mutation (l'utilisateur ne la saisit plus).
+        $workout->setEstimatedDurationMinutes($this->estimator->estimateMinutes($workout));
+        $this->entityManager->flush();
+
         if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
             $request->setRequestFormat(TurboBundle::STREAM_FORMAT);
 

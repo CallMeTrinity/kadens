@@ -68,10 +68,10 @@ class PrescribedExerciseType extends AbstractType
                 'required' => false,
                 'attr' => ['min' => 0],
             ])
-            ->add('paceSecondsPerKm', IntegerType::class, [
-                'label' => 'Allure (s/km)',
+            ->add('paceSecondsPerKm', PaceType::class, [
+                'label' => 'Allure (min/km)',
                 'required' => false,
-                'attr' => ['min' => 0],
+                'attr' => ['placeholder' => '5:30'],
             ])
             ->add('targetReps', IntegerType::class, [
                 'label' => 'Répétitions cible',
@@ -88,7 +88,7 @@ class PrescribedExerciseType extends AbstractType
                 'required' => false,
             ])
             ->add('restSeconds', IntegerType::class, [
-                'label' => 'Repos après (s)',
+                'label' => 'Repos (s)',
                 'required' => false,
                 'attr' => ['min' => 0],
             ])

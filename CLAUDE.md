@@ -333,6 +333,29 @@ navigateur (non automatisable ici).
   / `.kd-libpanel*` / `.kd-libx*` / `.kd-cblock*` / `.kd-cexo*` + `.kd-page--wide`
   ajoutée à `components.css`, tout tokenisé. Icônes importées : `repeat`,
   `grip-vertical`, `sliders-horizontal`, `eye`, `settings-2`. Pas de migration.
+  **Affinages éditeur (lot d'ergonomie).** Sans changement de schéma ni de modèle
+  server-driven : (1) **durée estimée dérivée du contenu** — nouveau service
+  `WorkoutEstimator` (10 reps ≈ 1 min, repos par défaut 2 min si absent, sommée par
+  bloc × tours ; distance×allure via mètres/allure). Le champ `estimatedDurationMinutes`
+  n'est plus saisi (retiré de `WorkoutType` et de l'éditeur) : il est recalculé et
+  persisté à chaque mutation dans `blocksResponse`. Toutes les vues lisant
+  `workout.estimatedDurationMinutes` restent valides. (2) **Allure saisie en min/km**
+  (`m:ss`, ex. `5:30`) via un `PaceType` (form type, `CallbackTransformer` vers/depuis
+  les secondes/km stockées) — l'utilisateur ne convertit plus en secondes. (3) **Type
+  d'effort par défaut déduit de l'activité** à l'ajout express (`defaultPrescriptionType` :
+  course/vélo/natation → `DISTANCE_PACE`, sinon `SETS_REPS`). (4) **Duplication de
+  séance** : route `app_workout_duplicate` (POST + CSRF) copie profonde blocs→exercices
+  (cascade persist), nouveau slug `… (copie)`, redirige vers l'éditeur ; boutons sur
+  `show` et l'index. (5) **Ordre des blocs re-rendu dynamiquement** : `_blocks.html.twig`
+  trie les blocs par position en mémoire (même piège `#[OrderBy]` que les exercices, cf.
+  mémoire projet). (6) **Suppressions sans `confirm()` et asynchrones** (bloc + exercice) :
+  paramètre `confirm` retiré de `_action_form`. (7) **Correctif glisser-déposer** :
+  relâcher immédiatement une carte de bibliothèque ne la fait plus disparaître
+  (`onLibDrop` ne retirait plus `evt.item` — la carte d'origine — dans le cas « pas de
+  dépôt réel »). (8) Libellé repos « Repos » (au lieu de « Repos après ») et repos
+  exposé dans la pastille résumé de l'éditeur. (9) Fix CSS `.kd-cblock__role` (padding
+  droit pour la flèche du `<select>`, libellé de rôle plus tronqué). Icônes : `copy`
+  déjà importée. Pas de migration.
 
 ---
 

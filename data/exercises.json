@@ -3,455 +3,2444 @@
         "name": "Développé couché",
         "description": "Allongé sur un banc plat, descendre la barre jusqu'à la poitrine puis pousser à la verticale. Exercice roi pour les pectoraux.",
         "activity": "gym",
-        "targetAreas": ["chest", "triceps", "shoulders"],
+        "targetAreas": [
+            "chest",
+            "triceps",
+            "shoulders"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Développé couché avec haltères",
         "description": "Allongé sur banc plat, pousser deux haltères au-dessus de la poitrine en resserrant en haut de mouvement pour une meilleure amplitude.",
         "activity": "gym",
-        "targetAreas": ["chest", "triceps", "shoulders"],
+        "targetAreas": [
+            "chest",
+            "triceps",
+            "shoulders"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Développé incliné à la barre",
         "description": "Allongé sur un banc incliné à 30-45°, pousser la barre pour cibler le haut des pectoraux et le faisceau claviculaire.",
         "activity": "gym",
-        "targetAreas": ["chest", "shoulders", "triceps"],
+        "targetAreas": [
+            "chest",
+            "shoulders",
+            "triceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Développé incliné à la machine convergente",
         "description": "Sur machine inclinée à trajectoire convergente, pousser les poignées vers l'avant et le haut pour cibler le haut des pectoraux.",
         "activity": "gym",
-        "targetAreas": ["chest", "shoulders"],
+        "targetAreas": [
+            "chest",
+            "shoulders"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Écarté couché avec haltères",
         "description": "Allongé sur banc plat, écarter les bras légèrement fléchis sur les côtés puis ramener les haltères au centre.",
         "activity": "gym",
-        "targetAreas": ["chest"],
+        "targetAreas": [
+            "chest"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Écarté à la poulie vis-à-vis",
         "description": "Debout entre deux poulies, ramener les poignées vers l'avant en croisant ou rapprochant les mains pour une tension continue.",
         "activity": "gym",
-        "targetAreas": ["chest"],
+        "targetAreas": [
+            "chest"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Pec Deck (Petherfly)",
         "description": "Assis sur la machine, ramener les poignées ou les coussins devant soi en contractant fortement le centre de la poitrine.",
         "activity": "gym",
-        "targetAreas": ["chest"],
+        "targetAreas": [
+            "chest"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Pompe",
         "description": "Au poids du corps, mains au sol largeur épaules, descendre la poitrine puis remonter en gainant le tronc.",
         "activity": "gym",
-        "targetAreas": ["chest", "triceps", "abs"],
+        "targetAreas": [
+            "chest",
+            "triceps",
+            "abs"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Traction",
         "description": "Suspendu à la barre en pronation, tirer le corps jusqu'à passer le menton au-dessus de la barre.",
         "activity": "gym",
-        "targetAreas": ["back", "biceps"],
+        "targetAreas": [
+            "back",
+            "biceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Traction en supination (Chin-up)",
         "description": "Suspendu à la barre, paumes vers soi, tirer le corps vers le haut pour accentuer l'engagement des biceps et du grand dorsal.",
         "activity": "gym",
-        "targetAreas": ["back", "biceps"],
+        "targetAreas": [
+            "back",
+            "biceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Traction australienne",
         "description": "Corps incliné sous une barre basse, tirer la poitrine vers la barre en gardant le corps gainé. Variante horizontale accessible.",
         "activity": "gym",
-        "targetAreas": ["back", "biceps"],
+        "targetAreas": [
+            "back",
+            "biceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Tirage vertical poitrine (Lat pulldown)",
         "description": "À la poulie haute, tirer la barre large vers le haut de la poitrine en ouvrant la cage et en resserrant les omoplates.",
         "activity": "gym",
-        "targetAreas": ["back", "biceps"],
+        "targetAreas": [
+            "back",
+            "biceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Tirage vertical prise serrée",
         "description": "À la poulie haute, tirer la barre en prise serrée vers le haut de la poitrine en resserrant les omoplates.",
         "activity": "gym",
-        "targetAreas": ["back", "biceps"],
+        "targetAreas": [
+            "back",
+            "biceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Tirage horizontal à la poulie (Seated row)",
         "description": "Assis face à la poulie basse, ramener la poignée vers le bas de l'abdomen en gardant le dos droit.",
         "activity": "gym",
-        "targetAreas": ["back", "biceps"],
+        "targetAreas": [
+            "back",
+            "biceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Rowing buste penché à la barre",
         "description": "Buste Incliné à 45°, tirer la barre vers le nombril en gardant le dos neutre et gainé.",
         "activity": "gym",
-        "targetAreas": ["back", "biceps"],
+        "targetAreas": [
+            "back",
+            "biceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Rowing unilatéral avec haltère",
         "description": "Un genou et une main sur un banc, tirer un haltère vers la hanche en gardant le coude proche du corps.",
         "activity": "gym",
-        "targetAreas": ["back", "biceps"],
+        "targetAreas": [
+            "back",
+            "biceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Rowing unilatéral landmine",
         "description": "Barre en landmine, tirer une extrémité vers la hanche d'un seul bras pour travailler le dos de façon unilatérale.",
         "activity": "gym",
-        "targetAreas": ["back", "biceps"],
+        "targetAreas": [
+            "back",
+            "biceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Pull over à la poulie",
         "description": "Debout face à la poulie haute, bras tendus, ramener la barre vers les cuisses par un mouvement d'arc pour cibler le grand dorsal.",
         "activity": "gym",
-        "targetAreas": ["back"],
+        "targetAreas": [
+            "back"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Shrug avec haltères",
         "description": "Debout, haltères dans chaque main, hausser les épaules vers les oreilles pour cibler les trapèzes supérieurs.",
         "activity": "gym",
-        "targetAreas": ["back", "shoulders"],
+        "targetAreas": [
+            "back",
+            "shoulders"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Développé militaire",
         "description": "Debout, pousser la barre au-dessus de la tête depuis le haut de la poitrine en gainant. Développé vertical des épaules.",
         "activity": "gym",
-        "targetAreas": ["shoulders", "triceps"],
+        "targetAreas": [
+            "shoulders",
+            "triceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Développé épaules avec haltères",
         "description": "Assis ou debout, pousser les haltères au-dessus de la tête jusqu'à extension quasi-complète des bras.",
         "activity": "gym",
-        "targetAreas": ["shoulders", "triceps"],
+        "targetAreas": [
+            "shoulders",
+            "triceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Presse à épaules",
         "description": "Sur machine guidée, pousser les poignées à la verticale pour développer les deltoïdes en sécurité.",
         "activity": "gym",
-        "targetAreas": ["shoulders", "triceps"],
+        "targetAreas": [
+            "shoulders",
+            "triceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Élévations latérales avec haltères",
         "description": "Debout, écarter les bras sur les côtés jusqu'à la hauteur des épaules pour isoler le faisceau latéral des deltoïdes.",
         "activity": "gym",
-        "targetAreas": ["shoulders"],
+        "targetAreas": [
+            "shoulders"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Élévations frontales avec haltères",
         "description": "Debout, lever les haltères devant soi jusqu'à la hauteur des yeux pour cibler l'avant de l'épaule.",
         "activity": "gym",
-        "targetAreas": ["shoulders"],
+        "targetAreas": [
+            "shoulders"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Oiseau avec haltères (Rear delt fly)",
         "description": "Buste penché en avant, écarter les bras sur les côtés pour isoler l'arrière de l'épaule (deltoïde postérieur).",
         "activity": "gym",
-        "targetAreas": ["shoulders", "back"],
+        "targetAreas": [
+            "shoulders",
+            "back"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Face Pull à la poulie",
         "description": "À la poulie haute avec corde, tirer vers le visage en écartant les mains pour renforcer l'arrière de l'épaule et la coiffe des rotateurs.",
         "activity": "gym",
-        "targetAreas": ["shoulders", "back"],
+        "targetAreas": [
+            "shoulders",
+            "back"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Curl biceps barre droit / EZ",
         "description": "Debout, fléchir les coudes pour monter la barre vers les épaules en gardant les coudes fixes contre le buste.",
         "activity": "gym",
-        "targetAreas": ["biceps"],
+        "targetAreas": [
+            "biceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Curl biceps avec haltères (Alterné)",
         "description": "Debout ou assis, monter les haltères en effectuant une supination du poignet en fin de course.",
         "activity": "gym",
-        "targetAreas": ["biceps"],
+        "targetAreas": [
+            "biceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Curl marteau (Hammer curl)",
         "description": "En prise neutre (paumes face à face), fléchir les avant-bras pour cibler le brachiale et le brachio-radial.",
         "activity": "gym",
-        "targetAreas": ["biceps"],
+        "targetAreas": [
+            "biceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Curl biceps poulie basse",
         "description": "Debout face à la poulie basse, fléchir les coudes pour amener la barre vers les épaules sans balancement.",
         "activity": "gym",
-        "targetAreas": ["biceps"],
+        "targetAreas": [
+            "biceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Curl haltère debout sur banc incliné",
         "description": "Assis sur un banc incliné, bras le long du corps, fléchir les coudes en étirement complet du biceps.",
         "activity": "gym",
-        "targetAreas": ["biceps"],
+        "targetAreas": [
+            "biceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Curl au pupitre Larry Scott",
         "description": "Bras calés sur le pupitre, fléchir les coudes pour monter la barre EZ en isolant parfaitement le biceps.",
         "activity": "gym",
-        "targetAreas": ["biceps"],
+        "targetAreas": [
+            "biceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Extension des triceps à la poulie haute à la corde",
         "description": "Face à la poulie haute avec corde, coudes fixes, étendre les avant-bras vers le bas en écartant la corde en fin de mouvement.",
         "activity": "gym",
-        "targetAreas": ["triceps"],
+        "targetAreas": [
+            "triceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Extension des triceps au-dessus de la tête",
         "description": "Assis ou debout, un haltère ou la poulie derrière la tête, étendre les bras vers le haut pour étirer le chef long du triceps.",
         "activity": "gym",
-        "targetAreas": ["triceps"],
+        "targetAreas": [
+            "triceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Barre au front (Skullcrusher)",
         "description": "Allongé sur banc plat, descendre la barre EZ vers le front en gardant les coudes immobiles puis tendre les bras.",
         "activity": "gym",
-        "targetAreas": ["triceps"],
+        "targetAreas": [
+            "triceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Développé couché prise serrée",
         "description": "Allongé sur banc plat, descendre la barre mains espacées de la largeur des épaules pour solliciter prioritairement les triceps.",
         "activity": "gym",
-        "targetAreas": ["triceps", "chest"],
+        "targetAreas": [
+            "triceps",
+            "chest"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Dips",
         "description": "Aux barres parallèles, descendre en fléchissant les coudes puis remonter. Buste vertical pour cibler les triceps, penché pour les pectoraux.",
         "activity": "gym",
-        "targetAreas": ["triceps", "chest"],
+        "targetAreas": [
+            "triceps",
+            "chest"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Squat",
         "description": "Barre sur le haut du dos, fléchir hanches et genoux jusqu'à cuisses parallèles puis remonter en poussant sur les talons.",
         "activity": "gym",
-        "targetAreas": ["quadriceps", "glutes", "abs"],
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "abs"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Front Squat (Squat avant)",
         "description": "Barre reposant sur les clavicules devant le cou, descendre en squat en gardant le buste le plus droit possible.",
         "activity": "gym",
-        "targetAreas": ["quadriceps", "glutes", "abs"],
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "abs"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Front squat kettlebell",
         "description": "Kettlebell tenue en rack devant la poitrine, réaliser un squat en gardant le buste vertical.",
         "activity": "gym",
-        "targetAreas": ["quadriceps", "glutes", "abs"],
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "abs"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Goblet Squat",
         "description": "Un haltère ou kettlebell tenu à deux mains contre la poitrine, effectuer un squat profond avec contrôle.",
         "activity": "gym",
-        "targetAreas": ["quadriceps", "glutes", "abs"],
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "abs"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Squat pistol",
         "description": "Squat sur une seule jambe, l'autre tendue vers l'avant. Fort travail de force et d'équilibre au poids du corps.",
         "activity": "gym",
-        "targetAreas": ["quadriceps", "glutes", "abs"],
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "abs"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Hack squat inversé",
         "description": "Sur machine hack squat en position inversée face au dossier, pousser la charge pour insister sur les quadriceps.",
         "activity": "gym",
-        "targetAreas": ["quadriceps"],
+        "targetAreas": [
+            "quadriceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Presse à cuisse",
         "description": "Assis sur la presse, pousser le plateau chargé avec les jambes sans verrouiller les genoux en fin de course.",
         "activity": "gym",
-        "targetAreas": ["quadriceps", "glutes"],
+        "targetAreas": [
+            "quadriceps",
+            "glutes"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Fentes marchées avec haltères",
         "description": "Avancer en effectuant de grands pas, descendre le genou arrière proche du sol puis enchaîner sur l'autre jambe.",
         "activity": "gym",
-        "targetAreas": ["quadriceps", "glutes", "hamstrings"],
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "hamstrings"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Squat bulgare (Bulgarian split squat)",
         "description": "Un pied posé sur un banc derrière soi, effectuer une fente profonde sur la jambe avant.",
         "activity": "gym",
-        "targetAreas": ["quadriceps", "glutes"],
+        "targetAreas": [
+            "quadriceps",
+            "glutes"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Leg Extension",
         "description": "Assis sur la machine, étendre les jambes vers le haut pour isoler le travail des quadriceps.",
         "activity": "gym",
-        "targetAreas": ["quadriceps"],
+        "targetAreas": [
+            "quadriceps"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Soulevé de terre traditionnel (Deadlift)",
         "description": "Barre au sol, fléchir légèrement les jambes et pencher le buste pour lever la charge en poussant sur les jambes et en redressant le dos.",
         "activity": "gym",
-        "targetAreas": ["glutes", "hamstrings", "back", "lower_back"],
+        "targetAreas": [
+            "glutes",
+            "hamstrings",
+            "back",
+            "lower_back"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Soulevé de terre jambes tendues / roumain",
         "description": "Bassin vers l'arrière, incliner le buste avec jambes quasi-tendues pour étirer fortement les ischio-jambiers et fessiers.",
         "activity": "gym",
-        "targetAreas": ["hamstrings", "glutes", "lower_back"],
+        "targetAreas": [
+            "hamstrings",
+            "glutes",
+            "lower_back"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Leg curl assis à la machine",
         "description": "Assis, ramener le coussin sous les mollets en fléchissant les genoux pour isoler les ischio-jambiers.",
         "activity": "gym",
-        "targetAreas": ["hamstrings"],
+        "targetAreas": [
+            "hamstrings"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Leg curl allongé à la machine",
         "description": "Allongé sur le ventre, ramener le boudin vers les fessiers en fléchissant les genoux.",
         "activity": "gym",
-        "targetAreas": ["hamstrings"],
+        "targetAreas": [
+            "hamstrings"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Hip Thrust à la barre",
         "description": "Haut du dos appuyé sur un banc, barre posée sur le bassin, pousser les hanches vers le haut en contractant les fessiers.",
         "activity": "gym",
-        "targetAreas": ["glutes", "hamstrings"],
+        "targetAreas": [
+            "glutes",
+            "hamstrings"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Extension des mollets barre debout",
         "description": "Debout barre sur les épaules, monter sur la pointe des pieds puis redescendre lentement pour travailler les mollets.",
         "activity": "gym",
-        "targetAreas": ["calves"],
+        "targetAreas": [
+            "calves"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Extension mollets presse 45",
         "description": "Sur la presse à 45°, plante des pieds en bas du plateau, pousser en extension de cheville pour cibler les mollets.",
         "activity": "gym",
-        "targetAreas": ["calves"],
+        "targetAreas": [
+            "calves"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Extension des mollets assis à la machine",
         "description": "Assis, coussin posé sur les cuisses, monter sur la pointe des pieds pour cibler préférentiellement le soléaire.",
         "activity": "gym",
-        "targetAreas": ["calves"],
+        "targetAreas": [
+            "calves"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Reverse Hyperextension",
         "description": "Buste posé sur le banc, jambes libres, remonter les jambes tendues à l'horizontale pour renforcer fessiers et lombaires.",
         "activity": "gym",
-        "targetAreas": ["glutes", "lower_back", "hamstrings"],
+        "targetAreas": [
+            "glutes",
+            "lower_back",
+            "hamstrings"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Extension lombaire au banc à 45°",
         "description": "Bassin calé, incliner le buste vers le bas puis se redresser à l'alignement du corps sans hyper-extension.",
         "activity": "gym",
-        "targetAreas": ["lower_back", "glutes", "hamstrings"],
+        "targetAreas": [
+            "lower_back",
+            "glutes",
+            "hamstrings"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Crunch au sol",
         "description": "Allongé, genoux fléchis, enrouler le buste pour rapprocher les côtes du bassin sans tirer sur la nuque.",
         "activity": "gym",
-        "targetAreas": ["abs"],
+        "targetAreas": [
+            "abs"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Crunch à la poulie haute",
         "description": "À genoux face à la poulie avec corde, enrouler le buste vers le bas en contractant fortement les abdominaux.",
         "activity": "gym",
-        "targetAreas": ["abs"],
+        "targetAreas": [
+            "abs"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Relevés de jambes",
         "description": "Suspendu ou allongé, monter les jambes tendues vers le haut en contrôlant la descente pour cibler le bas des abdominaux.",
         "activity": "gym",
-        "targetAreas": ["abs"],
+        "targetAreas": [
+            "abs"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Abdominaux à la barre",
         "description": "Avec une roue ou une barre lestée au sol, rouler vers l'avant en gainant puis revenir. Travail intense du gainage.",
         "activity": "gym",
-        "targetAreas": ["abs", "obliques"],
+        "targetAreas": [
+            "abs",
+            "obliques"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Gainage planche (Plank)",
         "description": "Appui sur les avant-bras et les pointes de pieds, maintenir le corps droit et immobile pour renforcer le transverse.",
         "activity": "gym",
-        "targetAreas": ["abs", "obliques"],
+        "targetAreas": [
+            "abs",
+            "obliques"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Gainage latéral (Side plank)",
         "description": "Appui sur un avant-bras et le côté du pied, maintenir le bassin haut pour solliciter les obliques.",
         "activity": "gym",
-        "targetAreas": ["obliques", "abs"],
+        "targetAreas": [
+            "obliques",
+            "abs"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Relevé tibial",
         "description": "Assis ou debout, fléchir les chevilles pour lever les orteils vers le tibia, renforçant les muscles antérieurs de la jambe.",
         "activity": "gym",
-        "targetAreas": ["shins"],
+        "targetAreas": [
+            "shins"
+        ],
         "mediaUrl": null
     },
     {
         "name": "Course à pied route",
         "description": "Courir sur route ou chemin plat pour améliorer l'endurance cardiovasculaire et la condition physique générale.",
         "activity": "running",
-        "targetAreas": ["calves", "hamstrings", "glutes", "shins"],
+        "targetAreas": [
+            "calves",
+            "hamstrings",
+            "glutes",
+            "shins"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Développé décliné à la barre",
+        "description": "Allongé sur un banc décliné, pousser la barre vers le haut pour solliciter préférentiellement la partie inférieure des pectoraux.",
+        "activity": "gym",
+        "targetAreas": [
+            "chest",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Développé décliné avec haltères",
+        "description": "Allongé sur banc décliné, pousser deux haltères au-dessus du bas de la poitrine pour accentuer la contraction de la portion basse.",
+        "activity": "gym",
+        "targetAreas": [
+            "chest",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Écarté incliné avec haltères",
+        "description": "Allongé sur un banc incliné, écarter les bras sur les côtés puis les ramener pour étirer et cibler la haut de la poitrine.",
+        "activity": "gym",
+        "targetAreas": [
+            "chest"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Pull over avec haltère",
+        "description": "En travers d'un banc, faire descendre un haltère bras tendus derrière la tête puis remonter au-dessus des yeux pour ouvrir la cage et solliciter la poitrine et les dorsaux.",
+        "activity": "gym",
+        "targetAreas": [
+            "chest",
+            "back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Pompe inclinée",
+        "description": "Mains posées en hauteur sur un banc ou un support, effectuer des pompes pour réduire la charge et cibler le bas des pectoraux.",
+        "activity": "gym",
+        "targetAreas": [
+            "chest",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Pompe déclinée",
+        "description": "Pieds surélevés sur un banc, mains au sol, descendre le buste pour accentuer la difficulté sur le haut de la poitrine.",
+        "activity": "gym",
+        "targetAreas": [
+            "chest",
+            "shoulders",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Pompe diamant",
+        "description": "Mains rapprochées formant un losange au sol, exécuter une pompe pour reporter l'effort sur les triceps et la partie interne de la poitrine.",
+        "activity": "gym",
+        "targetAreas": [
+            "triceps",
+            "chest"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Dips pectoraux",
+        "description": "Aux barres parallèles, fléchir le buste vers l'avant et écarter légèrement les coudes pour maximiser la tension sur le bas de la poitrine.",
+        "activity": "gym",
+        "targetAreas": [
+            "chest",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Press autour du monde (Around the world)",
+        "description": "Allongé sur un banc, faire pivoter les haltères en décrivant un arc de cercle autour du corps du bas vers le haut.",
+        "activity": "gym",
+        "targetAreas": [
+            "chest",
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Svend press",
+        "description": "Debout ou assis, presser un disque de fonte entre les paumes de mains et l'étendre vers l'avant pour une contraction isométrique des pectoraux.",
+        "activity": "gym",
+        "targetAreas": [
+            "chest"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Chest press assise à la machine",
+        "description": "Assis à la machine guidée, pousser les poignées vers l'avant en ajustant la charge en toute sécurité.",
+        "activity": "gym",
+        "targetAreas": [
+            "chest",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Rowing T-Bar",
+        "description": "Buste penché, saisir la barre T et la tirer vers l'abdomen pour travailler l'épaisseur du dos.",
+        "activity": "gym",
+        "targetAreas": [
+            "back",
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Rowing à la machine Chest Supported",
+        "description": "Buste appuyé contre un coussin, tirer les poignées vers soi pour éliminer la contrainte lombaire et isoler les dorsaux.",
+        "activity": "gym",
+        "targetAreas": [
+            "back",
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Tirage vertical en supination",
+        "description": "À la poulie haute, tirer la barre paumes vers soi pour recruter le bas du grand dorsal et le biceps.",
+        "activity": "gym",
+        "targetAreas": [
+            "back",
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Traction prise neutre",
+        "description": "Suspendu à deux barres parallèles (paumes face à face), se hisser jusqu'à dépasser le menton, posture confortable pour les poignets.",
+        "activity": "gym",
+        "targetAreas": [
+            "back",
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Soulevé de terre sumo",
+        "description": "Pieds très écartés, mains à l'intérieur des genoux, redresser la barre pour cibler le dos, les adducteurs et les fessiers.",
+        "activity": "gym",
+        "targetAreas": [
+            "back",
+            "glutes",
+            "hamstrings",
+            "lower_back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Shrug à la barre",
+        "description": "Barre tenue devant le bassin, hausser les épaules vers le haut sans fléchir les coudes pour développer les trapèzes.",
+        "activity": "gym",
+        "targetAreas": [
+            "back",
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Shrug à la poulie basse",
+        "description": "Tirer les poignées de la poulie basse vers le haut en haussant les épaules pour une tension continue du trapèze.",
+        "activity": "gym",
+        "targetAreas": [
+            "back",
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Rowing menton à la barre (Upright row)",
+        "description": "Tirer une barre le long du corps jusqu'à la poitrine en montant les coudes plus haut que les mains.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders",
+            "back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Rowing menton à la poulie",
+        "description": "Tirer le câble le long du buste en amenant les coudes vers le haut pour accentuer l'effort sur les deltoïdes latéraux et trapèzes.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders",
+            "back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Développé Arnold",
+        "description": "Assis avec deux haltères, commencer en supination devant soi et effectuer une rotation en poussant au-dessus de la tête.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Développé épaules à la barre guidée (Smith machine)",
+        "description": "Pousser la barre guidée au-dessus de la tête pour travailler la force des deltoïdes en trajectoire sécurisée.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Élévations latérales à la poulie basse",
+        "description": "Debout à côté d'une poulie basse, écarter le bras sur le côté pour maintenir une tension uniforme sur le deltoïde latéral.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Élévations latérales inclinées sur banc",
+        "description": "Allongé de profil sur un banc incliné, lever l'haltère latéralement pour maximiser la tension au début du mouvement.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Oiseau à la machine (Reverse Pec Deck)",
+        "description": "Assis face à la machine, écarter les bras vers l'arrière pour cibler de manière isolée les deltoïdes postérieurs.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders",
+            "back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Oiseau à la poulie vis-à-vis",
+        "description": "Croiser les câbles des poulies hautes sans poignées et tirer vers l'arrière pour isoler l'arrière de l'épaule.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders",
+            "back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Rotation externe de l'épaule à la poulie",
+        "description": "Coude collé au corps fléchi à 90°, pivoter l'avant-bras vers l'extérieur pour renforcer l'infra-épineux et le petit rond.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Rotation interne de l'épaule à la poulie",
+        "description": "Coude collé au corps fléchi à 90°, pivoter l'avant-bras vers le nombril pour renforcer le sous-scapulaire.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Curl biceps concentration",
+        "description": "Assis, coude calé à l'intérieur de la cuisse, fléchir le bras pour focaliser l'effort sur le sommet du biceps.",
+        "activity": "gym",
+        "targetAreas": [
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Curl araignée (Spider curl)",
+        "description": "Buste posé face contre un banc incliné, bras pendants verticalement, fléchir les coudes pour une tension maximale en haut.",
+        "activity": "gym",
+        "targetAreas": [
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Curl à la poulie haute (Poulies vis-à-vis)",
+        "description": "Debout au centre du cadre, bras écartés à l'horizontale, fléchir les coudes vers les oreilles pour contracter les biceps.",
+        "activity": "gym",
+        "targetAreas": [
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Curl en pronation à la barre",
+        "description": "Saisir la barre en pronation (paumes vers le bas) et monter la charge pour renforcer le brachio-radial et les avant-bras.",
+        "activity": "gym",
+        "targetAreas": [
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Curl zottman",
+        "description": "Monter les haltères en supination, pivoter les poignets en haut puis redescendre lentement en pronation.",
+        "activity": "gym",
+        "targetAreas": [
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Extension des triceps au-dessus de la tête à la poulie basse",
+        "description": "Dos à la poulie basse, étendre le bras ou la corde vers le haut pour étirer puissamment le chef long du triceps.",
+        "activity": "gym",
+        "targetAreas": [
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Extension unilatérale des triceps à la poulie haute",
+        "description": "À une main en prise inversée ou neutre, étendre l'avant-bras vers le bas pour isoler le triceps.",
+        "activity": "gym",
+        "targetAreas": [
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Kickback avec haltère",
+        "description": "Buste penché en avant, coude collé au corps, étendre l'avant-bras vers l'arrière jusqu'à verrouillage du coude.",
+        "activity": "gym",
+        "targetAreas": [
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Dips entre deux bancs",
+        "description": "Mains sur un banc derrière soi et pieds reposant sur un autre banc devant, descendre le bassin et pousser avec les triceps.",
+        "activity": "gym",
+        "targetAreas": [
+            "triceps",
+            "chest"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Barre au front sur banc incliné",
+        "description": "Allongé sur banc incliné, effectuer une extension triceps vers le haut pour augmenter la tension d'étirement.",
+        "activity": "gym",
+        "targetAreas": [
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Squat clavicule (Zercher squat)",
+        "description": "Barre calée dans le creux des coudes, effectuer un squat profond renforçant le tronc et les quadriceps.",
+        "activity": "gym",
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Hack Squat à la machine",
+        "description": "Épaules et dos contre les coussins de la machine, descendre et pousser pour isoler la masse des quadriceps.",
+        "activity": "gym",
+        "targetAreas": [
+            "quadriceps",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Sissy Squat",
+        "description": "Incliner le buste vers l'arrière en fléchissant les genoux vers l'avant pour étirer et cibler le droit fémonal.",
+        "activity": "gym",
+        "targetAreas": [
+            "quadriceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Squat sauté (Jump squat)",
+        "description": "Effectuer un squat puis effectuer une extension explosive avec un saut vertical pour développer la puissance.",
+        "activity": "gym",
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Step-up (Montées sur banc) avec haltères",
+        "description": "Poser un pied sur un banc haut et pousser sur la jambe pour monter tout le corps sans donner d'impulsion arrière.",
+        "activity": "gym",
+        "targetAreas": [
+            "quadriceps",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Fentes arrière (Reverse lunge)",
+        "description": "Faire un pas vers l'arrière et fléchir les genoux pour stabiliser le genou avant et solliciter fessiers et quadriceps.",
+        "activity": "gym",
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "hamstrings"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Fentes latérales (Side lunge)",
+        "description": "Effectuer un pas large sur le côté et fléchir une jambe tout en gardant l'autre tendue pour travailler les adducteurs et fessiers.",
+        "activity": "gym",
+        "targetAreas": [
+            "quadriceps",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Jefferson Curl",
+        "description": "Debout sur une marche avec un poids léger, enrouler lentement la colonne vertébrale vertèbre par vertèbre vers le sol pour étirer la chaîne postérieure.",
+        "activity": "gym",
+        "targetAreas": [
+            "hamstrings",
+            "lower_back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Nordic Hamstring Curl",
+        "description": "A genoux avec les chevilles bloquées, freiner la descente du buste vers le sol grâce aux ischio-jambiers.",
+        "activity": "gym",
+        "targetAreas": [
+            "hamstrings"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Good Morning à la barre",
+        "description": "Barre sur les épaules, fléchir les hanches vers l'arrière en gardant le dos droit pour cibler ischio-jambiers et lombaires.",
+        "activity": "gym",
+        "targetAreas": [
+            "hamstrings",
+            "glutes",
+            "lower_back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Glute Ham Raise (GHR)",
+        "description": "Sur un banc GHD, exécuter une flexion des genoux pour remonter le buste et solliciter Ischio-jambiers et fessiers.",
+        "activity": "gym",
+        "targetAreas": [
+            "hamstrings",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Soulevé de terre unilatéral (Single leg deadlift)",
+        "description": "En équilibre sur une jambe, basculer le buste vers l'avant et la jambe arrière à l'horizontale pour la stabilité et les ischio-jambiers.",
+        "activity": "gym",
+        "targetAreas": [
+            "hamstrings",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Kickback fessier à la poulie",
+        "description": "Sangle attachée à la cheville, pousser la jambe vers l'arrière en contractant le grand fessier.",
+        "activity": "gym",
+        "targetAreas": [
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Abduction des hanches à la machine",
+        "description": "Assis à la machine, écarter les cuisses vers l'extérieur pour isoler le moyen fessier.",
+        "activity": "gym",
+        "targetAreas": [
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Adduction des hanches à la machine",
+        "description": "Assis à la machine, resserrer les cuisses vers l'intérieur pour cibler les muscles adducteurs.",
+        "activity": "gym",
+        "targetAreas": [
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Frog Pump",
+        "description": "Allongé sur le dos, plantes de pieds collées l'une contre l'autre, monter le bassin pour contracter fortement les fessiers.",
+        "activity": "gym",
+        "targetAreas": [
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Extension des mollets unilatérale avec haltère",
+        "description": "En équilibre sur la pointe d'un pied sur une marche, effectuer des montées et descentes complètes pour le mollet.",
+        "activity": "gym",
+        "targetAreas": [
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Crunch inversé",
+        "description": "Allongé sur le dos, enrouler le bassin vers le haut pour ramener les genoux vers la poitrine.",
+        "activity": "gym",
+        "targetAreas": [
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Bird Dog",
+        "description": "A quatre pattes, tendre simultanément le bras droit et la jambe gauche à l'horizontale pour le renforcement profond du dos et du tronc.",
+        "activity": "gym",
+        "targetAreas": [
+            "abs",
+            "lower_back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Bug mort (Dead bug)",
+        "description": "Allongé sur le dos, tendre alternativement le bras et la jambe opposée en maintenant le bas du dos plaqué au sol.",
+        "activity": "gym",
+        "targetAreas": [
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Russian Twist avec charge",
+        "description": "Assis en équilibre sur le fessier, pivoter le buste de gauche à droite avec un disque ou kettlebell pour solliciter les obliques.",
+        "activity": "gym",
+        "targetAreas": [
+            "obliques",
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Flexion latérale du buste à la poulie",
+        "description": "Debout de profil à la poulie basse, incliner le buste sur le côté opposé pour cibler l'oblique.",
+        "activity": "gym",
+        "targetAreas": [
+            "obliques"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Woodchopper à la poulie (Bûcheron)",
+        "description": "Tirer le câble en diagonale du haut vers le bas en effectuant une rotation du buste pour entraîner la chaîne rotative.",
+        "activity": "gym",
+        "targetAreas": [
+            "obliques",
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Pallof Press à la poulie",
+        "description": "De côté par rapport à la poulie, pousser la poignée devant soi sans laisser la tension faire pivoter le buste (anti-rotation).",
+        "activity": "gym",
+        "targetAreas": [
+            "abs",
+            "obliques"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mountain Climber",
+        "description": "En position de planche, ramener alternativement les genoux vers la poitrine de manière dynamique.",
+        "activity": "gym",
+        "targetAreas": [
+            "abs",
+            "quadriceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Vacuum (Aspiration abdominale)",
+        "description": "Expirer tout l'air des poumons et aspirer le nombril vers la colonne vertébrale pour renforcer le muscle transverse.",
+        "activity": "gym",
+        "targetAreas": [
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "L-Sit aux barres parallèles",
+        "description": "En appui bras tendus, maintenir les jambes tendues à la perpendiculaire du buste en statique.",
+        "activity": "gym",
+        "targetAreas": [
+            "abs",
+            "quadriceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Marche du fermier (Farmer's walk)",
+        "description": "Marcher sur une distance donnée en tenant deux charges lourdes dans les mains pour la poigne et le gainage.",
+        "activity": "gym",
+        "targetAreas": [
+            "abs",
+            "shoulders",
+            "back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Kettlebell Swing",
+        "description": "Mouvement de charnière de hanche dynamique pour propulser un kettlebell à hauteur d'épaules.",
+        "activity": "gym",
+        "targetAreas": [
+            "glutes",
+            "hamstrings",
+            "lower_back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Turkish Get-Up (Relevé turc)",
+        "description": "Partir allongé au sol et se relever jusqu'à la position debout en maintenant une charge tendue au-dessus de soi.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders",
+            "abs",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Clean and Press avec haltères",
+        "description": "Épauler deux haltères depuis le sol jusqu'aux épaules puis les pousser au-dessus de la tête.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders",
+            "quadriceps",
+            "back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Snatch avec Kettlebell",
+        "description": "Arracher le kettlebell du sol jusqu'au-dessus de la tête en un seul mouvement fluide et explosif.",
+        "activity": "gym",
+        "targetAreas": [
+            "glutes",
+            "back",
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Thruster avec barre",
+        "description": "Exécuter un front squat immédiatement suivi d'un développé vertical au-dessus de la tête.",
+        "activity": "gym",
+        "targetAreas": [
+            "quadriceps",
+            "shoulders",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Flexion des poignets à la barre",
+        "description": "Avant-bras posés sur les cuisses, fléchir les poignets vers le haut pour cibler les fléchisseurs des doigts.",
+        "activity": "gym",
+        "targetAreas": [
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Extension des poignets à la barre",
+        "description": "Avant-bras posés sur les cuisses en pronation, lever le dos de la main pour développer les extenseurs du poignet.",
+        "activity": "gym",
+        "targetAreas": [
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Course sur tapis roulant",
+        "description": "Entraînement de course en intérieur avec contrôle précis de la vitesse et de l'inclinaison.",
+        "activity": "running",
+        "targetAreas": [
+            "calves",
+            "quadriceps",
+            "hamstrings"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Sprint 100m",
+        "description": "Sprints à vitesse maximale sur courte distance pour développer la puissance anaérobie et le recrutement musculaire rapide.",
+        "activity": "running",
+        "targetAreas": [
+            "hamstrings",
+            "glutes",
+            "quadriceps",
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Frractionné 30/30",
+        "description": "Alternance de 30 secondes de course à haute intensité (VMA) et 30 secondes de récupération active.",
+        "activity": "running",
+        "targetAreas": [
+            "quadriceps",
+            "hamstrings",
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Course en côte",
+        "description": "Montées répétées en course à pied pour renforcer la puissance des mollets, fessiers et cuisses.",
+        "activity": "running",
+        "targetAreas": [
+            "glutes",
+            "calves",
+            "quadriceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Trail en montagne",
+        "description": "Course sur sentiers naturels comportant du dénivelé et du terrain technique améliorant la proprioception.",
+        "activity": "running",
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "calves",
+            "shins"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Course fondamentale (Endurance fondamentale)",
+        "description": "Course lente à fréquence cardiaque basse pour développer le réseau capillaire et l'endurance de base.",
+        "activity": "running",
+        "targetAreas": [
+            "calves",
+            "hamstrings"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Fartlek",
+        "description": "Jeu de vitesse en plein air alternant accélérations improvisées et phases de récupération au sensation.",
+        "activity": "running",
+        "targetAreas": [
+            "quadriceps",
+            "hamstrings",
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Course arrière (Retro-running)",
+        "description": "Courir en marche arrière pour renforcer le droit antérieur et réduire la pression sur les articulations du genou.",
+        "activity": "running",
+        "targetAreas": [
+            "quadriceps",
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Educatif course : Montées de genoux",
+        "description": "Exercice de gamme athlétique consistant à monter rapidement les genoux à hauteur de hanche en avançant.",
+        "activity": "running",
+        "targetAreas": [
+            "quadriceps",
+            "abs",
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Educatif course : Talons-fesses",
+        "description": "Courir en ramenant rapidement les talons sous les fessiers pour travailler le dynamisme de la foulée.",
+        "activity": "running",
+        "targetAreas": [
+            "hamstrings",
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Educatif course : Griffé de sol",
+        "description": "Mouvement de la jambe tendue venant griffes le sol avec l'avant-pied pour optimiser la pose de pied.",
+        "activity": "running",
+        "targetAreas": [
+            "hamstrings",
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Course au seuil",
+        "description": "Maintien d'une allure soutenue et régulière à la limite de l'accumulation de l'acide lactique.",
+        "activity": "running",
+        "targetAreas": [
+            "quadriceps",
+            "hamstrings",
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Cyclisme sur route endurance",
+        "description": "Sortie longue à vélo sur route à allure régulière pour optimiser le métabolisme aérobie.",
+        "activity": "cycling",
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Sprint sur vélo en danseuse",
+        "description": "Pédalage explosif debout sur les pédales à maximale résistance pour stimuler la puissance des cuisses.",
+        "activity": "cycling",
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Cyclisme en côte (Col)",
+        "description": "Montée prolongée sollicitant la force sous-maximale des fessiers et des quadriceps.",
+        "activity": "cycling",
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "hamstrings"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Entraînement vélocité (Pédalage haute fréquence)",
+        "description": "Pédaler à plus de 110 RPM pour améliorer la coordination neuromusculaire et le relâchement.",
+        "activity": "cycling",
+        "targetAreas": [
+            "quadriceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Pédalage unijambiste sur Home Trainer",
+        "description": "Pédaler avec une seule jambe clipsée pour corriger les points morts du coup de pédale.",
+        "activity": "cycling",
+        "targetAreas": [
+            "quadriceps",
+            "hamstrings"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "VTT Cross-Country",
+        "description": "Parcours tout-terrain varié nécessitant puissance, gainage dynamique du haut du corps et agilité.",
+        "activity": "cycling",
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "abs",
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "RPM / Spinning en salle",
+        "description": "Cours collectif de vélo d'intérieur rythmé par la musique alternant bosses, sprints et plats.",
+        "activity": "cycling",
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Cyclo-cross (Portage et relances)",
+        "description": "Circuit hors-route combinant pédalage intense et phases de course à pied en portant le vélo.",
+        "activity": "cycling",
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "calves",
+            "hamstrings"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Natation : Crawl éducatif un bras",
+        "description": "Nager le crawl en gardant un bras immobile le long du corps pour travailler le roulis du buste et l'appui.",
+        "activity": "swimming",
+        "targetAreas": [
+            "back",
+            "shoulders",
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Natation : Crawl complet",
+        "description": "Nage ventrale alternative offrant une excellente sollicitation du grand dorsal, des épaules et du tronc.",
+        "activity": "swimming",
+        "targetAreas": [
+            "back",
+            "shoulders",
+            "abs",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Natation : Dos pitché (Dos crawlé)",
+        "description": "Nage dorsale avec battements de jambes et action alternative des bras pour renforcer la chaîne postérieure et l'ouverture thoracique.",
+        "activity": "swimming",
+        "targetAreas": [
+            "back",
+            "shoulders",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Natation : Brasse athlétique",
+        "description": "Mouvement simultané et symétrique des bras et ciseaux de jambes poussant sur l'intérieur des cuisses.",
+        "activity": "swimming",
+        "targetAreas": [
+            "chest",
+            "shoulders",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Natation : Papillon",
+        "description": "Nage ondulatoire très exigeante demandant une grande puissance du buste, des épaules et du sangle abdominale.",
+        "activity": "swimming",
+        "targetAreas": [
+            "shoulders",
+            "back",
+            "abs",
+            "chest"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Battements de jambes avec planche",
+        "description": "Isoler le travail des membres inférieurs en maintenant une planche de natation devant soi.",
+        "activity": "swimming",
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Pull-Buoy entre les cuisses",
+        "description": "Flotteur calé entre les cuisses pour neutraliser les jambes et se focaliser sur la force de traction des bras.",
+        "activity": "swimming",
+        "targetAreas": [
+            "back",
+            "shoulders",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Nage avec plaquettes (Paddles)",
+        "description": "Accessoires fixés aux mains augmentant la résistance de l'eau pour développer la force musculaire spécifique du dos et des bras.",
+        "activity": "swimming",
+        "targetAreas": [
+            "back",
+            "shoulders",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Nage avec palmes courtes",
+        "description": "Utilisation de palmes pour accentuer la fréquence du battement et renforcer fessiers et quadriceps.",
+        "activity": "swimming",
+        "targetAreas": [
+            "glutes",
+            "quadriceps",
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Ondulations sous-marines (Dolphin kicks)",
+        "description": "Propulsion ondulatoire du corps sous l'eau sollicitant de façon intense la ceinture abdominale et lombaire.",
+        "activity": "swimming",
+        "targetAreas": [
+            "abs",
+            "lower_back",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Chien tête en bas à chien tête en haut",
+        "description": "Enchaînement fluide alternant étirement de la chaîne postérieure et ouverture de la cage thoracique et fléchisseurs de hanche.",
+        "activity": "mobility",
+        "targetAreas": [
+            "hamstrings",
+            "back",
+            "shoulders",
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Chat-Vache (Cat-Cow)",
+        "description": "À quatre pattes, alterner la flexion et l'extension du dos pour mobiliser les vertèbres lombaires et thoraciques.",
+        "activity": "mobility",
+        "targetAreas": [
+            "back",
+            "lower_back",
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Le plus grand étirement du monde (World's greatest stretch)",
+        "description": "Fente avant profonde avec rotation du buste vers le genou avant pour ouvrir hanches, adducteurs et colonne thoracique.",
+        "activity": "mobility",
+        "targetAreas": [
+            "glutes",
+            "hamstrings",
+            "back",
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Squat profond en ouverture de hanche (Couch / Deep squat hold)",
+        "description": "Maintien statique en bas de squat avec coudes poussant les genoux vers l'extérieur pour débloquer la cheville et le bassin.",
+        "activity": "mobility",
+        "targetAreas": [
+            "glutes",
+            "calves",
+            "shins"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Dislocation d'épaules au bâton",
+        "description": "Faire passer un bâton d'avant en arrière au-dessus de la tête bras tendus pour améliorer l'amplitude de la ceinture scapulaire.",
+        "activity": "mobility",
+        "targetAreas": [
+            "shoulders",
+            "chest"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Rotation thoracique au sol (Open book)",
+        "description": "Allongé sur le côté genoux fléchis, ouvrir le bras supérieur vers le sol opposé pour libérer la colonne dorsale.",
+        "activity": "mobility",
+        "targetAreas": [
+            "back",
+            "chest"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Étirement du psoas en fente",
+        "description": "Un genou au sol, basculer le bassin en rétroversion pour étirer le muscle ilio-psoas à l'avant de la hanche.",
+        "activity": "mobility",
+        "targetAreas": [
+            "quadriceps",
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Étirement Pigeon (Pigeon pose)",
+        "description": "Jambe avant fléchie au sol sous le buste, jambe arrière tendue, pour étirer en profondeur le grand et moyen fessier.",
+        "activity": "mobility",
+        "targetAreas": [
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Pose de l'enfant (Child's pose)",
+        "description": "A genoux, fesses sur les talons, bras tendus loin devant au sol pour relâcher le bas du dos et les grands dorsaux.",
+        "activity": "mobility",
+        "targetAreas": [
+            "back",
+            "lower_back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Flexion cheville contre mur",
+        "description": "Pied proche du mur, avancer le genou vers la paroi sans décoller le talon pour améliorer la dorsiflexion de cheville.",
+        "activity": "mobility",
+        "targetAreas": [
+            "calves",
+            "shins"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Rotations articulaires contrôlées (CARs) Épaule",
+        "description": "Exécuter de très grands cercles isolés d'épaule au maximum de l'amplitude sans bouger le reste du buste.",
+        "activity": "mobility",
+        "targetAreas": [
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Rotations articulaires contrôlées (CARs) Hanche",
+        "description": "A quatre pattes, effectuer une rotation lente et complète de la hanche pour entretenir la capsule articulaire.",
+        "activity": "mobility",
+        "targetAreas": [
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : 90/90 pour les hanches",
+        "description": "Assis au sol, jambes pliées à 90° devant et sur le côté, basculer le poids pour travailler la rotation interne et externe de hanche.",
+        "activity": "mobility",
+        "targetAreas": [
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Étirement de la grenouille (Frog stretch)",
+        "description": "Genoux très écartés au sol, pieds tournés vers l'extérieur, glisser le bassin vers l'arrière pour étirer les adducteurs.",
+        "activity": "mobility",
+        "targetAreas": [
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Étirement du chameau (Camel pose)",
+        "description": "A genoux, incliner le buste vers l'arrière et attraper ses talons pour étirer la chaîne antérieure et ouvrir les épaules.",
+        "activity": "mobility",
+        "targetAreas": [
+            "chest",
+            "abs",
+            "quadriceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Étirement des pectoraux sur rouleau de massage",
+        "description": "Allongé de tout son long sur un foam roller, ouvrir les bras en croix pour libérer la cage thoracique et le petit pectoral.",
+        "activity": "mobility",
+        "targetAreas": [
+            "chest",
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Saut à la corde",
+        "description": "Sauts répétés sur la pointe des pieds à la corde pour le travail du cardio, de la coordination et des mollets.",
+        "activity": "other",
+        "targetAreas": [
+            "calves",
+            "quadriceps",
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Burpees",
+        "description": "Enchaînement d'une flexion, pompe au sol, regroupement des pieds et saut vertical explosif.",
+        "activity": "other",
+        "targetAreas": [
+            "chest",
+            "quadriceps",
+            "abs",
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Jumping Jacks",
+        "description": "Sauts sur place en écartant et rapprochant simultanément les bras et les jambes.",
+        "activity": "other",
+        "targetAreas": [
+            "calves",
+            "shoulders",
+            "quadriceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Frappes sur sac de frappe (Boxe)",
+        "description": "Enchaînement de coups de poings dynamiques sollicitant le cardio, le haut du corps et la rotation de hanche.",
+        "activity": "other",
+        "targetAreas": [
+            "shoulders",
+            "triceps",
+            "abs",
+            "chest"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Rameur Concept2 (Ergomètre)",
+        "description": "Mouvement complet de tirage sollicitant simultanément les jambes, le dos et le système cardiovasculaire.",
+        "activity": "other",
+        "targetAreas": [
+            "back",
+            "quadriceps",
+            "biceps",
+            "hamstrings"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "SkiErg (Ergomètre de ski)",
+        "description": "Tirage dynamique vertical vers le bas simulant le ski de fond pour les abdominaux, dorsaux et triceps.",
+        "activity": "other",
+        "targetAreas": [
+            "abs",
+            "triceps",
+            "back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Battle Ropes (Cordes ondulatoires)",
+        "description": "Créer des vagues rapides avec de grosses cordes lourdes pour un effort métabolique et le renforcement des épaules.",
+        "activity": "other",
+        "targetAreas": [
+            "shoulders",
+            "abs",
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Poussée de chariot (Sled push)",
+        "description": "Pousser un chariot lourdement chargé sur une piste pour développer la force athlétique des membres inférieurs.",
+        "activity": "other",
+        "targetAreas": [
+            "quadriceps",
+            "calves",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Tirage de chariot (Sled pull)",
+        "description": "Tirer un chariot vers soi à l'aide d'une sangle ou corde pour cibler la chaîne postérieure ou les quadriceps selon le sens.",
+        "activity": "other",
+        "targetAreas": [
+            "hamstrings",
+            "back",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Grimper de corde (Rope climb)",
+        "description": "Se hisser le long d'une corde suspendue en combinant tirage des bras et verrouillage des pieds.",
+        "activity": "other",
+        "targetAreas": [
+            "back",
+            "biceps",
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Handstand Push-up (Pompe en poirier)",
+        "description": "En équilibre renversé contre un mur, descendre la tête vers le sol puis pousser verticalement.",
+        "activity": "other",
+        "targetAreas": [
+            "shoulders",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Muscle-up aux anneaux / barre",
+        "description": "Mouvement combinant une traction puissante et une transition pour finir en dips au-dessus du support.",
+        "activity": "other",
+        "targetAreas": [
+            "back",
+            "triceps",
+            "chest",
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Landmine press à un bras",
+        "description": "Pousser l'extrémité d'une barre fixée au sol en diagonale pour travailler la force d'épaule et la stabilité du tronc.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders",
+            "triceps",
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Développé couché floor press",
+        "description": "Allongé à même le sol, pousser la barre ou haltères pour limiter le trajet et solliciter intensément les triceps.",
+        "activity": "gym",
+        "targetAreas": [
+            "triceps",
+            "chest"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Squat maverick / Belt squat",
+        "description": "Squat réalisé avec une ceinture lestée reliée à une poulie au sol éliminant toute charge sur la colonne vertébrale.",
+        "activity": "gym",
+        "targetAreas": [
+            "quadriceps",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Tirage Meadows (Meadows row)",
+        "description": "Positionné perpendiculairement à une barre landmine, tirer l'extrémité avec le coude évasé pour le haut du dos.",
+        "activity": "gym",
+        "targetAreas": [
+            "back",
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Curl sur banc incliné prise marteau",
+        "description": "Assis sur banc incliné, effectuer des curls en prise neutre pour étirer la longue portion du biceps et le brachio-radial.",
+        "activity": "gym",
+        "targetAreas": [
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Extension des triceps JM Press",
+        "description": "Hybride entre un développé couché prise serrée et une barre au front pour charger lourdement les triceps.",
+        "activity": "gym",
+        "targetAreas": [
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Glute bridge au sol (Pont fessier)",
+        "description": "Allongé sur le dos genoux pliés, monter le bassin en serrant les fessiers en haut du mouvement.",
+        "activity": "gym",
+        "targetAreas": [
+            "glutes",
+            "hamstrings"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Soulevé de terre trap bar",
+        "description": "Debout à l'intérieur d'une barre hexagonale, soulever la charge avec une position de buste plus redressée.",
+        "activity": "gym",
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "lower_back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Tirage vertical bras tendus à la poulie",
+        "description": "Debout, abaisser la barre bras tendus en arc de cercle pour isoler le grand dorsal et le grand rond.",
+        "activity": "gym",
+        "targetAreas": [
+            "back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Écarté inversé à la poulie haute",
+        "description": "Croiser les câbles des poulies hautes et tirer vers l'arrière pour cibler l'arrière de l'épaule et le rhomboïde.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders",
+            "back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Jefferson squat",
+        "description": "Barre à cheval entre les cuisses, descendre en squat pour une sollicitation asymétrique intéressante du bassin.",
+        "activity": "gym",
+        "targetAreas": [
+            "quadriceps",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Cossack Squat",
+        "description": "Squat latéral très profond sur une jambe, l'autre tendue sur le talon, améliorant force et mobilité des hanches.",
+        "activity": "gym",
+        "targetAreas": [
+            "quadriceps",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Marche en crabe avec mini-bande (Monster walk)",
+        "description": "Bande élastique autour des chevilles ou genoux, effectuer des pas latéraux en demi-squat pour le moyen fessier.",
+        "activity": "gym",
+        "targetAreas": [
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Dragon Flag",
+        "description": "Allongé sur un banc en s'accrochant à la tête, lever tout le corps aligné puis redescendre sans casser les hanches.",
+        "activity": "gym",
+        "targetAreas": [
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Hollow Hold (Gainage banane)",
+        "description": "Allongé sur le dos, décoller les épaules et les jambes tendues du sol en maintenant le bas du dos parfaitement plaqué.",
+        "activity": "gym",
+        "targetAreas": [
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Tuck Jump",
+        "description": "Saut vertical explosif en ramenant vivement les deux genoux contre la poitrine à chaque répétition.",
+        "activity": "other",
+        "targetAreas": [
+            "quadriceps",
+            "calves",
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Box Jump (Saut sur caisse)",
+        "description": "Sauter à deux pieds depuis le sol pour atterrir en douceur sur une caisse en pliométrie.",
+        "activity": "other",
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Broad Jump (Saut en longueur sans élan)",
+        "description": "Projection horizontale explosive vers l'avant à deux pieds pour développer la puissance des jambes.",
+        "activity": "other",
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Kettlebell Windmill",
+        "description": "Charge tenue au-dessus de la tête d'un bras, basculer le buste vers le sol du côté opposé pour la stabilité d'épaule et obliques.",
+        "activity": "gym",
+        "targetAreas": [
+            "obliques",
+            "shoulders",
+            "hamstrings"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Tirage Seal Row",
+        "description": "Allongé à plat ventre sur un banc surélevé, tirer la barre vers la poitrine sans aucune triche possible.",
+        "activity": "gym",
+        "targetAreas": [
+            "back",
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Curl Drag (Drag curl)",
+        "description": "Monter la barre en glissant le long du buste en tirant les coudes vers l'arrière pour isoler le biceps.",
+        "activity": "gym",
+        "targetAreas": [
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Z-Press à la barre",
+        "description": "Assis à même le sol jambes tendues devant soi, pousser la barre au-dessus de la tête sans pouvoir s'aider des jambes.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders",
+            "abs",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Gainage Superman",
+        "description": "Allongé sur le ventre, décoller simultanément les bras et les jambes du sol pour renforcer la chaîne lombaire.",
+        "activity": "gym",
+        "targetAreas": [
+            "lower_back",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Pompe Hindou (Hindu Push-up)",
+        "description": "Mouvement fluide passant du chien tête en bas vers une pompe rasant le sol puis finissant en chien tête en haut.",
+        "activity": "gym",
+        "targetAreas": [
+            "chest",
+            "shoulders",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Pompe Archer",
+        "description": "Pompe large où le poids bascule d'un bras tendu vers un bras fléchi alternativement.",
+        "activity": "gym",
+        "targetAreas": [
+            "chest",
+            "triceps",
+            "shoulders"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Pike Push-up (Pompe en pique)",
+        "description": "Bassin levé vers le haut, descendre le sommet de la tête vers le sol pour transférer la charge sur les épaules.",
+        "activity": "gym",
+        "targetAreas": [
+            "shoulders",
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Shrug inversé aux barres parallèles",
+        "description": "En suspension sur les bras tendus aux dips, repousser les épaules vers le bas pour engager le petit pectoral et le dentelé.",
+        "activity": "gym",
+        "targetAreas": [
+            "back",
+            "chest"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Presse à cuisses unilatérale",
+        "description": "Pousser le plateau de la presse avec une seule jambe pour corriger les déséquilibres de force gauche/droite.",
+        "activity": "gym",
+        "targetAreas": [
+            "quadriceps",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Extension des mollets Donkey (Donkey calf raise)",
+        "description": "Buste penché à 90° avec une charge sur le bas du dos ou à la machine, réaliser des extensions de cheville.",
+        "activity": "gym",
+        "targetAreas": [
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Marche en fente overhead avec kettlebell",
+        "description": "Marcher en fentes en maintenant un kettlebell à bout de bras au-dessus de la tête.",
+        "activity": "gym",
+        "targetAreas": [
+            "quadriceps",
+            "glutes",
+            "shoulders",
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Tirage horizontal unilatéral poulie neutre",
+        "description": "Rameur à une main à la poulie pour se focaliser sur l'étirement et la contraction du grand dorsal de chaque côté.",
+        "activity": "gym",
+        "targetAreas": [
+            "back",
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Crunch oblique sur banc à hyperextension",
+        "description": "Installé de profil sur le banc à 45°, effectuer des flexions latérales du buste pour renforcer les obliques.",
+        "activity": "gym",
+        "targetAreas": [
+            "obliques"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Abduction de hanche couché (Clamshell)",
+        "description": "Allongé sur le côté genoux pliés, écarter le genou du dessus en gardant les pieds collés pour le petit/moyen fessier.",
+        "activity": "gym",
+        "targetAreas": [
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Rotation interne de hanche en position assise",
+        "description": "Exercice de kiné visant à pivoter le bas de la jambe vers l'extérieur pour travailler la rotation interne de hanche.",
+        "activity": "mobility",
+        "targetAreas": [
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Pont fessier unilatéral",
+        "description": "Décoller le bassin du sol en poussant sur une seule jambe, l'autre étant tendue ou fléchie dans le vide.",
+        "activity": "gym",
+        "targetAreas": [
+            "glutes",
+            "hamstrings"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Curl 21 avec barre EZ",
+        "description": "7 demi-répétitions bas, 7 demi-répétitions haut, puis 7 répétitions complètes pour une congestion maximale du biceps.",
+        "activity": "gym",
+        "targetAreas": [
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Extension triceps contre un mur",
+        "description": "Mains plaquées au mur, fléchir les coudes jusqu'à toucher le mur avec les avant-bras puis pousser pour tendre.",
+        "activity": "gym",
+        "targetAreas": [
+            "triceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Traction en pronation prise large",
+        "description": "Saisir la barre très largement pour cibler spécifiquement le développement du grand dorsal en largeur.",
+        "activity": "gym",
+        "targetAreas": [
+            "back"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Course avec gilet lesté",
+        "description": "Course à pied pratiquée avec un gilet surchargé de quelques kilos pour accroître la difficulté cardiaque et musculaire.",
+        "activity": "running",
+        "targetAreas": [
+            "calves",
+            "quadriceps",
+            "glutes",
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Pédalage en force (Basse fréquence)",
+        "description": "Pédaler à une fréquence basse (50-60 RPM) avec une grosse résistance pour travailler la force spécifique à vélo.",
+        "activity": "cycling",
+        "targetAreas": [
+            "quadriceps",
+            "glutes"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Sprint natation 50m départ plongé",
+        "description": "All-out de 50m dans le style de nage choisi en recherchant la vitesse maximale de déplacement.",
+        "activity": "swimming",
+        "targetAreas": [
+            "back",
+            "shoulders",
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Étirement des fléchisseurs du poignet au sol",
+        "description": "Mains au sol doigts pointant vers les genoux, reculer doucement le poids du corps pour étirer les avant-bras.",
+        "activity": "mobility",
+        "targetAreas": [
+            "biceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Étirement du soléaire genou fléchi",
+        "description": "Pied calé contre une marche, fléchir le genou vers l'avant pour étirer le muscle profond sous le jumeau.",
+        "activity": "mobility",
+        "targetAreas": [
+            "calves"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Course sur sable fin",
+        "description": "Course sur terrain meuble demandant un effort supplémentaire de stabilisation de cheville et des mollets.",
+        "activity": "running",
+        "targetAreas": [
+            "calves",
+            "shins",
+            "quadriceps"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Aquagym / Course dans l'eau (Aqua jogging)",
+        "description": "Simuler la course à pied en immersion complète avec ceinture de flottaison pour un travail sans aucun impact.",
+        "activity": "swimming",
+        "targetAreas": [
+            "quadriceps",
+            "hamstrings",
+            "abs"
+        ],
+        "mediaUrl": null
+    },
+    {
+        "name": "Pompe à une main",
+        "description": "Pompe exécutée sur un seul bras, nécessitant un gainage extrême et une force d'appui considérable.",
+        "activity": "gym",
+        "targetAreas": [
+            "chest",
+            "triceps",
+            "abs",
+            "shoulders"
+        ],
         "mediaUrl": null
     }
 ]

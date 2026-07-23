@@ -194,18 +194,23 @@ export default class extends Controller {
     /** Dépôt d'une carte de bibliothèque (clone) dans un bloc -> quick-add au
      *  point de dépôt. */
     onLibDrop(evt) {
-        const clone = evt.item;
+        // En mode clone, `evt.item` est la carte d'origine déplacée par Sortable,
+        // et `evt.clone` reste dans la bibliothèque à sa place.
+        const moved = evt.item;
         const target = evt.to;
-        // Retombé dans la bibliothèque, ou ailleurs qu'un conteneur de bloc : rien.
-        if (target === evt.from || !target.matches('[data-composer-target="items"]')) {
-            clone.remove();
+        // Retombé dans la bibliothèque, ou ailleurs qu'un conteneur de bloc : pas de
+        // dépôt réel. On NE touche PAS à `moved` : le retirer effacerait la carte de
+        // la bibliothèque (il fallait recharger pour la revoir). Sortable a déjà remis
+        // les choses en place.
+        if (target === evt.from || !target || !target.matches('[data-composer-target="items"]')) {
             return;
         }
-        const exerciseId = clone.dataset.exerciseId;
+        const exerciseId = moved.dataset.exerciseId;
         const blockId = target.dataset.blockId;
-        const afterId = this.prevPrescribedId(clone);
-        // Le serveur re-render le bloc avec la vraie ligne : on retire le clone.
-        clone.remove();
+        const afterId = this.prevPrescribedId(moved);
+        // Le serveur re-render le bloc avec la vraie ligne : on retire la carte
+        // déposée (le clone reste dans la bibliothèque).
+        moved.remove();
         this.submitQuickAdd(exerciseId, blockId, afterId);
     }
 
