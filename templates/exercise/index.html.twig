@@ -1,52 +1,99 @@
 {% extends 'base.html.twig' %}
+{% import 'components/_activity.html.twig' as activity %}
 
 {% block title %}Bibliothèque d'exercices{% endblock %}
 
 {% block body %}
     {% for message in app.flashes('success') %}
-        <p role="status">{{ message }}</p>
+        <p class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }} {{ message }}</p>
     {% endfor %}
 
-    <h1>Bibliothèque d'exercices</h1>
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Bibliothèque</p>
+            <h1 class="kd-title">Exercices</h1>
+            <p class="kd-lead">Tes mouvements, perso et globaux. La brique de base des séances.</p>
+        </div>
+        <a href="{{ path('app_exercise_new') }}" class="kd-btn kd-btn--primary">
+            {{ ux_icon('lucide:plus') }} Nouvel exercice
+        </a>
+    </div>
 
-    <p><a href="{{ path('app_exercise_new') }}">Nouvel exercice</a></p>
+    <div data-controller="filter">
+        <div class="kd-toolbar">
+            <div class="kd-search">
+                {{ ux_icon('lucide:search') }}
+                <input type="search" class="kd-input" placeholder="Rechercher un exercice…"
+                       aria-label="Rechercher un exercice"
+                       data-filter-target="input" data-action="input->filter#filter">
+            </div>
+            <span class="kd-count"><span data-filter-target="count">{{ exercises|length }}</span> exercice{{ exercises|length > 1 ? 's' }}</span>
+        </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Nom</th>
-                <th>Activité</th>
-                <th>Zones travaillées</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for exercise in exercises %}
-            <tr>
-                <td>
-                    {{ exercise.name }}
-                    {% if exercise.owner is null %}<small>(bibliothèque)</small>{% endif %}
-                </td>
-                <td>{{ exercise.activity ? exercise.activity.label : '' }}</td>
-                <td>
-                    {% for area in exercise.targetAreas %}
-                        {{ area.label }}{{ not loop.last ? ', ' }}
-                    {% endfor %}
-                </td>
-                <td>
-                    {% if is_granted('VIEW', exercise) %}
-                        <a href="{{ path('app_exercise_show', {id: exercise.id}) }}">Voir</a>
-                    {% endif %}
-                    {% if is_granted('EDIT', exercise) %}
-                        <a href="{{ path('app_exercise_edit', {id: exercise.id}) }}">Éditer</a>
-                    {% endif %}
-                </td>
-            </tr>
+        {% if exercises is empty %}
+            <div class="kd-card kd-empty">
+                {{ ux_icon('lucide:dumbbell') }}
+                <div>Aucun exercice pour l'instant.</div>
+                <a href="{{ path('app_exercise_new') }}" class="kd-btn kd-btn--secondary kd-btn--sm" style="margin-top:var(--kd-space-6);">
+                    {{ ux_icon('lucide:plus') }} Créer le premier
+                </a>
+            </div>
         {% else %}
-            <tr>
-                <td colspan="4">Aucun exercice pour l'instant.</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+            <div class="kd-grid kd-grid--3">
+                {% for exercise in exercises %}
+                    {% set mod = activity.modifier(exercise.activity)|trim %}
+                    <article class="kd-libcard{{ mod ? ' kd-libcard--' ~ mod }}"
+                             data-filter-target="item"
+                             data-filter-text="{{ exercise.name }} {{ exercise.activity.label }} {% for area in exercise.targetAreas %}{{ area.label }} {% endfor %}">
+                        <div class="kd-libcard__head">
+                            <span class="kd-libcard__icon">{{ ux_icon(activity.icon(exercise.activity)|trim) }}</span>
+                            <div class="kd-libcard__body">
+                                {% if is_granted('VIEW', exercise) %}
+                                    <a class="kd-libcard__name" href="{{ path('app_exercise_show', {id: exercise.id}) }}">{{ exercise.name }}</a>
+                                {% else %}
+                                    <span class="kd-libcard__name">{{ exercise.name }}</span>
+                                {% endif %}
+                                <div class="kd-libcard__meta">
+                                    {{ exercise.activity.label }}
+                                    <span class="kd-scope">
+                                        {% if exercise.owner is null %}
+                                            {{ ux_icon('lucide:library') }} Bibliothèque
+                                        {% else %}
+                                            {{ ux_icon('lucide:user') }} Perso
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if exercise.targetAreas is not empty %}
+                            <div class="kd-tags">
+                                {% for area in exercise.targetAreas %}
+                                    <span class="kd-tag">{{ area.label }}</span>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        <div class="kd-libcard__foot">
+                            {% if is_granted('VIEW', exercise) %}
+                                <a href="{{ path('app_exercise_show', {id: exercise.id}) }}" class="kd-btn kd-btn--ghost kd-btn--sm">
+                                    {{ ux_icon('lucide:arrow-right') }} Voir
+                                </a>
+                            {% endif %}
+                            {% if is_granted('EDIT', exercise) %}
+                                <a href="{{ path('app_exercise_edit', {id: exercise.id}) }}" class="kd-btn kd-btn--ghost kd-btn--sm kd-libcard__foot-sep">
+                                    {{ ux_icon('lucide:square-pen') }} Éditer
+                                </a>
+                            {% endif %}
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+
+            <div class="kd-card kd-empty" data-filter-target="empty" hidden>
+                {{ ux_icon('lucide:search') }}
+                <div>Aucun exercice ne correspond à ta recherche.</div>
+            </div>
+        {% endif %}
+    </div>
 {% endblock %}

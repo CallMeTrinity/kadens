@@ -1,0 +1,1748 @@
+/* ============================================================================
+   Kadens — composants réutilisables
+   Classes de présentation partagées par toutes les vues (header, boutons,
+   cartes, badges, stats, grilles). Identité « Carnet clair ».
+
+   Règle absolue : aucune couleur ni police en dur. Uniquement des tokens
+   sémantiques (--color-*, --font-*) définis dans tokens.css.
+   ============================================================================ */
+
+/* ----------------------------------------------------------------------------
+   Header / navigation applicative
+   ---------------------------------------------------------------------------- */
+.kd-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--color-surface-raised) 88%, transparent);
+  backdrop-filter: saturate(1.1) blur(8px);
+  border-bottom: 1px solid var(--color-border);
+}
+.kd-header__inner {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 0 var(--kd-space-8);
+  height: 58px;
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-8);
+}
+
+.kd-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  text-decoration: none;
+  color: var(--color-text-strong);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 17px;
+  letter-spacing: -.01em;
+}
+.kd-brand:hover { color: var(--color-text-strong); }
+.kd-brand__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px; height: 28px;
+  border-radius: var(--kd-radius-sm);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-size: 15px;
+  font-weight: var(--kd-weight-bold);
+}
+
+.kd-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-1);
+  margin-left: var(--kd-space-4);
+}
+.kd-nav__link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  padding: 7px var(--kd-space-4);
+  border-radius: var(--kd-radius-md);
+  font-size: 13px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: background-color .12s ease, color .12s ease;
+}
+.kd-nav__link svg { width: 16px; height: 16px; opacity: .85; }
+.kd-nav__link:hover {
+  color: var(--color-text-strong);
+  background: var(--color-surface-subtle);
+}
+.kd-nav__link.is-active {
+  color: var(--color-primary);
+  background: var(--color-primary-tint);
+}
+
+.kd-header__end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-5);
+}
+.kd-header__user {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+.kd-header__user svg { width: 15px; height: 15px; }
+.kd-header__logout {
+  display: inline-flex;
+  color: var(--color-text-faint);
+  padding: var(--kd-space-2);
+  border-radius: var(--kd-radius-sm);
+}
+.kd-header__logout:hover { color: var(--color-primary); background: var(--color-surface-subtle); }
+.kd-header__logout svg { width: 16px; height: 16px; }
+
+/* Nav condensée : on masque les libellés, on garde les icônes */
+@media (max-width: 780px) {
+  .kd-nav__link span { display: none; }
+  .kd-nav__link { padding: 7px var(--kd-space-3); }
+  .kd-header__user span { display: none; }
+}
+
+/* ----------------------------------------------------------------------------
+   Mise en page
+   ---------------------------------------------------------------------------- */
+.kd-page {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--kd-space-13) var(--kd-space-8) var(--kd-space-13);
+}
+
+.kd-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow-lg);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin: 0;
+}
+
+.kd-title {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 26px;
+  line-height: 1.15;
+  color: var(--color-text-strong);
+  margin: var(--kd-space-2) 0 0;
+}
+
+.kd-lead {
+  font-size: 14px;
+  color: var(--color-text-soft);
+  margin: var(--kd-space-3) 0 0;
+  max-width: 60ch;
+}
+
+/* Bandeau de titre de page (eyebrow + titre + actions à droite) */
+.kd-pagehead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--kd-space-8);
+  flex-wrap: wrap;
+  margin-bottom: var(--kd-space-11);
+}
+
+/* ----------------------------------------------------------------------------
+   Grilles utilitaires
+   ---------------------------------------------------------------------------- */
+.kd-grid {
+  display: grid;
+  gap: var(--kd-space-6);
+}
+.kd-grid--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.kd-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.kd-grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+@media (max-width: 820px) {
+  .kd-grid--3, .kd-grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .kd-grid--2, .kd-grid--3, .kd-grid--4 { grid-template-columns: 1fr; }
+}
+
+/* ----------------------------------------------------------------------------
+   Carte
+   ---------------------------------------------------------------------------- */
+.kd-card {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-9) var(--kd-space-10);
+}
+
+.kd-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kd-space-4);
+  padding-bottom: var(--kd-space-6);
+  margin-bottom: var(--kd-space-6);
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.kd-card__title {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 15px;
+  color: var(--color-text-strong);
+  margin: 0;
+}
+
+/* ----------------------------------------------------------------------------
+   Boutons
+   ---------------------------------------------------------------------------- */
+.kd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: var(--kd-weight-semibold);
+  line-height: 1;
+  padding: 10px var(--kd-space-6);
+  border-radius: var(--kd-radius-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color .12s ease, border-color .12s ease, color .12s ease;
+}
+.kd-btn svg { width: 15px; height: 15px; }
+
+.kd-btn--primary {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+.kd-btn--primary:hover {
+  background: var(--color-primary-hover);
+  border-color: var(--color-primary-hover);
+  color: var(--color-on-primary);
+}
+
+.kd-btn--secondary {
+  background: var(--color-surface-raised);
+  border-color: var(--color-border-strong);
+  color: var(--color-text-strong);
+}
+.kd-btn--secondary:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.kd-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-text-secondary);
+  padding-left: var(--kd-space-3);
+  padding-right: var(--kd-space-3);
+}
+.kd-btn--ghost:hover { color: var(--color-primary); }
+
+.kd-btn--sm { padding: 7px var(--kd-space-4); font-size: 12px; }
+
+/* ----------------------------------------------------------------------------
+   Badges / pills
+   ---------------------------------------------------------------------------- */
+.kd-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-1);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  padding: 4px var(--kd-space-3);
+  border-radius: var(--kd-radius-pill);
+  background: var(--color-fill);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+.kd-badge--run  { background: var(--color-activity-run-tint); color: var(--color-activity-run-text); }
+.kd-badge--gym  { background: var(--color-activity-gym-tint); color: var(--color-activity-gym-text); }
+
+/* Statuts prévu / réalisé — pastille + libellé */
+.kd-badge--done    { color: var(--color-status-done); }
+.kd-badge--planned { color: var(--color-status-planned); }
+.kd-badge--missed  { color: var(--color-status-missed); }
+.kd-badge__dot {
+  width: 6px; height: 6px; border-radius: var(--kd-radius-full);
+  background: currentColor;
+}
+
+/* ----------------------------------------------------------------------------
+   Stat (gros chiffre + label mono)
+   ---------------------------------------------------------------------------- */
+.kd-stat__value {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 28px;
+  line-height: 1;
+  color: var(--color-text-strong);
+}
+.kd-stat__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin-top: var(--kd-space-2);
+}
+
+/* ----------------------------------------------------------------------------
+   Carte de navigation (raccourci vers une section, avec icône)
+   ---------------------------------------------------------------------------- */
+.kd-navcard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-4);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-9) var(--kd-space-9) var(--kd-space-8);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color .12s ease, transform .12s ease, box-shadow .12s ease;
+}
+.kd-navcard:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+  color: inherit;
+}
+.kd-navcard__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px; height: 40px;
+  border-radius: var(--kd-radius-md);
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+}
+.kd-navcard__icon svg { width: 20px; height: 20px; }
+.kd-navcard__title {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 15px;
+  color: var(--color-text-strong);
+}
+.kd-navcard__desc {
+  font-size: 12.5px;
+  color: var(--color-text-soft);
+  line-height: 1.45;
+}
+.kd-navcard__more {
+  margin-top: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+}
+.kd-navcard:hover .kd-navcard__more svg { transform: translateX(3px); }
+.kd-navcard__more svg { width: 13px; height: 13px; transition: transform .12s ease; }
+
+/* ----------------------------------------------------------------------------
+   Liste de séances à venir (ligne compacte)
+   ---------------------------------------------------------------------------- */
+.kd-list { list-style: none; margin: 0; padding: 0; }
+.kd-list__row {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-6);
+  padding: var(--kd-space-5) 0;
+  border-top: 1px solid var(--color-divider);
+}
+.kd-list__row:first-child { border-top: 0; }
+.kd-list__date {
+  flex: 0 0 auto;
+  text-align: center;
+  min-width: 42px;
+}
+.kd-list__date-day {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 19px;
+  color: var(--color-text-strong);
+  line-height: 1;
+}
+.kd-list__date-mon {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin-top: 2px;
+}
+.kd-list__main { flex: 1 1 auto; min-width: 0; }
+.kd-list__title {
+  font-size: 14px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text-strong);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+.kd-list__title:hover { color: var(--color-primary); }
+.kd-list__meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin-top: 2px;
+}
+
+/* ----------------------------------------------------------------------------
+   État vide
+   ---------------------------------------------------------------------------- */
+.kd-empty {
+  text-align: center;
+  padding: var(--kd-space-12) var(--kd-space-8);
+  color: var(--color-text-soft);
+  font-size: 13px;
+}
+.kd-empty svg { width: 26px; height: 26px; color: var(--color-text-placeholder); margin-bottom: var(--kd-space-4); }
+
+/* ----------------------------------------------------------------------------
+   Bouton destructif (variante) + icône dans les badges
+   ---------------------------------------------------------------------------- */
+.kd-btn--danger {
+  background: transparent;
+  border-color: transparent;
+  color: var(--color-status-missed);
+}
+.kd-btn--danger:hover {
+  background: color-mix(in srgb, var(--color-status-missed) 12%, transparent);
+  color: var(--color-status-missed);
+}
+
+.kd-badge svg { width: 12px; height: 12px; }
+
+/* ----------------------------------------------------------------------------
+   Barre d'outils d'index (recherche + compteur)
+   ---------------------------------------------------------------------------- */
+.kd-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-6);
+  margin-bottom: var(--kd-space-9);
+  flex-wrap: wrap;
+}
+.kd-search {
+  position: relative;
+  flex: 1 1 260px;
+  max-width: 380px;
+}
+.kd-search > svg {
+  position: absolute;
+  left: var(--kd-space-5);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px; height: 16px;
+  color: var(--color-text-placeholder);
+  pointer-events: none;
+}
+.kd-search .kd-input { padding-left: 38px; }
+.kd-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------------------------
+   Tag neutre (liste de valeurs : zones travaillées, mots-clés)
+   ---------------------------------------------------------------------------- */
+.kd-tags { display: flex; flex-wrap: wrap; gap: var(--kd-space-2); }
+.kd-tag {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text-secondary);
+  background: var(--color-fill);
+  border-radius: var(--kd-radius-pill);
+  padding: 3px var(--kd-space-4);
+  white-space: nowrap;
+}
+
+/* ----------------------------------------------------------------------------
+   Carte de bibliothèque (exercice, et autres entrées listées)
+   Filet gauche à la couleur de l'activité (course = terracotta, muscu = olive).
+   ---------------------------------------------------------------------------- */
+.kd-libcard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-6);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border-strong);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-8) var(--kd-space-9);
+  transition: box-shadow .12s ease, transform .12s ease;
+}
+.kd-libcard:hover { box-shadow: var(--shadow-card); transform: translateY(-2px); }
+.kd-libcard--run { border-left-color: var(--color-activity-run); }
+.kd-libcard--gym { border-left-color: var(--color-activity-gym); }
+
+.kd-libcard__head { display: flex; align-items: flex-start; gap: var(--kd-space-5); }
+.kd-libcard__icon {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px; height: 38px;
+  border-radius: var(--kd-radius-md);
+  background: var(--color-fill);
+  color: var(--color-text-secondary);
+}
+.kd-libcard__icon svg { width: 19px; height: 19px; }
+.kd-libcard--run .kd-libcard__icon { background: var(--color-activity-run-tint); color: var(--color-activity-run); }
+.kd-libcard--gym .kd-libcard__icon { background: var(--color-activity-gym-tint); color: var(--color-activity-gym); }
+
+.kd-libcard__body { flex: 1 1 auto; min-width: 0; }
+.kd-libcard__name {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 15px;
+  line-height: 1.25;
+  color: var(--color-text-strong);
+  text-decoration: none;
+  display: block;
+}
+a.kd-libcard__name:hover { color: var(--color-primary); }
+.kd-libcard__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  margin-top: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+.kd-libcard__meta svg { width: 13px; height: 13px; }
+.kd-libcard__meta .kd-dot { color: var(--color-text-placeholder); margin: 0 2px; }
+
+.kd-libcard__foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-1);
+  padding-top: var(--kd-space-5);
+  border-top: 1px solid var(--color-divider);
+}
+.kd-libcard__foot .kd-btn { margin-left: 0; }
+.kd-libcard__foot-sep { margin-left: auto; }
+
+/* Indicateur de portée : bibliothèque globale vs perso */
+.kd-scope {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-1);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-scope svg { width: 12px; height: 12px; }
+
+/* ----------------------------------------------------------------------------
+   Liste de définitions (page de consultation : activité, zones, description…)
+   ---------------------------------------------------------------------------- */
+.kd-deflist {
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  gap: var(--kd-space-7) var(--kd-space-9);
+  margin: 0;
+}
+.kd-deflist dt {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  padding-top: 2px;
+}
+.kd-deflist dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-strong);
+}
+@media (max-width: 560px) {
+  .kd-deflist { grid-template-columns: 1fr; gap: var(--kd-space-2) 0; }
+  .kd-deflist dd { margin-bottom: var(--kd-space-6); }
+}
+
+/* ----------------------------------------------------------------------------
+   Message flash
+   ---------------------------------------------------------------------------- */
+.kd-flash {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  padding: var(--kd-space-5) var(--kd-space-7);
+  border-radius: var(--kd-radius-md);
+  font-size: 13px;
+  margin-bottom: var(--kd-space-8);
+  background: var(--color-primary-tint);
+  color: var(--color-primary-on-tint);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 20%, transparent);
+}
+.kd-flash svg { width: 16px; height: 16px; flex: 0 0 auto; }
+.kd-flash--error {
+  background: color-mix(in srgb, var(--color-status-missed) 9%, transparent);
+  color: var(--color-status-missed);
+  border-color: color-mix(in srgb, var(--color-status-missed) 22%, transparent);
+}
+
+/* ----------------------------------------------------------------------------
+   Formulaires — stylés globalement via le thème form/kadens_theme.html.twig.
+   Ces classes sont appliquées automatiquement par le thème à tous les champs.
+   ---------------------------------------------------------------------------- */
+.kd-form { display: flex; flex-direction: column; gap: var(--kd-space-9); }
+
+.kd-field { display: flex; flex-direction: column; gap: var(--kd-space-3); }
+
+.kd-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.kd-label .required,
+.kd-label.required::after { color: var(--color-primary); }
+
+.kd-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--color-text-strong);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--kd-radius-md);
+  padding: 10px var(--kd-space-5);
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.kd-input::placeholder { color: var(--color-text-placeholder); }
+.kd-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-tint);
+}
+.kd-input--area { min-height: 96px; resize: vertical; line-height: 1.5; }
+
+.kd-select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%237a7264' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--kd-space-5) center;
+  padding-right: var(--kd-space-11);
+}
+
+/* Choix multiples affichés en pastilles sélectionnables (checkbox masqué) */
+.kd-choicegrid { display: flex; flex-wrap: wrap; gap: var(--kd-space-2); }
+.kd-choicegrid input[type="checkbox"],
+.kd-choicegrid input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 1px; height: 1px;
+  pointer-events: none;
+}
+.kd-choicegrid .kd-label {
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+  font-weight: var(--kd-weight-medium);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--kd-radius-pill);
+  padding: 6px var(--kd-space-6);
+  transition: all .12s ease;
+}
+.kd-choicegrid .kd-label:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.kd-choicegrid input:checked + .kd-label {
+  background: var(--color-primary-tint);
+  border-color: var(--color-primary);
+  color: var(--color-primary-on-tint);
+}
+.kd-choicegrid input:focus-visible + .kd-label {
+  box-shadow: 0 0 0 3px var(--color-primary-tint);
+}
+
+.kd-errors {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.kd-errors li {
+  font-size: 12px;
+  color: var(--color-status-missed);
+}
+.kd-help {
+  font-size: 12px;
+  color: var(--color-text-soft);
+  margin: 0;
+}
+
+/* Barre d'actions de formulaire (submit + annuler) */
+.kd-formactions {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-4);
+  padding-top: var(--kd-space-4);
+  border-top: 1px solid var(--color-divider);
+  margin-top: var(--kd-space-2);
+}
+
+/* Lien de retour discret */
+.kd-backlink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+  text-decoration: none;
+  margin-bottom: var(--kd-space-7);
+}
+.kd-backlink:hover { color: var(--color-primary); }
+.kd-backlink svg { width: 14px; height: 14px; }
+
+/* ----------------------------------------------------------------------------
+   Authentification (login) — écran centré plein hauteur, hors chrome applicatif.
+   Le <main> prend la classe .kd-auth (bloc main_class dans base.html.twig).
+   ---------------------------------------------------------------------------- */
+.kd-auth {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kd-space-8);
+  padding: var(--kd-space-13) var(--kd-space-8);
+}
+
+.kd-auth__brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-4);
+  text-decoration: none;
+  color: var(--color-text-strong);
+}
+.kd-auth__mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px; height: 38px;
+  border-radius: var(--kd-radius-md);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 20px;
+  box-shadow: var(--shadow-accent);
+}
+.kd-auth__wordmark {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 20px;
+  letter-spacing: -.01em;
+}
+
+.kd-auth__card {
+  width: 100%;
+  max-width: 400px;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-xl);
+  box-shadow: var(--shadow-card);
+  padding: var(--kd-space-12) var(--kd-space-11);
+}
+.kd-auth__head { text-align: center; margin-bottom: var(--kd-space-11); }
+.kd-auth__title {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 22px;
+  color: var(--color-text-strong);
+  margin: 0;
+}
+.kd-auth__sub {
+  font-size: 13px;
+  color: var(--color-text-soft);
+  margin: var(--kd-space-3) 0 0;
+}
+
+/* Champ avec icône enchâssée à gauche */
+.kd-inputgroup { position: relative; }
+.kd-inputgroup > svg {
+  position: absolute;
+  left: var(--kd-space-5);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px; height: 16px;
+  color: var(--color-text-placeholder);
+  pointer-events: none;
+}
+.kd-inputgroup .kd-input { padding-left: 40px; }
+
+/* Ligne "se souvenir de moi" — case à cocher sobre */
+.kd-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.kd-check input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 auto;
+  width: 17px; height: 17px;
+  margin: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--kd-radius-xs);
+  background: var(--color-surface-raised);
+  cursor: pointer;
+  transition: background-color .12s ease, border-color .12s ease;
+}
+.kd-check input[type="checkbox"]:checked {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+}
+.kd-check input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--color-primary-tint);
+}
+
+.kd-btn--block { width: 100%; justify-content: center; padding: 12px var(--kd-space-6); }
+
+/* Message d'erreur d'authentification */
+.kd-auth__error {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  padding: var(--kd-space-4) var(--kd-space-6);
+  border-radius: var(--kd-radius-md);
+  font-size: 13px;
+  margin-bottom: var(--kd-space-8);
+  background: color-mix(in srgb, var(--color-status-missed) 9%, transparent);
+  color: var(--color-status-missed);
+  border: 1px solid color-mix(in srgb, var(--color-status-missed) 22%, transparent);
+}
+.kd-auth__error svg { width: 16px; height: 16px; flex: 0 0 auto; }
+
+.kd-auth__foot {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+/* ----------------------------------------------------------------------------
+   Séance — barre utilitaire de consultation (retour + actions à droite)
+   ---------------------------------------------------------------------------- */
+.kd-actionbar {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--kd-space-9);
+}
+.kd-actionbar .kd-backlink { margin-bottom: 0; }
+.kd-actionbar__end {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  flex-wrap: wrap;
+}
+/* Retour d'action inline (copie de lien) */
+.kd-actionbar__feedback {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-activity-gym-text);
+}
+
+/* ----------------------------------------------------------------------------
+   Séance — en-tête de lecture (titre + méta + description)
+   ---------------------------------------------------------------------------- */
+.kd-workouthead { margin-bottom: var(--kd-space-11); }
+.kd-workouthead__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kd-space-3);
+  margin-top: var(--kd-space-5);
+}
+.kd-workouthead__desc {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-soft);
+  margin: var(--kd-space-6) 0 0;
+  max-width: 68ch;
+}
+
+/* ----------------------------------------------------------------------------
+   Séance — blocs en lecture
+   Rôles de bloc différenciés par l'icône seule : la couleur reste neutre (la
+   règle « la couleur porte du sens » réserve terracotta/olive aux activités).
+   ---------------------------------------------------------------------------- */
+.kd-blocks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-8);
+}
+.kd-block {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-8) var(--kd-space-9);
+}
+.kd-block__head {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-4);
+  padding-bottom: var(--kd-space-6);
+  margin-bottom: var(--kd-space-6);
+  border-bottom: 1px solid var(--color-divider);
+}
+.kd-block__role {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  background: var(--color-fill);
+  border-radius: var(--kd-radius-pill);
+  padding: 5px var(--kd-space-4);
+}
+.kd-block__role svg { width: 13px; height: 13px; }
+.kd-block__label {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 15px;
+  color: var(--color-text-strong);
+}
+.kd-block__rounds {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-primary);
+  background: var(--color-primary-tint);
+  border-radius: var(--kd-radius-pill);
+  padding: 4px var(--kd-space-4);
+  white-space: nowrap;
+}
+
+/* Liste d'exercices d'un bloc — numérotée (counter mono) */
+.kd-exlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  counter-reset: kd-ex;
+}
+.kd-exrow {
+  display: flex;
+  gap: var(--kd-space-5);
+  padding: var(--kd-space-5) 0;
+  border-top: 1px solid var(--color-divider);
+}
+.kd-exrow:first-child { border-top: 0; padding-top: 0; }
+.kd-exrow:last-child { padding-bottom: 0; }
+.kd-exrow::before {
+  counter-increment: kd-ex;
+  content: counter(kd-ex);
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  border-radius: var(--kd-radius-full);
+  background: var(--color-fill);
+  color: var(--color-text-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+}
+.kd-exrow__body { flex: 1 1 auto; min-width: 0; }
+.kd-exrow__name {
+  font-size: 14px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-strong);
+}
+.kd-exrow__params {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kd-space-2);
+  margin-left: var(--kd-space-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.kd-exrow__params .kd-dot { color: var(--color-text-placeholder); }
+.kd-exrow__rest { color: var(--color-text-faint); }
+.kd-exrow__notes {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text-soft);
+  margin: var(--kd-space-2) 0 0;
+}
+.kd-exrow--empty {
+  padding: var(--kd-space-5) 0;
+  color: var(--color-text-placeholder);
+  font-size: 13px;
+}
+
+/* ----------------------------------------------------------------------------
+   Séance — éditeur (formulaires server-driven + Turbo Streams)
+   ---------------------------------------------------------------------------- */
+.kd-editsection { margin-top: var(--kd-space-11); }
+.kd-editsection__title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin: 0 0 var(--kd-space-6);
+}
+
+/* Bloc en édition */
+.kd-editblock {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-8) var(--kd-space-9);
+  margin-bottom: var(--kd-space-7);
+}
+.kd-editblock__head {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--kd-space-5);
+  flex-wrap: wrap;
+  padding-bottom: var(--kd-space-6);
+  margin-bottom: var(--kd-space-6);
+  border-bottom: 1px solid var(--color-divider);
+}
+/* Champs role/rounds/label alignés horizontalement */
+.kd-fieldrow {
+  display: flex;
+  gap: var(--kd-space-5);
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.kd-fieldrow .kd-field { margin: 0; }
+.kd-fieldrow--tight .kd-field:nth-child(2) { flex: 0 0 90px; }
+.kd-fieldrow--tight .kd-field:nth-child(1) { flex: 0 0 190px; }
+.kd-fieldrow--tight .kd-field:last-child { flex: 1 1 160px; }
+
+/* Barre d'actions d'un bloc / exercice (déplacer, supprimer) */
+.kd-microactions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-1);
+}
+.kd-microactions form { display: inline-flex; margin: 0; }
+.kd-iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px; height: 32px;
+  padding: 0;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--kd-radius-md);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: border-color .12s ease, color .12s ease, background-color .12s ease;
+}
+.kd-iconbtn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.kd-iconbtn svg { width: 15px; height: 15px; }
+.kd-iconbtn--danger:hover {
+  border-color: var(--color-status-missed);
+  color: var(--color-status-missed);
+  background: color-mix(in srgb, var(--color-status-missed) 8%, transparent);
+}
+.kd-iconbtn:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Exercices prescrits en édition */
+.kd-editexlist {
+  list-style: none;
+  margin: 0 0 var(--kd-space-6);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-5);
+}
+.kd-editex {
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-md);
+  padding: var(--kd-space-7) var(--kd-space-8);
+}
+.kd-editex__head {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--kd-space-4);
+  margin-bottom: var(--kd-space-5);
+}
+.kd-editex__pos {
+  margin-right: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-editex--empty {
+  color: var(--color-text-placeholder);
+  font-size: 13px;
+  padding: var(--kd-space-5) 0;
+}
+
+/* Repli "Ajouter un exercice" */
+.kd-adddetails {
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--kd-radius-md);
+  padding: 0 var(--kd-space-7);
+}
+.kd-adddetails[open] { padding-bottom: var(--kd-space-7); }
+.kd-adddetails > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  padding: var(--kd-space-5) 0;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-primary);
+}
+.kd-adddetails > summary::-webkit-details-marker { display: none; }
+.kd-adddetails > summary svg { width: 15px; height: 15px; }
+
+/* Carte "Ajouter un bloc" */
+.kd-addblock {
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-8) var(--kd-space-9);
+  background: var(--color-surface);
+}
+.kd-addblock__title {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--kd-space-6);
+}
+.kd-addblock__title svg { width: 14px; height: 14px; }
+
+/* ----------------------------------------------------------------------------
+   Plan — trame multi-semaines (lecture + édition)
+   Grille dense semaines × 7 jours (lundi→dimanche). Bascule en agenda vertical
+   sur petit écran : plus tôt en édition (besoin de place pour le select), plus
+   tard en lecture. Couleur neutre : la trame regroupe des séances multi-activités,
+   terracotta/olive restent réservés aux activités (règle « la couleur porte du sens »).
+   ---------------------------------------------------------------------------- */
+.kd-planweeks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-8);
+}
+.kd-planweek {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-7) var(--kd-space-8) var(--kd-space-8);
+}
+.kd-planweek__head {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-4);
+  margin-bottom: var(--kd-space-6);
+}
+.kd-planweek__num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-primary);
+  background: var(--color-primary-tint);
+  border-radius: var(--kd-radius-pill);
+  padding: 4px var(--kd-space-4);
+}
+.kd-planweek__count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+.kd-plangrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--kd-space-3);
+}
+.kd-planday {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-3);
+  min-height: 84px;
+  padding: var(--kd-space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-md);
+  background: var(--color-surface);
+}
+.kd-planday.is-empty { background: transparent; border-style: dashed; }
+.kd-planday__name {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-planday__body,
+.kd-planday__items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-3);
+  min-width: 0;
+}
+.kd-planday__items { gap: var(--kd-space-2); }
+.kd-planentry { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+/* Séance placée — lecture (lien plein) */
+.kd-planday__item {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-size: 12px;
+  font-weight: var(--kd-weight-medium);
+  line-height: 1.3;
+  color: var(--color-text-strong);
+  text-decoration: none;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-sm);
+  padding: var(--kd-space-2) var(--kd-space-3);
+}
+.kd-planday__item svg { width: 12px; height: 12px; flex: 0 0 auto; color: var(--color-text-faint); }
+a.kd-planday__item:hover { border-color: var(--color-primary); color: var(--color-primary); }
+a.kd-planday__item:hover svg { color: var(--color-primary); }
+
+.kd-planday__notes {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-text-soft);
+  margin: 0;
+  padding-left: var(--kd-space-3);
+}
+.kd-planday__rest {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-placeholder);
+}
+
+/* Séance placée — édition (lien + retrait) */
+.kd-planitem {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-1);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-sm);
+  padding: var(--kd-space-1) var(--kd-space-1) var(--kd-space-1) var(--kd-space-3);
+}
+.kd-planitem__link {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text-strong);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-planitem__link:hover { color: var(--color-primary); }
+.kd-planitem form { display: inline-flex; margin: 0; }
+.kd-planitem__del {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-placeholder);
+  border-radius: var(--kd-radius-sm);
+  cursor: pointer;
+  transition: color .12s ease, background-color .12s ease;
+}
+.kd-planitem__del:hover {
+  color: var(--color-status-missed);
+  background: color-mix(in srgb, var(--color-status-missed) 10%, transparent);
+}
+.kd-planitem__del svg { width: 13px; height: 13px; }
+
+/* Repli « Ajouter une séance » dans une case */
+.kd-planadd { margin-top: var(--kd-space-1); }
+.kd-planadd > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-1);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-primary);
+  padding: var(--kd-space-1) 0;
+}
+.kd-planadd > summary::-webkit-details-marker { display: none; }
+.kd-planadd > summary svg { width: 12px; height: 12px; }
+.kd-planadd__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-4);
+  margin-top: var(--kd-space-4);
+}
+
+/* Bascule agenda vertical : édition à 1024px, lecture à 880px */
+.kd-plangrid--edit { gap: var(--kd-space-4); }
+
+@media (max-width: 1024px) {
+  .kd-plangrid--edit { grid-template-columns: 1fr; }
+  .kd-plangrid--edit .kd-planday {
+    flex-direction: row;
+    align-items: flex-start;
+    min-height: 0;
+    gap: var(--kd-space-5);
+  }
+  .kd-plangrid--edit .kd-planday__name { flex: 0 0 44px; padding-top: 4px; }
+  .kd-plangrid--edit .kd-planday__body { flex: 1 1 auto; }
+  .kd-plangrid--edit .kd-planday.is-empty { border-style: solid; }
+}
+@media (max-width: 880px) {
+  .kd-plangrid { grid-template-columns: 1fr; gap: var(--kd-space-2); }
+  .kd-plangrid:not(.kd-plangrid--edit) .kd-planday {
+    flex-direction: row;
+    align-items: flex-start;
+    min-height: 0;
+    gap: var(--kd-space-5);
+  }
+  .kd-plangrid:not(.kd-plangrid--edit) .kd-planday__name { flex: 0 0 44px; padding-top: 4px; }
+  .kd-plangrid:not(.kd-plangrid--edit) .kd-planday.is-empty { border-style: solid; }
+}
+
+/* ----------------------------------------------------------------------------
+   Calendrier — grille mensuelle dense (semaines ISO lundi→dimanche)
+   Chaque case porte ses séances datées en pastilles colorées par statut
+   (prévu / fait / manqué : seul cas où la couleur ne code pas l'activité mais
+   l'état). L'édition d'une séance (statut, déplacer, retirer) passe par une
+   modale, pour garder les cases lisibles malgré la densité.
+   ---------------------------------------------------------------------------- */
+
+/* Barre d'ajout : poser une séance / instancier un plan (deux replis) */
+.kd-calbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kd-space-5);
+  margin-bottom: var(--kd-space-9);
+}
+.kd-caladd {
+  flex: 1 1 260px;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--kd-radius-lg);
+  background: var(--color-surface);
+  padding: 0 var(--kd-space-8);
+}
+.kd-caladd[open] { padding-bottom: var(--kd-space-8); background: var(--color-surface-raised); }
+.kd-caladd > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  padding: var(--kd-space-6) 0;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-strong);
+}
+.kd-caladd > summary::-webkit-details-marker { display: none; }
+.kd-caladd > summary svg { width: 16px; height: 16px; color: var(--color-primary); }
+.kd-caladd__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-6);
+}
+
+/* Cadre défilable : le mois garde ses 7 colonnes et défile plutôt que de
+   s'écraser sur petit écran (la structure hebdomadaire reste lisible). */
+.kd-cal { overflow-x: auto; }
+.kd-cal__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  min-width: 720px;
+  background: var(--color-border-cell);
+  border: 1px solid var(--color-border-cell);
+  border-radius: var(--kd-radius-lg);
+  overflow: hidden;
+}
+.kd-cal__dow {
+  background: var(--color-surface-subtle);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  text-align: center;
+  padding: var(--kd-space-4) var(--kd-space-3);
+}
+
+.kd-calday {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-3);
+  min-height: 116px;
+  padding: var(--kd-space-4);
+  background: var(--color-surface-raised);
+}
+.kd-calday--out { background: var(--color-surface-subtle); }
+.kd-calday__num {
+  align-self: flex-end;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text-secondary);
+}
+.kd-calday--out .kd-calday__num { color: var(--color-text-placeholder); }
+.kd-calday--today .kd-calday__num {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  border-radius: var(--kd-radius-full);
+  font-weight: var(--kd-weight-bold);
+}
+.kd-calday__events {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-2);
+  min-width: 0;
+}
+
+/* Pastille de séance datée — bouton ouvrant la modale d'édition.
+   Filet gauche = statut (prévu / fait / manqué). */
+.kd-calevent {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  width: 100%;
+  text-align: left;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: var(--kd-weight-medium);
+  line-height: 1.25;
+  color: var(--color-text-strong);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-status-planned);
+  border-radius: var(--kd-radius-sm);
+  padding: var(--kd-space-2) var(--kd-space-3);
+  cursor: pointer;
+  transition: border-color .12s ease, background-color .12s ease;
+}
+.kd-calevent:hover { background: var(--color-surface-raised); border-color: var(--color-border-strong); }
+.kd-calevent--planned { border-left-color: var(--color-status-planned); }
+.kd-calevent--done    { border-left-color: var(--color-status-done); }
+.kd-calevent--missed  { border-left-color: var(--color-status-missed); }
+.kd-calevent__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-calevent__dot {
+  flex: 0 0 auto;
+  width: 6px; height: 6px;
+  border-radius: var(--kd-radius-full);
+  background: var(--color-status-planned);
+}
+.kd-calevent--done .kd-calevent__dot   { background: var(--color-status-done); }
+.kd-calevent--missed .kd-calevent__dot { background: var(--color-status-missed); }
+.kd-calevent--done .kd-calevent__title { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--color-status-done) 55%, transparent); }
+
+/* ----------------------------------------------------------------------------
+   Modale réutilisable (élément natif <dialog> + contrôleur Stimulus `dialog`)
+   ---------------------------------------------------------------------------- */
+.kd-modal {
+  width: min(440px, calc(100vw - 2 * var(--kd-space-8)));
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-xl);
+  background: var(--color-surface-raised);
+  color: var(--color-text-strong);
+  box-shadow: var(--shadow-card);
+}
+.kd-modal::backdrop { background: color-mix(in srgb, var(--kd-ink-900) 42%, transparent); }
+.kd-modal__card { padding: var(--kd-space-9) var(--kd-space-10) var(--kd-space-10); }
+.kd-modal__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kd-space-4);
+  margin-bottom: var(--kd-space-7);
+}
+.kd-modal__title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 17px;
+  line-height: 1.25;
+  color: var(--color-text-strong);
+  margin: 0;
+}
+.kd-modal__sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin: var(--kd-space-2) 0 0;
+}
+.kd-modal__close {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px; height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--kd-radius-sm);
+  background: transparent;
+  color: var(--color-text-faint);
+  cursor: pointer;
+  transition: color .12s ease, background-color .12s ease;
+}
+.kd-modal__close:hover { color: var(--color-primary); background: var(--color-surface-subtle); }
+.kd-modal__close svg { width: 17px; height: 17px; }
+.kd-modal__section {
+  padding-top: var(--kd-space-7);
+  margin-top: var(--kd-space-7);
+  border-top: 1px solid var(--color-divider);
+}
+.kd-modal__section:first-of-type { padding-top: 0; margin-top: 0; border-top: 0; }
+.kd-modal__section-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin: 0 0 var(--kd-space-5);
+}
+/* Formulaire compact dans une section de modale (statut) */
+.kd-modal__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-5);
+}
+/* Ligne « déplacer » : champ date + bouton alignés */
+.kd-modal__inline {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--kd-space-4);
+  flex-wrap: wrap;
+}
+.kd-modal__inline .kd-field { flex: 1 1 160px; margin: 0; }
+
+/* ----------------------------------------------------------------------------
+   Synthèse « prévu vs réalisé » (Phase 7)
+   Observance = part des séances échues effectivement faites. La couleur code ici
+   le statut (fait / prévu / manqué), seul cas où elle ne code pas l'activité.
+   ---------------------------------------------------------------------------- */
+
+/* Bloc du mois mis en avant : filet terracotta à gauche */
+.kd-summonth {
+  border-left: 3px solid var(--color-primary);
+  margin-bottom: var(--kd-space-11);
+}
+.kd-card__title svg { width: 16px; height: 16px; vertical-align: -3px; color: var(--color-text-faint); }
+
+/* Titre de sous-section (réutilise .kd-pagehead resserré) */
+.kd-pagehead--sub { margin-bottom: var(--kd-space-7); align-items: baseline; }
+.kd-title--sm { font-size: 18px; }
+
+/* Composant observance : grand chiffre + barre proportionnelle + légende */
+.kd-observance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-6);
+}
+.kd-observance__figure {
+  display: flex;
+  align-items: baseline;
+  gap: var(--kd-space-4);
+  flex-wrap: wrap;
+}
+.kd-observance__pct {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 34px;
+  line-height: 1;
+  color: var(--color-text-strong);
+  letter-spacing: -.02em;
+}
+.kd-observance--hero .kd-observance__pct { font-size: 52px; }
+.kd-observance__cap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-observance__sub {
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--color-text-placeholder);
+}
+.kd-observance__empty {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-size: 13px;
+  color: var(--color-text-faint);
+  margin: 0;
+}
+.kd-observance__empty svg { width: 15px; height: 15px; }
+
+/* Barre proportionnelle : segments dimensionnés par flex (= part du total) */
+.kd-obar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  border-radius: var(--kd-radius-pill);
+  overflow: hidden;
+  background: var(--color-surface-subtle);
+}
+.kd-observance--hero .kd-obar { height: 11px; }
+.kd-obar__seg { display: block; min-width: 3px; }
+.kd-obar__seg--done    { background: var(--color-status-done); }
+.kd-obar__seg--missed  { background: var(--color-status-missed); }
+.kd-obar__seg--planned { background: var(--color-status-planned); }
+
+/* Légende : pastille de couleur + compteur */
+.kd-olegend {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kd-space-3) var(--kd-space-6);
+}
+.kd-olegend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+.kd-olegend__dot {
+  width: 8px; height: 8px;
+  border-radius: var(--kd-radius-full);
+  background: currentColor;
+}
+.kd-olegend__item--done    { color: var(--color-status-done); }
+.kd-olegend__item--missed  { color: var(--color-status-missed); }
+.kd-olegend__item--planned { color: var(--color-status-planned); }
+
+/* Carte de plan instancié */
+.kd-summplan__head { margin-bottom: var(--kd-space-6); }
+.kd-summplan__title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 15px;
+  color: var(--color-text-strong);
+  text-decoration: none;
+}
+a.kd-summplan__title:hover { color: var(--color-primary); }
+.kd-summplan__title svg { width: 15px; height: 15px; color: var(--color-text-faint); }
+.kd-summplan__title--loose { color: var(--color-text-secondary); }

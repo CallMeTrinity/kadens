@@ -4,33 +4,53 @@
 
 {% block body %}
     {% for message in app.flashes('success') %}
-        <p role="status">{{ message }}</p>
+        <p class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }} {{ message }}</p>
     {% endfor %}
 
-    <p>
-        <a href="{{ path('app_workout_index') }}">Retour aux séances</a>
-        · <a href="{{ path('app_workout_show', {id: workout.id}) }}">Voir la séance</a>
-    </p>
+    <div class="kd-actionbar">
+        <a href="{{ path('app_workout_index') }}" class="kd-backlink">
+            {{ ux_icon('lucide:arrow-left') }} Mes séances
+        </a>
+        <div class="kd-actionbar__end">
+            <a href="{{ path('app_workout_show', {id: workout.id}) }}" class="kd-btn kd-btn--secondary kd-btn--sm">
+                {{ ux_icon('lucide:arrow-right') }} Voir la séance
+            </a>
+        </div>
+    </div>
 
-    <h1>Éditer la séance</h1>
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Éditeur de séance</p>
+            <h1 class="kd-title">{{ workout.title }}</h1>
+        </div>
+    </div>
 
-    <section>
-        <h2>Informations</h2>
+    {# Informations générales #}
+    <section class="kd-card" style="max-width:640px;">
+        <div class="kd-card__head">
+            <h2 class="kd-card__title">Informations</h2>
+        </div>
         {{ form_start(form) }}
             {{ form_widget(form) }}
-            <button type="submit">Enregistrer</button>
+            <div class="kd-formactions">
+                <button type="submit" class="kd-btn kd-btn--primary">
+                    {{ ux_icon('lucide:save') }} Enregistrer
+                </button>
+            </div>
         {{ form_end(form) }}
     </section>
 
-    <section>
-        <h2>Blocs & exercices</h2>
-        {# Conteneur cible des Turbo Streams : chaque mutation le remplace. #}
+    {# Blocs & exercices — conteneur cible des Turbo Streams #}
+    <section class="kd-editsection">
+        <p class="kd-editsection__title">Blocs &amp; exercices</p>
         <div id="workout-blocks">
             {{ include('workout/_blocks.html.twig') }}
         </div>
     </section>
 
-    <section>
+    {# Zone dangereuse #}
+    <section class="kd-editsection">
+        <p class="kd-editsection__title">Zone dangereuse</p>
         {{ include('workout/_delete_form.html.twig') }}
     </section>
 {% endblock %}

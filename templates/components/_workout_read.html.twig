@@ -3,40 +3,86 @@
    (public_share/workout). Auto-suffisant : aucun AJAX post-rendu, condition
    du cache offline (Phase 9). Attend une variable `flat` (sortie de
    PlanFlattener::flattenWorkout). #}
+{% import 'components/_activity.html.twig' as activity %}
 {% set workout = flat.workout %}
 
-<h1>{{ workout.title }}</h1>
+{# Icône par rôle de bloc — la couleur reste neutre (règle « la couleur porte
+   du sens » : terracotta/olive réservés aux activités). #}
+{% set role_icon = {'warmup': 'lucide:flame', 'main': 'lucide:activity', 'cooldown': 'lucide:wind'} %}
 
-{% if workout.estimatedDurationMinutes %}
-    <p>Durée estimée : {{ workout.estimatedDurationMinutes }} min</p>
-{% endif %}
-
-{% if workout.description %}
-    <p>{{ workout.description|nl2br }}</p>
-{% endif %}
-
+{# Activités distinctes présentes dans la séance, pour la méta d'en-tête. #}
+{% set seen = [] %}
+{% set seen_activities = [] %}
 {% for entry in flat.blocks %}
-    {% set block = entry.block %}
-    <section>
-        <h2>
-            {{ block.role.label }}
-            {% if block.label %} — {{ block.label }}{% endif %}
-            {% if block.rounds > 1 %} <small>× {{ block.rounds }} tours</small>{% endif %}
-        </h2>
-
-        <ol>
-        {% for ex in entry.exercises %}
-            <li>
-                <strong>{{ ex.exercise ? ex.exercise.name : '—' }}</strong>
-                {% if ex.summary %}<span> · {{ ex.summary }}</span>{% endif %}
-                {% if ex.rest %}<span> · repos {{ ex.rest }} s</span>{% endif %}
-                {% if ex.notes %}<p>{{ ex.notes|nl2br }}</p>{% endif %}
-            </li>
-        {% else %}
-            <li>Aucun exercice.</li>
-        {% endfor %}
-        </ol>
-    </section>
-{% else %}
-    <p>Cette séance est encore vide.</p>
+    {% for ex in entry.exercises %}
+        {% if ex.exercise and ex.exercise.activity.value not in seen %}
+            {% set seen = seen|merge([ex.exercise.activity.value]) %}
+            {% set seen_activities = seen_activities|merge([ex.exercise.activity]) %}
+        {% endif %}
+    {% endfor %}
 {% endfor %}
+
+<header class="kd-workouthead">
+    <p class="kd-eyebrow">Séance</p>
+    <h1 class="kd-title">{{ workout.title }}</h1>
+
+    <div class="kd-workouthead__meta">
+        {% if workout.estimatedDurationMinutes %}
+            <span class="kd-badge">{{ ux_icon('lucide:clock') }} {{ workout.estimatedDurationMinutes }} min</span>
+        {% endif %}
+        <span class="kd-badge">{{ ux_icon('lucide:layers') }} {{ flat.blocks|length }} bloc{{ flat.blocks|length > 1 ? 's' }}</span>
+        {% for act in seen_activities %}
+            {{ activity.badge(act) }}
+        {% endfor %}
+    </div>
+
+    {% if workout.description %}
+        <p class="kd-workouthead__desc">{{ workout.description|nl2br }}</p>
+    {% endif %}
+</header>
+
+{% if flat.blocks is empty %}
+    <div class="kd-card kd-empty">
+        {{ ux_icon('lucide:clipboard-list') }}
+        <div>Cette séance est encore vide.</div>
+    </div>
+{% else %}
+    <ol class="kd-blocks">
+        {% for entry in flat.blocks %}
+            {% set block = entry.block %}
+            <li class="kd-block">
+                <div class="kd-block__head">
+                    <span class="kd-block__role">
+                        {{ ux_icon(role_icon[block.role.value] ?? 'lucide:activity') }} {{ block.role.label }}
+                    </span>
+                    {% if block.label %}<span class="kd-block__label">{{ block.label }}</span>{% endif %}
+                    {% if block.rounds > 1 %}<span class="kd-block__rounds">× {{ block.rounds }} tours</span>{% endif %}
+                </div>
+
+                {% if entry.exercises is empty %}
+                    <p class="kd-exrow--empty">Aucun exercice.</p>
+                {% else %}
+                    <ol class="kd-exlist">
+                        {% for ex in entry.exercises %}
+                            <li class="kd-exrow">
+                                <div class="kd-exrow__body">
+                                    <span class="kd-exrow__name">{{ ex.exercise ? ex.exercise.name : '—' }}</span>
+                                    {% if ex.summary or ex.rest %}
+                                        <span class="kd-exrow__params">
+                                            {% if ex.summary %}{{ ex.summary }}{% endif %}
+                                            {% if ex.rest %}
+                                                {% if ex.summary %}<span class="kd-dot">·</span>{% endif %}
+                                                <span class="kd-exrow__rest">repos {{ ex.rest }} s</span>
+                                            {% endif %}
+                                        </span>
+                                    {% endif %}
+                                    {% if ex.notes %}<p class="kd-exrow__notes">{{ ex.notes|nl2br }}</p>{% endif %}
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ol>
+                {% endif %}
+            </li>
+        {% endfor %}
+    </ol>
+{% endif %}

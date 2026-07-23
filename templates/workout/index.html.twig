@@ -4,38 +4,74 @@
 
 {% block body %}
     {% for message in app.flashes('success') %}
-        <p role="status">{{ message }}</p>
+        <p class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }} {{ message }}</p>
     {% endfor %}
 
-    <h1>Mes séances</h1>
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Bibliothèque</p>
+            <h1 class="kd-title">Séances</h1>
+            <p class="kd-lead">Tes séances : blocs, exercices et paramètres. La brique assemblée dans les plans et le calendrier.</p>
+        </div>
+        <a href="{{ path('app_workout_new') }}" class="kd-btn kd-btn--primary">
+            {{ ux_icon('lucide:plus') }} Nouvelle séance
+        </a>
+    </div>
 
-    <p><a href="{{ path('app_workout_new') }}">Nouvelle séance</a></p>
+    <div data-controller="filter">
+        <div class="kd-toolbar">
+            <div class="kd-search">
+                {{ ux_icon('lucide:search') }}
+                <input type="search" class="kd-input" placeholder="Rechercher une séance…"
+                       aria-label="Rechercher une séance"
+                       data-filter-target="input" data-action="input->filter#filter">
+            </div>
+            <span class="kd-count"><span data-filter-target="count">{{ workouts|length }}</span> séance{{ workouts|length > 1 ? 's' }}</span>
+        </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Titre</th>
-                <th>Durée estimée</th>
-                <th>Blocs</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for workout in workouts %}
-            <tr>
-                <td>{{ workout.title }}</td>
-                <td>{{ workout.estimatedDurationMinutes ? workout.estimatedDurationMinutes ~ ' min' : '—' }}</td>
-                <td>{{ workout.blocks|length }}</td>
-                <td>
-                    <a href="{{ path('app_workout_show', {id: workout.id}) }}">Voir</a>
-                    <a href="{{ path('app_workout_edit', {id: workout.id}) }}">Éditer</a>
-                </td>
-            </tr>
+        {% if workouts is empty %}
+            <div class="kd-card kd-empty">
+                {{ ux_icon('lucide:clipboard-list') }}
+                <div>Aucune séance pour l'instant.</div>
+                <a href="{{ path('app_workout_new') }}" class="kd-btn kd-btn--secondary kd-btn--sm" style="margin-top:var(--kd-space-6);">
+                    {{ ux_icon('lucide:plus') }} Créer la première
+                </a>
+            </div>
         {% else %}
-            <tr>
-                <td colspan="4">Aucune séance pour l'instant.</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+            <div class="kd-grid kd-grid--3">
+                {% for workout in workouts %}
+                    <article class="kd-libcard"
+                             data-filter-target="item"
+                             data-filter-text="{{ workout.title }}">
+                        <div class="kd-libcard__head">
+                            <span class="kd-libcard__icon">{{ ux_icon('lucide:clipboard-list') }}</span>
+                            <div class="kd-libcard__body">
+                                <a class="kd-libcard__name" href="{{ path('app_workout_show', {id: workout.id}) }}">{{ workout.title }}</a>
+                                <div class="kd-libcard__meta">
+                                    {{ ux_icon('lucide:layers') }} {{ workout.blocks|length }} bloc{{ workout.blocks|length > 1 ? 's' }}
+                                    {% if workout.estimatedDurationMinutes %}
+                                        <span class="kd-dot">·</span>{{ ux_icon('lucide:clock') }} {{ workout.estimatedDurationMinutes }} min
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="kd-libcard__foot">
+                            <a href="{{ path('app_workout_show', {id: workout.id}) }}" class="kd-btn kd-btn--ghost kd-btn--sm">
+                                {{ ux_icon('lucide:arrow-right') }} Voir
+                            </a>
+                            <a href="{{ path('app_workout_edit', {id: workout.id}) }}" class="kd-btn kd-btn--ghost kd-btn--sm kd-libcard__foot-sep">
+                                {{ ux_icon('lucide:square-pen') }} Éditer
+                            </a>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+
+            <div class="kd-card kd-empty" data-filter-target="empty" hidden>
+                {{ ux_icon('lucide:search') }}
+                <div>Aucune séance ne correspond à ta recherche.</div>
+            </div>
+        {% endif %}
+    </div>
 {% endblock %}

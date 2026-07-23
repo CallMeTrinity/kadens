@@ -3,12 +3,27 @@
 {% block title %}Nouvelle séance{% endblock %}
 
 {% block body %}
-    <h1>Nouvelle séance</h1>
+    <a href="{{ path('app_workout_index') }}" class="kd-backlink">
+        {{ ux_icon('lucide:arrow-left') }} Mes séances
+    </a>
 
-    {{ form_start(form) }}
-        {{ form_widget(form) }}
-        <button type="submit">Créer</button>
-    {{ form_end(form) }}
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Séance</p>
+            <h1 class="kd-title">Nouvelle séance</h1>
+            <p class="kd-lead">Donne un titre et une durée estimée. Tu ajouteras les blocs et les exercices juste après.</p>
+        </div>
+    </div>
 
-    <p><a href="{{ path('app_workout_index') }}">Retour aux séances</a></p>
+    <div class="kd-card" style="max-width:640px;">
+        {{ form_start(form) }}
+            {{ form_widget(form) }}
+            <div class="kd-formactions">
+                <button type="submit" class="kd-btn kd-btn--primary">
+                    {{ ux_icon('lucide:plus') }} Créer la séance
+                </button>
+                <a href="{{ path('app_workout_index') }}" class="kd-btn kd-btn--ghost">Annuler</a>
+            </div>
+        {{ form_end(form) }}
+    </div>
 {% endblock %}

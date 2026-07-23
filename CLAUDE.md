@@ -28,6 +28,10 @@ tracking détaillé** (Strava couvre déjà ça).
   partiels). Pas de SPA.
 - **AssetMapper** (pas de Webpack Encore, pas de bundling). Conséquence : le
   service worker PWA (Phase 9) sera écrit **à la main**.
+- **Symfony UX Icons** (`symfony/ux-icons`) pour les icônes, jeu **Lucide**
+  (traits fins, cohérent « Carnet clair »). Icônes **figées en local** dans
+  `assets/icons/lucide/` (`php bin/console ux:icons:import lucide:<nom>`) : pas de
+  fetch réseau en prod/offline. Toute nouvelle icône doit être importée localement.
 - **Doctrine ORM** + **MariaDB 10.4** (même version dev et prod).
 - **Docker** en dev uniquement. Prod = **hébergement mutualisé Infomaniak**
   (`kadens.antoninpamart.fr`), pas de conteneurs, pas de root.
@@ -198,6 +202,86 @@ Toutes les phases du ROADMAP sont livrées. Prochaines pistes hors-roadmap : pre
 déploiement PWA sur `kadens.antoninpamart.fr` (HTTPS requis pour le service worker) et
 vérification manuelle Lighthouse/installabilité + navigation offline réelle en
 navigateur (non automatisable ici).
+
+- **Design & finitions (en cours).** Ouverture de la couche visuelle « Carnet
+  clair » sur des vues jusqu'ici brutes. **Fondation CSS réutilisable** :
+  `assets/styles/components.css` (importé par `app.css`) porte les composants
+  partagés — header, boutons (`.kd-btn--primary/secondary/ghost`), cartes
+  (`.kd-card`), badges/statuts (`.kd-badge--run/gym/done/planned/missed`), stats,
+  cartes de nav (`.kd-navcard`), grilles (`.kd-grid--2/3/4`), page (`.kd-page`).
+  Tout piloté par les tokens, zéro couleur/police en dur. **Header réutilisable**
+  `templates/components/_header.html.twig` (marque + nav à icônes Lucide + état
+  actif déduit du préfixe de route + user/déconnexion), inclus par `base.html.twig`
+  sous `if app.user`. **Page d'accueil** : `HomeController` (route `/` = `app_home`,
+  redirige vers login si anonyme), dashboard `templates/home/index.html.twig`
+  (prochaines séances sur 14 j via `findByOwnerBetween`, observance du mois via
+  `countByStatusForOwnerBetween`, compteurs biblio, raccourcis sections). Rendu
+  auto-suffisant (cachable offline). **Bibliothèque d'exercices stylée** : index
+  (grille de `.kd-libcard`, recherche client offline-safe via contrôleur Stimulus
+  `filter`), show (`.kd-deflist`), new/edit + suppression. **Formulaires stylés
+  globalement** : thème `templates/form/kadens_theme.html.twig` (enregistré dans
+  `config/packages/twig.yaml`) applique les classes `.kd-*` à tous les champs du
+  site — les nouvelles vues n'ont plus à styler leurs champs. Nouveau composant
+  Twig transverse `templates/components/_activity.html.twig` (macros `badge`/`icon`/
+  `modifier`, source unique icône↔couleur par `ActivityType`). Classes ajoutées à
+  `components.css` : `.kd-libcard`, `.kd-tag(s)`, `.kd-deflist`, `.kd-toolbar`/
+  `.kd-search`/`.kd-count`, `.kd-flash`, `.kd-backlink`, `.kd-btn--danger`, la
+  couche formulaire. **Page de connexion stylée** : `<main>` à classe surchargeable
+  (bloc `main_class` dans `base.html.twig`, défaut `kd-page`) pour sortir le login du
+  chrome applicatif ; couche `.kd-auth` dans `components.css` (écran centré plein
+  hauteur, carte, champ à icône `.kd-inputgroup`, case `.kd-check`, `.kd-btn--block`,
+  bloc erreur d'auth) ; template `security/login.html.twig` réécrit. **Séances stylées** :
+  index (grille de `.kd-libcard` + recherche offline-safe via `filter`), consultation
+  (`_workout_read.html.twig` refait : en-tête `.kd-workouthead` avec badges durée/blocs/
+  activités distinctes, blocs en cartes `.kd-block` + liste d'exercices numérotée
+  `.kd-exlist`, rôle de bloc différencié par icône seule — couleur neutre pour ne pas
+  empiéter sur terracotta/olive ; partagé par `workout/show` et la page publique),
+  `show` (barre `.kd-actionbar` : retour + éditer/Excel/copier-lien/page publique),
+  new (carte formulaire), éditeur (`.kd-editblock`, champs role/rounds/label alignés
+  `.kd-fieldrow`, actions déplacer/supprimer en boutons-icônes `.kd-iconbtn` via
+  `_action_form` refait icône+variant, ajout d'exercice en `<details>` `.kd-adddetails`,
+  carte d'ajout de bloc `.kd-addblock`). Icônes importées : `flame`/`activity`/`wind`
+  (rôles), `clock`, `chevron-up`/`chevron-down`, `x`, `save`, `link-2`, `file-down`.
+  **Plans stylés** : index (grille de `.kd-libcard` + recherche offline-safe via
+  `filter`), consultation (`_plan_read.html.twig` refait : en-tête `.kd-workouthead`
+  avec badges durée/nb séances, puis trame en cartes `.kd-planweek` → grille dense
+  7 jours `.kd-plangrid` de cases `.kd-planday`, séance placée en lien
+  `.kd-planday__item`, jour sans séance affiché « Repos » ; partagé par `show`),
+  `show` (barre `.kd-actionbar` : retour + éditer/Excel), new (carte formulaire),
+  éditeur (`_grid.html.twig` : même grille en variante `.kd-plangrid--edit`, séance en
+  `.kd-planitem` avec retrait `.kd-planitem__del`, ajout par case en `<details>`
+  `.kd-planadd`, sections infos/dupliquer/zone dangereuse en `.kd-editsection`,
+  suppression `.kd-btn--danger`). La grille bascule en agenda vertical (jour en ligne) :
+  à 1024px en édition, 880px en lecture. Couleur neutre (trame multi-activités). Icônes
+  importées : `copy`, `calendar-range`.
+  **Calendrier stylé** : `calendar/index.html.twig` refait. En-tête `.kd-pagehead`
+  (eyebrow « Planning » + mois) avec nav prev/aujourd'hui/suivant + export en
+  `.kd-btn`. Ajout (poser une séance / instancier un plan) en deux replis
+  `.kd-caladd` (`.kd-calbar`). Grille mensuelle `.kd-cal__grid` (7 colonnes, cadre
+  `overflow-x` défilable + `min-width` : la structure hebdo tient sur mobile plutôt
+  que de s'écraser) : en-têtes `.kd-cal__dow`, cases `.kd-calday` (`--out` hors mois,
+  `--today` = numéro en pastille terracotta). Séances datées en pastilles
+  `.kd-calevent--planned/done/missed` (filet gauche = statut : **seul cas où la
+  couleur code l'état, pas l'activité** ; fait = titre barré). Chaque pastille est
+  un bouton ouvrant la **modale** d'édition (statut prévu/fait/manqué +
+  `completionNotes`, déplacer, retirer) — les cases restent lisibles malgré la
+  densité. **Composant modale réutilisable créé** : élément natif `<dialog>` +
+  contrôleur Stimulus `dialog` (`assets/controllers/dialog_controller.js` :
+  open/close/backdrop, promotion en top-layer donc non rognée par l'`overflow` de la
+  grille) ; purement client, aucun AJAX, formulaires déjà dans la page (offline-safe).
+  Classes `.kd-modal*` dans `components.css`. Suppression toujours par `confirm()`
+  natif (dans la modale). Icône importée : `calendar-clock` (déplacer). Variante
+  `.kd-flash--error` ajoutée.
+  **Synthèse stylée** : `summary/index.html.twig` refait. En-tête `.kd-pagehead`
+  (eyebrow « Synthèse » + titre + `.kd-lead`) avec nav prev/ce mois/suivant +
+  retour calendrier en `.kd-btn`. Observance du mois en carte mise en avant
+  `.kd-summonth` (filet terracotta), détail par plan instancié en grille
+  `.kd-grid--2` de cartes `.kd-summplan` (bucket « hors plan » différencié).
+  **Composant `_status_stats` refait** : passe des styles inline aux classes
+  `.kd-observance*` (grand pourcentage `--hero` pour le mois, barre proportionnelle
+  `.kd-obar` dimensionnée par `flex`, légende `.kd-olegend` pastille+compteur ;
+  couleur = statut fait/prévu/manqué, seul cas hors activité). Icônes importées :
+  `calendar-check`, `calendar-off`, `calendar`. Toutes les vues sont désormais stylées.
 
 ---
 

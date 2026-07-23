@@ -1,0 +1,34 @@
+{# ============================================================================
+   Composant activité — source unique du couple (icône Lucide, modificateur de
+   couleur) par ActivityType. À réutiliser partout où une activité s'affiche
+   (séances, calendrier, etc.). La couleur ne porte du sens que pour course/trail
+   (terracotta) et muscu/renfo (olive) ; les autres activités restent neutres
+   (règle « la couleur porte du sens »).
+
+   Usage :
+     {% import 'components/_activity.html.twig' as activity %}
+     {{ activity.badge(exercise.activity) }}          {# pastille icône + label #}
+     {{ activity.icon(exercise.activity) }}            {# 'lucide:...'          #}
+     {{ activity.modifier(exercise.activity) }}        {# 'run' | 'gym' | ''    #}
+   ============================================================================ #}
+
+{%- macro icon(activity) -%}
+    {{- {
+        'gym': 'lucide:dumbbell', 'running': 'lucide:footprints',
+        'swimming': 'lucide:waves', 'cycling': 'lucide:bike',
+        'mobility': 'lucide:person-standing', 'other': 'lucide:circle-dot',
+    }[activity.value] ?? 'lucide:circle-dot' -}}
+{%- endmacro -%}
+
+{%- macro modifier(activity) -%}
+    {{- {'running': 'run', 'gym': 'gym'}[activity.value] ?? '' -}}
+{%- endmacro -%}
+
+{%- macro badge(activity, with_label = true) -%}
+    {%- import _self as self -%}
+    {%- set mod = self.modifier(activity) -%}
+    <span class="kd-badge{{ mod ? ' kd-badge--' ~ mod }}">
+        {{- ux_icon(self.icon(activity)|trim) -}}
+        {%- if with_label %} {{ activity.label }}{% endif -%}
+    </span>
+{%- endmacro -%}

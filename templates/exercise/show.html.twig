@@ -1,43 +1,78 @@
 {% extends 'base.html.twig' %}
+{% import 'components/_activity.html.twig' as activity %}
 
 {% block title %}{{ exercise.name }}{% endblock %}
 
 {% block body %}
-    <h1>{{ exercise.name }}</h1>
+    <a href="{{ path('app_exercise_index') }}" class="kd-backlink">
+        {{ ux_icon('lucide:arrow-left') }} Bibliothèque
+    </a>
 
-    <dl>
-        <dt>Activité</dt>
-        <dd>{{ exercise.activity ? exercise.activity.label : '' }}</dd>
-
-        <dt>Zones travaillées</dt>
-        <dd>
-            {% for area in exercise.targetAreas %}
-                {{ area.label }}{{ not loop.last ? ', ' }}
-            {% else %}
-                —
-            {% endfor %}
-        </dd>
-
-        <dt>Description</dt>
-        <dd>{{ exercise.description ?: '—' }}</dd>
-
-        <dt>Lien média</dt>
-        <dd>
-            {% if exercise.mediaUrl %}
-                <a href="{{ exercise.mediaUrl }}" target="_blank" rel="noopener">{{ exercise.mediaUrl }}</a>
-            {% else %}
-                —
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Exercice</p>
+            <h1 class="kd-title">{{ exercise.name }}</h1>
+            <div style="margin-top:var(--kd-space-4); display:flex; gap:var(--kd-space-3); align-items:center;">
+                {{ activity.badge(exercise.activity) }}
+                <span class="kd-scope">
+                    {% if exercise.owner is null %}
+                        {{ ux_icon('lucide:library') }} Bibliothèque
+                    {% else %}
+                        {{ ux_icon('lucide:user') }} Perso
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+        <div style="display:flex; gap:var(--kd-space-4); flex-wrap:wrap;">
+            {% if is_granted('EDIT', exercise) %}
+                <a href="{{ path('app_exercise_edit', {id: exercise.id}) }}" class="kd-btn kd-btn--secondary">
+                    {{ ux_icon('lucide:square-pen') }} Éditer
+                </a>
             {% endif %}
-        </dd>
-    </dl>
+            {% if is_granted('DELETE', exercise) %}
+                {{ include('exercise/_delete_form.html.twig') }}
+            {% endif %}
+        </div>
+    </div>
 
-    {% if is_granted('EDIT', exercise) %}
-        <a href="{{ path('app_exercise_edit', {id: exercise.id}) }}">Éditer</a>
-    {% endif %}
+    <div class="kd-card">
+        <dl class="kd-deflist">
+            <dt>Activité</dt>
+            <dd>{{ exercise.activity.label }}</dd>
 
-    {% if is_granted('DELETE', exercise) %}
-        {{ include('exercise/_delete_form.html.twig') }}
-    {% endif %}
+            <dt>Zones travaillées</dt>
+            <dd>
+                {% if exercise.targetAreas is not empty %}
+                    <div class="kd-tags">
+                        {% for area in exercise.targetAreas %}
+                            <span class="kd-tag">{{ area.label }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <span style="color:var(--color-text-placeholder);">—</span>
+                {% endif %}
+            </dd>
 
-    <p><a href="{{ path('app_exercise_index') }}">Retour à la liste</a></p>
+            <dt>Description</dt>
+            <dd>
+                {% if exercise.description %}
+                    {{ exercise.description|nl2br }}
+                {% else %}
+                    <span style="color:var(--color-text-placeholder);">—</span>
+                {% endif %}
+            </dd>
+
+            <dt>Média</dt>
+            <dd>
+                {% if exercise.mediaUrl %}
+                    <a href="{{ exercise.mediaUrl }}" target="_blank" rel="noopener"
+                       class="kd-btn kd-btn--ghost kd-btn--sm" style="padding-left:0;">
+                        {{ ux_icon('lucide:external-link') }} Ouvrir le lien
+                    </a>
+                {% else %}
+                    <span style="color:var(--color-text-placeholder);">—</span>
+                {% endif %}
+            </dd>
+        </dl>
+    </div>
 {% endblock %}

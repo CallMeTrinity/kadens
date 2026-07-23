@@ -1,0 +1,68 @@
+{# ============================================================================
+   Kadens — thème de formulaire « Carnet clair »
+   Applique les classes .kd-* (voir components.css) à tous les champs du site.
+   Enregistré globalement dans config/packages/twig.yaml (form_themes).
+   Aucune couleur/police en dur : tout passe par les classes tokenisées.
+   ============================================================================ #}
+{% extends 'form_div_layout.html.twig' %}
+
+{%- block form_row -%}
+    {%- set widget_attr = {} -%}
+    {%- if help is not empty -%}
+        {%- set widget_attr = {attr: {'aria-describedby': id ~ '_help'}} -%}
+    {%- endif -%}
+    <div class="kd-field">
+        {{- form_label(form) -}}
+        {{- form_widget(form, widget_attr) -}}
+        {{- form_help(form) -}}
+        {{- form_errors(form) -}}
+    </div>
+{%- endblock -%}
+
+{%- block form_label -%}
+    {%- if label is not same as(false) -%}
+        {%- set label_attr = label_attr|merge({class: (label_attr.class|default('') ~ ' kd-label')|trim}) -%}
+    {%- endif -%}
+    {{- parent() -}}
+{%- endblock -%}
+
+{%- block form_widget_simple -%}
+    {%- set attr = attr|merge({class: (attr.class|default('') ~ ' kd-input')|trim}) -%}
+    {{- parent() -}}
+{%- endblock -%}
+
+{%- block textarea_widget -%}
+    {%- set attr = attr|merge({class: (attr.class|default('') ~ ' kd-input kd-input--area')|trim}) -%}
+    {{- parent() -}}
+{%- endblock -%}
+
+{%- block choice_widget_collapsed -%}
+    {%- set attr = attr|merge({class: (attr.class|default('') ~ ' kd-input kd-select')|trim}) -%}
+    {{- parent() -}}
+{%- endblock -%}
+
+{%- block choice_widget_expanded -%}
+    <div class="kd-choicegrid" {{ block('widget_container_attributes') }}>
+    {%- for child in form -%}
+        {{- form_widget(child) -}}
+        {{- form_label(child, null, {translation_domain: choice_translation_domain}) -}}
+    {%- endfor -%}
+    </div>
+{%- endblock -%}
+
+{%- block form_help -%}
+    {%- if help is not empty -%}
+        {%- set help_attr = help_attr|merge({class: (help_attr.class|default('') ~ ' kd-help')|trim, id: id ~ '_help'}) -%}
+        {{- parent() -}}
+    {%- endif -%}
+{%- endblock -%}
+
+{%- block form_errors -%}
+    {%- if errors|length > 0 -%}
+        <ul class="kd-errors">
+            {%- for error in errors -%}
+                <li>{{ error.message }}</li>
+            {%- endfor -%}
+        </ul>
+    {%- endif -%}
+{%- endblock -%}

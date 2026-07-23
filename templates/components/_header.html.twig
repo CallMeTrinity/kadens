@@ -1,0 +1,43 @@
+{#
+    Header applicatif réutilisable — barre de navigation « Carnet clair ».
+    Rendu uniquement pour un utilisateur connecté (inclus sous `if app.user`
+    dans base.html.twig). L'état actif est déduit du préfixe de la route courante.
+#}
+{% set route = app.request.attributes.get('_route') %}
+{% set items = [
+    { label: 'Accueil',     icon: 'lucide:home',           path: 'app_home',                 match: 'app_home' },
+    { label: 'Exercices',   icon: 'lucide:dumbbell',       path: 'app_exercise_index',       match: 'app_exercise' },
+    { label: 'Séances',     icon: 'lucide:clipboard-list', path: 'app_workout_index',        match: 'app_workout' },
+    { label: 'Plans',       icon: 'lucide:layers',         path: 'app_plan_template_index',  match: 'app_plan_template' },
+    { label: 'Calendrier',  icon: 'lucide:calendar-days',  path: 'app_calendar_index',       match: 'app_calendar' },
+    { label: 'Synthèse',    icon: 'lucide:trending-up',    path: 'app_summary_index',        match: 'app_summary' },
+] %}
+
+<header class="kd-header">
+    <div class="kd-header__inner">
+        <a href="{{ path('app_home') }}" class="kd-brand">
+            <span class="kd-brand__mark">K</span>
+            Kadens
+        </a>
+
+        <nav class="kd-nav" aria-label="Navigation principale">
+            {% for item in items %}
+                {% set active = route == item.match or route starts with item.match ~ '_' %}
+                <a href="{{ path(item.path) }}"
+                   class="kd-nav__link{{ active ? ' is-active' }}"
+                   {{ active ? 'aria-current="page"' }}>
+                    {{ ux_icon(item.icon) }}<span>{{ item.label }}</span>
+                </a>
+            {% endfor %}
+        </nav>
+
+        <div class="kd-header__end">
+            <span class="kd-header__user">
+                {{ ux_icon('lucide:user') }}<span>{{ app.user.userIdentifier }}</span>
+            </span>
+            <a href="{{ path('app_logout') }}" class="kd-header__logout" title="Déconnexion" aria-label="Déconnexion">
+                {{ ux_icon('lucide:log-out') }}
+            </a>
+        </div>
+    </div>
+</header>

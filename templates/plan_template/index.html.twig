@@ -4,38 +4,72 @@
 
 {% block body %}
     {% for message in app.flashes('success') %}
-        <p role="status">{{ message }}</p>
+        <p class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }} {{ message }}</p>
     {% endfor %}
 
-    <h1>Mes plans</h1>
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Bibliothèque</p>
+            <h1 class="kd-title">Plans</h1>
+            <p class="kd-lead">Tes trames multi-semaines : une grille de séances par jour, réutilisable et projetable sur le calendrier.</p>
+        </div>
+        <a href="{{ path('app_plan_template_new') }}" class="kd-btn kd-btn--primary">
+            {{ ux_icon('lucide:plus') }} Nouveau plan
+        </a>
+    </div>
 
-    <p><a href="{{ path('app_plan_template_new') }}">Nouveau plan</a></p>
+    <div data-controller="filter">
+        <div class="kd-toolbar">
+            <div class="kd-search">
+                {{ ux_icon('lucide:search') }}
+                <input type="search" class="kd-input" placeholder="Rechercher un plan…"
+                       aria-label="Rechercher un plan"
+                       data-filter-target="input" data-action="input->filter#filter">
+            </div>
+            <span class="kd-count"><span data-filter-target="count">{{ planTemplates|length }}</span> plan{{ planTemplates|length > 1 ? 's' }}</span>
+        </div>
 
-    <table>
-        <thead>
-            <tr>
-                <th>Titre</th>
-                <th>Semaines</th>
-                <th>Séances placées</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for template in planTemplates %}
-            <tr>
-                <td>{{ template.title }}</td>
-                <td>{{ template.durationWeeks }}</td>
-                <td>{{ template.planItems|length }}</td>
-                <td>
-                    <a href="{{ path('app_plan_template_show', {id: template.id}) }}">Voir</a>
-                    <a href="{{ path('app_plan_template_edit', {id: template.id}) }}">Éditer</a>
-                </td>
-            </tr>
+        {% if planTemplates is empty %}
+            <div class="kd-card kd-empty">
+                {{ ux_icon('lucide:layers') }}
+                <div>Aucun plan pour l'instant.</div>
+                <a href="{{ path('app_plan_template_new') }}" class="kd-btn kd-btn--secondary kd-btn--sm" style="margin-top:var(--kd-space-6);">
+                    {{ ux_icon('lucide:plus') }} Créer le premier
+                </a>
+            </div>
         {% else %}
-            <tr>
-                <td colspan="4">Aucun plan pour l'instant.</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+            <div class="kd-grid kd-grid--3">
+                {% for template in planTemplates %}
+                    <article class="kd-libcard"
+                             data-filter-target="item"
+                             data-filter-text="{{ template.title }}">
+                        <div class="kd-libcard__head">
+                            <span class="kd-libcard__icon">{{ ux_icon('lucide:layers') }}</span>
+                            <div class="kd-libcard__body">
+                                <a class="kd-libcard__name" href="{{ path('app_plan_template_show', {id: template.id}) }}">{{ template.title }}</a>
+                                <div class="kd-libcard__meta">
+                                    {{ ux_icon('lucide:calendar-range') }} {{ template.durationWeeks }} semaine{{ template.durationWeeks > 1 ? 's' }}
+                                    <span class="kd-dot">·</span>{{ ux_icon('lucide:clipboard-list') }} {{ template.planItems|length }} séance{{ template.planItems|length > 1 ? 's' }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="kd-libcard__foot">
+                            <a href="{{ path('app_plan_template_show', {id: template.id}) }}" class="kd-btn kd-btn--ghost kd-btn--sm">
+                                {{ ux_icon('lucide:arrow-right') }} Voir
+                            </a>
+                            <a href="{{ path('app_plan_template_edit', {id: template.id}) }}" class="kd-btn kd-btn--ghost kd-btn--sm kd-libcard__foot-sep">
+                                {{ ux_icon('lucide:square-pen') }} Éditer
+                            </a>
+                        </div>
+                    </article>
+                {% endfor %}
+            </div>
+
+            <div class="kd-card kd-empty" data-filter-target="empty" hidden>
+                {{ ux_icon('lucide:search') }}
+                <div>Aucun plan ne correspond à ta recherche.</div>
+            </div>
+        {% endif %}
+    </div>
 {% endblock %}

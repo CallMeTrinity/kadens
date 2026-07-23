@@ -4,22 +4,30 @@
    Paramètres : form (FormView), submit_label. #}
 <div data-controller="prescription-fields"
      data-prescription-fields-map-value="{{ prescription_type_fields_map()|json_encode|e('html_attr') }}">
-    {{ form_start(form) }}
+    {{ form_start(form, { attr: { class: 'kd-form' } }) }}
         {{ form_row(form.exercise) }}
         {{ form_row(form.prescriptionType, { attr: {
             'data-prescription-fields-target': 'type',
             'data-action': 'prescription-fields#update',
         } }) }}
 
-        {% for field in ['sets', 'reps', 'weightKg', 'durationSeconds', 'distanceMeters', 'paceSecondsPerKm', 'targetReps', 'capSeconds', 'intensityZone'] %}
-            <div data-prescription-fields-target="field" data-field="{{ field }}">
-                {{ form_row(attribute(form, field)) }}
-            </div>
-        {% endfor %}
+        <div class="kd-fieldrow">
+            {% for field in ['sets', 'reps', 'weightKg', 'durationSeconds', 'distanceMeters', 'paceSecondsPerKm', 'targetReps', 'capSeconds', 'intensityZone'] %}
+                <div data-prescription-fields-target="field" data-field="{{ field }}" style="flex:1 1 140px;">
+                    {{ form_row(attribute(form, field)) }}
+                </div>
+            {% endfor %}
+        </div>
 
-        {{ form_row(form.restSeconds) }}
+        <div class="kd-fieldrow">
+            <div style="flex:0 0 140px;">{{ form_row(form.restSeconds) }}</div>
+        </div>
         {{ form_row(form.notes) }}
 
-        <button type="submit">{{ submit_label|default('Enregistrer') }}</button>
+        <div class="kd-formactions">
+            <button type="submit" class="kd-btn kd-btn--primary kd-btn--sm">
+                {{ ux_icon('lucide:check') }} {{ submit_label|default('Enregistrer') }}
+            </button>
+        </div>
     {{ form_end(form) }}
 </div>
