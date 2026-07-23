@@ -242,7 +242,19 @@ navigateur (non automatisable ici).
   `_action_form` refait icône+variant, ajout d'exercice en `<details>` `.kd-adddetails`,
   carte d'ajout de bloc `.kd-addblock`). Icônes importées : `flame`/`activity`/`wind`
   (rôles), `clock`, `chevron-up`/`chevron-down`, `x`, `save`, `link-2`, `file-down`.
-  **Reste à styler** : plans, calendrier, synthèse. Composant **modale** réutilisable
+  **Plans stylés** : index (grille de `.kd-libcard` + recherche offline-safe via
+  `filter`), consultation (`_plan_read.html.twig` refait : en-tête `.kd-workouthead`
+  avec badges durée/nb séances, puis trame en cartes `.kd-planweek` → grille dense
+  7 jours `.kd-plangrid` de cases `.kd-planday`, séance placée en lien
+  `.kd-planday__item`, jour sans séance affiché « Repos » ; partagé par `show`),
+  `show` (barre `.kd-actionbar` : retour + éditer/Excel), new (carte formulaire),
+  éditeur (`_grid.html.twig` : même grille en variante `.kd-plangrid--edit`, séance en
+  `.kd-planitem` avec retrait `.kd-planitem__del`, ajout par case en `<details>`
+  `.kd-planadd`, sections infos/dupliquer/zone dangereuse en `.kd-editsection`,
+  suppression `.kd-btn--danger`). La grille bascule en agenda vertical (jour en ligne) :
+  à 1024px en édition, 880px en lecture. Couleur neutre (trame multi-activités). Icônes
+  importées : `copy`, `calendar-range`.
+  **Reste à styler** : calendrier, synthèse. Composant **modale** réutilisable
   à créer quand une vue en aura besoin (ex. confirmation suppression, qui passe encore
   par `confirm()` natif).
 

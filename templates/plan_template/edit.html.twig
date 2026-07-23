@@ -4,41 +4,66 @@
 
 {% block body %}
     {% for message in app.flashes('success') %}
-        <p role="status">{{ message }}</p>
+        <p class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }} {{ message }}</p>
     {% endfor %}
 
-    <p>
-        <a href="{{ path('app_plan_template_index') }}">Retour aux plans</a>
-        · <a href="{{ path('app_plan_template_show', {id: template.id}) }}">Voir le plan</a>
-    </p>
+    <div class="kd-actionbar">
+        <a href="{{ path('app_plan_template_index') }}" class="kd-backlink">
+            {{ ux_icon('lucide:arrow-left') }} Mes plans
+        </a>
+        <div class="kd-actionbar__end">
+            <a href="{{ path('app_plan_template_show', {id: template.id}) }}" class="kd-btn kd-btn--secondary kd-btn--sm">
+                {{ ux_icon('lucide:arrow-right') }} Voir le plan
+            </a>
+        </div>
+    </div>
 
-    <h1>Éditer le plan</h1>
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Éditeur de plan</p>
+            <h1 class="kd-title">{{ template.title }}</h1>
+        </div>
+    </div>
 
-    <section>
-        <h2>Informations</h2>
+    {# Informations générales #}
+    <section class="kd-card" style="max-width:640px;">
+        <div class="kd-card__head">
+            <h2 class="kd-card__title">Informations</h2>
+        </div>
         {{ form_start(form) }}
             {{ form_widget(form) }}
-            <button type="submit">Enregistrer</button>
+            <div class="kd-formactions">
+                <button type="submit" class="kd-btn kd-btn--primary">
+                    {{ ux_icon('lucide:save') }} Enregistrer
+                </button>
+            </div>
         {{ form_end(form) }}
     </section>
 
-    <section>
-        <h2>Trame</h2>
-        {# Conteneur cible des Turbo Streams : chaque mutation le remplace. #}
+    {# Trame — conteneur cible des Turbo Streams #}
+    <section class="kd-editsection">
+        <p class="kd-editsection__title">Trame</p>
         <div id="plan-grid">
             {{ include('plan_template/_grid.html.twig') }}
         </div>
     </section>
 
-    <section>
-        <h2>Dupliquer</h2>
-        <form method="post" action="{{ path('app_plan_template_duplicate', {id: template.id}) }}">
-            <input type="hidden" name="_token" value="{{ csrf_token('duplicate' ~ template.id) }}">
-            <button type="submit">Dupliquer ce plan</button>
-        </form>
+    {# Dupliquer #}
+    <section class="kd-editsection">
+        <p class="kd-editsection__title">Dupliquer</p>
+        <div class="kd-card" style="max-width:640px;">
+            <form method="post" action="{{ path('app_plan_template_duplicate', {id: template.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('duplicate' ~ template.id) }}">
+                <button type="submit" class="kd-btn kd-btn--secondary">
+                    {{ ux_icon('lucide:copy') }} Dupliquer ce plan
+                </button>
+            </form>
+        </div>
     </section>
 
-    <section>
+    {# Zone dangereuse #}
+    <section class="kd-editsection">
+        <p class="kd-editsection__title">Zone dangereuse</p>
         {{ include('plan_template/_delete_form.html.twig') }}
     </section>
 {% endblock %}

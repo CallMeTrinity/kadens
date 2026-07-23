@@ -3,11 +3,22 @@
 {% block title %}{{ flat.template.title }}{% endblock %}
 
 {% block body %}
-    <p>
-        <a href="{{ path('app_plan_template_index') }}">Retour aux plans</a>
-        · <a href="{{ path('app_plan_template_edit', {id: flat.template.id}) }}">Éditer</a>
-        · <a href="{{ path('app_export_plan_template', {id: flat.template.id}) }}">Exporter en Excel</a>
-    </p>
+    {# Vue de consultation auto-suffisante : aucun chargement AJAX post-rendu,
+       condition du cache offline (Phase 9). Consomme la sortie de PlanFlattener. #}
+    <div class="kd-actionbar">
+        <a href="{{ path('app_plan_template_index') }}" class="kd-backlink">
+            {{ ux_icon('lucide:arrow-left') }} Mes plans
+        </a>
+
+        <div class="kd-actionbar__end">
+            <a href="{{ path('app_plan_template_edit', {id: flat.template.id}) }}" class="kd-btn kd-btn--secondary kd-btn--sm">
+                {{ ux_icon('lucide:square-pen') }} Éditer
+            </a>
+            <a href="{{ path('app_export_plan_template', {id: flat.template.id}) }}" class="kd-btn kd-btn--ghost kd-btn--sm">
+                {{ ux_icon('lucide:file-down') }} Excel
+            </a>
+        </div>
+    </div>
 
     {{ include('components/_plan_read.html.twig') }}
 {% endblock %}

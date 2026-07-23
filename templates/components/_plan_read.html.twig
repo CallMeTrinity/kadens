@@ -2,34 +2,52 @@
    Auto-suffisant : aucun AJAX post-rendu, condition du cache offline (Phase 9).
    Attend une variable `flat` (grille dense semaines × jours). #}
 {% set template = flat.template %}
-{% set dayNames = {1: 'Lundi', 2: 'Mardi', 3: 'Mercredi', 4: 'Jeudi', 5: 'Vendredi', 6: 'Samedi', 7: 'Dimanche'} %}
+{% set dayNames = {1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Jeu', 5: 'Ven', 6: 'Sam', 7: 'Dim'} %}
 
-<h1>{{ template.title }}</h1>
-<p>{{ template.durationWeeks }} semaines</p>
+<header class="kd-workouthead">
+    <p class="kd-eyebrow">Plan</p>
+    <h1 class="kd-title">{{ template.title }}</h1>
 
-{% if template.description %}
-    <p>{{ template.description|nl2br }}</p>
-{% endif %}
+    <div class="kd-workouthead__meta">
+        <span class="kd-badge">{{ ux_icon('lucide:calendar-range') }} {{ template.durationWeeks }} semaine{{ template.durationWeeks > 1 ? 's' }}</span>
+        <span class="kd-badge">{{ ux_icon('lucide:clipboard-list') }} {{ template.planItems|length }} séance{{ template.planItems|length > 1 ? 's' }}</span>
+    </div>
 
-{% for week in flat.weeks %}
-    <section>
-        <h2>Semaine {{ week.weekNumber }}</h2>
-        <div style="display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:.5rem">
-        {% for day in week.days %}
-            <div style="border:1px solid var(--color-border); padding:.5rem">
-                <strong>{{ dayNames[day.dayOfWeek] }}</strong>
-                <ul>
-                {% for entry in day.items %}
-                    <li>
-                        <a href="{{ path('app_workout_show', {id: entry.item.workout.id}) }}">{{ entry.workout.workout.title }}</a>
-                        {% if entry.item.notes %}<p>{{ entry.item.notes|nl2br }}</p>{% endif %}
-                    </li>
-                {% else %}
-                    <li>—</li>
-                {% endfor %}
-                </ul>
+    {% if template.description %}
+        <p class="kd-workouthead__desc">{{ template.description|nl2br }}</p>
+    {% endif %}
+</header>
+
+<div class="kd-planweeks">
+    {% for week in flat.weeks %}
+        {% set weekCount = 0 %}
+        {% for day in week.days %}{% set weekCount = weekCount + day.items|length %}{% endfor %}
+        <section class="kd-planweek">
+            <div class="kd-planweek__head">
+                <span class="kd-planweek__num">Semaine {{ week.weekNumber }}</span>
+                <span class="kd-planweek__count">{{ weekCount }} séance{{ weekCount > 1 ? 's' }}</span>
             </div>
-        {% endfor %}
-        </div>
-    </section>
-{% endfor %}
+
+            <div class="kd-plangrid">
+                {% for day in week.days %}
+                    <div class="kd-planday{{ day.items is empty ? ' is-empty' }}">
+                        <div class="kd-planday__name">{{ dayNames[day.dayOfWeek] }}</div>
+                        <div class="kd-planday__items">
+                            {% for entry in day.items %}
+                                <div class="kd-planentry">
+                                    <a class="kd-planday__item" href="{{ path('app_workout_show', {id: entry.item.workout.id}) }}">
+                                        {{ ux_icon('lucide:clipboard-list') }}
+                                        <span>{{ entry.workout.workout.title }}</span>
+                                    </a>
+                                    {% if entry.item.notes %}<p class="kd-planday__notes">{{ entry.item.notes|nl2br }}</p>{% endif %}
+                                </div>
+                            {% else %}
+                                <span class="kd-planday__rest">Repos</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+    {% endfor %}
+</div>

@@ -2,42 +2,53 @@
    (ajout/retrait d'une séance dans une case) remplace ce conteneur via Turbo
    Stream. Contexte attendu (fourni par gridContext) : template, flat (sortie de
    PlanFlattener::flattenPlanTemplate), addItemForms (indexés « w{semaine}d{jour} »). #}
-{% set dayNames = {1: 'Lundi', 2: 'Mardi', 3: 'Mercredi', 4: 'Jeudi', 5: 'Vendredi', 6: 'Samedi', 7: 'Dimanche'} %}
+{% set dayNames = {1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Jeu', 5: 'Ven', 6: 'Sam', 7: 'Dim'} %}
 
-{% for week in flat.weeks %}
-    <section>
-        <h3>Semaine {{ week.weekNumber }}</h3>
-        <div style="display:grid; grid-template-columns:repeat(7, minmax(0, 1fr)); gap:.5rem">
-        {% for day in week.days %}
-            <div style="border:1px solid var(--color-border); padding:.5rem">
-                <strong>{{ dayNames[day.dayOfWeek] }}</strong>
-
-                <ul>
-                {% for entry in day.items %}
-                    <li>
-                        <a href="{{ path('app_workout_show', {id: entry.item.workout.id}) }}">{{ entry.workout.workout.title }}</a>
-                        {{ include('workout/_action_form.html.twig', {
-                            action: path('app_plan_template_item_delete', {id: template.id, itemId: entry.item.id}),
-                            token: csrf_token('item_delete' ~ entry.item.id),
-                            label: '×',
-                            confirm: 'Retirer cette séance de la trame ?'
-                        }) }}
-                        {% if entry.item.notes %}<p>{{ entry.item.notes|nl2br }}</p>{% endif %}
-                    </li>
-                {% endfor %}
-                </ul>
-
-                {% set addForm = addItemForms['w' ~ week.weekNumber ~ 'd' ~ day.dayOfWeek] %}
-                <details>
-                    <summary>+ Séance</summary>
-                    {{ form_start(addForm) }}
-                        {{ form_row(addForm.workout) }}
-                        {{ form_row(addForm.notes) }}
-                        <button type="submit">Ajouter</button>
-                    {{ form_end(addForm) }}
-                </details>
+<div class="kd-planweeks">
+    {% for week in flat.weeks %}
+        <section class="kd-planweek">
+            <div class="kd-planweek__head">
+                <span class="kd-planweek__num">Semaine {{ week.weekNumber }}</span>
             </div>
-        {% endfor %}
-        </div>
-    </section>
-{% endfor %}
+
+            <div class="kd-plangrid kd-plangrid--edit">
+                {% for day in week.days %}
+                    <div class="kd-planday{{ day.items is empty ? ' is-empty' }}">
+                        <div class="kd-planday__name">{{ dayNames[day.dayOfWeek] }}</div>
+                        <div class="kd-planday__body">
+                            <div class="kd-planday__items">
+                                {% for entry in day.items %}
+                                    <div class="kd-planentry">
+                                        <div class="kd-planitem">
+                                            <a class="kd-planitem__link" href="{{ path('app_workout_show', {id: entry.item.workout.id}) }}">{{ entry.workout.workout.title }}</a>
+                                            <form method="post" action="{{ path('app_plan_template_item_delete', {id: template.id, itemId: entry.item.id}) }}"
+                                                  onsubmit="return confirm('Retirer cette séance de la trame ?');">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('item_delete' ~ entry.item.id) }}">
+                                                <button type="submit" class="kd-planitem__del" title="Retirer" aria-label="Retirer">
+                                                    {{ ux_icon('lucide:x') }}
+                                                </button>
+                                            </form>
+                                        </div>
+                                        {% if entry.item.notes %}<p class="kd-planday__notes">{{ entry.item.notes|nl2br }}</p>{% endif %}
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                            {% set addForm = addItemForms['w' ~ week.weekNumber ~ 'd' ~ day.dayOfWeek] %}
+                            <details class="kd-planadd">
+                                <summary>{{ ux_icon('lucide:plus') }} Séance</summary>
+                                {{ form_start(addForm, {attr: {class: 'kd-planadd__form'}}) }}
+                                    {{ form_row(addForm.workout) }}
+                                    {{ form_row(addForm.notes) }}
+                                    <button type="submit" class="kd-btn kd-btn--primary kd-btn--sm">
+                                        {{ ux_icon('lucide:plus') }} Ajouter
+                                    </button>
+                                {{ form_end(addForm) }}
+                            </details>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </section>
+    {% endfor %}
+</div>

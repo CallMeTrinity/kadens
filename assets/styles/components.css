@@ -1188,3 +1188,207 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
   margin: 0 0 var(--kd-space-6);
 }
 .kd-addblock__title svg { width: 14px; height: 14px; }
+
+/* ----------------------------------------------------------------------------
+   Plan — trame multi-semaines (lecture + édition)
+   Grille dense semaines × 7 jours (lundi→dimanche). Bascule en agenda vertical
+   sur petit écran : plus tôt en édition (besoin de place pour le select), plus
+   tard en lecture. Couleur neutre : la trame regroupe des séances multi-activités,
+   terracotta/olive restent réservés aux activités (règle « la couleur porte du sens »).
+   ---------------------------------------------------------------------------- */
+.kd-planweeks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-8);
+}
+.kd-planweek {
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-7) var(--kd-space-8) var(--kd-space-8);
+}
+.kd-planweek__head {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-4);
+  margin-bottom: var(--kd-space-6);
+}
+.kd-planweek__num {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-primary);
+  background: var(--color-primary-tint);
+  border-radius: var(--kd-radius-pill);
+  padding: 4px var(--kd-space-4);
+}
+.kd-planweek__count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+.kd-plangrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--kd-space-3);
+}
+.kd-planday {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-3);
+  min-height: 84px;
+  padding: var(--kd-space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-md);
+  background: var(--color-surface);
+}
+.kd-planday.is-empty { background: transparent; border-style: dashed; }
+.kd-planday__name {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-planday__body,
+.kd-planday__items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-3);
+  min-width: 0;
+}
+.kd-planday__items { gap: var(--kd-space-2); }
+.kd-planentry { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+/* Séance placée — lecture (lien plein) */
+.kd-planday__item {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-size: 12px;
+  font-weight: var(--kd-weight-medium);
+  line-height: 1.3;
+  color: var(--color-text-strong);
+  text-decoration: none;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-sm);
+  padding: var(--kd-space-2) var(--kd-space-3);
+}
+.kd-planday__item svg { width: 12px; height: 12px; flex: 0 0 auto; color: var(--color-text-faint); }
+a.kd-planday__item:hover { border-color: var(--color-primary); color: var(--color-primary); }
+a.kd-planday__item:hover svg { color: var(--color-primary); }
+
+.kd-planday__notes {
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-text-soft);
+  margin: 0;
+  padding-left: var(--kd-space-3);
+}
+.kd-planday__rest {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-placeholder);
+}
+
+/* Séance placée — édition (lien + retrait) */
+.kd-planitem {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-1);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-sm);
+  padding: var(--kd-space-1) var(--kd-space-1) var(--kd-space-1) var(--kd-space-3);
+}
+.kd-planitem__link {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text-strong);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-planitem__link:hover { color: var(--color-primary); }
+.kd-planitem form { display: inline-flex; margin: 0; }
+.kd-planitem__del {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px; height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-placeholder);
+  border-radius: var(--kd-radius-sm);
+  cursor: pointer;
+  transition: color .12s ease, background-color .12s ease;
+}
+.kd-planitem__del:hover {
+  color: var(--color-status-missed);
+  background: color-mix(in srgb, var(--color-status-missed) 10%, transparent);
+}
+.kd-planitem__del svg { width: 13px; height: 13px; }
+
+/* Repli « Ajouter une séance » dans une case */
+.kd-planadd { margin-top: var(--kd-space-1); }
+.kd-planadd > summary {
+  list-style: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-1);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-primary);
+  padding: var(--kd-space-1) 0;
+}
+.kd-planadd > summary::-webkit-details-marker { display: none; }
+.kd-planadd > summary svg { width: 12px; height: 12px; }
+.kd-planadd__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-4);
+  margin-top: var(--kd-space-4);
+}
+
+/* Bascule agenda vertical : édition à 1024px, lecture à 880px */
+.kd-plangrid--edit { gap: var(--kd-space-4); }
+
+@media (max-width: 1024px) {
+  .kd-plangrid--edit { grid-template-columns: 1fr; }
+  .kd-plangrid--edit .kd-planday {
+    flex-direction: row;
+    align-items: flex-start;
+    min-height: 0;
+    gap: var(--kd-space-5);
+  }
+  .kd-plangrid--edit .kd-planday__name { flex: 0 0 44px; padding-top: 4px; }
+  .kd-plangrid--edit .kd-planday__body { flex: 1 1 auto; }
+  .kd-plangrid--edit .kd-planday.is-empty { border-style: solid; }
+}
+@media (max-width: 880px) {
+  .kd-plangrid { grid-template-columns: 1fr; gap: var(--kd-space-2); }
+  .kd-plangrid:not(.kd-plangrid--edit) .kd-planday {
+    flex-direction: row;
+    align-items: flex-start;
+    min-height: 0;
+    gap: var(--kd-space-5);
+  }
+  .kd-plangrid:not(.kd-plangrid--edit) .kd-planday__name { flex: 0 0 44px; padding-top: 4px; }
+  .kd-plangrid:not(.kd-plangrid--edit) .kd-planday.is-empty { border-style: solid; }
+}

@@ -3,12 +3,27 @@
 {% block title %}Nouveau plan{% endblock %}
 
 {% block body %}
-    <h1>Nouveau plan</h1>
+    <a href="{{ path('app_plan_template_index') }}" class="kd-backlink">
+        {{ ux_icon('lucide:arrow-left') }} Mes plans
+    </a>
 
-    {{ form_start(form) }}
-        {{ form_widget(form) }}
-        <button type="submit">Créer</button>
-    {{ form_end(form) }}
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Plan</p>
+            <h1 class="kd-title">Nouveau plan</h1>
+            <p class="kd-lead">Donne un titre et un nombre de semaines. Tu composeras la trame jour par jour juste après.</p>
+        </div>
+    </div>
 
-    <p><a href="{{ path('app_plan_template_index') }}">Retour aux plans</a></p>
+    <div class="kd-card" style="max-width:640px;">
+        {{ form_start(form) }}
+            {{ form_widget(form) }}
+            <div class="kd-formactions">
+                <button type="submit" class="kd-btn kd-btn--primary">
+                    {{ ux_icon('lucide:plus') }} Créer le plan
+                </button>
+                <a href="{{ path('app_plan_template_index') }}" class="kd-btn kd-btn--ghost">Annuler</a>
+            </div>
+        {{ form_end(form) }}
+    </div>
 {% endblock %}
