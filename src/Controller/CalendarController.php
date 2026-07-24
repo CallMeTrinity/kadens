@@ -48,6 +48,7 @@ final class CalendarController extends AbstractController
         ScheduledWorkoutRepository $scheduledWorkoutRepository,
         WorkoutRepository $workoutRepository,
         PlanTemplateRepository $planTemplateRepository,
+        \App\Service\PlanFlattener $planFlattener,
     ): Response {
         if ($month < 1 || $month > 12) {
             throw $this->createNotFoundException('Mois invalide.');
@@ -55,6 +56,18 @@ final class CalendarController extends AbstractController
 
         $first = new \DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month));
         $weeks = $this->buildWeeks($first, $month, $scheduledWorkoutRepository);
+
+        // Aperçu au survol : une mise à plat par séance distincte du mois,
+        // indexée par id de Workout (source unique PlanFlattener, cf. plans).
+        $flattened = [];
+        foreach ($weeks as $week) {
+            foreach ($week as $cell) {
+                foreach ($cell['scheduled'] as $scheduled) {
+                    $workout = $scheduled->getWorkout();
+                    $flattened[$workout->getId()] ??= $planFlattener->flattenWorkout($workout);
+                }
+            }
+        }
 
         $prev = $first->modify('-1 month');
         $next = $first->modify('+1 month');
@@ -74,6 +87,7 @@ final class CalendarController extends AbstractController
             'month' => $month,
             'monthLabel' => self::MONTH_NAMES[$month].' '.$year,
             'weeks' => $weeks,
+            'flattened' => $flattened,
             'prev' => ['year' => (int) $prev->format('Y'), 'month' => (int) $prev->format('n')],
             'next' => ['year' => (int) $next->format('Y'), 'month' => (int) $next->format('n')],
             'scheduleForm' => $scheduleForm,

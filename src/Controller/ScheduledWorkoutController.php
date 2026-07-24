@@ -156,6 +156,26 @@ final class ScheduledWorkoutController extends AbstractController
     }
 
     /**
+     * Cycle rapide du statut (clic sur la zone gauche d'une pastille au
+     * calendrier) : prévue → faite → manquée → prévue. Ne touche pas la note
+     * d'écart (contrairement au formulaire complet de la modale) : c'est un
+     * geste express, pas une saisie. Repli sans JS : c'est un vrai bouton de
+     * formulaire, il fonctionne sans Stimulus.
+     */
+    #[Route('/{id}/cycle-status', name: 'app_scheduled_workout_cycle_status', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function cycleStatus(Request $request, ScheduledWorkout $scheduled): Response
+    {
+        $this->denyAccessUnlessGranted(ScheduledWorkoutVoter::EDIT, $scheduled);
+
+        if ($this->isCsrfTokenValid('cycle'.$scheduled->getId(), $request->getPayload()->getString('_token'))) {
+            $scheduled->setStatus($scheduled->getStatus()->next());
+            $this->entityManager->flush();
+        }
+
+        return $this->redirectToMonth($scheduled->getScheduledDate());
+    }
+
+    /**
      * Efface d'un coup un plan instancié : supprime TOUTES les séances datées
      * qui en proviennent (y compris DONE/MISSED — c'est une action explicite et
      * globale, distincte du retrait d'une case qui préserve le réalisé). Le

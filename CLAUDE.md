@@ -297,6 +297,32 @@ navigateur (non automatisable ici).
   Classes `.kd-modal*` dans `components.css`. Suppression toujours par `confirm()`
   natif (dans la modale). Icône importée : `calendar-clock` (déplacer). Variante
   `.kd-flash--error` ajoutée.
+  **Pastille de séance en deux zones (raffinage).** La pastille `.kd-calevent`
+  n'est plus un seul bouton mais un conteneur à deux zones cliquables : **gauche**
+  (`.kd-calevent__toggle`, dans un `<form>` `.kd-calevent__statusform`) = cycle
+  rapide du statut prévu → fait → manqué → prévu ; **droite**
+  (`.kd-calevent__open`) = ouvre la modale. Le cycle passe par un endpoint dédié
+  `ScheduledWorkoutController::cycleStatus` (`POST /schedule/{id}/cycle-status`,
+  CSRF `cycle{id}`) qui avance le statut via `ScheduledStatus::next()` (nouvel
+  enum method) et **préserve la note d'écart** (contrairement à `updateStatus`) —
+  c'est un geste express. Repli sans JS : vrai bouton de formulaire. L'icône du
+  toggle et son filet gauche codent le statut (`circle-dot`/`check`/`x`).
+  **Modale améliorée** : en-tête + `.kd-modal__meta` (badge de statut + lien
+  « Voir la séance » en `.kd-btn--ghost`), puis section Statut refaite en
+  **segmenté** `.kd-segmented`/`.kd-segbtn--planned/done/missed` : trois boutons
+  submit (`name="status"`) marquant fait/manqué/prévu en un clic, la note
+  `completionNotes` partagée part avec (plus de `<select>` + bouton Enregistrer).
+  Sections Déplacer et Retirer inchangées. Icônes déjà locales (`check`, `x`,
+  `circle-dot`). Pas de migration.
+  **Aperçu au survol au calendrier.** Comme dans l'éditeur de plan, survoler une
+  pastille affiche le contenu de la séance (blocs/exercices) via le composant
+  partagé `_plan_preview.html.twig` + le contrôleur Stimulus `preview` (Popover
+  API, top-layer, échappe à l'`overflow-x` de la grille, aucun AJAX). La pastille
+  porte `data-controller="dialog preview"` + `mouseenter/leave`. `CalendarController`
+  construit une map `flattened` (id de `Workout` → `PlanFlattener::flattenWorkout`,
+  une par séance distincte du mois, `??=` anti-doublon) passée au template ;
+  le panneau reçoit `fw: flattened[scheduled.workout.id]`. Source unique de mise à
+  plat inchangée. Pas de migration.
   **Synthèse stylée** : `summary/index.html.twig` refait. En-tête `.kd-pagehead`
   (eyebrow « Synthèse » + titre + `.kd-lead`) avec nav prev/ce mois/suivant +
   retour calendrier en `.kd-btn`. Observance du mois en carte mise en avant

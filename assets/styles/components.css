@@ -1512,14 +1512,13 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   min-width: 0;
 }
 
-/* Pastille de séance datée — bouton ouvrant la modale d'édition.
-   Filet gauche = statut (prévu / fait / manqué). */
+/* Pastille de séance datée — deux zones cliquables distinctes.
+   Gauche = cycle rapide du statut (prévu → fait → manqué) ; droite = ouvre la
+   modale. Filet gauche = statut (prévu / fait / manqué). */
 .kd-calevent {
   display: flex;
-  align-items: center;
-  gap: var(--kd-space-2);
+  align-items: stretch;
   width: 100%;
-  text-align: left;
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: var(--kd-weight-medium);
@@ -1529,14 +1528,53 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-status-planned);
   border-radius: var(--kd-radius-sm);
-  padding: var(--kd-space-2) var(--kd-space-3);
-  cursor: pointer;
-  transition: border-color .12s ease, background-color .12s ease;
+  overflow: hidden;
+  transition: border-color .12s ease;
 }
-.kd-calevent:hover { background: var(--color-surface-raised); border-color: var(--color-border-strong); }
+.kd-calevent:hover { border-color: var(--color-border-strong); }
 .kd-calevent--planned { border-left-color: var(--color-status-planned); }
 .kd-calevent--done    { border-left-color: var(--color-status-done); }
 .kd-calevent--missed  { border-left-color: var(--color-status-missed); }
+
+/* Le formulaire de cycle enveloppe le bouton toggle : il ne prend pas de place
+   propre, le bouton porte tout. */
+.kd-calevent__statusform { display: flex; }
+
+/* Zone gauche : bouton de cycle du statut. L'icône est teintée par le statut. */
+.kd-calevent__toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--kd-space-2);
+  border: 0;
+  border-right: 1px solid var(--color-divider);
+  background: transparent;
+  color: var(--color-status-planned);
+  cursor: pointer;
+  transition: background-color .12s ease, color .12s ease;
+}
+.kd-calevent__toggle:hover { background: var(--color-surface-raised); }
+.kd-calevent__toggle svg { width: 14px; height: 14px; }
+.kd-calevent--done .kd-calevent__toggle   { color: var(--color-status-done); }
+.kd-calevent--missed .kd-calevent__toggle { color: var(--color-status-missed); }
+
+/* Zone droite : ouvre la modale. */
+.kd-calevent__open {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  text-align: left;
+  padding: var(--kd-space-2) var(--kd-space-3);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color .12s ease;
+}
+.kd-calevent__open:hover { background: var(--color-surface-raised); }
 .kd-calevent__title {
   flex: 1 1 auto;
   min-width: 0;
@@ -1544,14 +1582,6 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.kd-calevent__dot {
-  flex: 0 0 auto;
-  width: 6px; height: 6px;
-  border-radius: var(--kd-radius-full);
-  background: var(--color-status-planned);
-}
-.kd-calevent--done .kd-calevent__dot   { background: var(--color-status-done); }
-.kd-calevent--missed .kd-calevent__dot { background: var(--color-status-missed); }
 .kd-calevent--done .kd-calevent__title { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--color-status-done) 55%, transparent); }
 
 /* ----------------------------------------------------------------------------
@@ -1635,6 +1665,57 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   flex-wrap: wrap;
 }
 .kd-modal__inline .kd-field { flex: 1 1 160px; margin: 0; }
+
+/* En-tête secondaire de modale : badge de statut + lien vers la séance. */
+.kd-modal__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kd-space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--kd-space-2);
+}
+
+/* Segmenté de statut : trois boutons soumettant le formulaire avec leur valeur.
+   Le bouton actif reflète le statut courant ; la couleur code le statut. */
+.kd-segmented {
+  display: flex;
+  gap: var(--kd-space-2);
+}
+.kd-segbtn {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kd-space-2);
+  padding: var(--kd-space-3) var(--kd-space-2);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-md);
+  cursor: pointer;
+  transition: border-color .12s ease, background-color .12s ease, color .12s ease;
+}
+.kd-segbtn svg { width: 15px; height: 15px; }
+.kd-segbtn:hover { border-color: var(--color-border-strong); background: var(--color-surface-raised); }
+.kd-segbtn--done.is-active {
+  color: var(--color-status-done);
+  border-color: color-mix(in srgb, var(--color-status-done) 45%, transparent);
+  background: color-mix(in srgb, var(--color-status-done) 10%, transparent);
+}
+.kd-segbtn--planned.is-active {
+  color: var(--color-status-planned);
+  border-color: color-mix(in srgb, var(--color-status-planned) 55%, transparent);
+  background: color-mix(in srgb, var(--color-status-planned) 12%, transparent);
+}
+.kd-segbtn--missed.is-active {
+  color: var(--color-status-missed);
+  border-color: color-mix(in srgb, var(--color-status-missed) 45%, transparent);
+  background: color-mix(in srgb, var(--color-status-missed) 9%, transparent);
+}
 
 /* ----------------------------------------------------------------------------
    Synthèse « prévu vs réalisé » (Phase 7)

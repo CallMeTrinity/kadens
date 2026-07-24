@@ -88,9 +88,25 @@
                             <div class="kd-calday__events">
                                 {% for scheduled in cell.scheduled %}
                                     {% set st = scheduled.status.value %}
-                                    <div data-controller="dialog">
-                                        <button type="button" class="kd-calevent kd-calevent--{{ st }}" data-action="dialog#open">
-                                            <span class="kd-calevent__dot"></span>
+                                    {% set nextStatus = scheduled.status.next %}
+                                    {# Aperçu du contenu de la séance au survol (Popover API,
+                                       contrôleur `preview`), comme dans l'éditeur de plan. #}
+                                    <div class="kd-calevent kd-calevent--{{ st }}" data-controller="dialog preview"
+                                         data-action="mouseenter->preview#show mouseleave->preview#hide">
+                                        {# Zone gauche : cycle rapide du statut (prévue → faite → manquée). #}
+                                        <form method="post" action="{{ path('app_scheduled_workout_cycle_status', {id: scheduled.id}) }}" class="kd-calevent__statusform">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('cycle' ~ scheduled.id) }}">
+                                            <button type="submit" class="kd-calevent__toggle"
+                                                    aria-label="Statut : {{ scheduled.status.label }}. Marquer « {{ nextStatus.label }} »"
+                                                    title="{{ scheduled.status.label }} · cliquer pour marquer « {{ nextStatus.label }} »">
+                                                {% if st == 'done' %}{{ ux_icon('lucide:check') }}
+                                                {% elseif st == 'missed' %}{{ ux_icon('lucide:x') }}
+                                                {% else %}{{ ux_icon('lucide:circle-dot') }}{% endif %}
+                                            </button>
+                                        </form>
+
+                                        {# Zone droite : ouvre la modale d'édition détaillée. #}
+                                        <button type="button" class="kd-calevent__open" data-action="dialog#open" title="{{ scheduled.workout.title }}">
                                             <span class="kd-calevent__title">{{ scheduled.workout.title }}</span>
                                         </button>
 
@@ -99,33 +115,41 @@
                                                 <div class="kd-modal__head">
                                                     <div>
                                                         <h2 class="kd-modal__title">{{ scheduled.workout.title }}</h2>
-                                                        <p class="kd-modal__sub">{{ scheduled.scheduledDate|date('d/m/Y') }} · {{ scheduled.status.label }}</p>
+                                                        <p class="kd-modal__sub">{{ scheduled.scheduledDate|date('d/m/Y') }}</p>
                                                     </div>
                                                     <button type="button" class="kd-modal__close" data-action="dialog#close" aria-label="Fermer">
                                                         {{ ux_icon('lucide:x') }}
                                                     </button>
                                                 </div>
 
-                                                <a class="kd-btn kd-btn--secondary kd-btn--block" href="{{ path('app_workout_show', {id: scheduled.workout.id}) }}">
-                                                    {{ ux_icon('lucide:external-link') }} Voir la séance
-                                                </a>
+                                                <div class="kd-modal__meta">
+                                                    <span class="kd-badge kd-badge--{{ st }}"><span class="kd-badge__dot"></span>{{ scheduled.status.label }}</span>
+                                                    <a class="kd-btn kd-btn--ghost kd-btn--sm" href="{{ path('app_workout_show', {id: scheduled.workout.id}) }}">
+                                                        {{ ux_icon('lucide:external-link') }} Voir la séance
+                                                    </a>
+                                                </div>
 
-                                                {# Prévu vs réalisé : marquer fait/manqué et noter un écart léger. #}
+                                                {# Prévu vs réalisé : marquer fait/manqué en un clic + noter un écart léger.
+                                                   Chaque bouton du segmenté soumet le formulaire avec son statut ; la note
+                                                   partagée part avec. #}
                                                 <div class="kd-modal__section">
                                                     <p class="kd-modal__section-title">Statut</p>
                                                     <form method="post" action="{{ path('app_scheduled_workout_status', {id: scheduled.id}) }}" class="kd-modal__form">
                                                         <input type="hidden" name="_token" value="{{ csrf_token('status' ~ scheduled.id) }}">
                                                         <div class="kd-field">
-                                                            <select name="status" class="kd-input kd-select">
-                                                                {% for status in statuses %}
-                                                                    <option value="{{ status.value }}"{{ status == scheduled.status ? ' selected' }}>{{ status.label }}</option>
-                                                                {% endfor %}
-                                                            </select>
-                                                        </div>
-                                                        <div class="kd-field">
                                                             <textarea name="completionNotes" rows="2" class="kd-input kd-input--area" placeholder="Écart / ressenti (optionnel)">{{ scheduled.completionNotes }}</textarea>
                                                         </div>
-                                                        <button type="submit" class="kd-btn kd-btn--primary">{{ ux_icon('lucide:save') }} Enregistrer</button>
+                                                        <div class="kd-segmented" role="group" aria-label="Marquer le statut">
+                                                            {% for status in statuses %}
+                                                                <button type="submit" name="status" value="{{ status.value }}"
+                                                                        class="kd-segbtn kd-segbtn--{{ status.value }}{{ status == scheduled.status ? ' is-active' }}">
+                                                                    {% if status.value == 'done' %}{{ ux_icon('lucide:check') }}
+                                                                    {% elseif status.value == 'missed' %}{{ ux_icon('lucide:x') }}
+                                                                    {% else %}{{ ux_icon('lucide:circle-dot') }}{% endif %}
+                                                                    {{ status.label }}
+                                                                </button>
+                                                            {% endfor %}
+                                                        </div>
                                                     </form>
                                                 </div>
 
@@ -148,6 +172,8 @@
                                                 </div>
                                             </div>
                                         </dialog>
+
+                                        {{ include('components/_plan_preview.html.twig', {fw: flattened[scheduled.workout.id]}) }}
                                     </div>
                                 {% endfor %}
                             </div>
