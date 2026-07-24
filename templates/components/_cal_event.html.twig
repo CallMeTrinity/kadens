@@ -20,12 +20,14 @@
 {% set detailed = detailed|default(false) %}
 {% set overdue = overdue|default(false) %}
 
-<div class="kd-calevent kd-calevent--{{ st }}{{ detailed ? ' kd-calevent--detailed' }}{{ overdue ? ' is-overdue' }}"
+<div id="cal-event-{{ scheduled.id }}" class="kd-calevent kd-calevent--{{ st }}{{ detailed ? ' kd-calevent--detailed' }}{{ overdue ? ' is-overdue' }}"
      data-controller="dialog preview"
      data-action="mouseenter->preview#show mouseleave->preview#hide">
     {# Zone gauche : cycle rapide du statut (prévue → faite → manquée). #}
     <form method="post" action="{{ path('app_scheduled_workout_cycle_status', {id: scheduled.id}) }}" class="kd-calevent__statusform">
         <input type="hidden" name="_token" value="{{ csrf_token('cycle' ~ scheduled.id) }}">
+        {# Vue courante : permet au flux Turbo de re-rendre la pastille à l'identique. #}
+        <input type="hidden" name="detailed" value="{{ detailed ? 1 : 0 }}">
         <button type="submit" class="kd-calevent__toggle"
                 aria-label="Statut : {{ scheduled.status.label }}. Marquer « {{ nextStatus.label }} »"
                 title="{{ scheduled.status.label }} · cliquer pour marquer « {{ nextStatus.label }} »">
@@ -81,6 +83,7 @@
                 <p class="kd-modal__section-title">Statut</p>
                 <form method="post" action="{{ path('app_scheduled_workout_status', {id: scheduled.id}) }}" class="kd-modal__form">
                     <input type="hidden" name="_token" value="{{ csrf_token('status' ~ scheduled.id) }}">
+                    <input type="hidden" name="detailed" value="{{ detailed ? 1 : 0 }}">
                     <div class="kd-field">
                         <textarea name="completionNotes" rows="2" class="kd-input kd-input--area" placeholder="Écart / ressenti (optionnel)">{{ scheduled.completionNotes }}</textarea>
                     </div>

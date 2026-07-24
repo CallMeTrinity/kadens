@@ -601,6 +601,27 @@ navigateur (non automatisable ici).
   `.kd-modal--picker`, `.kd-modal__card--picker`, `.kd-picker*`, `.kd-palettecard--btn`,
   `.kd-weekday__right`. Icônes déjà locales (`plus`, `layers`, `search`, `calendar-plus`…).
   Pas de migration.
+  **Changement de statut asynchrone + vue mémorisée (sans migration).** Le
+  changement de statut d'une séance datée (cycle rapide de la pastille ET
+  segmenté de la modale) ne recharge plus la page : il répond en **Turbo Stream**
+  `action="replace"` sur `#cal-event-{id}` (nouvel id porté par le composant
+  `_cal_event`, template `calendar/stream/cal_event.stream.html.twig`). Turbo
+  applique le flux nativement (formulaires interceptés, `Accept:
+  text/vnd.turbo-stream.html`) — pas de contrôleur Stimulus dédié. `cycleStatus`
+  et `updateStatus` renvoient le stream quand `getPreferredFormat() ===
+  TurboBundle::STREAM_FORMAT`, sinon **redirection** (repli sans JS conservé). Le
+  formulaire porte un champ caché `detailed` (0/1) pour que la pastille re-rendue
+  garde sa forme selon la vue (compacte en mois, haute en semaine) ; `overdue` est
+  recalculé côté serveur. Aucun flash sur la réponse stream (il resterait en
+  session et s'afficherait plus tard). **Ceci lève, pour le seul cas du statut, la
+  règle « pas de Turbo Stream au calendrier »** — les autres mutations (poser /
+  instancier / déplacer / retirer) restent en redirection. **Vue résistante au
+  refresh** : `CalendarController` pose un cookie `kd_calview` (`month`/`week`) au
+  rendu de chaque vue (`rememberView`) ; `app_calendar_index` **et** toutes les
+  redirections de `ScheduledWorkoutController` (`redirectToMonth`/`monthFromPayload`,
+  via `preferredCalendarView()` lu sur `RequestStack`) retombent sur la vue
+  mémorisée — une action faite en vue semaine ré-atterrit en semaine, un refresh
+  garde la vue. Pas de migration.
 
 ---
 

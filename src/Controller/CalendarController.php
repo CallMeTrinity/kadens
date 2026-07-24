@@ -9,6 +9,8 @@ use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
 use App\Service\WorkoutMetrics;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Cookie;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -37,9 +39,15 @@ final class CalendarController extends AbstractController
     ];
 
     #[Route('', name: 'app_calendar_index', methods: ['GET'])]
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $now = new \DateTimeImmutable('today');
+
+        // Respecte la dernière vue choisie (cookie posé au rendu mois/semaine) :
+        // l'entrée « Calendrier » et un refresh retombent sur la bonne vue.
+        if ('week' === $request->cookies->get('kd_calview')) {
+            return $this->redirectToRoute('app_calendar_week', ['date' => $now->format('Y-m-d')]);
+        }
 
         return $this->redirectToRoute('app_calendar_month', [
             'year' => (int) $now->format('Y'),
@@ -84,7 +92,7 @@ final class CalendarController extends AbstractController
         $weekPivot = ((int) $today->format('Y') === $year && (int) $today->format('n') === $month)
             ? $today : $first;
 
-        return $this->render('calendar/index.html.twig', [
+        return $this->rememberView($this->render('calendar/index.html.twig', [
             'year' => $year,
             'month' => $month,
             'monthLabel' => self::MONTH_NAMES[$month].' '.$year,
@@ -94,7 +102,7 @@ final class CalendarController extends AbstractController
             'prev' => ['year' => (int) $prev->format('Y'), 'month' => (int) $prev->format('n')],
             'next' => ['year' => (int) $next->format('Y'), 'month' => (int) $next->format('n')],
             ...$this->buildAddContext($workoutRepository, $planTemplateRepository, $scheduledWorkoutRepository),
-        ]);
+        ]), 'month');
     }
 
     #[Route('/week', name: 'app_calendar_week_index', methods: ['GET'])]
@@ -161,7 +169,7 @@ final class CalendarController extends AbstractController
 
         $counts = $scheduledWorkoutRepository->countByStatusForOwnerBetween($user, $monday, $sunday);
 
-        return $this->render('calendar/week.html.twig', [
+        return $this->rememberView($this->render('calendar/week.html.twig', [
             'monday' => $monday,
             'sunday' => $sunday,
             'weekLabel' => $this->formatWeekLabel($monday, $sunday),
@@ -176,7 +184,22 @@ final class CalendarController extends AbstractController
             'nextDate' => $monday->modify('+7 days')->format('Y-m-d'),
             'monthPivot' => ['year' => (int) $monday->modify('+3 days')->format('Y'), 'month' => (int) $monday->modify('+3 days')->format('n')],
             ...$this->buildAddContext($workoutRepository, $planTemplateRepository, $scheduledWorkoutRepository),
-        ]);
+        ]), 'week');
+    }
+
+    /**
+     * Mémorise la vue courante ('month' | 'week') dans un cookie lu par
+     * app_calendar_index et par les redirections de mutation
+     * (ScheduledWorkoutController) : la vue choisie survit à un refresh et aux
+     * actions de planning.
+     */
+    private function rememberView(Response $response, string $view): Response
+    {
+        $response->headers->setCookie(
+            Cookie::create('kd_calview', $view, new \DateTimeImmutable('+1 year'), '/', null, false, true, false, Cookie::SAMESITE_LAX)
+        );
+
+        return $response;
     }
 
     /**
