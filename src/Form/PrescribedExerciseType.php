@@ -6,6 +6,7 @@ use App\Entity\Exercise;
 use App\Entity\PrescribedExercise;
 use App\Entity\User;
 use App\Enum\ActivityType;
+use App\Enum\DistanceUnit;
 use App\Enum\PaceUnit;
 use App\Enum\PrescriptionType;
 use App\Repository\ExerciseRepository;
@@ -31,6 +32,7 @@ class PrescribedExerciseType extends AbstractType
         /** @var User $user */
         $user = $options['user'];
         $paceUnit = PaceUnit::forActivity($options['activity']);
+        $distanceUnit = DistanceUnit::forActivity($options['activity']);
 
         $builder
             ->add('exercise', EntityType::class, [
@@ -66,10 +68,13 @@ class PrescribedExerciseType extends AbstractType
                 'required' => false,
                 'attr' => ['min' => 0],
             ])
-            ->add('distanceMeters', IntegerType::class, [
-                'label' => 'Distance (m)',
+            ->add('distanceMeters', DistanceType::class, [
+                // Unité déduite de l'activité de l'exercice prescrit (course/vélo
+                // en km, natation et reste en mètres).
+                'label' => 'Distance ('.$distanceUnit->label().')',
+                'unit' => $distanceUnit,
                 'required' => false,
-                'attr' => ['min' => 0],
+                'attr' => ['placeholder' => $distanceUnit->placeholder()],
             ])
             ->add('paceSecondsPerKm', PaceType::class, [
                 // Unité déduite de l'activité de l'exercice prescrit (course

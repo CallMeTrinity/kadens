@@ -516,10 +516,12 @@ navigateur (non automatisable ici).
   `activity`, dérivée dans `WorkoutController::createPrescribedForm`/
   `createAddPrescribedForm`) et adapte label/placeholder. `UnitFormatter::pace` et
   `PlanFlattener::summarizeDistancePace` formatent via `PaceUnit::forActivity(...)`
-  (l'export Excel en hérite). Tests : `PlanFlattenerTest::paceUnitCases`. **Piste non
-  faite (signalée)** : la distance se saisit toujours en mètres (illogique pour
-  course/vélo qui pensent en km) — un `DistanceType` activité-conscient serait le
-  pendant de `PaceType`.
+  (l'export Excel en hérite). Tests : `PlanFlattenerTest::paceUnitCases`.
+  (6) **Distance dans l'unité naturelle de l'activité** (pendant de la 5) : enum
+  `DistanceUnit` (km course/vélo, mètres natation et reste) + `DistanceType` (option
+  `unit`), câblés dans `PrescribedExerciseType` via la même option `activity`. Le
+  stockage reste en mètres ; l'AFFICHAGE ne change pas (`UnitFormatter::distance` : m
+  sous 1 km, km au-delà, déjà lisible). Tests : `DistanceUnitTest`.
 
 ---
 
