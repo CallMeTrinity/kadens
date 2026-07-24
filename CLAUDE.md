@@ -548,6 +548,32 @@ navigateur (non automatisable ici).
   `unit`), câblés dans `PrescribedExerciseType` via la même option `activity`. Le
   stockage reste en mètres ; l'AFFICHAGE ne change pas (`UnitFormatter::distance` : m
   sous 1 km, km au-delà, déjà lisible). Tests : `DistanceUnitTest`.
+  **Calendrier : vue semaine + refonte (sans migration).** Le calendrier a
+  désormais deux vues, basculables via un segmenté « Mois / Semaine »
+  (`.kd-viewtoggle` dans un nouvel en-tête `.kd-calhead`), server-driven et
+  auto-suffisantes (aucun AJAX). **Vue semaine** : `CalendarController::week`
+  (`/calendar/week/{date}`, ancrage au lundi ISO de la semaine contenant la date ;
+  `/calendar/week` sans date → aujourd'hui) rend `calendar/week.html.twig` — grille
+  7 jours (`.kd-week`/`.kd-weekday`, agenda vertical < 900px), cartes de séance
+  détaillées, jour vide « Repos », aujourd'hui/week-end/passé différenciés. Un
+  **bandeau de synthèse** `.kd-weekbar` (nb de séances, volume estimé cumulé,
+  observance `done/(done+missed)`, chips fait/prévu/manqué) réutilise
+  `countByStatusForOwnerBetween` sur la fenêtre lundi→dimanche. Le pivot mois de la
+  bascule/export part du jeudi de la semaine (règle ISO). **Composant partagé**
+  `templates/components/_cal_event.html.twig` : la pastille + sa modale (extraites de
+  `calendar/index`, dédupliquées) sont désormais consommées par les deux vues ;
+  paramètre `detailed` (carte haute de la semaine : nb d'exos + marqueur « En
+  retard »), paramètre `overdue`. La pastille montre désormais une **méta** (icônes
+  d'activité teintées run/gym + durée estimée) tirée de `PlanFlattener::flattenWorkout`
+  (déjà chargé). **Barre d'ajout** extraite en `calendar/_addbar.html.twig` (poser /
+  instancier / retirer un plan), partagée mois+semaine. **Polish vue mois** : colonnes
+  week-end teintées, séance passée encore `PLANNED` marquée (filet gauche terracotta
+  pointillé = action à mener). Contrôleur factorisé (`buildAddContext`,
+  `formatWeekLabel`). Nouvelles classes CSS `.kd-calhead`, `.kd-viewtoggle*`,
+  `.kd-calevent__meta/__act/__dur/__exos/__flag`, `.kd-calevent--detailed`,
+  `.kd-calday--weekend`, `.kd-weekbar`, `.kd-weekstat*`, `.kd-weekchip*`, `.kd-week`,
+  `.kd-weekday*`. Icônes déjà locales (`calendar-days`, `calendar-range`, `clock`,
+  `calendar-clock`…). Pas de migration.
 
 ---
 

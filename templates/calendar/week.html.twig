@@ -1,0 +1,96 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Semaine — {{ weekLabel }}{% endblock %}
+
+{% block body %}
+    {% for message in app.flashes('success') %}
+        <div class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }}{{ message }}</div>
+    {% endfor %}
+    {% for message in app.flashes('error') %}
+        <div class="kd-flash kd-flash--error" role="alert">{{ ux_icon('lucide:calendar-x') }}{{ message }}</div>
+    {% endfor %}
+
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Planning · Semaine {{ isoWeek }}</p>
+            <h1 class="kd-title">{{ weekLabel }}</h1>
+        </div>
+
+        <div class="kd-calhead">
+            <div class="kd-viewtoggle" role="group" aria-label="Type de vue">
+                <a class="kd-viewtoggle__btn" href="{{ path('app_calendar_month', {year: monthPivot.year, month: monthPivot.month}) }}">
+                    {{ ux_icon('lucide:calendar-days') }} Mois
+                </a>
+                <a class="kd-viewtoggle__btn is-active" aria-current="page" href="{{ path('app_calendar_week', {date: monday|date('Y-m-d')}) }}">
+                    {{ ux_icon('lucide:calendar-range') }} Semaine
+                </a>
+            </div>
+
+            <nav class="kd-actionbar__end" aria-label="Navigation de la semaine">
+                <a class="kd-btn kd-btn--secondary kd-btn--sm" href="{{ path('app_calendar_week', {date: prevDate}) }}" aria-label="Semaine précédente">
+                    {{ ux_icon('lucide:arrow-left') }}
+                </a>
+                <a class="kd-btn kd-btn--ghost kd-btn--sm" href="{{ path('app_calendar_week_index') }}">Cette semaine</a>
+                <a class="kd-btn kd-btn--secondary kd-btn--sm" href="{{ path('app_calendar_week', {date: nextDate}) }}" aria-label="Semaine suivante">
+                    {{ ux_icon('lucide:arrow-right') }}
+                </a>
+                <a class="kd-btn kd-btn--secondary kd-btn--sm" href="{{ path('app_export_schedule', {year: monthPivot.year, month: monthPivot.month}) }}">
+                    {{ ux_icon('lucide:file-down') }} Exporter
+                </a>
+            </nav>
+        </div>
+    </div>
+
+    {# Bandeau de synthèse de la semaine : charge + observance en un coup d'œil. #}
+    {% set done = counts.done %}
+    {% set missed = counts.missed %}
+    {% set planned = counts.planned %}
+    {% set rated = done + missed %}
+    <div class="kd-weekbar">
+        <div class="kd-weekstat">
+            <span class="kd-weekstat__val">{{ sessionCount }}</span>
+            <span class="kd-weekstat__lbl">séance{{ sessionCount > 1 ? 's' }}</span>
+        </div>
+        <div class="kd-weekstat">
+            <span class="kd-weekstat__val">
+                {% if totalMinutes >= 60 %}{{ (totalMinutes // 60) }}h{{ '%02d'|format(totalMinutes % 60) }}{% else %}{{ totalMinutes }}′{% endif %}
+            </span>
+            <span class="kd-weekstat__lbl">volume estimé</span>
+        </div>
+        <div class="kd-weekstat kd-weekstat--sep">
+            <span class="kd-weekstat__val">{% if rated %}{{ (done / rated * 100)|round }}%{% else %}—{% endif %}</span>
+            <span class="kd-weekstat__lbl">observance</span>
+        </div>
+        <div class="kd-weekchips">
+            <span class="kd-weekchip kd-weekchip--done">{{ ux_icon('lucide:check') }} {{ done }} faite{{ done > 1 ? 's' }}</span>
+            <span class="kd-weekchip kd-weekchip--planned">{{ ux_icon('lucide:circle-dot') }} {{ planned }} prévue{{ planned > 1 ? 's' }}</span>
+            <span class="kd-weekchip kd-weekchip--missed">{{ ux_icon('lucide:x') }} {{ missed }} manquée{{ missed > 1 ? 's' }}</span>
+        </div>
+    </div>
+
+    {{ include('calendar/_addbar.html.twig', {year: monthPivot.year, month: monthPivot.month}) }}
+
+    <div class="kd-week">
+        {% for day in days %}
+            <section class="kd-weekday{{ day.isToday ? ' kd-weekday--today' }}{{ day.weekend ? ' kd-weekday--weekend' }}{{ day.isPast and not day.isToday ? ' kd-weekday--past' }}">
+                <header class="kd-weekday__head">
+                    <span class="kd-weekday__name">{{ day.dayName }}</span>
+                    <span class="kd-weekday__num">{{ day.date|date('j') }}</span>
+                </header>
+                <div class="kd-weekday__events">
+                    {% for scheduled in day.scheduled %}
+                        {{ include('components/_cal_event.html.twig', {
+                            scheduled: scheduled,
+                            fw: flattened[scheduled.workout.id],
+                            statuses: statuses,
+                            detailed: true,
+                            overdue: day.isPast and scheduled.status.value == 'planned',
+                        }) }}
+                    {% else %}
+                        <p class="kd-weekday__rest">Repos</p>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endfor %}
+    </div>
+{% endblock %}

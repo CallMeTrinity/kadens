@@ -1,0 +1,45 @@
+{# Barre d'ajout partagée (vues mois et semaine) : poser une séance / instancier
+   un plan / retirer un plan instancié. Chaque action redirige vers le mois passé
+   (year/month) ; en vue semaine on passe le mois pivot de la semaine.
+
+   Attend : scheduleForm, instantiateForm, instantiatedPlans, year, month. #}
+<div class="kd-calbar">
+    <details class="kd-caladd">
+        <summary>{{ ux_icon('lucide:calendar-plus') }} Poser une séance</summary>
+        {{ form_start(scheduleForm, {attr: {class: 'kd-caladd__form'}}) }}
+            {{ form_row(scheduleForm.workout) }}
+            {{ form_row(scheduleForm.scheduledDate) }}
+            <button type="submit" class="kd-btn kd-btn--primary">Planifier</button>
+        {{ form_end(scheduleForm) }}
+    </details>
+
+    <details class="kd-caladd">
+        <summary>{{ ux_icon('lucide:layers') }} Instancier un plan</summary>
+        {{ form_start(instantiateForm, {attr: {class: 'kd-caladd__form'}}) }}
+            {{ form_row(instantiateForm.planTemplate) }}
+            {{ form_row(instantiateForm.startDate) }}
+            <button type="submit" class="kd-btn kd-btn--primary">Instancier</button>
+        {{ form_end(instantiateForm) }}
+    </details>
+
+    {% if instantiatedPlans|length %}
+        <details class="kd-caladd">
+            <summary>{{ ux_icon('lucide:calendar-x') }} Retirer un plan du planning</summary>
+            <form method="post" action="{{ path('app_scheduled_workout_clear_plan') }}" class="kd-caladd__form"
+                  onsubmit="return confirm('Retirer ce plan et TOUTES ses séances du planning (y compris les séances faites) ? Le plan lui-même est conservé.');">
+                <input type="hidden" name="_token" value="{{ csrf_token('clear_plan') }}">
+                <input type="hidden" name="year" value="{{ year }}">
+                <input type="hidden" name="month" value="{{ month }}">
+                <div class="kd-field">
+                    <select name="planId" class="kd-input kd-select" required>
+                        <option value="" disabled selected>Choisir un plan instancié…</option>
+                        {% for plan in instantiatedPlans %}
+                            <option value="{{ plan.id }}">{{ plan.title }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="kd-btn kd-btn--danger">{{ ux_icon('lucide:trash-2') }} Retirer du planning</button>
+            </form>
+        </details>
+    {% endif %}
+</div>

@@ -1451,6 +1451,44 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   gap: var(--kd-space-6);
 }
 
+/* En-tête du calendrier : bascule de vue à gauche, navigation à droite. */
+.kd-calhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-6);
+}
+
+/* Bascule segmentée Mois / Semaine. */
+.kd-viewtoggle {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-pill);
+  background: var(--color-surface-subtle);
+}
+.kd-viewtoggle__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  padding: var(--kd-space-3) var(--kd-space-6);
+  border-radius: var(--kd-radius-pill);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: background-color .12s ease, color .12s ease;
+}
+.kd-viewtoggle__btn svg { width: 15px; height: 15px; }
+.kd-viewtoggle__btn:hover { color: var(--color-text-strong); }
+.kd-viewtoggle__btn.is-active {
+  background: var(--color-surface-raised);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-card);
+}
+
 /* Cadre défilable : le mois garde ses 7 colonnes et défile plutôt que de
    s'écraser sur petit écran (la structure hebdomadaire reste lisible). */
 .kd-cal { overflow-x: auto; }
@@ -1485,6 +1523,7 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   background: var(--color-surface-raised);
 }
 .kd-calday--out { background: var(--color-surface-subtle); }
+.kd-calday--weekend:not(.kd-calday--out) { background: color-mix(in srgb, var(--color-surface-subtle) 55%, var(--color-surface-raised)); }
 .kd-calday__num {
   align-self: flex-end;
   display: inline-flex;
@@ -1559,12 +1598,14 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
 .kd-calevent--done .kd-calevent__toggle   { color: var(--color-status-done); }
 .kd-calevent--missed .kd-calevent__toggle { color: var(--color-status-missed); }
 
-/* Zone droite : ouvre la modale. */
+/* Zone droite : ouvre la modale. Colonne = titre + méta (activités / durée). */
 .kd-calevent__open {
   flex: 1 1 auto;
   min-width: 0;
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
   text-align: left;
   padding: var(--kd-space-2) var(--kd-space-3);
   border: 0;
@@ -1576,13 +1617,172 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
 }
 .kd-calevent__open:hover { background: var(--color-surface-raised); }
 .kd-calevent__title {
-  flex: 1 1 auto;
+  align-self: stretch;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .kd-calevent--done .kd-calevent__title { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--color-status-done) 55%, transparent); }
+
+/* Méta compacte de la pastille : icônes d'activité + durée estimée (+ nb d'exos
+   en vue semaine). Couleur d'icône par activité (run/gym), reste neutre. */
+.kd-calevent__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-faint);
+}
+.kd-calevent__act { display: inline-flex; }
+.kd-calevent__act svg { width: 12px; height: 12px; }
+.kd-calevent__act--run { color: var(--color-primary); }
+.kd-calevent__act--gym { color: var(--color-activity-gym); }
+.kd-calevent__act--neutral { color: var(--color-text-faint); }
+.kd-calevent__dur { display: inline-flex; align-items: center; gap: 2px; }
+.kd-calevent__dur svg { width: 11px; height: 11px; }
+.kd-calevent__exos {
+  padding: 0 var(--kd-space-2);
+  border-radius: var(--kd-radius-pill);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-secondary);
+}
+
+/* Séance passée encore « prévue » : marqueur d'action à mener (terracotta). */
+.kd-calevent.is-overdue { border-left-style: dashed; border-left-color: var(--color-primary); }
+.kd-calevent__flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-primary);
+}
+.kd-calevent__flag svg { width: 11px; height: 11px; }
+
+/* Variante détaillée (vue semaine) : la pastille respire un peu plus. */
+.kd-calevent--detailed .kd-calevent__open { padding: var(--kd-space-3) var(--kd-space-4); gap: 3px; }
+.kd-calevent--detailed .kd-calevent__title { white-space: normal; }
+
+/* ----------------------------------------------------------------------------
+   Vue semaine — bandeau de synthèse + grille 7 jours
+   ---------------------------------------------------------------------------- */
+.kd-weekbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-8);
+  padding: var(--kd-space-7) var(--kd-space-8);
+  margin-bottom: var(--kd-space-7);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--kd-radius-lg);
+  background: var(--color-surface-raised);
+}
+.kd-weekstat { display: flex; flex-direction: column; line-height: 1.1; }
+.kd-weekstat--sep { padding-left: var(--kd-space-8); border-left: 1px solid var(--color-divider); }
+.kd-weekstat__val {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: var(--kd-weight-bold);
+  color: var(--color-text-strong);
+}
+.kd-weekstat__lbl {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-weekchips { display: flex; flex-wrap: wrap; gap: var(--kd-space-4); margin-left: auto; }
+.kd-weekchip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  padding: var(--kd-space-2) var(--kd-space-5);
+  border-radius: var(--kd-radius-pill);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-secondary);
+}
+.kd-weekchip svg { width: 12px; height: 12px; }
+.kd-weekchip--done { color: var(--color-status-done); }
+.kd-weekchip--planned { color: var(--color-text-secondary); }
+.kd-weekchip--missed { color: var(--color-status-missed); }
+
+/* Grille des 7 jours : colonnes égales, bascule en agenda vertical sur mobile. */
+.kd-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--kd-space-4);
+}
+.kd-weekday {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-4);
+  min-height: 160px;
+  padding: var(--kd-space-5);
+  border: 1px solid var(--color-border-cell);
+  border-radius: var(--kd-radius-md);
+  background: var(--color-surface-raised);
+}
+.kd-weekday--weekend { background: color-mix(in srgb, var(--color-surface-subtle) 55%, var(--color-surface-raised)); }
+.kd-weekday--past { opacity: .72; }
+.kd-weekday--today { border-color: var(--color-primary); box-shadow: inset 0 0 0 1px var(--color-primary); }
+.kd-weekday__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--kd-space-3);
+  padding-bottom: var(--kd-space-3);
+  border-bottom: 1px solid var(--color-divider);
+}
+.kd-weekday__name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-weekday__num {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: var(--kd-weight-bold);
+  color: var(--color-text-secondary);
+}
+.kd-weekday--today .kd-weekday__name,
+.kd-weekday--today .kd-weekday__num { color: var(--color-primary); }
+.kd-weekday__events { display: flex; flex-direction: column; gap: var(--kd-space-3); }
+.kd-weekday__rest {
+  margin: 0;
+  padding: var(--kd-space-4) 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--color-text-placeholder);
+}
+
+@media (max-width: 900px) {
+  .kd-week { grid-template-columns: 1fr; }
+  .kd-weekday { min-height: 0; flex-direction: row; align-items: flex-start; gap: var(--kd-space-6); }
+  .kd-weekday__head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 64px;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+  .kd-weekday__events { flex: 1 1 auto; min-width: 0; }
+  .kd-weekchips { margin-left: 0; }
+}
 
 /* ----------------------------------------------------------------------------
    Modale réutilisable (élément natif <dialog> + contrôleur Stimulus `dialog`)
