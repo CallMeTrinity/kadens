@@ -2003,17 +2003,34 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
    ============================================================================ */
 .kd-planeditor {
   display: flex;
-  align-items: stretch;
+  align-items: flex-start;
   border: 1px solid var(--color-border);
   border-radius: var(--kd-radius-lg);
-  overflow: hidden;
+  /* `clip` (et non `hidden`) : borde/arrondit les coins sans devenir un
+     conteneur de défilement, condition pour que la palette `sticky` s'ancre
+     sur le viewport et non sur cet encadré. */
+  overflow: clip;
   background: var(--color-surface);
 }
 .kd-planeditor .kd-composer__main { padding: var(--kd-space-6); }
 
+/* La palette reste visible pendant qu'on scrolle la grille des semaines. */
+.kd-planeditor .kd-composer__lib {
+  position: sticky;
+  top: var(--kd-space-4);
+  align-self: flex-start;
+  max-height: calc(100vh - var(--kd-space-4) * 2);
+  display: flex;
+  flex-direction: column;
+}
+/* La liste se réduit et scrolle dans la palette quand la fenêtre est courte. */
+.kd-planeditor .kd-composer__lib .kd-libpanel { flex: 1; min-height: 0; }
+
 @media (max-width: 1100px) {
-  .kd-planeditor { flex-direction: column; }
+  .kd-planeditor { flex-direction: column; align-items: stretch; }
   .kd-planeditor .kd-composer__lib {
+    position: static;
+    max-height: none;
     width: auto;
     border-right: none;
     border-bottom: 1px solid var(--color-border);
