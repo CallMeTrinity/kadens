@@ -5,6 +5,8 @@ namespace App\Form;
 use App\Entity\Exercise;
 use App\Entity\PrescribedExercise;
 use App\Entity\User;
+use App\Enum\ActivityType;
+use App\Enum\PaceUnit;
 use App\Enum\PrescriptionType;
 use App\Repository\ExerciseRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
@@ -28,6 +30,7 @@ class PrescribedExerciseType extends AbstractType
     {
         /** @var User $user */
         $user = $options['user'];
+        $paceUnit = PaceUnit::forActivity($options['activity']);
 
         $builder
             ->add('exercise', EntityType::class, [
@@ -69,9 +72,12 @@ class PrescribedExerciseType extends AbstractType
                 'attr' => ['min' => 0],
             ])
             ->add('paceSecondsPerKm', PaceType::class, [
-                'label' => 'Allure (min/km)',
+                // Unité déduite de l'activité de l'exercice prescrit (course
+                // min/km, vélo km/h, natation min/100m).
+                'label' => 'Allure ('.$paceUnit->label().')',
+                'unit' => $paceUnit,
                 'required' => false,
-                'attr' => ['placeholder' => '5:30'],
+                'attr' => ['placeholder' => $paceUnit->placeholder()],
             ])
             ->add('targetReps', IntegerType::class, [
                 'label' => 'Répétitions cible',
@@ -106,5 +112,9 @@ class PrescribedExerciseType extends AbstractType
         ]);
         $resolver->setRequired('user');
         $resolver->setAllowedTypes('user', User::class);
+        // Activité de l'exercice prescrit : pilote l'unité d'allure. Null (ex.
+        // formulaire d'ajout où l'exercice n'est pas encore choisi) -> min/km.
+        $resolver->setDefault('activity', null);
+        $resolver->setAllowedTypes('activity', ['null', ActivityType::class]);
     }
 }

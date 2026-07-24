@@ -25,13 +25,19 @@ import Sortable from 'sortablejs';
  *    cases.
  */
 export default class extends Controller {
-    static targets = ['cell', 'dialog', 'panel', 'fullLink'];
+    static targets = ['cell', 'dialog', 'panel', 'fullLink', 'palette', 'paletteList', 'palettecard'];
 
     static SORTABLE_GROUP = 'kd-plan-workouts';
 
     initialize() {
         this.sortables = new WeakMap();
         this.dirty = false;
+        // Palette : filtre client + mode tampon (une séance « armée » se pose au clic
+        // sur les cases). L'état survit aux re-render de #plan-grid (porté ici).
+        this.libQuery = '';
+        this.libActivity = 'all';
+        this.armedWorkoutId = null;
+        this.armedCard = null;
     }
 
     connect() {
@@ -40,10 +46,18 @@ export default class extends Controller {
         // ils gardent leur comportement natif (repli sans JS).
         this.onPanelSubmit = this.onPanelSubmit.bind(this);
         this.element.addEventListener('submit', this.onPanelSubmit);
+        this.onKeydown = this.onKeydown.bind(this);
+        this.element.addEventListener('keydown', this.onKeydown);
+        this.applyLibFilter();
     }
 
     disconnect() {
         this.element.removeEventListener('submit', this.onPanelSubmit);
+        this.element.removeEventListener('keydown', this.onKeydown);
+    }
+
+    onKeydown(event) {
+        if (event.key === 'Escape') this.disarm();
     }
 
     // ---- Glisser-déposer ---------------------------------------------------
@@ -165,5 +179,169 @@ export default class extends Controller {
 
     backdrop(event) {
         if (event.target === this.dialogTarget) this.dialogTarget.close();
+    }
+
+    // ---- Palette : filtre client (offline-safe) ---------------------------
+
+    filterLib(event) {
+        this.libQuery = event.target.value.trim().toLowerCase();
+        this.applyLibFilter();
+    }
+
+    pickActivity(event) {
+        this.libActivity = event.currentTarget.dataset.activity;
+        this.element.querySelectorAll('[data-activity-pill]').forEach((pill) => {
+            pill.classList.toggle('kd-libfilter--on', pill.dataset.activity === this.libActivity);
+        });
+        this.applyLibFilter();
+    }
+
+    applyLibFilter() {
+        if (!this.hasPalettecardTarget) return;
+        this.palettecardTargets.forEach((card) => {
+            const matchText = this.libQuery === '' || (card.dataset.filterText || '').toLowerCase().includes(this.libQuery);
+            // Une séance peut porter plusieurs activités (data-activity espacé).
+            const acts = (card.dataset.activity || '').split(' ').filter(Boolean);
+            const matchAct = this.libActivity === 'all' || acts.includes(this.libActivity);
+            card.hidden = !(matchText && matchAct);
+        });
+    }
+
+    // ---- Palette : mode tampon (armer puis cliquer les cases) -------------
+
+    armWorkout(event) {
+        const card = event.currentTarget;
+        const id = card.dataset.workoutId;
+        if (!id) return;
+
+        // Re-cliquer la séance armée la désarme.
+        if (this.armedWorkoutId === id) {
+            this.disarm();
+            return;
+        }
+
+        this.armedWorkoutId = id;
+        this.setArmedCard(card);
+        this.element.classList.add('is-arming');
+    }
+
+    setArmedCard(card) {
+        if (this.armedCard) this.armedCard.classList.remove('kd-palettecard--armed');
+        this.armedCard = card;
+        if (card) card.classList.add('kd-palettecard--armed');
+    }
+
+    disarm() {
+        this.armedWorkoutId = null;
+        this.setArmedCard(null);
+        this.element.classList.remove('is-arming');
+    }
+
+    /** Clic sur une case : pose la séance armée (sinon rien). Ignore les clics sur
+     *  une séance déjà posée (qui ouvrent l'édition rapide). */
+    stampCell(event) {
+        if (!this.armedWorkoutId) return;
+        if (event.target.closest('.kd-planentry')) return;
+
+        const cell = event.currentTarget;
+        this.placeWorkout(this.armedWorkoutId, cell.dataset.week, cell.dataset.day);
+    }
+
+    // ---- Palette : glisser une carte dans une case ------------------------
+
+    paletteListTargetConnected(el) {
+        // Source en clone, jamais cible (put:false) : on glisse une carte vers une
+        // cellule (même groupe que les cases). La palette est rendue une seule fois.
+        this.sortables.set(el, Sortable.create(el, {
+            group: { name: this.constructor.SORTABLE_GROUP, pull: 'clone', put: false },
+            sort: false,
+            draggable: '.kd-palettecard',
+            animation: 150,
+            ghostClass: 'kd-drag-ghost',
+            chosenClass: 'kd-drag-chosen',
+            dragClass: 'kd-drag-active',
+            onEnd: (evt) => this.onPaletteDrop(evt),
+        }));
+    }
+
+    paletteListTargetDisconnected(el) {
+        const instance = this.sortables.get(el);
+        if (instance) {
+            instance.destroy();
+            this.sortables.delete(el);
+        }
+    }
+
+    onPaletteDrop(evt) {
+        const moved = evt.item;
+        const target = evt.to;
+        // Pas un dépôt réel dans une case (retombé dans la palette ou ailleurs) : on
+        // NE retire PAS `moved` (ce serait retirer la carte de la palette), Sortable
+        // a déjà remis en place.
+        if (target === evt.from || !target || target.dataset.plangridTarget !== 'cell') {
+            return;
+        }
+        const workoutId = moved.dataset.workoutId;
+        // Le serveur re-render la grille avec la vraie case : on retire la carte
+        // déposée (le clone reste dans la palette).
+        moved.remove();
+        this.placeWorkout(workoutId, target.dataset.week, target.dataset.day);
+    }
+
+    // ---- Aperçu au survol (top-layer via Popover API) ---------------------
+
+    showPreview(event) {
+        // Pas d'aperçu pendant qu'une séance est armée (les cases sont en mode pose).
+        if (this.armedWorkoutId) return;
+        const entry = event.currentTarget;
+        const preview = entry.querySelector('.kd-planpreview');
+        if (!preview || typeof preview.showPopover !== 'function') return;
+
+        this.hidePreview();
+        try {
+            preview.showPopover();
+        } catch (error) {
+            return;
+        }
+
+        // Positionnement manuel près de la case (le popover est en top-layer, donc
+        // non rogné par l'overflow de la grille).
+        const rect = entry.getBoundingClientRect();
+        const pw = preview.offsetWidth;
+        const ph = preview.offsetHeight;
+        let left = rect.right + 8;
+        if (left + pw > window.innerWidth - 8) left = rect.left - pw - 8;
+        if (left < 8) left = 8;
+        let top = rect.top;
+        if (top + ph > window.innerHeight - 8) top = window.innerHeight - ph - 8;
+        if (top < 8) top = 8;
+        preview.style.left = `${left}px`;
+        preview.style.top = `${top}px`;
+        this.openPreview = preview;
+    }
+
+    hidePreview() {
+        if (!this.openPreview) return;
+        try {
+            this.openPreview.hidePopover();
+        } catch (error) {
+            // Déjà retiré du DOM (re-render de grille) : rien à faire.
+        }
+        this.openPreview = null;
+    }
+
+    placeWorkout(workoutId, week, day) {
+        if (!this.hasPaletteTarget || !workoutId || !week || !day) return;
+        const url = this.paletteTarget.dataset.placeUrl;
+        const token = this.paletteTarget.dataset.placeToken;
+        if (!url) return;
+
+        const body = new FormData();
+        body.append('_token', token);
+        body.append('workoutId', workoutId);
+        body.append('week', week);
+        body.append('day', day);
+
+        this.postStream(url, body);
     }
 }

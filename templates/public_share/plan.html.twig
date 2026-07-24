@@ -1,0 +1,10 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ flat.template.title }}{% endblock %}
+
+{% block body %}
+    {# Page publique d'un plan en lecture seule : réutilise le composant de rendu en
+       mode `public` (séances cliquables vers leur page publique), éventuellement
+       filtré sur une plage de semaines (`weeks`). Aucune action d'édition. #}
+    {% include 'components/_plan_read.html.twig' with { flat: flat, public: true, weeks: weeks } only %}
+{% endblock %}

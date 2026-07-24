@@ -64,20 +64,25 @@ final class PlanTemplateControllerTest extends WebTestCase
         self::assertResponseRedirects('/plan-template/'.$created->getId().'/edit');
     }
 
-    public function testAddItemPlacesWorkoutInCell(): void
+    public function testPlaceItemForksWorkoutInCell(): void
     {
         $user = $this->createUser('owner@example.com');
         $workout = $this->createWorkout($user, 'Sortie longue');
         $template = $this->createPlanTemplate($user, 'Plan 5k', 1);
         $this->client->loginUser($user);
 
-        $this->client->request('GET', '/plan-template/'.$template->getId().'/edit');
+        // La pose se fait par la palette (mode tampon / glisser-déposer) : POST
+        // vers /place avec workoutId + week + day. Le jeton CSRF est porté par la
+        // palette dans la page d'édition.
+        $crawler = $this->client->request('GET', '/plan-template/'.$template->getId().'/edit');
         self::assertResponseIsSuccessful();
+        $token = $crawler->filter('[data-place-token]')->attr('data-place-token');
 
-        // Première case de la grille = semaine 1, jour 1.
-        $this->client->submitForm('Ajouter', [
-            'add_item_w1_d1[workout]' => $workout->getId(),
-            'add_item_w1_d1[notes]' => 'facile',
+        $this->client->request('POST', '/plan-template/'.$template->getId().'/place', [
+            '_token' => $token,
+            'workoutId' => $workout->getId(),
+            'week' => 1,
+            'day' => 1,
         ]);
 
         $this->em->clear();
@@ -85,8 +90,11 @@ final class PlanTemplateControllerTest extends WebTestCase
         self::assertNotNull($item);
         self::assertSame(1, $item->getWeekNumber());
         self::assertSame(1, $item->getDayOfWeek());
-        self::assertSame('facile', $item->getNotes());
-        self::assertSame($workout->getId(), $item->getWorkout()->getId());
+        // Fork à la pose : la case porte une COPIE privée (planLocal), pas la
+        // séance de bibliothèque elle-même.
+        self::assertNotSame($workout->getId(), $item->getWorkout()->getId());
+        self::assertTrue($item->getWorkout()->isPlanLocal());
+        self::assertSame('Sortie longue', $item->getWorkout()->getTitle());
     }
 
     public function testDuplicateCopiesGrid(): void

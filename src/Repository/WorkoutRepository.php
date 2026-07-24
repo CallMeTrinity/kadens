@@ -40,6 +40,30 @@ class WorkoutRepository extends ServiceEntityRepository
         return $qb->getQuery()->getResult();
     }
 
+    /**
+     * Comme findLibraryForOwner mais en chargeant le contenu (blocs -> exercices
+     * prescrits -> exercice) en une requête. Sert la palette de l'éditeur de
+     * trame, qui calcule pour chaque carte des repères dérivés (activités
+     * distinctes, nombre d'exos) via WorkoutMetrics : sans ce fetch-join, ce
+     * serait un N+1 sur toute la bibliothèque.
+     *
+     * @return list<Workout>
+     */
+    public function findLibraryForOwnerWithContent(User $owner): array
+    {
+        return $this->createQueryBuilder('w')
+            ->addSelect('b', 'pe', 'ex')
+            ->leftJoin('w.blocks', 'b')
+            ->leftJoin('b.prescribedExercises', 'pe')
+            ->leftJoin('pe.exercise', 'ex')
+            ->andWhere('w.owner = :owner')
+            ->andWhere('w.planLocal = false')
+            ->setParameter('owner', $owner)
+            ->addOrderBy('w.title', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     //    /**
     //     * @return Workout[] Returns an array of Workout objects
     //     */

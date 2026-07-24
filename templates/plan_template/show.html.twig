@@ -5,7 +5,8 @@
 {% block body %}
     {# Vue de consultation auto-suffisante : aucun chargement AJAX post-rendu,
        condition du cache offline (Phase 9). Consomme la sortie de PlanFlattener. #}
-    <div class="kd-actionbar">
+    <div class="kd-actionbar" data-controller="clipboard"
+         data-clipboard-url-value="{{ url('app_public_share_plan', {slug: flat.template.slug}) }}">
         <a href="{{ path('app_plan_template_index') }}" class="kd-backlink">
             {{ ux_icon('lucide:arrow-left') }} Mes plans
         </a>
@@ -17,8 +18,35 @@
             <a href="{{ path('app_export_plan_template', {id: flat.template.id}) }}" class="kd-btn kd-btn--ghost kd-btn--sm">
                 {{ ux_icon('lucide:file-down') }} Excel
             </a>
+            <button type="button" class="kd-btn kd-btn--ghost kd-btn--sm" data-action="clipboard#copy">
+                {{ ux_icon('lucide:link-2') }} Copier le lien
+            </button>
+            <a href="{{ path('app_public_share_plan', {slug: flat.template.slug}) }}" target="_blank" rel="noopener"
+               class="kd-btn kd-btn--ghost kd-btn--sm">
+                {{ ux_icon('lucide:external-link') }} Page publique
+            </a>
+            <span class="kd-actionbar__feedback" data-clipboard-target="feedback" role="status" aria-live="polite"></span>
         </div>
     </div>
+
+    {# Partage d'une plage de semaines : lien filtré /s/plan/{slug}/semaines/{de}-{à}. #}
+    {% if flat.template.durationWeeks > 1 %}
+        <div class="kd-sharerange" data-controller="share-range"
+             data-share-range-base-value="{{ url('app_public_share_plan', {slug: flat.template.slug}) }}">
+            <span class="kd-sharerange__label">Partager des semaines&nbsp;:</span>
+            <select class="kd-planweek__select" data-share-range-target="from" aria-label="Semaine de début">
+                {% for w in 1..flat.template.durationWeeks %}<option value="{{ w }}">S{{ w }}</option>{% endfor %}
+            </select>
+            <span aria-hidden="true">→</span>
+            <select class="kd-planweek__select" data-share-range-target="to" aria-label="Semaine de fin">
+                {% for w in 1..flat.template.durationWeeks %}<option value="{{ w }}"{{ w == flat.template.durationWeeks ? ' selected' }}>S{{ w }}</option>{% endfor %}
+            </select>
+            <button type="button" class="kd-btn kd-btn--secondary kd-btn--sm" data-action="share-range#copy">
+                {{ ux_icon('lucide:link-2') }} Copier le lien de ces semaines
+            </button>
+            <span class="kd-actionbar__feedback" data-share-range-target="feedback" role="status" aria-live="polite"></span>
+        </div>
+    {% endif %}
 
     {{ include('components/_plan_read.html.twig') }}
 {% endblock %}

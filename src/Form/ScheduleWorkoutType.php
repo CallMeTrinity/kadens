@@ -15,7 +15,7 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  * propriétaire et le statut (PLANNED) sont fixés par le contrôleur.
  *
  * Les choix de séances sont préchargés une fois par le contrôleur et passés via
- * l'option `workouts` (même discipline que PlanItemType).
+ * l'option `workouts` (précharge unique pour éviter un N+1 par choix).
  */
 class ScheduleWorkoutType extends AbstractType
 {

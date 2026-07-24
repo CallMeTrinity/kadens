@@ -913,6 +913,26 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
   color: var(--color-activity-gym-text);
 }
 
+/* Sélecteur de plage de semaines à partager (page de consultation d'un plan). */
+.kd-sharerange {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-3);
+  margin-bottom: var(--kd-space-8);
+  padding: var(--kd-space-4) var(--kd-space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  background: var(--color-surface-raised);
+}
+.kd-sharerange__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--kd-tracking-eyebrow);
+  color: var(--color-text-faint);
+}
+
 /* ----------------------------------------------------------------------------
    Séance — en-tête de lecture (titre + méta + description)
    ---------------------------------------------------------------------------- */
@@ -1356,56 +1376,36 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
 }
 .kd-planitem__del svg { width: 13px; height: 13px; }
 
-/* Repli « Ajouter une séance » dans une case */
-.kd-planadd { margin-top: var(--kd-space-1); }
-.kd-planadd > summary {
-  list-style: none;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kd-space-1);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: var(--kd-weight-semibold);
-  letter-spacing: var(--kd-tracking-eyebrow);
-  text-transform: uppercase;
-  color: var(--color-primary);
-  padding: var(--kd-space-1) 0;
-}
-.kd-planadd > summary::-webkit-details-marker { display: none; }
-.kd-planadd > summary svg { width: 12px; height: 12px; }
-.kd-planadd__form {
+/* Éditeur : agenda vertical (un jour par ligne). Le volet de trame étant
+   contraint par la palette à gauche, une grille 7 colonnes serait illisible : on
+   déroule les jours en lignes, chacune large et lisible, quelle que soit la
+   largeur d'écran. */
+.kd-plangrid--edit {
   display: flex;
   flex-direction: column;
-  gap: var(--kd-space-4);
-  margin-top: var(--kd-space-4);
+  gap: var(--kd-space-3);
 }
-
-/* Bascule agenda vertical : édition à 1024px, lecture à 880px */
-.kd-plangrid--edit { gap: var(--kd-space-4); }
-
-@media (max-width: 1024px) {
-  .kd-plangrid--edit { grid-template-columns: 1fr; }
-  .kd-plangrid--edit .kd-planday {
-    flex-direction: row;
-    align-items: flex-start;
-    min-height: 0;
-    gap: var(--kd-space-5);
-  }
-  .kd-plangrid--edit .kd-planday__name { flex: 0 0 44px; padding-top: 4px; }
-  .kd-plangrid--edit .kd-planday__body { flex: 1 1 auto; }
-  .kd-plangrid--edit .kd-planday.is-empty { border-style: solid; }
+.kd-plangrid--edit .kd-planday {
+  flex-direction: row;
+  align-items: flex-start;
+  min-height: 0;
+  gap: var(--kd-space-5);
 }
+.kd-plangrid--edit .kd-planday__name { flex: 0 0 44px; padding-top: 4px; }
+.kd-plangrid--edit .kd-planday__body { flex: 1 1 auto; min-width: 0; }
+.kd-plangrid--edit .kd-planday.is-empty { border-style: solid; }
+
+/* Lecture : 7 colonnes, agenda vertical sous 880px */
 @media (max-width: 880px) {
   .kd-plangrid { grid-template-columns: 1fr; gap: var(--kd-space-2); }
-  .kd-plangrid:not(.kd-plangrid--edit) .kd-planday {
+  .kd-plangrid .kd-planday {
     flex-direction: row;
     align-items: flex-start;
     min-height: 0;
     gap: var(--kd-space-5);
   }
-  .kd-plangrid:not(.kd-plangrid--edit) .kd-planday__name { flex: 0 0 44px; padding-top: 4px; }
-  .kd-plangrid:not(.kd-plangrid--edit) .kd-planday.is-empty { border-style: solid; }
+  .kd-plangrid .kd-planday__name { flex: 0 0 44px; padding-top: 4px; }
+  .kd-plangrid .kd-planday.is-empty { border-style: solid; }
 }
 
 /* ----------------------------------------------------------------------------
@@ -1999,6 +1999,84 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
 .kd-libx__add svg { width: 15px; height: 15px; }
 
 /* ============================================================================
+   Éditeur de trame — deux volets (palette + grille) et mode tampon
+   ============================================================================ */
+.kd-planeditor {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+.kd-planeditor .kd-composer__main { padding: var(--kd-space-6); }
+
+@media (max-width: 1100px) {
+  .kd-planeditor { flex-direction: column; }
+  .kd-planeditor .kd-composer__lib {
+    width: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .kd-planeditor .kd-libpanel__list { max-height: 320px; }
+}
+
+/* Carte de séance de la palette (dérivée de .kd-libx) */
+.kd-palettecard {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kd-space-4);
+  padding: var(--kd-space-4);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border-strong);
+  border-radius: var(--kd-radius-lg);
+  cursor: grab;
+}
+.kd-palettecard:hover { box-shadow: var(--shadow-card); }
+.kd-palettecard:active { cursor: grabbing; }
+.kd-palettecard--armed {
+  border-color: var(--color-primary);
+  border-left-color: var(--color-primary);
+  background: var(--color-primary-tint);
+  box-shadow: var(--shadow-card);
+}
+.kd-palettecard__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-3);
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-faint);
+}
+.kd-palettecard__meta span { display: inline-flex; align-items: center; gap: 2px; }
+.kd-palettecard__meta svg { width: 12px; height: 12px; }
+
+/* Badges d'activité compacts (icône seule) — palette + cases de trame */
+.kd-cellbadges { display: inline-flex; flex-wrap: wrap; gap: 3px; margin-top: var(--kd-space-2); }
+.kd-cellbadges .kd-badge { padding: 2px; }
+.kd-cellbadges .kd-badge svg { width: 12px; height: 12px; }
+
+/* Mode tampon : une séance armée -> les cases invitent au dépôt au clic. Toute
+   la case (y compris une case déjà occupée) devient une cible de tampon : les
+   séances posées passent en pointer-events:none pour laisser le clic tamponner,
+   au lieu d'ouvrir l'édition rapide. */
+.kd-editsection.is-arming .kd-planday__items {
+  min-height: 40px;
+  padding: var(--kd-space-2);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--kd-radius-sm);
+  cursor: copy;
+}
+.kd-editsection.is-arming .kd-planday__items:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-tint);
+}
+.kd-editsection.is-arming .kd-planentry { pointer-events: none; }
+
+/* ============================================================================
    Blocs (volet droit)
    ============================================================================ */
 .kd-cblocks { display: flex; flex-direction: column; gap: var(--kd-space-6); }
@@ -2269,7 +2347,73 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
 }
 
 /* Bouton « Dupliquer sur S{n+1} » poussé à droite de l'en-tête de semaine */
-.kd-planweek__dup { margin-left: auto; margin-block: 0; display: inline-flex; }
+.kd-planweek__tools {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.kd-planweek__copy { margin: 0; display: inline-flex; align-items: center; gap: var(--kd-space-2); }
+.kd-planweek__copy form,
+.kd-planweek__tools form { margin: 0; display: inline-flex; align-items: center; gap: var(--kd-space-2); }
+.kd-planweek__select {
+  font-family: var(--font-body);
+  font-size: 12px;
+  padding: 3px var(--kd-space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--kd-radius-sm);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+.kd-planweek__add { margin: var(--kd-space-6) 0 0; display: flex; justify-content: center; }
+
+/* Charge de la semaine ventilée par activité (chips + détail dépliable). */
+.kd-weekvol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-3);
+  margin-bottom: var(--kd-space-6);
+}
+.kd-weekvol__sessions {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+.kd-weekvol__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px var(--kd-space-3);
+  border-radius: var(--kd-radius-pill);
+  background: var(--color-fill);
+  color: var(--color-text-secondary);
+}
+.kd-weekvol__chip svg { width: 12px; height: 12px; }
+.kd-weekvol__chip--run { background: var(--color-activity-run-tint); color: var(--color-activity-run-text); }
+.kd-weekvol__chip--gym { background: var(--color-activity-gym-tint); color: var(--color-activity-gym-text); }
+.kd-weekvol__detail { flex-basis: 100%; font-family: var(--font-body); font-size: 12px; }
+.kd-weekvol__detail > summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+.kd-weekvol__areas {
+  list-style: none;
+  margin: var(--kd-space-3) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 2px var(--kd-space-6);
+}
+.kd-weekvol__areas li { display: flex; justify-content: space-between; gap: var(--kd-space-3); color: var(--color-text-secondary); }
+.kd-weekvol__areas li span { font-family: var(--font-mono); color: var(--color-text-faint); }
+.kd-weekvol__tonnage { margin: var(--kd-space-3) 0 0; font-size: 11px; color: var(--color-text-faint); }
 
 /* Case = zone de dépôt : garde une hauteur minimale même vide pour accepter un drop */
 .kd-planday__items { min-height: 26px; }
@@ -2315,8 +2459,86 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
   font-size: 10px;
   color: var(--color-text-faint);
 }
+.kd-planitem__meta { flex-wrap: wrap; }
+.kd-planitem__meta span { display: inline-flex; align-items: center; gap: 2px; }
 .kd-planitem__meta svg { width: 11px; height: 11px; }
 .kd-planitem__delform { display: inline-flex; margin: 0; }
+
+/* Aperçu de séance au survol d'une case — promu en top-layer (popover), donc non
+   rogné par l'overflow de la grille. Positionné par le contrôleur plangrid. */
+.kd-planpreview { display: none; }
+.kd-planpreview:popover-open {
+  display: block;
+  position: fixed;
+  inset: auto;                 /* neutralise le centrage UA du popover */
+  margin: 0;
+  width: min(300px, calc(100vw - 2 * var(--kd-space-6)));
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--kd-space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-pop, var(--shadow-card));
+}
+.kd-planpreview__title {
+  margin: 0 0 var(--kd-space-3);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 13px;
+  color: var(--color-text-strong);
+}
+.kd-planpreview__block { margin-top: var(--kd-space-3); }
+.kd-planpreview__blockname {
+  margin: 0 0 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--kd-tracking-eyebrow-lg);
+  color: var(--color-text-faint);
+}
+.kd-planpreview__exos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.kd-planpreview__exos li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--kd-space-4);
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.kd-planpreview__exoname { min-width: 0; }
+.kd-planpreview__sum { flex: 0 0 auto; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-faint); }
+.kd-planpreview__empty { margin: 2px 0 0; font-size: 12px; color: var(--color-text-placeholder); }
+
+/* ----------------------------------------------------------------------------
+   Édition en ligne « semi-invisible » (contrôleur inline-edit)
+   Le texte a l'air normal au repos ; un liseré discret apparaît au survol, un
+   champ bordé au focus. Utilisé pour le titre/description du plan et les notes
+   de case.
+   ---------------------------------------------------------------------------- */
+.kd-inlineedit { cursor: text; border-radius: var(--kd-radius-sm); }
+.kd-inlineedit:hover { box-shadow: inset 0 0 0 1px var(--color-border-strong); }
+.kd-inlineedit--empty { color: var(--color-text-placeholder); font-style: italic; }
+.kd-inlineedit--desc { white-space: pre-wrap; }
+.kd-inlineedit--note { white-space: pre-wrap; }
+.kd-inlineedit__input {
+  font: inherit;
+  color: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 2px 4px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--kd-radius-sm);
+  background: var(--color-surface-raised);
+  outline: none;
+}
+textarea.kd-inlineedit__input { min-height: 3.2em; resize: vertical; }
+.kd-metafallback > summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
 
 /* ----------------------------------------------------------------------------
    Mini-modale d'édition rapide (éditeur de plan)

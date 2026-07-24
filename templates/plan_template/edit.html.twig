@@ -18,27 +18,50 @@
         </div>
     </div>
 
+    {# En-tête à édition en ligne : cliquer le titre ou la description pour les
+       modifier (contrôleur `inline-edit`, champs semi-invisibles). #}
     <div class="kd-pagehead">
         <div>
             <p class="kd-eyebrow">Éditeur de plan</p>
-            <h1 class="kd-title">{{ template.title }}</h1>
+            <h1 class="kd-title kd-inlineedit"
+                data-controller="inline-edit"
+                data-inline-edit-url-value="{{ path('app_plan_template_meta', {id: template.id}) }}"
+                data-inline-edit-token-value="{{ csrf_token('plan_meta' ~ template.id) }}"
+                data-inline-edit-field-value="title"
+                data-inline-edit-target="display"
+                data-value="{{ template.title }}"
+                data-action="click->inline-edit#start"
+                title="Cliquer pour renommer">{{ template.title }}</h1>
+
+            <p class="kd-lead kd-inlineedit kd-inlineedit--desc{{ template.description ? '' : ' kd-inlineedit--empty' }}"
+               data-controller="inline-edit"
+               data-inline-edit-url-value="{{ path('app_plan_template_meta', {id: template.id}) }}"
+               data-inline-edit-token-value="{{ csrf_token('plan_meta' ~ template.id) }}"
+               data-inline-edit-field-value="description"
+               data-inline-edit-type-value="textarea"
+               data-inline-edit-placeholder-value="+ Ajouter une description"
+               data-inline-edit-target="display"
+               data-value="{{ template.description }}"
+               data-action="click->inline-edit#start"
+               title="Cliquer pour modifier">{{ template.description ?: '+ Ajouter une description' }}</p>
         </div>
     </div>
 
-    {# Informations générales #}
-    <section class="kd-card" style="max-width:640px;">
-        <div class="kd-card__head">
-            <h2 class="kd-card__title">Informations</h2>
+    {# Repli sans JS pour éditer les infos. En JS : titre/description s'éditent dans
+       l'en-tête, le nombre de semaines via les boutons de la trame. #}
+    <details class="kd-editsection kd-metafallback">
+        <summary>Modifier les infos (formulaire)</summary>
+        <div class="kd-card" style="max-width:640px;">
+            {{ form_start(form) }}
+                {{ form_widget(form) }}
+                <div class="kd-formactions">
+                    <button type="submit" class="kd-btn kd-btn--primary">
+                        {{ ux_icon('lucide:save') }} Enregistrer
+                    </button>
+                </div>
+            {{ form_end(form) }}
         </div>
-        {{ form_start(form) }}
-            {{ form_widget(form) }}
-            <div class="kd-formactions">
-                <button type="submit" class="kd-btn kd-btn--primary">
-                    {{ ux_icon('lucide:save') }} Enregistrer
-                </button>
-            </div>
-        {{ form_end(form) }}
-    </section>
+    </details>
 
     {# Trame — conteneur cible des Turbo Streams. Le contrôleur `plangrid` porte le
        glisser-déposer inter-cases et la mini-modale d'édition rapide. Il enveloppe
@@ -47,12 +70,20 @@
     <section class="kd-editsection" data-controller="plangrid">
         <p class="kd-editsection__title">Trame</p>
         <p class="kd-editsection__hint">
-            Glisse une séance d'un jour à l'autre. Clique une séance pour ajuster ses
-            valeurs (sa progression est propre à cette semaine, les autres cases ne
-            bougent pas).
+            Arme une séance dans la palette puis clique les cases pour la poser (ou
+            glisse-la). Déplace une case d'un jour à l'autre par sa poignée. Clique une
+            séance posée pour ajuster ses valeurs (sa progression est propre à cette
+            case, les autres ne bougent pas).
         </p>
-        <div id="plan-grid">
-            {{ include('plan_template/_grid.html.twig') }}
+        <div class="kd-planeditor">
+            <div class="kd-composer__lib">
+                {{ include('plan_template/_palette.html.twig') }}
+            </div>
+            <div class="kd-composer__main">
+                <div id="plan-grid">
+                    {{ include('plan_template/_grid.html.twig') }}
+                </div>
+            </div>
         </div>
 
         {# Mini-modale d'édition rapide : le panneau des exercices de la copie locale

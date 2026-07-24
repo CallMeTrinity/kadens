@@ -564,6 +564,7 @@ final class WorkoutController extends AbstractController
     {
         return $this->formFactory->createNamed('add_exercise_'.$block->getId(), PrescribedExerciseType::class, $prescribed, [
             'user' => $this->getUser(),
+            'activity' => $prescribed->getExercise()?->getActivity(),
             'action' => $this->generateUrl('app_workout_prescribed_add', [
                 'id' => $block->getWorkout()->getId(),
                 'blockId' => $block->getId(),
@@ -575,6 +576,7 @@ final class WorkoutController extends AbstractController
     {
         return $this->formFactory->createNamed('prescribed_'.$prescribed->getId(), PrescribedExerciseType::class, $prescribed, [
             'user' => $this->getUser(),
+            'activity' => $prescribed->getExercise()?->getActivity(),
             'action' => $this->generateUrl($route, [
                 'id' => $prescribed->getBlock()->getWorkout()->getId(),
                 'prescribedId' => $prescribed->getId(),

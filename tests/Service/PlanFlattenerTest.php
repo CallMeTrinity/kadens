@@ -12,6 +12,8 @@ use App\Enum\ActivityType;
 use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
 use App\Service\PlanFlattener;
+use App\Service\UnitFormatter;
+use App\Service\WorkoutMetrics;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
@@ -21,7 +23,7 @@ final class PlanFlattenerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->flattener = new PlanFlattener();
+        $this->flattener = new PlanFlattener(new UnitFormatter(), new WorkoutMetrics());
     }
 
     #[DataProvider('summaryCases')]
@@ -39,6 +41,39 @@ final class PlanFlattenerTest extends TestCase
         $flat = $this->flattener->flattenWorkout($workout);
 
         self::assertSame($expected, $flat['blocks'][0]['exercises'][0]['summary']);
+    }
+
+    /**
+     * L'allure s'affiche dans l'unité naturelle de l'activité de l'exercice :
+     * min/km (course), km/h (vélo), min/100m (natation).
+     */
+    #[DataProvider('paceUnitCases')]
+    public function testPaceUnitFollowsActivity(ActivityType $activity, int $distanceMeters, int $paceSecondsPerKm, string $expected): void
+    {
+        $exercise = (new Exercise())->setName('Test')->setActivity($activity);
+        $prescribed = (new PrescribedExercise())
+            ->setPrescriptionType(PrescriptionType::DISTANCE_PACE)
+            ->setDistanceMeters($distanceMeters)
+            ->setPaceSecondsPerKm($paceSecondsPerKm)
+            ->setExercise($exercise)
+            ->setPosition(0);
+
+        $block = (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(0);
+        $block->addPrescribedExercise($prescribed);
+
+        $workout = (new Workout())->setTitle('Séance')->setSlug('seance');
+        $workout->addBlock($block);
+
+        $flat = $this->flattener->flattenWorkout($workout);
+
+        self::assertSame($expected, $flat['blocks'][0]['exercises'][0]['summary']);
+    }
+
+    public static function paceUnitCases(): \Generator
+    {
+        yield 'course en min/km' => [ActivityType::RUNNING, 5000, 300, '5 km @ 5:00/km'];
+        yield 'vélo en km/h' => [ActivityType::CYCLING, 40000, 120, '40 km @ 30 km/h'];
+        yield 'natation en min/100m' => [ActivityType::SWIMMING, 2000, 1050, '2 km @ 1:45/100m'];
     }
 
     public function testFlattenPlanTemplateProducesDenseGrid(): void

@@ -1,0 +1,29 @@
+{# Aperçu au survol d'une séance placée : promu en top-layer (Popover API) pour
+   échapper à l'overflow de la grille. Auto-suffisant (aucun AJAX). Positionné en
+   JS par le contrôleur porteur (`plangrid` en édition, `preview` en lecture).
+
+   Attend `fw` = sortie de PlanFlattener::flattenWorkout (workout + blocks). #}
+<div class="kd-planpreview" popover="manual" data-preview-target="panel">
+    <p class="kd-planpreview__title">{{ fw.workout.title }}</p>
+    {% if fw.blocks is empty %}
+        <p class="kd-planpreview__empty">Séance vide.</p>
+    {% else %}
+        {% for b in fw.blocks %}
+            <div class="kd-planpreview__block">
+                <p class="kd-planpreview__blockname">
+                    {{ b.block.label ?: b.block.role.label }}{% if b.block.rounds > 1 %} · ×{{ b.block.rounds }}{% endif %}
+                </p>
+                <ul class="kd-planpreview__exos">
+                    {% for ex in b.exercises %}
+                        <li>
+                            <span class="kd-planpreview__exoname">{{ ex.exercise ? ex.exercise.name : '—' }}</span>
+                            {% if ex.summary %}<span class="kd-planpreview__sum">{{ ex.summary }}</span>{% endif %}
+                        </li>
+                    {% else %}
+                        <li class="kd-planpreview__empty">—</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endfor %}
+    {% endif %}
+</div>

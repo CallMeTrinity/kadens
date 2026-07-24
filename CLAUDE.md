@@ -439,6 +439,87 @@ navigateur (non automatisable ici).
   `.kd-page--embed` retirées. Nouvelles classes `.kd-modal--quick`,
   `.kd-modal__card--quick/__headactions`, `.kd-quickedit*`, `.kd-quickblock*`,
   `.kd-quickexo*`. Icône `square-pen` (déjà locale). Pas de migration.
+  **Lot UX éditeur de plan (amont, sans migration).** Sept axes, tous en amélioration
+  progressive et sans changer le modèle server-driven ni le schéma :
+  1. **Palette de séances + mode tampon** (remplace le `<select>` par case, illisible à
+     200 séances). Volet gauche `_palette.html.twig` (recherche + filtres d'activité
+     100 % client, calqué sur `_composer_library`), cartes `.kd-palettecard`. Poser :
+     **armer** une séance (clic) puis **tamponner** les cases (clic), ou glisser-déposer
+     (Sortable clone, même groupe `kd-plan-workouts` que les cases). Nouvel endpoint
+     `app_plan_template_item_place` (POST workoutId+week+day) partageant
+     `placeWorkoutInCell` avec `addItem` (fork à la pose inchangé). Le `<details>` d'ajout
+     par case reste le **repli sans JS**. Contexte `paletteContext()` chargé une fois au
+     rendu (hors flux de grille), via `WorkoutRepository::findLibraryForOwnerWithContent`
+     (fetch-join anti N+1).
+  2. **Détail de case + aperçu au survol.** `flattenWorkout` enrichi (additif) de
+     `activities` (distinctes) + `exerciseCount` via nouveau `WorkoutMetrics`. Les cases
+     montrent badges d'activité (icône seule) + nb d'exos. Au survol, aperçu blocs/
+     exercices promu en **top-layer via Popover API** (`popover="manual"`, positionné en
+     JS) pour échapper à l'`overflow` de la grille — le clic reste l'édition rapide.
+  3. **Édition en ligne « semi-invisible ».** L'encadré Informations disparaît :
+     titre/description s'éditent en cliquant l'en-tête (contrôleur générique
+     `inline_edit_controller.js`, endpoint `app_plan_template_meta` renvoyant la valeur
+     nettoyée en texte brut). Idem pour la **note de case** (`app_plan_template_item_note`).
+     Repli sans JS : `<details>` « Modifier les infos (formulaire) » avec le
+     `PlanTemplateType` complet.
+  4. **Gestion des semaines en ligne.** `app_plan_template_week_add` /
+     `app_plan_template_week_remove` (détache les cases via nouveau helper `detachItem` —
+     factorisé avec `deleteItem`, préserve DONE/MISSED —, décale les semaines suivantes et
+     **réaligne le calendrier** via `PlanScheduler::rescheduleItem`).
+  5. **Dupliquer une semaine vers une cible libre.** `app_plan_template_week_copy` (POST
+     `target`) remplace `duplicateWeek` (S+1) : clone les cases vers la semaine choisie
+     (copies `planLocal` indépendantes), **remplace** le contenu de la cible.
+  6. **Volume par semaine ventilé par activité** (demande utilisateur). Nouveau
+     `PlanVolumeAggregator::byWeek` (consomme `WorkoutMetrics::volume`) : salle = séries
+     par groupe musculaire (attribuées à chaque `targetArea`, × tours) + tonnage ;
+     course/vélo/natation = distance/durée. Affiché en chips dans l'en-tête de semaine +
+     détail dépliable. `UnitFormatter` **extrait de `PlanFlattener`** (source unique
+     km/mm:ss/allure, `PlanFlattener` délègue).
+  7. **Partage public du plan** (comme les séances). `PublicShareController::plan`
+     (`/s/plan/{slug}`) + `planWeeks` (`/s/plan/{slug}/semaines/{de}-{à}`, plage stateless
+     encodée dans l'URL). `_plan_read.html.twig` prend `public`/`weeks` (séances
+     cliquables vers leur page publique `/s/{slug}`, filtre de semaines via `|filter`).
+     Boutons copier-lien/page-publique + sélecteur de plage (`share_range_controller.js`)
+     sur `plan_template/show`. `PlanTemplate` a déjà un slug (garde-fou `ensureSlug` sur
+     show/edit), donc **aucune migration**. Reste sous `/s` : pas de changement
+     `security.yaml`.
+  Nouveaux services : `WorkoutMetrics`, `UnitFormatter`, `PlanVolumeAggregator`. Nouveaux
+  contrôleurs Stimulus : `inline_edit`, `share_range` (plus extensions de `plangrid` :
+  filtre client, armer/tamponner, drag palette, aperçu). Nouvelles classes CSS
+  `.kd-planeditor`, `.kd-palettecard*`, `.kd-cellbadges`, `.kd-planpreview*`,
+  `.kd-inlineedit*`, `.kd-planweek__tools/__copy/__select/__add`, `.kd-weekvol*`,
+  `.kd-sharerange*`. Icônes ajoutées : `calendar-plus`, `external-link` (autres déjà
+  locales). Tests unitaires `WorkoutMetricsTest`. **Limite** : le retrait/copie de semaine
+  suit la règle « préserver le réalisé » (supprime les datées `PLANNED`, garde
+  `DONE`/`MISSED`) ; comme ailleurs, une case portée par la trame peut réapparaître au
+  `resync` tant qu'elle existe.
+  **Correctifs éditeur de plan + allure par activité (sans migration).**
+  (1) **Placement uniquement par la palette** : le `<details>` « + Séance » par case
+  (repli sans JS) et son `PlanItemType` sont supprimés (redondants avec armer/tamponner
+  + glisser-déposer). Route `app_plan_template_item_add`, `createAddItemForm`,
+  `addItemForms` et `PlanItemType.php` retirés ; il ne reste que
+  `app_plan_template_item_place`. Poser une séance requiert donc JS (choix assumé).
+  (2) **Grille d'édition en agenda vertical permanent** (`.kd-plangrid--edit` : un jour
+  par ligne, quelle que soit la largeur) : dans le volet contraint par la palette, une
+  grille 7 colonnes était illisible. (3) **Tampon sur case occupée** : en mode armé
+  (`.is-arming`), les séances posées passent en `pointer-events:none` pour que tout le
+  cadre de la case (agrandi + padding) tamponne, au lieu du seul espace vide.
+  (4) **Aperçu au survol en lecture** : le popover de contenu (blocs/exercices) est
+  extrait dans `templates/components/_plan_preview.html.twig` (attend `fw` =
+  `flattenWorkout`), réutilisé par l'éditeur (`_grid`) ET la consultation
+  (`_plan_read`, éditeur + page publique) via un nouveau contrôleur Stimulus léger
+  `preview` (Popover API, positionnement top-layer, aucun AJAX). (5) **Allure dans
+  l'unité naturelle de l'activité** : nouvel enum `PaceUnit` (min/km course, km/h vélo,
+  min/100m natation) portant la conversion aller/retour depuis les secondes/km stockées
+  (unité normalisée inchangée en base). `PaceType` prend une option `unit` ;
+  `PrescribedExerciseType` la déduit de l'activité de l'exercice prescrit (option
+  `activity`, dérivée dans `WorkoutController::createPrescribedForm`/
+  `createAddPrescribedForm`) et adapte label/placeholder. `UnitFormatter::pace` et
+  `PlanFlattener::summarizeDistancePace` formatent via `PaceUnit::forActivity(...)`
+  (l'export Excel en hérite). Tests : `PlanFlattenerTest::paceUnitCases`. **Piste non
+  faite (signalée)** : la distance se saisit toujours en mètres (illogique pour
+  course/vélo qui pensent en km) — un `DistanceType` activité-conscient serait le
+  pendant de `PaceType`.
 
 ---
 

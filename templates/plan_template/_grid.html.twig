@@ -1,12 +1,14 @@
 {# Contenu de #plan-grid : trame éditable semaines × 7 jours. Chaque mutation
    (poser/retirer/déplacer/dupliquer) met à jour le CONTENU de ce conteneur via
    Turbo Stream (action="update", l'id survit). Contexte attendu (fourni par
-   gridContext) : template, flat (sortie de PlanFlattener::flattenPlanTemplate),
-   addItemForms (indexés « w{semaine}d{jour} »).
+   gridContext) : template, flat (sortie de PlanFlattener::flattenPlanTemplate).
+   Le placement se fait par la palette (armer + tamponner, ou glisser-déposer) :
+   pas de formulaire d'ajout par case.
 
    Chaque case porte sa PROPRE copie de séance (fork à la pose) : l'éditer via la
    modale ne touche ni la séance de bibliothèque ni les autres cases. Le lien de
    la carte ouvre le compositeur de cette copie (édition rapide). #}
+{% import 'components/_activity.html.twig' as activity %}
 {% set dayNames = {1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Jeu', 5: 'Ven', 6: 'Sam', 7: 'Dim'} %}
 
 <div class="kd-planweeks">
@@ -14,16 +16,62 @@
         <section class="kd-planweek">
             <div class="kd-planweek__head">
                 <span class="kd-planweek__num">Semaine {{ week.weekNumber }}</span>
-                {% if week.weekNumber < template.durationWeeks %}
-                    <form method="post" class="kd-planweek__dup"
-                          action="{{ path('app_plan_template_week_duplicate', {id: template.id, week: week.weekNumber}) }}">
-                        <input type="hidden" name="_token" value="{{ csrf_token('week_duplicate' ~ week.weekNumber) }}">
-                        <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm" title="Dupliquer sur la semaine {{ week.weekNumber + 1 }}">
-                            {{ ux_icon('lucide:copy') }} Dupliquer sur S{{ week.weekNumber + 1 }}
-                        </button>
-                    </form>
+                {% if template.durationWeeks > 1 %}
+                    <div class="kd-planweek__tools">
+                        {# Copier cette semaine vers une cible libre (remplace la cible). #}
+                        <form method="post" class="kd-planweek__copy"
+                              action="{{ path('app_plan_template_week_copy', {id: template.id, week: week.weekNumber}) }}"
+                              onsubmit="return confirm('Copier la semaine {{ week.weekNumber }} vers la semaine choisie ? Son contenu actuel sera remplacé.');">
+                            <input type="hidden" name="_token" value="{{ csrf_token('week_copy' ~ week.weekNumber) }}">
+                            <select name="target" class="kd-planweek__select" aria-label="Copier la semaine {{ week.weekNumber }} vers">
+                                {% for w in 1..template.durationWeeks %}
+                                    {% if w != week.weekNumber %}<option value="{{ w }}">S{{ w }}</option>{% endif %}
+                                {% endfor %}
+                            </select>
+                            <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm" title="Copier cette semaine vers la semaine choisie">
+                                {{ ux_icon('lucide:copy') }} Copier vers
+                            </button>
+                        </form>
+                        {# Retirer cette semaine. #}
+                        <form method="post"
+                              action="{{ path('app_plan_template_week_remove', {id: template.id, week: week.weekNumber}) }}"
+                              onsubmit="return confirm('Retirer la semaine {{ week.weekNumber }} ? Les séances encore prévues au calendrier seront retirées (le réalisé est conservé).');">
+                            <input type="hidden" name="_token" value="{{ csrf_token('week_remove' ~ week.weekNumber) }}">
+                            <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm" title="Retirer la semaine {{ week.weekNumber }}">
+                                {{ ux_icon('lucide:trash-2') }}
+                            </button>
+                        </form>
+                    </div>
                 {% endif %}
             </div>
+
+            {# Charge de la semaine, ventilée par activité (salle : séries par groupe
+               musculaire + tonnage ; endurance : distance/durée). Source : PlanVolumeAggregator. #}
+            {% set vol = weekVolumes[week.weekNumber] ?? null %}
+            {% if vol and vol.sessions > 0 %}
+                <div class="kd-weekvol">
+                    <span class="kd-weekvol__sessions">
+                        {{ vol.sessions }} séance{{ vol.sessions > 1 ? 's' }} · ~{{ vol.totalTime }}
+                    </span>
+                    {% for chip in vol.chips %}
+                        {% set mod = activity.modifier(chip.activity) %}
+                        <span class="kd-weekvol__chip{{ mod ? ' kd-weekvol__chip--' ~ mod }}">
+                            {{ ux_icon(activity.icon(chip.activity)|trim) }} {{ chip.label }} · {{ chip.value }}
+                        </span>
+                    {% endfor %}
+                    {% if vol.gymAreas is not empty %}
+                        <details class="kd-weekvol__detail">
+                            <summary>Séries par groupe</summary>
+                            <ul class="kd-weekvol__areas">
+                                {% for a in vol.gymAreas %}
+                                    <li>{{ a.label }}<span>{{ a.sets }}</span></li>
+                                {% endfor %}
+                            </ul>
+                            {% if vol.tonnage %}<p class="kd-weekvol__tonnage">Tonnage salle : {{ vol.tonnage }}</p>{% endif %}
+                        </details>
+                    {% endif %}
+                </div>
+            {% endif %}
 
             <div class="kd-plangrid kd-plangrid--edit">
                 {% for day in week.days %}
@@ -33,11 +81,13 @@
                             {# Zone de dépôt SortableJS : source ET cible, la semaine/jour
                                cible sont portées ici et lues à la pose. #}
                             <div class="kd-planday__items" data-plangrid-target="cell"
-                                 data-week="{{ week.weekNumber }}" data-day="{{ day.dayOfWeek }}">
+                                 data-week="{{ week.weekNumber }}" data-day="{{ day.dayOfWeek }}"
+                                 data-action="click->plangrid#stampCell">
                                 {% for entry in day.items %}
                                     <div class="kd-planentry" data-item-id="{{ entry.item.id }}"
                                          data-move-url="{{ path('app_plan_template_item_move', {id: template.id, itemId: entry.item.id}) }}"
-                                         data-move-token="{{ csrf_token('item_move' ~ entry.item.id) }}">
+                                         data-move-token="{{ csrf_token('item_move' ~ entry.item.id) }}"
+                                         data-action="mouseenter->plangrid#showPreview mouseleave->plangrid#hidePreview">
                                         <div class="kd-planitem">
                                             <span class="kd-planitem__handle" title="Déplacer" aria-hidden="true">{{ ux_icon('lucide:grip-vertical') }}</span>
                                             <button type="button" class="kd-planitem__link"
@@ -45,8 +95,18 @@
                                                     data-panel-url="{{ path('app_workout_quick_panel', {id: entry.item.workout.id}) }}"
                                                     data-full-url="{{ path('app_workout_edit', {id: entry.item.workout.id}) }}">
                                                 <span class="kd-planitem__title">{{ entry.workout.workout.title }}</span>
-                                                {% if entry.item.workout.estimatedDurationMinutes %}
-                                                    <span class="kd-planitem__meta">{{ ux_icon('lucide:clock') }} {{ entry.item.workout.estimatedDurationMinutes }} min</span>
+                                                <span class="kd-planitem__meta">
+                                                    {% if entry.item.workout.estimatedDurationMinutes %}
+                                                        <span>{{ ux_icon('lucide:clock') }} {{ entry.item.workout.estimatedDurationMinutes }} min</span>
+                                                    {% endif %}
+                                                    {% if entry.workout.exerciseCount %}
+                                                        <span>{{ entry.workout.exerciseCount }} exo{{ entry.workout.exerciseCount > 1 ? 's' }}</span>
+                                                    {% endif %}
+                                                </span>
+                                                {% if entry.workout.activities %}
+                                                    <span class="kd-cellbadges">
+                                                        {% for a in entry.workout.activities %}{{ activity.badge(a, false) }}{% endfor %}
+                                                    </span>
                                                 {% endif %}
                                             </button>
                                             <form method="post" class="kd-planitem__delform"
@@ -58,26 +118,37 @@
                                                 </button>
                                             </form>
                                         </div>
-                                        {% if entry.item.notes %}<p class="kd-planday__notes">{{ entry.item.notes|nl2br }}</p>{% endif %}
+                                        {# Note de case éditable en ligne (clic). Toujours présente : une note
+                                           vide devient un discret « + note ». #}
+                                        <p class="kd-planday__notes kd-inlineedit kd-inlineedit--note{{ entry.item.notes ? '' : ' kd-inlineedit--empty' }}"
+                                           data-controller="inline-edit"
+                                           data-inline-edit-url-value="{{ path('app_plan_template_item_note', {id: template.id, itemId: entry.item.id}) }}"
+                                           data-inline-edit-token-value="{{ csrf_token('item_note' ~ entry.item.id) }}"
+                                           data-inline-edit-field-value="notes"
+                                           data-inline-edit-type-value="textarea"
+                                           data-inline-edit-placeholder-value="+ note"
+                                           data-inline-edit-target="display"
+                                           data-value="{{ entry.item.notes }}"
+                                           data-action="click->inline-edit#start">{{ entry.item.notes ?: '+ note' }}</p>
+
+                                        {# Aperçu au survol (top-layer via Popover API), positionné par le
+                                           contrôleur plangrid pour échapper à l'overflow de la grille. #}
+                                        {{ include('components/_plan_preview.html.twig', {fw: entry.workout}) }}
                                     </div>
                                 {% endfor %}
                             </div>
-
-                            {% set addForm = addItemForms['w' ~ week.weekNumber ~ 'd' ~ day.dayOfWeek] %}
-                            <details class="kd-planadd">
-                                <summary>{{ ux_icon('lucide:plus') }} Séance</summary>
-                                {{ form_start(addForm, {attr: {class: 'kd-planadd__form'}}) }}
-                                    {{ form_row(addForm.workout) }}
-                                    {{ form_row(addForm.notes) }}
-                                    <button type="submit" class="kd-btn kd-btn--primary kd-btn--sm">
-                                        {{ ux_icon('lucide:plus') }} Ajouter
-                                    </button>
-                                {{ form_end(addForm) }}
-                            </details>
                         </div>
                     </div>
                 {% endfor %}
             </div>
         </section>
     {% endfor %}
+
+    <form method="post" class="kd-planweek__add"
+          action="{{ path('app_plan_template_week_add', {id: template.id}) }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('week_add' ~ template.id) }}">
+        <button type="submit" class="kd-btn kd-btn--secondary kd-btn--sm">
+            {{ ux_icon('lucide:calendar-plus') }} Ajouter une semaine
+        </button>
+    </form>
 </div>
