@@ -2957,3 +2957,111 @@ textarea.kd-inlineedit__input { min-height: 3.2em; resize: vertical; }
   padding: var(--kd-space-4) var(--kd-space-4) var(--kd-space-5);
   border-top: 1px solid var(--color-divider);
 }
+
+/* ============================================================================
+   Ajout au calendrier : « + » par jour + modales de sélection (poser une séance /
+   instancier un plan). Remplacent les anciens dropdowns de la barre d'ajout.
+   ============================================================================ */
+
+/* Bouton « + » d'un jour (grille mois) : poussé en bas de la case, révélé au
+   survol / focus. Sur pointeur grossier (tactile), toujours visible en atténué. */
+.kd-calday__add {
+  margin-top: auto;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--kd-radius-sm);
+  background: transparent;
+  color: var(--color-text-placeholder);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .12s ease, color .12s ease, border-color .12s ease, background-color .12s ease;
+}
+.kd-calday:hover .kd-calday__add,
+.kd-calday__add:focus-visible { opacity: 1; }
+.kd-calday__add:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-tint);
+}
+.kd-calday__add svg { width: 15px; height: 15px; }
+@media (hover: none) {
+  .kd-calday__add { opacity: .55; }
+}
+
+/* Variante vue semaine : « + » compact dans l'en-tête du jour, à côté du numéro. */
+.kd-weekday__right { display: inline-flex; align-items: center; gap: var(--kd-space-3); }
+.kd-calday__add--week {
+  margin-top: 0;
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  opacity: 0;
+}
+.kd-weekday:hover .kd-calday__add--week,
+.kd-calday__add--week:focus-visible { opacity: 1; }
+@media (hover: none) {
+  .kd-calday__add--week { opacity: .55; }
+}
+
+/* Modale de sélection (cartes) — plus large que la modale d'édition standard,
+   corps = outils (recherche + tri) + filtres + liste de cartes défilable. */
+.kd-modal--picker { width: min(560px, calc(100vw - 2 * var(--kd-space-6))); }
+.kd-modal__card--picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-5);
+  max-height: min(80vh, 720px);
+  padding: var(--kd-space-8) var(--kd-space-8) var(--kd-space-7);
+}
+.kd-modal__card--picker .kd-modal__head { margin-bottom: 0; }
+.kd-picker__date::first-letter { text-transform: uppercase; }
+
+/* Ligne d'outils : recherche extensible + tri compact. */
+.kd-picker__tools { display: flex; align-items: center; gap: var(--kd-space-4); }
+.kd-picker__tools .kd-libsearch { flex: 1; margin-top: 0; }
+.kd-picker__sort { flex: 0 0 auto; width: auto; font-size: 12px; }
+
+/* La liste de cartes occupe l'espace restant et défile. */
+.kd-picker { display: flex; flex-direction: column; gap: var(--kd-space-5); min-height: 0; flex: 1; }
+.kd-picker__list {
+  flex: 1;
+  min-height: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-3);
+  padding-right: var(--kd-space-2);
+}
+.kd-picker__hidden { display: none; }
+
+/* Carte-bouton : réinitialise l'apparence bouton, garde le look .kd-palettecard. */
+.kd-palettecard--btn {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.kd-palettecard--btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.kd-palettecard--btn .kd-libx__body { display: flex; flex-direction: column; }
+.kd-palettecard--btn .kd-palettecard__meta { display: flex; }
+.kd-palettecard--btn .kd-cellbadges { display: inline-flex; }
+
+/* Pied de la modale plan : date de départ + bouton « Instancier ». */
+.kd-picker__foot {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--kd-space-4);
+  flex-wrap: wrap;
+  padding-top: var(--kd-space-5);
+  border-top: 1px solid var(--color-divider);
+}
+.kd-picker__foot .kd-field { flex: 1 1 160px; margin: 0; }

@@ -68,29 +68,39 @@
         </div>
     </div>
 
-    {{ include('calendar/_addbar.html.twig', {year: monthPivot.year, month: monthPivot.month}) }}
+    <div data-controller="caladd">
+        {{ include('calendar/_addbar.html.twig', {year: monthPivot.year, month: monthPivot.month}) }}
 
-    <div class="kd-week">
-        {% for day in days %}
-            <section class="kd-weekday{{ day.isToday ? ' kd-weekday--today' }}{{ day.weekend ? ' kd-weekday--weekend' }}{{ day.isPast and not day.isToday ? ' kd-weekday--past' }}">
-                <header class="kd-weekday__head">
-                    <span class="kd-weekday__name">{{ day.dayName }}</span>
-                    <span class="kd-weekday__num">{{ day.date|date('j') }}</span>
-                </header>
-                <div class="kd-weekday__events">
-                    {% for scheduled in day.scheduled %}
-                        {{ include('components/_cal_event.html.twig', {
-                            scheduled: scheduled,
-                            fw: flattened[scheduled.workout.id],
-                            statuses: statuses,
-                            detailed: true,
-                            overdue: day.isPast and scheduled.status.value == 'planned',
-                        }) }}
-                    {% else %}
-                        <p class="kd-weekday__rest">Repos</p>
-                    {% endfor %}
-                </div>
-            </section>
-        {% endfor %}
+        <div class="kd-week">
+            {% for day in days %}
+                <section class="kd-weekday{{ day.isToday ? ' kd-weekday--today' }}{{ day.weekend ? ' kd-weekday--weekend' }}{{ day.isPast and not day.isToday ? ' kd-weekday--past' }}">
+                    <header class="kd-weekday__head">
+                        <span class="kd-weekday__name">{{ day.dayName }}</span>
+                        <span class="kd-weekday__right">
+                            <span class="kd-weekday__num">{{ day.date|date('j') }}</span>
+                            <button type="button" class="kd-calday__add kd-calday__add--week"
+                                    data-action="caladd#openWorkout"
+                                    data-caladd-date-param="{{ day.date|date('Y-m-d') }}"
+                                    aria-label="Ajouter une séance le {{ day.date|date('d/m') }}">
+                                {{ ux_icon('lucide:plus') }}
+                            </button>
+                        </span>
+                    </header>
+                    <div class="kd-weekday__events">
+                        {% for scheduled in day.scheduled %}
+                            {{ include('components/_cal_event.html.twig', {
+                                scheduled: scheduled,
+                                fw: flattened[scheduled.workout.id],
+                                statuses: statuses,
+                                detailed: true,
+                                overdue: day.isPast and scheduled.status.value == 'planned',
+                            }) }}
+                        {% else %}
+                            <p class="kd-weekday__rest">Repos</p>
+                        {% endfor %}
+                    </div>
+                </section>
+            {% endfor %}
+        </div>
     </div>
 {% endblock %}

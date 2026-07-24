@@ -1,26 +1,18 @@
-{# Barre d'ajout partagée (vues mois et semaine) : poser une séance / instancier
-   un plan / retirer un plan instancié. Chaque action redirige vers le mois passé
-   (year/month) ; en vue semaine on passe le mois pivot de la semaine.
+{# Barre d'ajout + modales de sélection (vues mois et semaine). « Poser une
+   séance » n'est plus un dropdown : elle s'ouvre via le « + » d'un jour (grille)
+   et présente les séances en cartes cherchables/triables/filtrables. « Instancier
+   un plan » garde un bouton en tête mais ouvre lui aussi une vraie modale à cartes.
+   Recherche/tri/filtre 100 % client (contrôleur `caladd`), le wrapper porte
+   data-controller="caladd" (posé par index/week, il englobe la grille et ses « + »).
 
-   Attend : scheduleForm, instantiateForm, instantiatedPlans, year, month. #}
+   Attend : workoutCards, workoutActivities, planCards, instantiateForm,
+   instantiatedPlans, statuses, year, month. #}
+{% import 'components/_activity.html.twig' as activity %}
+
 <div class="kd-calbar">
-    <details class="kd-caladd">
-        <summary>{{ ux_icon('lucide:calendar-plus') }} Poser une séance</summary>
-        {{ form_start(scheduleForm, {attr: {class: 'kd-caladd__form'}}) }}
-            {{ form_row(scheduleForm.workout) }}
-            {{ form_row(scheduleForm.scheduledDate) }}
-            <button type="submit" class="kd-btn kd-btn--primary">Planifier</button>
-        {{ form_end(scheduleForm) }}
-    </details>
-
-    <details class="kd-caladd">
-        <summary>{{ ux_icon('lucide:layers') }} Instancier un plan</summary>
-        {{ form_start(instantiateForm, {attr: {class: 'kd-caladd__form'}}) }}
-            {{ form_row(instantiateForm.planTemplate) }}
-            {{ form_row(instantiateForm.startDate) }}
-            <button type="submit" class="kd-btn kd-btn--primary">Instancier</button>
-        {{ form_end(instantiateForm) }}
-    </details>
+    <button type="button" class="kd-btn kd-btn--secondary kd-btn--sm" data-action="caladd#openPlan">
+        {{ ux_icon('lucide:layers') }} Instancier un plan
+    </button>
 
     {% if instantiatedPlans|length %}
         <details class="kd-caladd">
@@ -43,3 +35,146 @@
         </details>
     {% endif %}
 </div>
+
+{# ---------------------------------------------------------------------------
+   Modale « poser une séance » — ouverte par le « + » d'un jour de la grille.
+   La date vient du bouton (data-caladd-date-param) ; chaque carte est un submit
+   (clic = pose immédiate). Outils hors du <form> pour qu'Entrée ne pose rien.
+   --------------------------------------------------------------------------- #}
+<dialog class="kd-modal kd-modal--picker" data-caladd-target="workoutDialog" data-action="click->caladd#backdrop">
+    <div class="kd-modal__card kd-modal__card--picker">
+        <div class="kd-modal__head">
+            <div>
+                <h2 class="kd-modal__title">Ajouter une séance</h2>
+                <p class="kd-modal__sub kd-picker__date" data-caladd-target="dateLabel"></p>
+            </div>
+            <button type="button" class="kd-modal__close" data-action="caladd#close" aria-label="Fermer">
+                {{ ux_icon('lucide:x') }}
+            </button>
+        </div>
+
+        <div class="kd-picker__tools">
+            <div class="kd-libsearch">
+                {{ ux_icon('lucide:search') }}
+                <input type="search" placeholder="Rechercher une séance…" data-action="input->caladd#filterWorkouts">
+            </div>
+            <select class="kd-input kd-select kd-picker__sort" data-action="caladd#sortWorkouts" aria-label="Trier">
+                <option value="title">A → Z</option>
+                <option value="duration">Durée</option>
+            </select>
+        </div>
+
+        <div class="kd-libfilters">
+            <button type="button" class="kd-libfilter kd-libfilter--on" data-activity="all"
+                    data-action="caladd#pickWorkoutActivity">Toutes · {{ workoutCards|length }}</button>
+            {% for act in workoutActivities %}
+                <button type="button" class="kd-libfilter" data-activity="{{ act.value }}"
+                        data-action="caladd#pickWorkoutActivity">{{ act.label }} · {{ act.count }}</button>
+            {% endfor %}
+        </div>
+
+        <form method="post" action="{{ path('app_scheduled_workout_place') }}" class="kd-picker">
+            <input type="hidden" name="_token" value="{{ csrf_token('schedule_place') }}">
+            <input type="hidden" name="date" data-caladd-target="dateInput">
+
+            <div class="kd-picker__list" data-caladd-target="workoutList">
+                {% for card in workoutCards %}
+                    {% set w = card.workout %}
+                    <button type="submit" name="workoutId" value="{{ w.id }}"
+                            class="kd-palettecard kd-palettecard--btn"
+                            data-caladd-target="workoutCard"
+                            data-activity="{% for a in card.activities %}{{ a.value }}{{ not loop.last ? ' ' }}{% endfor %}"
+                            data-filter-text="{{ card.filterText|lower }}"
+                            data-sort-title="{{ w.title|lower }}"
+                            data-sort-duration="{{ w.estimatedDurationMinutes ?: 0 }}">
+                        <span class="kd-libx__code">{{ w.title|slice(0, 2)|upper }}</span>
+                        <span class="kd-libx__body">
+                            <span class="kd-libx__name">{{ w.title }}</span>
+                            <span class="kd-palettecard__meta">
+                                {% if w.estimatedDurationMinutes %}
+                                    <span>{{ ux_icon('lucide:clock') }} {{ w.estimatedDurationMinutes }} min</span>
+                                {% endif %}
+                                <span>{{ card.exerciseCount }} exos</span>
+                            </span>
+                            {% if card.activities %}
+                                <span class="kd-cellbadges">
+                                    {% for a in card.activities %}{{ activity.badge(a, false) }}{% endfor %}
+                                </span>
+                            {% endif %}
+                        </span>
+                    </button>
+                {% else %}
+                    <p class="kd-libpanel__empty">Aucune séance en bibliothèque. Crée-en une d'abord.</p>
+                {% endfor %}
+                <p class="kd-libpanel__empty" data-caladd-target="workoutEmpty" hidden>Aucune séance ne correspond.</p>
+            </div>
+        </form>
+    </div>
+</dialog>
+
+{# ---------------------------------------------------------------------------
+   Modale « instancier un plan » — cartes de plans (sélection) + date + confirmer.
+   Le <select> du PlanInstantiationType est caché et piloté par les cartes.
+   --------------------------------------------------------------------------- #}
+<dialog class="kd-modal kd-modal--picker" data-caladd-target="planDialog" data-action="click->caladd#backdrop">
+    <div class="kd-modal__card kd-modal__card--picker">
+        <div class="kd-modal__head">
+            <div>
+                <h2 class="kd-modal__title">Instancier un plan</h2>
+                <p class="kd-modal__sub">Choisis un plan, puis sa date de départ.</p>
+            </div>
+            <button type="button" class="kd-modal__close" data-action="caladd#close" aria-label="Fermer">
+                {{ ux_icon('lucide:x') }}
+            </button>
+        </div>
+
+        <div class="kd-picker__tools">
+            <div class="kd-libsearch">
+                {{ ux_icon('lucide:search') }}
+                <input type="search" placeholder="Rechercher un plan…" data-action="input->caladd#filterPlans">
+            </div>
+            <select class="kd-input kd-select kd-picker__sort" data-action="caladd#sortPlans" aria-label="Trier">
+                <option value="title">A → Z</option>
+                <option value="weeks">Durée</option>
+            </select>
+        </div>
+
+        {{ form_start(instantiateForm, {attr: {class: 'kd-picker'}}) }}
+            <div class="kd-picker__hidden" data-caladd-target="planSelectWrap" hidden>
+                {{ form_row(instantiateForm.planTemplate) }}
+            </div>
+
+            <div class="kd-picker__list" data-caladd-target="planList">
+                {% for card in planCards %}
+                    {% set p = card.plan %}
+                    <button type="button" class="kd-palettecard kd-palettecard--btn"
+                            data-caladd-target="planCard"
+                            data-plan-id="{{ p.id }}"
+                            data-filter-text="{{ p.title|lower }}"
+                            data-sort-title="{{ p.title|lower }}"
+                            data-sort-weeks="{{ card.weeks }}"
+                            data-action="caladd#selectPlan">
+                        <span class="kd-libx__code">{{ ux_icon('lucide:layers') }}</span>
+                        <span class="kd-libx__body">
+                            <span class="kd-libx__name">{{ p.title }}</span>
+                            <span class="kd-palettecard__meta">
+                                <span>{{ ux_icon('lucide:calendar-range') }} {{ card.weeks }} sem.</span>
+                                <span>{{ card.sessionCount }} séance{{ card.sessionCount > 1 ? 's' }}</span>
+                            </span>
+                        </span>
+                    </button>
+                {% else %}
+                    <p class="kd-libpanel__empty">Aucun plan. Crée-en un d'abord.</p>
+                {% endfor %}
+                <p class="kd-libpanel__empty" data-caladd-target="planEmpty" hidden>Aucun plan ne correspond.</p>
+            </div>
+
+            <div class="kd-picker__foot">
+                {{ form_row(instantiateForm.startDate, {attr: {'data-caladd-target': 'planDate'}}) }}
+                <button type="submit" class="kd-btn kd-btn--primary" data-caladd-target="planSubmit" disabled>
+                    {{ ux_icon('lucide:calendar-plus') }} Instancier
+                </button>
+            </div>
+        {{ form_end(instantiateForm) }}
+    </div>
+</dialog>

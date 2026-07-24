@@ -2,11 +2,12 @@
 
 namespace App\Controller;
 
+use App\Enum\ActivityType;
 use App\Form\PlanInstantiationType;
-use App\Form\ScheduleWorkoutType;
 use App\Repository\PlanTemplateRepository;
 use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
+use App\Service\WorkoutMetrics;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -23,6 +24,11 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/calendar')]
 final class CalendarController extends AbstractController
 {
+    public function __construct(
+        private readonly WorkoutMetrics $workoutMetrics,
+    ) {
+    }
+
     /** Noms de mois en français (index 1..12), le calendrier étant mono-langue. */
     private const MONTH_NAMES = [
         1 => 'Janvier', 2 => 'Février', 3 => 'Mars', 4 => 'Avril',
@@ -195,8 +201,9 @@ final class CalendarController extends AbstractController
     }
 
     /**
-     * Contexte commun aux vues mois et semaine : formulaires d'ajout (poser une
-     * séance, instancier un plan), plans instanciés (retrait rapide) et statuts.
+     * Contexte commun aux vues mois et semaine : cartes de séances (modale « poser
+     * une séance » ouverte par le « + » d'un jour), formulaire + cartes de plans
+     * (modale « instancier un plan »), plans instanciés (retrait rapide) et statuts.
      *
      * @return array<string, mixed>
      */
@@ -205,21 +212,78 @@ final class CalendarController extends AbstractController
         PlanTemplateRepository $planTemplateRepository,
         ScheduledWorkoutRepository $scheduledWorkoutRepository,
     ): array {
-        $scheduleForm = $this->createForm(ScheduleWorkoutType::class, null, [
-            'action' => $this->generateUrl('app_scheduled_workout_add'),
-            'workouts' => $workoutRepository->findLibraryForOwner($this->getUser()),
-        ]);
+        $plans = $planTemplateRepository->findBy(['owner' => $this->getUser()], ['title' => 'ASC']);
 
         $instantiateForm = $this->createForm(PlanInstantiationType::class, null, [
             'action' => $this->generateUrl('app_scheduled_workout_instantiate'),
-            'planTemplates' => $planTemplateRepository->findBy(['owner' => $this->getUser()], ['title' => 'ASC']),
+            'planTemplates' => $plans,
         ]);
 
         return [
-            'scheduleForm' => $scheduleForm,
             'instantiateForm' => $instantiateForm,
             'instantiatedPlans' => $scheduledWorkoutRepository->findInstantiatedPlansForOwner($this->getUser()),
             'statuses' => \App\Enum\ScheduledStatus::cases(),
+            ...$this->buildPickerCards($workoutRepository, $plans),
+        ];
+    }
+
+    /**
+     * Repères de carte pour les deux modales de sélection : séances de bibliothèque
+     * (activités distinctes, nb d'exos, texte de recherche) et plans (durée, nb de
+     * séances). Contenu fetch-joint pour les séances (anti N+1), calqué sur la
+     * palette de l'éditeur de trame.
+     *
+     * @param list<\App\Entity\PlanTemplate> $plans
+     *
+     * @return array<string, mixed>
+     */
+    private function buildPickerCards(WorkoutRepository $workoutRepository, array $plans): array
+    {
+        $workouts = $workoutRepository->findLibraryForOwnerWithContent($this->getUser());
+
+        $cards = [];
+        $countsByActivity = [];
+        foreach ($workouts as $workout) {
+            $activities = $this->workoutMetrics->distinctActivities($workout);
+
+            $filterText = (string) $workout->getTitle();
+            foreach ($activities as $activity) {
+                $countsByActivity[$activity->value] = ($countsByActivity[$activity->value] ?? 0) + 1;
+                $filterText .= ' '.$activity->getLabel();
+            }
+
+            $cards[] = [
+                'workout' => $workout,
+                'activities' => $activities,
+                'exerciseCount' => $this->workoutMetrics->exerciseCount($workout),
+                'filterText' => $filterText,
+            ];
+        }
+
+        $activityFilters = [];
+        foreach (ActivityType::cases() as $activity) {
+            if (isset($countsByActivity[$activity->value])) {
+                $activityFilters[] = [
+                    'value' => $activity->value,
+                    'label' => $activity->getLabel(),
+                    'count' => $countsByActivity[$activity->value],
+                ];
+            }
+        }
+
+        $planCards = [];
+        foreach ($plans as $plan) {
+            $planCards[] = [
+                'plan' => $plan,
+                'weeks' => $plan->getDurationWeeks() ?? 0,
+                'sessionCount' => $plan->getPlanItems()->count(),
+            ];
+        }
+
+        return [
+            'workoutCards' => $cards,
+            'workoutActivities' => $activityFilters,
+            'planCards' => $planCards,
         ];
     }
 

@@ -6,12 +6,12 @@ use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
 use App\Enum\ScheduledStatus;
 use App\Form\PlanInstantiationType;
-use App\Form\ScheduleWorkoutType;
 use App\Repository\PlanTemplateRepository;
 use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\PlanTemplateVoter;
 use App\Security\Voter\ScheduledWorkoutVoter;
+use App\Security\Voter\WorkoutVoter;
 use App\Service\PlanScheduler;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -33,31 +33,43 @@ final class ScheduledWorkoutController extends AbstractController
     }
 
     /**
-     * Pose une séance existante sur une date précise, hors de tout plan.
+     * Pose une séance de bibliothèque sur une date précise, hors de tout plan.
+     * Endpoint lean posté par la modale « poser une séance » du calendrier (une
+     * carte cliquée = un submit workoutId+date, calqué sur la palette de plan) :
+     * pas de formulaire Symfony, la date vient du « + » du jour choisi.
      */
-    #[Route('/workout', name: 'app_scheduled_workout_add', methods: ['POST'])]
-    public function add(Request $request, WorkoutRepository $workoutRepository): Response
+    #[Route('/place', name: 'app_scheduled_workout_place', methods: ['POST'])]
+    public function place(Request $request, WorkoutRepository $workoutRepository): Response
     {
-        $scheduled = new ScheduledWorkout();
-        $form = $this->createForm(ScheduleWorkoutType::class, $scheduled, [
-            'workouts' => $workoutRepository->findLibraryForOwner($this->getUser()),
-        ]);
-        $form->handleRequest($request);
+        $payload = $request->getPayload();
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            $scheduled->setOwner($this->getUser());
-            $scheduled->setStatus(ScheduledStatus::PLANNED);
-            $this->entityManager->persist($scheduled);
-            $this->entityManager->flush();
-
-            $this->addFlash('success', 'Séance planifiée.');
-
-            return $this->redirectToMonth($scheduled->getScheduledDate());
+        if (!$this->isCsrfTokenValid('schedule_place', $payload->getString('_token'))) {
+            return $this->redirectToCurrentMonth();
         }
 
-        $this->addFlash('error', 'Impossible de planifier cette séance.');
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $payload->getString('date')) ?: null;
+        $workout = $workoutRepository->find($payload->getInt('workoutId'));
 
-        return $this->redirectToCurrentMonth();
+        // planLocal = copie privée portée par un plan : jamais posable seule.
+        if (null === $date || null === $workout || $workout->isPlanLocal()) {
+            $this->addFlash('error', 'Impossible de planifier cette séance.');
+
+            return null === $date ? $this->redirectToCurrentMonth() : $this->redirectToMonth($date);
+        }
+
+        $this->denyAccessUnlessGranted(WorkoutVoter::VIEW, $workout);
+
+        $scheduled = new ScheduledWorkout();
+        $scheduled->setWorkout($workout);
+        $scheduled->setScheduledDate($date);
+        $scheduled->setOwner($this->getUser());
+        $scheduled->setStatus(ScheduledStatus::PLANNED);
+        $this->entityManager->persist($scheduled);
+        $this->entityManager->flush();
+
+        $this->addFlash('success', 'Séance planifiée.');
+
+        return $this->redirectToMonth($date);
     }
 
     /**

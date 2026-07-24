@@ -574,6 +574,33 @@ navigateur (non automatisable ici).
   `.kd-calday--weekend`, `.kd-weekbar`, `.kd-weekstat*`, `.kd-weekchip*`, `.kd-week`,
   `.kd-weekday*`. Icônes déjà locales (`calendar-days`, `calendar-range`, `clock`,
   `calendar-clock`…). Pas de migration.
+  **Ajout au calendrier : modales à cartes (remplacent les dropdowns, sans migration).**
+  Les `<details>` « Poser une séance » / « Instancier un plan » de `_addbar` (dropdowns
+  natifs, illisibles à beaucoup de séances) laissent place à de vraies modales à cartes
+  cherchables/triables/filtrables, calquées sur la palette de l'éditeur de trame.
+  **Poser une séance** : plus de bouton en tête ; chaque case de jour porte un « + »
+  (`.kd-calday__add`, révélé au survol / focus, toujours atténué en tactile) qui ouvre
+  la modale et fixe la date. Les séances de biblio y sont des **cartes-boutons submit**
+  (`.kd-palettecard--btn`) : clic = pose immédiate via l'endpoint lean
+  `ScheduledWorkoutController::place` (`POST /schedule/place`, CSRF `schedule_place`,
+  `workoutId`+`date`, refuse un `planLocal`, `WorkoutVoter::VIEW`) — calqué sur
+  `app_plan_template_item_place`. L'ancien `add()` + `ScheduleWorkoutType` sont
+  **supprimés**. **Instancier un plan** garde un bouton en tête mais ouvre une modale :
+  cartes de plans (clic = sélection, pilote le `<select>` caché du `PlanInstantiationType`),
+  puis date de départ + « Instancier » (submit désactivé tant qu'aucun plan choisi).
+  Recherche/tri/filtre d'activité **100 % client** via le nouveau contrôleur Stimulus
+  `caladd` (`assets/controllers/caladd_controller.js`) ; les outils (recherche, tri,
+  filtres) vivent **hors du `<form>`** pour qu'un Entrée ne déclenche pas de pose
+  accidentelle. Le wrapper `data-controller="caladd"` (posé par `calendar/index` et
+  `calendar/week`) englobe l'`_addbar` (qui porte les deux `<dialog>`) **et** la grille
+  (ses « + »). « Retirer un plan » reste un `<details>` inchangé. Comme le reste du
+  calendrier : redirection vers le mois, pas de Turbo Stream ; poser/instancier requiert
+  JS (choix assumé, cf. palette de plan). Nouveaux repères de carte construits dans
+  `CalendarController::buildPickerCards` (via `WorkoutMetrics` +
+  `findLibraryForOwnerWithContent`, anti N+1). Classes CSS `.kd-calday__add(--week)`,
+  `.kd-modal--picker`, `.kd-modal__card--picker`, `.kd-picker*`, `.kd-palettecard--btn`,
+  `.kd-weekday__right`. Icônes déjà locales (`plus`, `layers`, `search`, `calendar-plus`…).
+  Pas de migration.
 
 ---
 
