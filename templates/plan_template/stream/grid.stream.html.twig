@@ -1,7 +1,8 @@
-{# Réponse Turbo Stream d'une mutation de la trame : on remplace intégralement
-   le conteneur de la grille par sa version fraîchement rendue. Contexte fourni
-   par gridContext(). #}
-<turbo-stream action="replace" target="plan-grid">
+{# Réponse Turbo Stream d'une mutation de la trame : on remplace le CONTENU du
+   conteneur (action="update"), pas l'élément lui-même — l'id #plan-grid survit
+   ainsi à chaque mutation (même piège que #workout-blocks dans le compositeur).
+   Contexte fourni par gridContext(). #}
+<turbo-stream action="update" target="plan-grid">
     <template>
         {{ include('plan_template/_grid.html.twig') }}
     </template>

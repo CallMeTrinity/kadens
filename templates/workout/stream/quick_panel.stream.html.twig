@@ -1,0 +1,8 @@
+{# Réponse à une modification d'exercice depuis la mini-modale. On met à jour le
+   CONTENU de #quick-panel (action="update", l'id survit), comme le compositeur le
+   fait pour #workout-blocks. #}
+<turbo-stream action="update" target="quick-panel">
+    <template>
+        {{ include('workout/_quick_panel.html.twig') }}
+    </template>
+</turbo-stream>

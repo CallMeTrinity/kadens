@@ -11,7 +11,7 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Formulaire d'instanciation d'un plan : quel PlanTemplate, à partir de quelle
- * date. Non lié à une entité (les données alimentent PlanInstantiator, qui
+ * date. Non lié à une entité (les données alimentent PlanScheduler, qui
  * produit N ScheduledWorkout). La date de départ est ancrée au lundi de sa
  * semaine ISO côté service.
  *

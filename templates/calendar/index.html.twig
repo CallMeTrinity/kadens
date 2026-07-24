@@ -50,6 +50,27 @@
                 <button type="submit" class="kd-btn kd-btn--primary">Instancier</button>
             {{ form_end(instantiateForm) }}
         </details>
+
+        {% if instantiatedPlans|length %}
+            <details class="kd-caladd">
+                <summary>{{ ux_icon('lucide:calendar-x') }} Retirer un plan du planning</summary>
+                <form method="post" action="{{ path('app_scheduled_workout_clear_plan') }}" class="kd-caladd__form"
+                      onsubmit="return confirm('Retirer ce plan et TOUTES ses séances du planning (y compris les séances faites) ? Le plan lui-même est conservé.');">
+                    <input type="hidden" name="_token" value="{{ csrf_token('clear_plan') }}">
+                    <input type="hidden" name="year" value="{{ year }}">
+                    <input type="hidden" name="month" value="{{ month }}">
+                    <div class="kd-field">
+                        <select name="planId" class="kd-input kd-select" required>
+                            <option value="" disabled selected>Choisir un plan instancié…</option>
+                            {% for plan in instantiatedPlans %}
+                                <option value="{{ plan.id }}">{{ plan.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="kd-btn kd-btn--danger">{{ ux_icon('lucide:trash-2') }} Retirer du planning</button>
+                </form>
+            </details>
+        {% endif %}
     </div>
 
     <div class="kd-cal">

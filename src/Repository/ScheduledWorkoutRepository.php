@@ -2,6 +2,8 @@
 
 namespace App\Repository;
 
+use App\Entity\PlanItem;
+use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -106,6 +108,62 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
         }
 
         return array_values($byPlan);
+    }
+
+    /**
+     * Séances datées issues d'un plan pour un utilisateur (l'« instance vivante »
+     * de ce plan sur son calendrier). Sert au resync : ajouter les cases nouvelles,
+     * retrouver l'ancre. La séance (copie locale) est jointe pour le rendu.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findBySourcePlanTemplateForOwner(PlanTemplate $template, User $owner): array
+    {
+        return $this->createQueryBuilder('s')
+            ->addSelect('w')
+            ->join('s.workout', 'w')
+            ->andWhere('s.sourcePlanTemplate = :template')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('template', $template)
+            ->setParameter('owner', $owner)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Plans actuellement posés sur le calendrier de l'utilisateur (au moins une
+     * séance datée en provient), dédupliqués et triés par titre. Alimente le
+     * retrait rapide d'un plan instancié depuis le calendrier.
+     *
+     * @return list<PlanTemplate>
+     */
+    public function findInstantiatedPlansForOwner(User $owner): array
+    {
+        return $this->getEntityManager()->createQueryBuilder()
+            ->select('p')
+            ->distinct()
+            ->from(PlanTemplate::class, 'p')
+            ->innerJoin(ScheduledWorkout::class, 's', 'WITH', 's.sourcePlanTemplate = p')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('owner', $owner)
+            ->orderBy('p.title', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Séances datées issues d'une case précise du plan. Sert au retrait d'une case :
+     * on retire les séances encore PLANNED, on préserve celles DONE/MISSED.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findBySourcePlanItem(PlanItem $item): array
+    {
+        return $this->createQueryBuilder('s')
+            ->andWhere('s.sourcePlanItem = :item')
+            ->setParameter('item', $item)
+            ->getQuery()
+            ->getResult();
     }
 
     /**

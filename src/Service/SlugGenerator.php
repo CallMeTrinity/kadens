@@ -32,13 +32,43 @@ final class SlugGenerator
 
         $repository = $this->entityManager->getRepository($entityClass);
 
+        // Slugs déjà générés dans la transaction courante mais pas encore flushés :
+        // sans ça, cloner plusieurs séances de même titre d'un coup (duplication de
+        // plan / de semaine) leur donnerait le même slug -> collision au flush.
+        $pending = $this->pendingSlugs($entityClass, $field);
+
         $slug = $base;
         $suffix = 2;
 
-        while (null !== $repository->findOneBy([$field => $slug])) {
+        while (\in_array($slug, $pending, true) || null !== $repository->findOneBy([$field => $slug])) {
             $slug = $base.'-'.$suffix++;
         }
 
         return $slug;
+    }
+
+    /**
+     * Slugs portés par les entités du même type déjà persistées (donc programmées
+     * pour insertion) mais pas encore écrites en base.
+     *
+     * @param class-string $entityClass
+     *
+     * @return list<string>
+     */
+    private function pendingSlugs(string $entityClass, string $field): array
+    {
+        $getter = 'get'.ucfirst($field);
+        $slugs = [];
+
+        foreach ($this->entityManager->getUnitOfWork()->getScheduledEntityInsertions() as $entity) {
+            if ($entity instanceof $entityClass && method_exists($entity, $getter)) {
+                $value = $entity->{$getter}();
+                if (null !== $value) {
+                    $slugs[] = (string) $value;
+                }
+            }
+        }
+
+        return $slugs;
     }
 }

@@ -61,7 +61,7 @@ final class CalendarController extends AbstractController
 
         $scheduleForm = $this->createForm(ScheduleWorkoutType::class, null, [
             'action' => $this->generateUrl('app_scheduled_workout_add'),
-            'workouts' => $workoutRepository->findBy(['owner' => $this->getUser()], ['title' => 'ASC']),
+            'workouts' => $workoutRepository->findLibraryForOwner($this->getUser()),
         ]);
 
         $instantiateForm = $this->createForm(PlanInstantiationType::class, null, [
@@ -78,6 +78,7 @@ final class CalendarController extends AbstractController
             'next' => ['year' => (int) $next->format('Y'), 'month' => (int) $next->format('n')],
             'scheduleForm' => $scheduleForm,
             'instantiateForm' => $instantiateForm,
+            'instantiatedPlans' => $scheduledWorkoutRepository->findInstantiatedPlansForOwner($this->getUser()),
             'statuses' => \App\Enum\ScheduledStatus::cases(),
         ]);
     }

@@ -40,12 +40,42 @@
         {{ form_end(form) }}
     </section>
 
-    {# Trame — conteneur cible des Turbo Streams #}
-    <section class="kd-editsection">
+    {# Trame — conteneur cible des Turbo Streams. Le contrôleur `plangrid` porte le
+       glisser-déposer inter-cases et la mini-modale d'édition rapide. Il enveloppe
+       la grille ET la modale : les mutations de trame ne touchent que le CONTENU de
+       #plan-grid (action="update"), la modale et le contrôleur survivent. #}
+    <section class="kd-editsection" data-controller="plangrid">
         <p class="kd-editsection__title">Trame</p>
+        <p class="kd-editsection__hint">
+            Glisse une séance d'un jour à l'autre. Clique une séance pour ajuster ses
+            valeurs (sa progression est propre à cette semaine, les autres cases ne
+            bougent pas).
+        </p>
         <div id="plan-grid">
             {{ include('plan_template/_grid.html.twig') }}
         </div>
+
+        {# Mini-modale d'édition rapide : le panneau des exercices de la copie locale
+           est chargé en fetch dans #quick-panel, puis re-rendu par Turbo Stream à
+           chaque enregistrement. data-turbo="false" : Turbo n'intercepte aucun
+           formulaire de la modale, le contrôleur applique lui-même les streams. #}
+        <dialog class="kd-modal kd-modal--quick" data-plangrid-target="dialog" data-turbo="false"
+                data-action="click->plangrid#backdrop">
+            <div class="kd-modal__card kd-modal__card--quick">
+                <header class="kd-modal__head">
+                    <span class="kd-modal__title">{{ ux_icon('lucide:sliders-horizontal') }} Édition rapide</span>
+                    <div class="kd-modal__headactions">
+                        <a data-plangrid-target="fullLink" href="#" class="kd-btn kd-btn--secondary kd-btn--sm">
+                            {{ ux_icon('lucide:square-pen') }} Édition complète
+                        </a>
+                        <button type="button" class="kd-modal__close" data-action="plangrid#close" aria-label="Fermer">
+                            {{ ux_icon('lucide:x') }}
+                        </button>
+                    </div>
+                </header>
+                <div id="quick-panel" class="kd-quickedit" data-plangrid-target="panel"></div>
+            </div>
+        </dialog>
     </section>
 
     {# Dupliquer #}

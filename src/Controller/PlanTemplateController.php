@@ -4,13 +4,17 @@ namespace App\Controller;
 
 use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
+use App\Enum\ScheduledStatus;
 use App\Form\PlanItemType;
 use App\Form\PlanTemplateType;
 use App\Repository\PlanTemplateRepository;
+use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\PlanTemplateVoter;
 use App\Service\PlanFlattener;
+use App\Service\PlanScheduler;
 use App\Service\SlugGenerator;
+use App\Service\WorkoutCloner;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormFactoryInterface;
@@ -113,7 +117,7 @@ final class PlanTemplateController extends AbstractController
      * (utile pour itérer sans repartir de zéro). Le template source reste intact.
      */
     #[Route('/{id}/duplicate', name: 'app_plan_template_duplicate', methods: ['POST'], requirements: ['id' => '\d+'])]
-    public function duplicate(Request $request, PlanTemplate $template, SlugGenerator $slugGenerator): Response
+    public function duplicate(Request $request, PlanTemplate $template, SlugGenerator $slugGenerator, WorkoutCloner $cloner): Response
     {
         $this->denyAccessUnlessGranted(PlanTemplateVoter::VIEW, $template);
 
@@ -128,12 +132,14 @@ final class PlanTemplateController extends AbstractController
             ->setDurationWeeks($template->getDurationWeeks())
             ->setSlug($slugGenerator->generate($template->getTitle().' copie', PlanTemplate::class));
 
-        // Les items pointent vers les mêmes Workout (référence de bibliothèque),
-        // on ne recopie que le placement dans la trame.
+        // Chaque case porte sa PROPRE copie de séance (progression indépendante) :
+        // on clone donc la copie locale, pas seulement le placement. Sans ça, les
+        // deux plans partageraient les mêmes séances et s'éditeraient mutuellement.
         foreach ($template->getPlanItems() as $item) {
+            $workoutCopy = $cloner->cloneWorkout($item->getWorkout(), $this->getUser(), $item->getWorkout()->getTitle(), true);
             $copy->addPlanItem(
                 (new PlanItem())
-                    ->setWorkout($item->getWorkout())
+                    ->setWorkout($workoutCopy)
                     ->setWeekNumber($item->getWeekNumber())
                     ->setDayOfWeek($item->getDayOfWeek())
                     ->setNotes($item->getNotes())
@@ -152,7 +158,7 @@ final class PlanTemplateController extends AbstractController
     // ---- Édition de la trame (placement des séances) -----------------------
 
     #[Route('/{id}/weeks/{week}/days/{day}/items', name: 'app_plan_template_item_add', methods: ['POST'], requirements: ['id' => '\d+', 'week' => '\d+', 'day' => '[1-7]'])]
-    public function addItem(Request $request, PlanTemplate $template, int $week, int $day): Response
+    public function addItem(Request $request, PlanTemplate $template, int $week, int $day, WorkoutCloner $cloner, PlanScheduler $scheduler): Response
     {
         $this->denyAccessUnlessGranted(PlanTemplateVoter::EDIT, $template);
         $this->assertCell($template, $week, $day);
@@ -162,23 +168,126 @@ final class PlanTemplateController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $template->addPlanItem($item);
-            $this->entityManager->persist($item);
-            $this->entityManager->flush();
+            // Le formulaire a lié la séance de bibliothèque choisie sur $item.
+            // Fork à la pose : la case reçoit sa PROPRE copie (planLocal), éditable
+            // et progressable sans toucher la séance source ni les autres cases.
+            $chosen = $item->getWorkout();
+            if (null !== $chosen) {
+                $copy = $cloner->cloneWorkout($chosen, $this->getUser(), $chosen->getTitle(), true);
+                $item->setWorkout($copy);
+                $template->addPlanItem($item);
+                $this->entityManager->persist($item);
+                $this->entityManager->flush();
+
+                // Si le plan est déjà posé sur le calendrier, la nouvelle case y
+                // apparaît (resync add-only, no-op sinon).
+                $scheduler->resync($template);
+            }
         }
 
         return $this->gridResponse($request, $template);
     }
 
     #[Route('/{id}/items/{itemId}/delete', name: 'app_plan_template_item_delete', methods: ['POST'], requirements: ['id' => '\d+', 'itemId' => '\d+'])]
-    public function deleteItem(Request $request, PlanTemplate $template, int $itemId): Response
+    public function deleteItem(Request $request, PlanTemplate $template, int $itemId, ScheduledWorkoutRepository $scheduledRepository): Response
     {
         $this->denyAccessUnlessGranted(PlanTemplateVoter::EDIT, $template);
         $item = $this->findItem($template, $itemId);
 
         if ($this->isCsrfTokenValid('item_delete'.$itemId, $request->getPayload()->getString('_token'))) {
+            $copy = $item->getWorkout();
+
+            // Séances datées issues de cette case : on retire celles encore prévues,
+            // on PRÉSERVE celles faites/manquées (leur FUT vaut historique). Leur
+            // lien vers la case passera à NULL au retrait de la case (SET NULL).
+            $kept = 0;
+            foreach ($scheduledRepository->findBySourcePlanItem($item) as $scheduled) {
+                if (ScheduledStatus::PLANNED === $scheduled->getStatus()) {
+                    $this->entityManager->remove($scheduled);
+                } else {
+                    ++$kept;
+                }
+            }
+
             $template->removePlanItem($item);
             $this->entityManager->flush();
+
+            // Copie orpheline (plus aucune séance datée préservée ne la référence) :
+            // on la nettoie. Si une séance faite la référence encore, on la garde
+            // (sinon la cascade workout->scheduled effacerait le réalisé).
+            if (null !== $copy && $copy->isPlanLocal() && 0 === $kept) {
+                $this->entityManager->remove($copy);
+                $this->entityManager->flush();
+            }
+        }
+
+        return $this->gridResponse($request, $template);
+    }
+
+    /**
+     * Duplique le contenu d'une semaine sur la semaine suivante. Chaque séance est
+     * clonée en une nouvelle copie locale (progression indépendante). Support de la
+     * construction incrémentale : « ma semaine 1 est bonne, je la reporte en 2 puis
+     * je fais progresser ».
+     */
+    #[Route('/{id}/weeks/{week}/duplicate', name: 'app_plan_template_week_duplicate', methods: ['POST'], requirements: ['id' => '\d+', 'week' => '\d+'])]
+    public function duplicateWeek(Request $request, PlanTemplate $template, int $week, WorkoutCloner $cloner, PlanScheduler $scheduler): Response
+    {
+        $this->denyAccessUnlessGranted(PlanTemplateVoter::EDIT, $template);
+
+        $target = $week + 1;
+        if ($this->isCsrfTokenValid('week_duplicate'.$week, $request->getPayload()->getString('_token'))
+            && $week >= 1 && $target <= (int) $template->getDurationWeeks()) {
+            // Snapshot des cases source AVANT d'ajouter (on modifie la collection).
+            $sources = [];
+            foreach ($template->getPlanItems() as $item) {
+                if ($item->getWeekNumber() === $week) {
+                    $sources[] = $item;
+                }
+            }
+
+            foreach ($sources as $item) {
+                $copy = $cloner->cloneWorkout($item->getWorkout(), $this->getUser(), $item->getWorkout()->getTitle(), true);
+                $newItem = (new PlanItem())
+                    ->setWeekNumber($target)
+                    ->setDayOfWeek($item->getDayOfWeek())
+                    ->setNotes($item->getNotes())
+                    ->setWorkout($copy);
+                $template->addPlanItem($newItem);
+                $this->entityManager->persist($newItem);
+            }
+
+            $this->entityManager->flush();
+            $scheduler->resync($template);
+        }
+
+        return $this->gridResponse($request, $template);
+    }
+
+    /**
+     * Déplace une case dans une autre semaine/jour (glisser-déposer SortableJS).
+     * Réaligne les séances datées ENCORE PRÉVUES sur la nouvelle position (le
+     * calendrier suit le plan), en préservant les DONE/MISSED (leur date =
+     * réalisé). Voir PlanScheduler::rescheduleItem.
+     */
+    #[Route('/{id}/items/{itemId}/move', name: 'app_plan_template_item_move', methods: ['POST'], requirements: ['id' => '\d+', 'itemId' => '\d+'])]
+    public function moveItem(Request $request, PlanTemplate $template, int $itemId, PlanScheduler $scheduler): Response
+    {
+        $this->denyAccessUnlessGranted(PlanTemplateVoter::EDIT, $template);
+        $item = $this->findItem($template, $itemId);
+        $payload = $request->getPayload();
+
+        if ($this->isCsrfTokenValid('item_move'.$itemId, $payload->getString('_token'))) {
+            $week = $payload->getInt('week');
+            $day = $payload->getInt('day');
+            if ($week >= 1 && $week <= (int) $template->getDurationWeeks() && $day >= 1 && $day <= 7) {
+                $item->setWeekNumber($week)->setDayOfWeek($day);
+                $this->entityManager->flush();
+
+                // Le calendrier suit : les séances prévues issues de cette case
+                // migrent à la nouvelle date (DONE/MISSED conservées).
+                $scheduler->rescheduleItem($item, $this->getUser());
+            }
         }
 
         return $this->gridResponse($request, $template);
@@ -228,10 +337,7 @@ final class PlanTemplateController extends AbstractController
      */
     private function ownedWorkouts(): array
     {
-        return $this->ownedWorkoutsCache ??= $this->workoutRepository->findBy(
-            ['owner' => $this->getUser()],
-            ['title' => 'ASC'],
-        );
+        return $this->ownedWorkoutsCache ??= $this->workoutRepository->findLibraryForOwner($this->getUser());
     }
 
     /**

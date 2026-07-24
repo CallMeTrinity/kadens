@@ -68,6 +68,21 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   la condition du cache offline (Phase 9).
 - **Template vs instance datée** : `PlanTemplate` (sans dates) ≠ `ScheduledWorkout`
   (daté). `ScheduledWorkout.workout` est une **référence vivante**.
+- **Progression = fork à la pose (règle ajustée).** Poser une séance dans un plan en
+  crée une **copie privée** (`Workout.planLocal = true`), portée par le `PlanItem`.
+  Éditer une séance placée (progression) ne touche ni la séance de bibliothèque ni
+  les autres cases. Ces copies sont **exclues de la bibliothèque**
+  (`WorkoutRepository::findLibraryForOwner`). Une séance datée issue d'un plan
+  référence la **copie locale** (pas la séance biblio) : ses modifications se
+  reflètent donc d'office au calendrier. Nuance qui remplace l'ancien « les items
+  pointent la même séance partagée ».
+- **Plan vivant sur le calendrier.** L'instanciation est désormais **idempotente**
+  (`PlanScheduler`, ex-`PlanInstantiator`) : la relancer resynchronise au lieu de
+  dupliquer. `resync` est **add-only** — il ajoute au calendrier les cases posées
+  après l'instanciation (`ScheduledWorkout.sourcePlanItem` + `planAnchorDate`) et ne
+  touche jamais une séance datée existante (préserve dates/statuts, décision
+  « préserver le réalisé »). Retirer une case supprime ses séances datées `PLANNED`
+  et **préserve** les `DONE`/`MISSED`.
 - **Aucune IA dans l'app.** Le remplissage de la biblio passe par une commande
   d'import JSON (Phase 3), pas d'API en prod.
 
@@ -356,6 +371,74 @@ navigateur (non automatisable ici).
   exposé dans la pastille résumé de l'éditeur. (9) Fix CSS `.kd-cblock__role` (padding
   droit pour la flèche du `<select>`, libellé de rôle plus tronqué). Icônes : `copy`
   déjà importée. Pas de migration.
+  **Éditeur de plan (refonte, notion de progression).** L'éditeur de trame passe au
+  compositeur : glisser-déposer, duplication de semaine, édition rapide, progression
+  indépendante par case, et plan vivant sur le calendrier. **Modèle** :
+  `Workout.planLocal` (copie privée d'une case, exclue de la biblio),
+  `ScheduledWorkout.sourcePlanItem` (case source, `ON DELETE SET NULL`) +
+  `planAnchorDate` (ancre d'instanciation). Migration `Version20260724120000`.
+  **Services** : `WorkoutCloner` (copie profonde unique, réutilisée par la
+  duplication de séance, la pose dans un plan et la duplication de semaine ;
+  recalcule la durée estimée) ; `PlanScheduler` (remplace `PlanInstantiator`,
+  instanciation **idempotente** + `resync` add-only préservant le réalisé, cf. §3).
+  **Contrôleur** (`PlanTemplateController`) : `addItem` clone la séance choisie
+  (fork à la pose) + resync ; `deleteItem` retire les séances datées `PLANNED`,
+  préserve `DONE`/`MISSED`, nettoie la copie orpheline ; `duplicateWeek` (POST) copie
+  une semaine sur la suivante (clones indépendants) + resync ; `moveItem` (POST,
+  glisser-déposer) change semaine/jour **et réaligne les séances datées encore
+  `PLANNED` sur la nouvelle date** (`PlanScheduler::rescheduleItem`, ancre =
+  `planAnchorDate` ; `DONE`/`MISSED` conservées, leur date = réalisé) ; la duplication de
+  plan clone aussi les copies (plans indépendants). Le stream de grille passe en
+  `action="update"` (l'id `#plan-grid` survit aux mutations, même piège que
+  `#workout-blocks`). **Front** : contrôleur Stimulus `plangrid` (SortableJS
+  inter-cases via une poignée `.kd-planitem__handle` ; sur dépôt, POST `fetch` +
+  `renderStreamMessage`) qui porte aussi la **mini-modale d'édition rapide** (cf.
+  section suivante). Amélioration progressive : sans JS, poser/retirer/dupliquer
+  par formulaire reste le repli (glisser-déposer et édition rapide requièrent JS).
+  Classes CSS `.kd-planitem__handle/__title/__meta`, `.kd-planweek__dup`.
+  Icônes déjà locales (`copy`,
+  `grip-vertical`, `clock`, `sliders-horizontal`, `x`). **Limite connue** : supprimer
+  une séance datée issue d'un plan directement au calendrier peut la voir réapparaître
+  au prochain `resync` (la case existe toujours) — pour l'enlever pour de bon, retirer
+  la case du plan. Re-instancier un plan déjà posé ignore la nouvelle date de départ
+  (une seule instance vivante par plan) : vider d'abord le planning pour ré-ancrer.
+  **Retrait rapide d'un plan instancié (calendrier).** Repli `.kd-caladd`
+  « Retirer un plan du planning » dans la `.kd-calbar`, listé seulement s'il existe
+  au moins une instance (`ScheduledWorkoutRepository::findInstantiatedPlansForOwner`,
+  `DISTINCT` sur `sourcePlanTemplate`). `ScheduledWorkoutController::clearPlan`
+  (`POST /schedule/plan/clear`, CSRF `clear_plan`, `planId` + `year`/`month` dans le
+  corps → redirige vers le mois affiché) supprime **toutes** les séances datées du
+  plan, **y compris DONE/MISSED** (action explicite et globale, contrairement au
+  retrait d'une case qui préserve le réalisé). Le `PlanTemplate` et ses copies locales
+  sont conservés : seule l'instanciation calendrier disparaît. C'est le moyen direct
+  de « vider le planning pour ré-ancrer ». Amélioration progressive : `planId` passe
+  par le corps du formulaire (pas l'URL), donc le repli sans JS marche ; garde-fou
+  `confirm()`. Voter `PlanTemplateVoter::VIEW` + filtre `owner` sur la requête. Pas de
+  migration.
+  **Édition rapide au plan : mini-modale inline (remplace l'iframe).** Cliquer une
+  séance dans l'éditeur de plan n'ouvre plus le compositeur complet en iframe
+  `?embed=1` mais une **mini-modale** ciblée sur les valeurs. Le contrôleur
+  `plangrid` charge en `fetch` le panneau des exercices de la copie locale
+  (`app_workout_quick_panel` → fragment `workout/_quick_panel.html.twig`, sans
+  layout) dans `#quick-panel` : exercices groupés par bloc, chacun en `<details>`
+  dépliant son formulaire `PrescribedExerciseType` (reps/séries/charge/repos…, champs
+  pilotés par `prescription-fields`). Enregistrer poste vers
+  `app_workout_prescribed_quick_edit` (`POST /workout/{id}/exercises/{prescribedId}/quick-edit`)
+  qui renvoie `workout/stream/quick_panel.stream.html.twig` (`action="update"` sur
+  `#quick-panel`, même piège d'id que `#workout-blocks`) : recalcule la durée
+  estimée, re-rend le panneau (pastille résumé à jour). La modale porte
+  `data-turbo="false"` ; `plangrid` intercepte les soumissions **du panneau
+  uniquement** (`panelTarget.contains(form)`) — les formulaires de trame gardent leur
+  repli natif. Un lien **« Édition complète »** (`data-full-url`) renvoie au
+  compositeur pour la structure (blocs, ordre, glisser-déposer). À la fermeture, la
+  page est rechargée **seulement** si un enregistrement a eu lieu (`this.dirty`), pour
+  refléter durée/titre sur les cases. Le contrôleur réutilise
+  `createPrescribedForm($prescribed, $route)` (paramétré par la route d'action) et un
+  nouveau `quickPanelContext`. **Mode `embed`/iframe supprimé** (mort) :
+  `base.html.twig`, `workout/edit.html.twig`, classes `.kd-modal--wide/__frame` et
+  `.kd-page--embed` retirées. Nouvelles classes `.kd-modal--quick`,
+  `.kd-modal__card--quick/__headactions`, `.kd-quickedit*`, `.kd-quickblock*`,
+  `.kd-quickexo*`. Icône `square-pen` (déjà locale). Pas de migration.
 
 ---
 

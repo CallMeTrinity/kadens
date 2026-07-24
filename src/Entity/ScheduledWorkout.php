@@ -31,6 +31,19 @@ class ScheduledWorkout
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     private ?PlanTemplate $sourcePlanTemplate = null;
 
+    // Case précise de la trame dont cette séance datée est issue. Sert au resync
+    // « plan vivant » (retrouver/ajouter la séance datée d'un item). SET NULL :
+    // retirer une case du plan n'efface pas une séance datée déjà réalisée, elle
+    // en oublie juste l'origine (décision « préserver le réalisé »).
+    #[ORM\ManyToOne]
+    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    private ?PlanItem $sourcePlanItem = null;
+
+    // Ancre de l'instanciation (lundi ISO de la semaine 1). Conservée pour pouvoir
+    // dater les cases ajoutées au plan APRÈS coup, sans redemander la date de départ.
+    #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $planAnchorDate = null;
+
     #[ORM\Column(type: Types::DATE_IMMUTABLE)]
     private ?\DateTimeImmutable $scheduledDate = null;
 
@@ -95,6 +108,30 @@ class ScheduledWorkout
     public function setSourcePlanTemplate(?PlanTemplate $sourcePlanTemplate): static
     {
         $this->sourcePlanTemplate = $sourcePlanTemplate;
+
+        return $this;
+    }
+
+    public function getSourcePlanItem(): ?PlanItem
+    {
+        return $this->sourcePlanItem;
+    }
+
+    public function setSourcePlanItem(?PlanItem $sourcePlanItem): static
+    {
+        $this->sourcePlanItem = $sourcePlanItem;
+
+        return $this;
+    }
+
+    public function getPlanAnchorDate(): ?\DateTimeImmutable
+    {
+        return $this->planAnchorDate;
+    }
+
+    public function setPlanAnchorDate(?\DateTimeImmutable $planAnchorDate): static
+    {
+        $this->planAnchorDate = $planAnchorDate;
 
         return $this;
     }

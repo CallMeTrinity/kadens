@@ -34,6 +34,16 @@ class Workout
     #[ORM\Column(nullable: true)]
     private ?int $estimatedDurationMinutes = null;
 
+    /**
+     * Séance « locale à un plan » : copie privée créée en posant une séance dans
+     * une trame (fork à la pose, cf. notion de progression). Ces copies portent la
+     * progression propre à leur case et ne doivent PAS apparaître dans la
+     * bibliothèque de séances (index, sélecteurs). Une séance de bibliothèque
+     * vaut false.
+     */
+    #[ORM\Column(options: ['default' => false])]
+    private bool $planLocal = false;
+
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -139,6 +149,18 @@ class Workout
     public function setEstimatedDurationMinutes(?int $estimatedDurationMinutes): static
     {
         $this->estimatedDurationMinutes = $estimatedDurationMinutes;
+
+        return $this;
+    }
+
+    public function isPlanLocal(): bool
+    {
+        return $this->planLocal;
+    }
+
+    public function setPlanLocal(bool $planLocal): static
+    {
+        $this->planLocal = $planLocal;
 
         return $this;
     }

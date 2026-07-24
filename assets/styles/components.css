@@ -2254,3 +2254,186 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
   .kd-composer__headactions { width: 100%; }
   .kd-composer__headactions .kd-btn { width: 100%; justify-content: center; }
 }
+
+/* ============================================================================
+   Éditeur de trame — glisser-déposer des séances + édition rapide (mini-modale)
+   ========================================================================== */
+
+/* Astuce d'usage sous le titre de section */
+.kd-editsection__hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-soft);
+  margin: 0 0 var(--kd-space-6);
+  max-width: 60ch;
+}
+
+/* Bouton « Dupliquer sur S{n+1} » poussé à droite de l'en-tête de semaine */
+.kd-planweek__dup { margin-left: auto; margin-block: 0; display: inline-flex; }
+
+/* Case = zone de dépôt : garde une hauteur minimale même vide pour accepter un drop */
+.kd-planday__items { min-height: 26px; }
+
+/* Séance placée : poignée + titre cliquable (ouvre le compositeur) + méta */
+.kd-planentry { cursor: default; }
+.kd-planitem__handle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-placeholder);
+  cursor: grab;
+}
+.kd-planitem__handle:active { cursor: grabbing; }
+.kd-planitem__handle svg { width: 13px; height: 13px; }
+.kd-planitem__link {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  /* Colonne : le titre garde toute la largeur de la carte (sinon, en case étroite,
+     la durée à largeur fixe l'écrase jusqu'à le faire disparaître). */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  overflow: hidden;
+}
+.kd-planitem__title {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-planitem__meta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-faint);
+}
+.kd-planitem__meta svg { width: 11px; height: 11px; }
+.kd-planitem__delform { display: inline-flex; margin: 0; }
+
+/* ----------------------------------------------------------------------------
+   Mini-modale d'édition rapide (éditeur de plan)
+   Le panneau (#quick-panel) liste les exercices de la copie locale avec leurs
+   paramètres éditables. Chrome resserré + corps défilable ; le lien « Édition
+   complète » renvoie au compositeur. Couleur neutre (trame multi-activités).
+   ---------------------------------------------------------------------------- */
+.kd-modal--quick { width: min(560px, calc(100vw - 2 * var(--kd-space-6))); }
+.kd-modal__card--quick {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: min(88vh, 820px);
+}
+.kd-modal__card--quick .kd-modal__head {
+  margin: 0;
+  align-items: center;
+  padding: var(--kd-space-5) var(--kd-space-6);
+  border-bottom: 1px solid var(--color-divider);
+}
+.kd-modal__card--quick .kd-modal__title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  font-size: 15px;
+}
+.kd-modal__card--quick .kd-modal__title svg { width: 16px; height: 16px; color: var(--color-primary); }
+.kd-modal__headactions { flex: none; display: inline-flex; align-items: center; gap: var(--kd-space-3); }
+
+/* Corps défilable */
+.kd-quickedit {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--kd-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-6);
+}
+.kd-quickedit__loading,
+.kd-quickedit__error,
+.kd-quickedit__empty {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--color-text-faint);
+  margin: 0;
+}
+.kd-quickedit__empty svg { width: 18px; height: 18px; }
+
+/* Un bloc dans le panneau rapide */
+.kd-quickblock { display: flex; flex-direction: column; gap: var(--kd-space-3); }
+.kd-quickblock__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kd-space-4);
+}
+.kd-quickblock__role {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-quickblock__rounds {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+.kd-quickblock__rounds svg { width: 12px; height: 12px; }
+.kd-quickblock__empty {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--color-text-placeholder);
+  margin: 0;
+  padding-left: var(--kd-space-2);
+}
+
+/* Un exercice : ligne repliable, le formulaire de paramètres se déplie */
+.kd-quickexo {
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-md);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+.kd-quickexo[open] { border-color: var(--color-border-strong); }
+.kd-quickexo__sum {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-4);
+  padding: var(--kd-space-3) var(--kd-space-4);
+  cursor: pointer;
+  list-style: none;
+}
+.kd-quickexo__sum::-webkit-details-marker { display: none; }
+.kd-quickexo__name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-quickexo__chevron { flex: none; display: flex; color: var(--color-text-faint); transition: transform .15s ease; }
+.kd-quickexo__chevron svg { width: 15px; height: 15px; }
+.kd-quickexo[open] .kd-quickexo__chevron { transform: rotate(180deg); }
+.kd-quickexo__form {
+  padding: var(--kd-space-4) var(--kd-space-4) var(--kd-space-5);
+  border-top: 1px solid var(--color-divider);
+}

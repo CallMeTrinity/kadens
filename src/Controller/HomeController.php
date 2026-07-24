@@ -57,7 +57,8 @@ final class HomeController extends AbstractController
                 'adherence' => $settled > 0 ? (int) round(100 * $done / $settled) : null,
             ],
             'counts' => [
-                'workouts' => $workouts->count(['owner' => $user]),
+                // planLocal = false : on ne compte pas les copies privées aux plans.
+                'workouts' => $workouts->count(['owner' => $user, 'planLocal' => false]),
                 'plans' => $plans->count(['owner' => $user]),
                 'exercises' => \count($exercises->findLibraryForUser($user)),
             ],

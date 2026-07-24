@@ -17,6 +17,7 @@ use App\Repository\WorkoutRepository;
 use App\Security\Voter\WorkoutVoter;
 use App\Service\PlanFlattener;
 use App\Service\SlugGenerator;
+use App\Service\WorkoutCloner;
 use App\Service\WorkoutEstimator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -52,7 +53,7 @@ final class WorkoutController extends AbstractController
     public function index(WorkoutRepository $workoutRepository): Response
     {
         return $this->render('workout/index.html.twig', [
-            'workouts' => $workoutRepository->findBy(['owner' => $this->getUser()], ['createdAt' => 'DESC']),
+            'workouts' => $workoutRepository->findLibraryForOwner($this->getUser(), ['createdAt' => 'DESC']),
         ]);
     }
 
@@ -127,7 +128,7 @@ final class WorkoutController extends AbstractController
     }
 
     #[Route('/{id}/duplicate', name: 'app_workout_duplicate', methods: ['POST'], requirements: ['id' => '\d+'])]
-    public function duplicate(Request $request, Workout $workout, SlugGenerator $slugGenerator): Response
+    public function duplicate(Request $request, Workout $workout, WorkoutCloner $cloner): Response
     {
         $this->denyAccessUnlessGranted(WorkoutVoter::VIEW, $workout);
 
@@ -135,30 +136,8 @@ final class WorkoutController extends AbstractController
             return $this->redirectToRoute('app_workout_show', ['id' => $workout->getId()]);
         }
 
-        $copy = (new Workout())
-            ->setOwner($this->getUser())
-            ->setTitle($workout->getTitle().' (copie)')
-            ->setDescription($workout->getDescription())
-            ->setEstimatedDurationMinutes($workout->getEstimatedDurationMinutes());
-        $copy->setSlug($slugGenerator->generate($copy->getTitle(), Workout::class));
-
-        // Copie profonde blocs -> exercices prescrits. La cascade persist de
-        // Workout::blocks / Block::prescribedExercises persiste l'arbre entier.
-        foreach ($workout->getBlocks() as $block) {
-            $blockCopy = (new Block())
-                ->setRole($block->getRole())
-                ->setRounds($block->getRounds() ?? 1)
-                ->setPosition($block->getPosition())
-                ->setLabel($block->getLabel());
-
-            foreach ($block->getPrescribedExercises() as $prescribed) {
-                $blockCopy->addPrescribedExercise($this->copyPrescribed($prescribed));
-            }
-
-            $copy->addBlock($blockCopy);
-        }
-
-        $this->entityManager->persist($copy);
+        // Copie de bibliothèque (planLocal = false) : réutilisable et listée.
+        $copy = $cloner->cloneWorkout($workout, $this->getUser(), $workout->getTitle().' (copie)', false);
         $this->entityManager->flush();
 
         $this->addFlash('success', 'Séance dupliquée. Compose-la maintenant.');
@@ -331,6 +310,57 @@ final class WorkoutController extends AbstractController
         return $this->blocksResponse($request, $workout);
     }
 
+    // ---- Édition rapide (mini-modale de l'éditeur de plan) ------------------
+
+    /**
+     * Panneau d'édition rapide d'une séance : ses exercices prescrits avec leurs
+     * paramètres éditables (reps/séries/repos…), groupés par bloc. Fragment injecté
+     * dans la modale de l'éditeur de plan (fetch), sans layout. La séance est la
+     * copie locale portée par la case (référence vivante) : l'éditer se reflète au
+     * calendrier sans toucher la biblio ni les autres cases. Pour la structure
+     * (ajout/suppression de blocs, glisser-déposer), l'utilisateur passe par le lien
+     * « Édition complète » vers le compositeur.
+     */
+    #[Route('/{id}/quick-panel', name: 'app_workout_quick_panel', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function quickPanel(Workout $workout): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
+
+        return $this->render('workout/_quick_panel.html.twig', $this->quickPanelContext($workout));
+    }
+
+    /**
+     * Enregistre les paramètres d'un exercice depuis la mini-modale. Même
+     * traitement que editPrescribed, mais renvoie le stream du panneau rapide
+     * (#quick-panel) et non celui du compositeur (#workout-blocks). Sans JS, repli
+     * par redirection vers le compositeur.
+     */
+    #[Route('/{id}/exercises/{prescribedId}/quick-edit', name: 'app_workout_prescribed_quick_edit', methods: ['POST'], requirements: ['id' => '\d+', 'prescribedId' => '\d+'])]
+    public function quickEditPrescribed(Request $request, Workout $workout, int $prescribedId): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
+        $prescribed = $this->findPrescribed($workout, $prescribedId);
+
+        $form = $this->createPrescribedForm($prescribed, 'app_workout_prescribed_quick_edit');
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $this->clearIrrelevantFields($prescribed);
+            // La durée estimée dérive du contenu : on la recalcule (elle s'affiche
+            // sur la case du plan, rafraîchie à la fermeture de la modale).
+            $workout->setEstimatedDurationMinutes($this->estimator->estimateMinutes($workout));
+            $this->entityManager->flush();
+        }
+
+        if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
+            $request->setRequestFormat(TurboBundle::STREAM_FORMAT);
+
+            return $this->render('workout/stream/quick_panel.stream.html.twig', $this->quickPanelContext($workout));
+        }
+
+        return $this->redirectToRoute('app_workout_edit', ['id' => $workout->getId()]);
+    }
+
     #[Route('/{id}/exercises/{prescribedId}/delete', name: 'app_workout_prescribed_delete', methods: ['POST'], requirements: ['id' => '\d+', 'prescribedId' => '\d+'])]
     public function deletePrescribed(Request $request, Workout $workout, int $prescribedId): Response
     {
@@ -412,29 +442,6 @@ final class WorkoutController extends AbstractController
             ActivityType::RUNNING, ActivityType::CYCLING, ActivityType::SWIMMING => PrescriptionType::DISTANCE_PACE,
             default => PrescriptionType::SETS_REPS,
         };
-    }
-
-    /**
-     * Duplique un exercice prescrit avec tous ses paramètres (hors identité et
-     * bloc, posés par l'appelant). La position est reprise telle quelle.
-     */
-    private function copyPrescribed(PrescribedExercise $source): PrescribedExercise
-    {
-        return (new PrescribedExercise())
-            ->setExercise($source->getExercise())
-            ->setPrescriptionType($source->getPrescriptionType())
-            ->setPosition($source->getPosition())
-            ->setSets($source->getSets())
-            ->setReps($source->getReps())
-            ->setWeightKg($source->getWeightKg())
-            ->setDurationSeconds($source->getDurationSeconds())
-            ->setDistanceMeters($source->getDistanceMeters())
-            ->setPaceSecondsPerKm($source->getPaceSecondsPerKm())
-            ->setTargetReps($source->getTargetReps())
-            ->setCapSeconds($source->getCapSeconds())
-            ->setIntensityZone($source->getIntensityZone())
-            ->setRestSeconds($source->getRestSeconds())
-            ->setNotes($source->getNotes());
     }
 
     /**
@@ -564,15 +571,39 @@ final class WorkoutController extends AbstractController
         ]);
     }
 
-    private function createPrescribedForm(PrescribedExercise $prescribed): FormInterface
+    private function createPrescribedForm(PrescribedExercise $prescribed, string $route = 'app_workout_prescribed_edit'): FormInterface
     {
         return $this->formFactory->createNamed('prescribed_'.$prescribed->getId(), PrescribedExerciseType::class, $prescribed, [
             'user' => $this->getUser(),
-            'action' => $this->generateUrl('app_workout_prescribed_edit', [
+            'action' => $this->generateUrl($route, [
                 'id' => $prescribed->getBlock()->getWorkout()->getId(),
                 'prescribedId' => $prescribed->getId(),
             ]),
         ]);
+    }
+
+    /**
+     * Contexte de rendu du panneau d'édition rapide : les formulaires prescrits
+     * (postant vers la route quick-edit) et les résumés lisibles par exercice.
+     *
+     * @return array<string, mixed>
+     */
+    private function quickPanelContext(Workout $workout): array
+    {
+        $prescribedForms = [];
+        foreach ($workout->getBlocks() as $block) {
+            foreach ($block->getPrescribedExercises() as $prescribed) {
+                $prescribedForms[$prescribed->getId()] = $this
+                    ->createPrescribedForm($prescribed, 'app_workout_prescribed_quick_edit')
+                    ->createView();
+            }
+        }
+
+        return [
+            'workout' => $workout,
+            'prescribedForms' => $prescribedForms,
+            'summaries' => $this->prescribedSummaries($workout),
+        ];
     }
 
     /**

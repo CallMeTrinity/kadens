@@ -8,10 +8,11 @@ use App\Enum\ScheduledStatus;
 use App\Form\PlanInstantiationType;
 use App\Form\ScheduleWorkoutType;
 use App\Repository\PlanTemplateRepository;
+use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\PlanTemplateVoter;
 use App\Security\Voter\ScheduledWorkoutVoter;
-use App\Service\PlanInstantiator;
+use App\Service\PlanScheduler;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -39,7 +40,7 @@ final class ScheduledWorkoutController extends AbstractController
     {
         $scheduled = new ScheduledWorkout();
         $form = $this->createForm(ScheduleWorkoutType::class, $scheduled, [
-            'workouts' => $workoutRepository->findBy(['owner' => $this->getUser()]),
+            'workouts' => $workoutRepository->findLibraryForOwner($this->getUser()),
         ]);
         $form->handleRequest($request);
 
@@ -60,14 +61,14 @@ final class ScheduledWorkoutController extends AbstractController
     }
 
     /**
-     * Instancie un plan complet à partir d'une date : PlanInstantiator projette
+     * Instancie un plan complet à partir d'une date : PlanScheduler projette
      * la trame sur des dates réelles et crée N ScheduledWorkout.
      */
     #[Route('/plan', name: 'app_scheduled_workout_instantiate', methods: ['POST'])]
     public function instantiate(
         Request $request,
         PlanTemplateRepository $planTemplateRepository,
-        PlanInstantiator $planInstantiator,
+        PlanScheduler $planScheduler,
     ): Response {
         $form = $this->createForm(PlanInstantiationType::class, null, [
             'planTemplates' => $planTemplateRepository->findBy(['owner' => $this->getUser()]),
@@ -82,9 +83,12 @@ final class ScheduledWorkoutController extends AbstractController
 
             $this->denyAccessUnlessGranted(PlanTemplateVoter::VIEW, $template);
 
-            $created = $planInstantiator->instantiate($template, $this->getUser(), $startDate);
+            $alreadyOnCalendar = $planScheduler->isInstantiated($template, $this->getUser());
+            $created = $planScheduler->instantiate($template, $this->getUser(), $startDate);
 
-            $this->addFlash('success', sprintf('Plan instancié : %d séance(s) planifiée(s).', count($created)));
+            $this->addFlash('success', $alreadyOnCalendar
+                ? sprintf('Plan resynchronisé : %d nouvelle(s) séance(s) ajoutée(s).', count($created))
+                : sprintf('Plan instancié : %d séance(s) planifiée(s).', count($created)));
 
             return $this->redirectToMonth($startDate);
         }
@@ -151,6 +155,53 @@ final class ScheduledWorkoutController extends AbstractController
         return $this->redirectToMonth($scheduled->getScheduledDate());
     }
 
+    /**
+     * Efface d'un coup un plan instancié : supprime TOUTES les séances datées
+     * qui en proviennent (y compris DONE/MISSED — c'est une action explicite et
+     * globale, distincte du retrait d'une case qui préserve le réalisé). Le
+     * PlanTemplate n'est pas touché, seule son instanciation calendrier disparaît.
+     * Permet notamment de vider un plan pour le ré-instancier sur une autre date.
+     */
+    #[Route('/plan/clear', name: 'app_scheduled_workout_clear_plan', methods: ['POST'])]
+    public function clearPlan(
+        Request $request,
+        PlanTemplateRepository $planTemplateRepository,
+        ScheduledWorkoutRepository $repository,
+    ): Response {
+        $payload = $request->getPayload();
+        $redirect = $this->monthFromPayload($payload);
+
+        if (!$this->isCsrfTokenValid('clear_plan', $payload->getString('_token'))) {
+            return $redirect;
+        }
+
+        $template = $planTemplateRepository->find($payload->getInt('planId'));
+        if (null === $template) {
+            $this->addFlash('error', 'Plan introuvable.');
+
+            return $redirect;
+        }
+
+        $this->denyAccessUnlessGranted(PlanTemplateVoter::VIEW, $template);
+
+        /** @var \App\Entity\User $user */
+        $user = $this->getUser();
+        $scheduled = $repository->findBySourcePlanTemplateForOwner($template, $user);
+
+        foreach ($scheduled as $one) {
+            $this->entityManager->remove($one);
+        }
+        $this->entityManager->flush();
+
+        $this->addFlash('success', sprintf(
+            'Plan « %s » retiré du planning : %d séance(s) supprimée(s).',
+            $template->getTitle(),
+            \count($scheduled),
+        ));
+
+        return $redirect;
+    }
+
     #[Route('/{id}/delete', name: 'app_scheduled_workout_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function delete(Request $request, ScheduledWorkout $scheduled): Response
     {
@@ -179,5 +230,21 @@ final class ScheduledWorkoutController extends AbstractController
     private function redirectToCurrentMonth(): Response
     {
         return $this->redirectToRoute('app_calendar_index');
+    }
+
+    /**
+     * Redirige vers le mois de calendrier porté par le formulaire (champs cachés
+     * year/month), avec repli sur le mois courant si absent ou invalide.
+     */
+    private function monthFromPayload(\Symfony\Component\HttpFoundation\InputBag $payload): Response
+    {
+        $year = $payload->getInt('year');
+        $month = $payload->getInt('month');
+
+        if ($year >= 1 && $month >= 1 && $month <= 12) {
+            return $this->redirectToRoute('app_calendar_month', ['year' => $year, 'month' => $month]);
+        }
+
+        return $this->redirectToCurrentMonth();
     }
 }

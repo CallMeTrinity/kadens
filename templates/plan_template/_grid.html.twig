@@ -1,7 +1,12 @@
 {# Contenu de #plan-grid : trame éditable semaines × 7 jours. Chaque mutation
-   (ajout/retrait d'une séance dans une case) remplace ce conteneur via Turbo
-   Stream. Contexte attendu (fourni par gridContext) : template, flat (sortie de
-   PlanFlattener::flattenPlanTemplate), addItemForms (indexés « w{semaine}d{jour} »). #}
+   (poser/retirer/déplacer/dupliquer) met à jour le CONTENU de ce conteneur via
+   Turbo Stream (action="update", l'id survit). Contexte attendu (fourni par
+   gridContext) : template, flat (sortie de PlanFlattener::flattenPlanTemplate),
+   addItemForms (indexés « w{semaine}d{jour} »).
+
+   Chaque case porte sa PROPRE copie de séance (fork à la pose) : l'éditer via la
+   modale ne touche ni la séance de bibliothèque ni les autres cases. Le lien de
+   la carte ouvre le compositeur de cette copie (édition rapide). #}
 {% set dayNames = {1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Jeu', 5: 'Ven', 6: 'Sam', 7: 'Dim'} %}
 
 <div class="kd-planweeks">
@@ -9,6 +14,15 @@
         <section class="kd-planweek">
             <div class="kd-planweek__head">
                 <span class="kd-planweek__num">Semaine {{ week.weekNumber }}</span>
+                {% if week.weekNumber < template.durationWeeks %}
+                    <form method="post" class="kd-planweek__dup"
+                          action="{{ path('app_plan_template_week_duplicate', {id: template.id, week: week.weekNumber}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('week_duplicate' ~ week.weekNumber) }}">
+                        <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm" title="Dupliquer sur la semaine {{ week.weekNumber + 1 }}">
+                            {{ ux_icon('lucide:copy') }} Dupliquer sur S{{ week.weekNumber + 1 }}
+                        </button>
+                    </form>
+                {% endif %}
             </div>
 
             <div class="kd-plangrid kd-plangrid--edit">
@@ -16,12 +30,27 @@
                     <div class="kd-planday{{ day.items is empty ? ' is-empty' }}">
                         <div class="kd-planday__name">{{ dayNames[day.dayOfWeek] }}</div>
                         <div class="kd-planday__body">
-                            <div class="kd-planday__items">
+                            {# Zone de dépôt SortableJS : source ET cible, la semaine/jour
+                               cible sont portées ici et lues à la pose. #}
+                            <div class="kd-planday__items" data-plangrid-target="cell"
+                                 data-week="{{ week.weekNumber }}" data-day="{{ day.dayOfWeek }}">
                                 {% for entry in day.items %}
-                                    <div class="kd-planentry">
+                                    <div class="kd-planentry" data-item-id="{{ entry.item.id }}"
+                                         data-move-url="{{ path('app_plan_template_item_move', {id: template.id, itemId: entry.item.id}) }}"
+                                         data-move-token="{{ csrf_token('item_move' ~ entry.item.id) }}">
                                         <div class="kd-planitem">
-                                            <a class="kd-planitem__link" href="{{ path('app_workout_show', {id: entry.item.workout.id}) }}">{{ entry.workout.workout.title }}</a>
-                                            <form method="post" action="{{ path('app_plan_template_item_delete', {id: template.id, itemId: entry.item.id}) }}"
+                                            <span class="kd-planitem__handle" title="Déplacer" aria-hidden="true">{{ ux_icon('lucide:grip-vertical') }}</span>
+                                            <button type="button" class="kd-planitem__link"
+                                                    data-action="plangrid#edit"
+                                                    data-panel-url="{{ path('app_workout_quick_panel', {id: entry.item.workout.id}) }}"
+                                                    data-full-url="{{ path('app_workout_edit', {id: entry.item.workout.id}) }}">
+                                                <span class="kd-planitem__title">{{ entry.workout.workout.title }}</span>
+                                                {% if entry.item.workout.estimatedDurationMinutes %}
+                                                    <span class="kd-planitem__meta">{{ ux_icon('lucide:clock') }} {{ entry.item.workout.estimatedDurationMinutes }} min</span>
+                                                {% endif %}
+                                            </button>
+                                            <form method="post" class="kd-planitem__delform"
+                                                  action="{{ path('app_plan_template_item_delete', {id: template.id, itemId: entry.item.id}) }}"
                                                   onsubmit="return confirm('Retirer cette séance de la trame ?');">
                                                 <input type="hidden" name="_token" value="{{ csrf_token('item_delete' ~ entry.item.id) }}">
                                                 <button type="submit" class="kd-planitem__del" title="Retirer" aria-label="Retirer">
