@@ -14,7 +14,7 @@ enum BlockRole: string
     {
         return match ($this) {
             self::WARMUP => 'Échauffement',
-            self::MAIN => 'Corps de séance',
+            self::MAIN => 'Entraînement',
             self::COOLDOWN => 'Retour au calme',
         };
     }
