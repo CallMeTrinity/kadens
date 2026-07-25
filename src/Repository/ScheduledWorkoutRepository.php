@@ -68,6 +68,49 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     }
 
     /**
+     * Nombre de séances par statut pour un utilisateur, sur toute la période (pas
+     * de borne de date). Alimente l'observance « tous temps » et le total de
+     * séances faites de la page profil. Une seule requête agrégée, pas d'hydratation.
+     *
+     * @return array<string, int> clés = valeurs de ScheduledStatus, valeurs = compte.
+     */
+    public function countByStatusForOwner(User $owner): array
+    {
+        $rows = $this->createQueryBuilder('s')
+            ->select('s.status AS status', 'COUNT(s.id) AS cnt')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('owner', $owner)
+            ->groupBy('s.status')
+            ->getQuery()
+            ->getResult();
+
+        return $this->mapStatusCounts($rows);
+    }
+
+    /**
+     * Séances FAITES d'un utilisateur, avec tout leur contenu fetch-joint
+     * (blocs -> exercices prescrits -> exercice), pour agréger le volume réalisé
+     * sur l'historique (tonnage, distances) sans N+1. Alimente ProfileStats.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findDoneWithContentForOwner(User $owner): array
+    {
+        return $this->createQueryBuilder('s')
+            ->addSelect('w', 'b', 'pe', 'e')
+            ->join('s.workout', 'w')
+            ->leftJoin('w.blocks', 'b')
+            ->leftJoin('b.prescribedExercises', 'pe')
+            ->leftJoin('pe.exercise', 'e')
+            ->andWhere('s.owner = :owner')
+            ->andWhere('s.status = :done')
+            ->setParameter('owner', $owner)
+            ->setParameter('done', \App\Enum\ScheduledStatus::DONE)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Répartition par statut, regroupée par plan source, pour un utilisateur.
      * Le plan source est nullable (séance isolée, ou plan supprimé qui a mis la
      * FK à NULL) : ces séances retombent dans un bucket « hors plan ».

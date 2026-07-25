@@ -5,17 +5,15 @@
 #}
 {% set route = app.request.attributes.get('_route') %}
 {% set items = [
-    { label: 'Accueil',     icon: 'lucide:home',           path: 'app_home',                 match: 'app_home' },
     { label: 'Exercices',   icon: 'lucide:dumbbell',       path: 'app_exercise_index',       match: 'app_exercise' },
     { label: 'Séances',     icon: 'lucide:clipboard-list', path: 'app_workout_index',        match: 'app_workout' },
     { label: 'Plans',       icon: 'lucide:layers',         path: 'app_plan_template_index',  match: 'app_plan_template' },
     { label: 'Calendrier',  icon: 'lucide:calendar-days',  path: 'app_calendar_index',       match: 'app_calendar' },
-    { label: 'Synthèse',    icon: 'lucide:trending-up',    path: 'app_summary_index',        match: 'app_summary' },
 ] %}
 
 <header class="kd-header">
     <div class="kd-header__inner">
-        <a href="{{ path('app_home') }}" class="kd-brand">
+        <a href="{{ path('app_profile') }}" class="kd-brand">
             <img src="{{ asset('icons/kadens.png') }}" alt="" width="32" height="32">
             Kadens
         </a>
@@ -32,9 +30,9 @@
         </nav>
 
         <div class="kd-header__end">
-            <span class="kd-header__user">
+            <a href="{{ path('app_profile') }}" class="kd-header__user">
                 {{ ux_icon('lucide:user') }}<span>{{ app.user.userIdentifier }}</span>
-            </span>
+            </a>
             <a href="{{ path('app_logout') }}" class="kd-header__logout" title="Déconnexion" aria-label="Déconnexion">
                 {{ ux_icon('lucide:log-out') }}
             </a>

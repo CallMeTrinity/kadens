@@ -3047,3 +3047,59 @@ textarea.kd-inlineedit__input { min-height: 3.2em; resize: vertical; }
   border-top: 1px solid var(--color-divider);
 }
 .kd-picker__foot .kd-field { flex: 1 1 160px; margin: 0; }
+
+/* ----------------------------------------------------------------------------
+   Profil — tuiles de volume, en-têtes de groupe, fieldsets d'édition
+   ---------------------------------------------------------------------------- */
+
+/* Tuiles de volume réalisé (tonnage, distances). */
+.kd-profile__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--kd-space-5);
+}
+.kd-profile__tile {
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-md);
+  padding: var(--kd-space-6);
+}
+.kd-profile__tileicon {
+  display: inline-flex;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--kd-space-3);
+}
+.kd-profile__tileicon svg { width: 18px; height: 18px; }
+
+/* En-tête de groupe de fiche : icône + libellé alignés. */
+.kd-profile__grouphead {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+}
+.kd-profile__grouphead svg { width: 16px; height: 16px; color: var(--color-text-secondary); }
+
+/* Fieldsets de l'éditeur de fiche (regroupement identité / force / endurance). */
+.kd-profile__fieldset {
+  border: 0;
+  border-top: 1px solid var(--color-divider);
+  padding: var(--kd-space-7) 0 0;
+  margin: var(--kd-space-7) 0 0;
+}
+.kd-profile__fieldset:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
+.kd-profile__legend {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 14px;
+  color: var(--color-text-strong);
+  padding: 0;
+  margin-bottom: var(--kd-space-5);
+}
+.kd-profile__legend svg { width: 16px; height: 16px; color: var(--color-text-secondary); }

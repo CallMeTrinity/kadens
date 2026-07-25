@@ -666,6 +666,35 @@ navigateur (non automatisable ici).
   (`.kd-cellbadges`). Nouvelles classes CSS `.kd-filterbar`/`__row`, `.kd-sort`/`__select`
   (l'ancien `.kd-toolbar` n'est plus utilisé). Icônes importées : `arrow-up-down`,
   `list-filter`. Pas de migration.
+  **Page profil (remplace accueil + synthèse) — AVEC migration.** `HomeController`
+  et `SummaryController` (+ `templates/home`, `templates/summary`) sont **supprimés**
+  au profit d'un unique **`ProfileController`**. Le **profil est la page d'accueil**
+  (`/` = `app_profile`, garde manuelle `getUser()` comme l'ex-home car `/` n'est pas
+  dans `access_control`) ; l'édition est `app_profile_edit` (`/profile/edit`) sous la
+  nouvelle règle `access_control ^/profile` (remplace `^/summary`). Nav : item
+  « Profil » (`lucide:user`) remplace « Accueil », l'onglet « Synthèse » est retiré ;
+  marque + page de login repointées sur `app_profile`. Le fragment
+  `templates/components/_status_stats.html.twig` est **conservé** (réutilisé pour
+  l'observance du profil). **Deux volets** : (1) **stats générales** via le nouveau
+  service `ProfileStats` (compose l'existant, aucune mise à plat réimplémentée) —
+  compteurs biblio, observance du mois ET « tous temps », répartition des séances
+  faites par activité, et **volume réalisé agrégé sur l'historique** (tonnage/séries,
+  distances course/vélo/natation) en itérant les séances `DONE` via
+  `WorkoutMetrics::volume` ; formatage par `UnitFormatter`. Deux méthodes ajoutées à
+  `ScheduledWorkoutRepository` : `countByStatusForOwner` (agrégat sans borne de date)
+  et `findDoneWithContentForOwner` (fetch-join anti N+1 des séances faites).
+  (2) **fiche athlète éditable** : nouveaux champs **tous nullable** sur `User`
+  (identité : `birthDate`→âge dérivé, `sex`, `heightCm`, `weightKg`→IMC dérivé,
+  `trainingYears`, `mainGoal`, `bio` ; force kg : squat/bench/deadlift/ohp/traction
+  lestée + total SBD & score **DOTS** dérivés ; endurance : temps 5K/10K/semi/marathon
+  + 100m nat en secondes, `cyclingFtpWatts`) + `updatedAt`/`PreUpdate`. Enums
+  `Sex`/`TrainingGoal`. `ProfileType` (thème global) ; nouveau **`DurationType`**
+  calqué sur `PaceType` (round-trip secondes ↔ `mm:ss`/`h:mm:ss`, réutilise
+  `UnitFormatter::duration`). Vue lecture (`profile/index`) : stats + fiche en
+  `.kd-deflist` groupées (Identité/Force/Endurance) via la carte construite par
+  `ProfileStats::athleteCard`. **Migration** `Version20260725073629` : colonnes profil
+  nullable sur `user`. Couche CSS `.kd-profile*` (tuiles de volume, fieldsets,
+  en-têtes de groupe), tokenisée. Aucune icône nouvelle (toutes déjà locales).
 
 ---
 

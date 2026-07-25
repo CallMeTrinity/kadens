@@ -1,0 +1,58 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Modifier ma fiche — Kadens{% endblock %}
+
+{% block body %}
+    <a href="{{ path('app_profile') }}" class="kd-backlink">
+        {{ ux_icon('lucide:arrow-left') }} Mon profil
+    </a>
+
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Profil</p>
+            <h1 class="kd-title">Fiche athlète</h1>
+            <p class="kd-lead">Tout est facultatif. Poids et charges en kg, temps en <code>mm:ss</code> ou <code>h:mm:ss</code>.</p>
+        </div>
+    </div>
+
+    <div class="kd-card" style="max-width:720px;">
+        {{ form_start(form) }}
+            <fieldset class="kd-profile__fieldset">
+                <legend class="kd-profile__legend">{{ ux_icon('lucide:user') }} Identité</legend>
+                {{ form_row(form.birthDate) }}
+                {{ form_row(form.sex) }}
+                {{ form_row(form.heightCm) }}
+                {{ form_row(form.weightKg) }}
+                {{ form_row(form.trainingYears) }}
+                {{ form_row(form.mainGoal) }}
+                {{ form_row(form.bio) }}
+            </fieldset>
+
+            <fieldset class="kd-profile__fieldset">
+                <legend class="kd-profile__legend">{{ ux_icon('lucide:dumbbell') }} Records de force (1RM)</legend>
+                {{ form_row(form.squat1rmKg) }}
+                {{ form_row(form.bench1rmKg) }}
+                {{ form_row(form.deadlift1rmKg) }}
+                {{ form_row(form.ohp1rmKg) }}
+                {{ form_row(form.weightedPullupKg) }}
+            </fieldset>
+
+            <fieldset class="kd-profile__fieldset">
+                <legend class="kd-profile__legend">{{ ux_icon('lucide:footprints') }} Records d'endurance</legend>
+                {{ form_row(form.run5kSeconds) }}
+                {{ form_row(form.run10kSeconds) }}
+                {{ form_row(form.halfMarathonSeconds) }}
+                {{ form_row(form.marathonSeconds) }}
+                {{ form_row(form.cyclingFtpWatts) }}
+                {{ form_row(form.swim100mSeconds) }}
+            </fieldset>
+
+            <div class="kd-formactions">
+                <button type="submit" class="kd-btn kd-btn--primary">
+                    {{ ux_icon('lucide:save') }} Enregistrer
+                </button>
+                <a href="{{ path('app_profile') }}" class="kd-btn kd-btn--ghost">Annuler</a>
+            </div>
+        {{ form_end(form) }}
+    </div>
+{% endblock %}
