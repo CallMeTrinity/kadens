@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Exercise;
+use App\Enum\ActivityType;
 use App\Form\ExerciseType;
 use App\Repository\ExerciseRepository;
 use App\Security\Voter\ExerciseVoter;
@@ -18,8 +19,26 @@ final class ExerciseController extends AbstractController
     #[Route('', name: 'app_exercise_index', methods: ['GET'])]
     public function index(ExerciseRepository $exerciseRepository): Response
     {
+        $exercises = $exerciseRepository->findLibraryForUser($this->getUser());
+
+        // Puces d'activité présentes (chaque exercice porte une activité).
+        $counts = [];
+        foreach ($exercises as $exercise) {
+            $activity = $exercise->getActivity();
+            if (null !== $activity) {
+                $counts[$activity->value] = ($counts[$activity->value] ?? 0) + 1;
+            }
+        }
+        $activityFacets = [];
+        foreach (ActivityType::cases() as $case) {
+            if (isset($counts[$case->value])) {
+                $activityFacets[] = ['value' => $case->value, 'label' => $case->getLabel(), 'count' => $counts[$case->value]];
+            }
+        }
+
         return $this->render('exercise/index.html.twig', [
-            'exercises' => $exerciseRepository->findLibraryForUser($this->getUser()),
+            'exercises' => $exercises,
+            'activityFacets' => $activityFacets,
         ]);
     }
 

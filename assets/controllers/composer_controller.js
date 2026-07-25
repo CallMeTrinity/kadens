@@ -57,17 +57,26 @@ export default class extends Controller {
     // ---- Soumission dynamique (fetch + Turbo Stream appliqué à la main) -----
 
     /**
-     * Intercepte toute soumission de formulaire du compositeur. On envoie la
-     * requête en `fetch` (format stream) et on applique le flux renvoyé, sans
-     * recharger. Le formulaire d'en-tête (titre/description) est laissé au
-     * comportement natif : c'est une sauvegarde volontaire qui redirige.
+     * Intercepte toute soumission de formulaire du compositeur (en-tête inclus, mais
+     * le titre/description passent désormais par l'édition en ligne, hors de cette
+     * section). On envoie la requête en `fetch` (format stream) et on applique le flux
+     * renvoyé, sans recharger.
+     *
+     * L'enregistrement des paramètres d'un exercice est automatique (sur `change`) :
+     * comme le stream re-rend tout #workout-blocks, le panneau de params se referme et
+     * le focus est perdu. On mémorise donc le champ actif (nom unique par formulaire
+     * nommé) avant l'envoi, puis on ré-ouvre son panneau et lui rend le focus après le
+     * re-render.
      */
     async onSubmit(event) {
         const form = event.target;
         if (!(form instanceof HTMLFormElement)) return;
-        if (form.classList.contains('kd-composer__head')) return;
 
         event.preventDefault();
+
+        const active = document.activeElement;
+        const activeName = active && active.name ? active.name : null;
+        const caret = active && typeof active.selectionStart === 'number' ? active.selectionStart : null;
 
         try {
             const response = await fetch(form.action, {
@@ -78,11 +87,41 @@ export default class extends Controller {
             });
             const html = await response.text();
             renderStreamMessage(html);
+            this.restoreFocus(activeName, caret);
         } catch (error) {
             // Repli : en cas d'échec réseau, on recharge la page d'édition.
             console.error('Composer submit failed:', error);
             window.location.reload();
         }
+    }
+
+    /**
+     * Rend le focus au champ qui vient d'auto-enregistrer (retrouvé par son nom,
+     * unique grâce aux formulaires nommés). S'il vit dans un panneau de paramètres,
+     * on ré-ouvre ce panneau (fermé par le re-render). rAF : laisse le DOM du stream
+     * se poser avant de refocaliser.
+     */
+    restoreFocus(name, caret) {
+        if (!name) return;
+        requestAnimationFrame(() => {
+            const el = this.element.querySelector(`[name="${CSS.escape(name)}"]`);
+            if (!el) return;
+
+            const params = el.closest('.kd-cexo__params');
+            if (params) {
+                params.hidden = false;
+                params.closest('.kd-cexo')?.classList.add('kd-cexo--open');
+            }
+
+            el.focus();
+            if (caret !== null && typeof el.setSelectionRange === 'function') {
+                try {
+                    el.setSelectionRange(caret, caret);
+                } catch (error) {
+                    // Certains types d'input n'acceptent pas setSelectionRange : sans importance.
+                }
+            }
+        });
     }
 
     // ---- Bloc actif --------------------------------------------------------

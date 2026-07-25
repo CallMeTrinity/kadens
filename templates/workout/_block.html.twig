@@ -95,7 +95,7 @@
                 <div class="kd-cexo__params" hidden>
                     {{ include('workout/_prescribed_form.html.twig', {
                         form: prescribedForms[prescribed.id],
-                        submit_label: 'Enregistrer l\'exercice'
+                        auto_action: 'change->composer#submitForm'
                     }) }}
                     <div class="kd-cexo__reorder">
                         {{ include('workout/_action_form.html.twig', {

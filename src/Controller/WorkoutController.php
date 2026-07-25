@@ -19,6 +19,7 @@ use App\Service\PlanFlattener;
 use App\Service\SlugGenerator;
 use App\Service\WorkoutCloner;
 use App\Service\WorkoutEstimator;
+use App\Service\WorkoutMetrics;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormFactoryInterface;
@@ -50,11 +51,46 @@ final class WorkoutController extends AbstractController
     }
 
     #[Route('', name: 'app_workout_index', methods: ['GET'])]
-    public function index(WorkoutRepository $workoutRepository): Response
+    public function index(WorkoutRepository $workoutRepository, WorkoutMetrics $workoutMetrics): Response
     {
+        // Fetch-join du contenu : les activités distinctes par séance servent aux
+        // facettes/filtres de l'index (sans ce join ce serait un N+1).
+        $workouts = $workoutRepository->findLibraryForOwnerWithContent($this->getUser());
+
+        $items = [];
+        $counts = [];
+        foreach ($workouts as $workout) {
+            $activities = $workoutMetrics->distinctActivities($workout);
+            $items[] = ['workout' => $workout, 'activities' => $activities];
+            foreach ($activities as $activity) {
+                $counts[$activity->value] = ($counts[$activity->value] ?? 0) + 1;
+            }
+        }
+
         return $this->render('workout/index.html.twig', [
-            'workouts' => $workoutRepository->findLibraryForOwner($this->getUser(), ['createdAt' => 'DESC']),
+            'items' => $items,
+            'total' => \count($items),
+            'activityFacets' => $this->buildActivityFacets($counts),
         ]);
+    }
+
+    /**
+     * Puces d'activité présentes, ordonnées selon l'enum, avec leur effectif.
+     *
+     * @param array<string, int> $counts
+     *
+     * @return list<array{value: string, label: string, count: int}>
+     */
+    private function buildActivityFacets(array $counts): array
+    {
+        $facets = [];
+        foreach (ActivityType::cases() as $case) {
+            if (isset($counts[$case->value])) {
+                $facets[] = ['value' => $case->value, 'label' => $case->getLabel(), 'count' => $counts[$case->value]];
+            }
+        }
+
+        return $facets;
     }
 
     #[Route('/new', name: 'app_workout_new', methods: ['GET', 'POST'])]
@@ -110,6 +146,42 @@ final class WorkoutController extends AbstractController
             'workout' => $workout,
             'form' => $form,
         ] + $this->blocksContext($workout) + $this->libraryContext());
+    }
+
+    /**
+     * Édition en ligne d'un champ de la séance (titre/description) depuis l'en-tête
+     * cliquable du compositeur (contrôleur `inline-edit`, même pattern que le plan).
+     * Renvoie la valeur persistée (texte brut) que le JS réaffiche ; repli sans JS =
+     * le formulaire complet replié dans l'éditeur.
+     */
+    #[Route('/{id}/meta', name: 'app_workout_meta', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function updateMeta(Request $request, Workout $workout): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
+        $payload = $request->getPayload();
+
+        if (!$this->isCsrfTokenValid('workout_meta'.$workout->getId(), $payload->getString('_token'))) {
+            return new Response('', Response::HTTP_FORBIDDEN);
+        }
+
+        $value = trim($payload->getString('value'));
+        switch ($payload->getString('field')) {
+            case 'title':
+                if ('' === $value) {
+                    return new Response('Le titre ne peut pas être vide.', Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+                $workout->setTitle($value);
+                break;
+            case 'description':
+                $workout->setDescription('' === $value ? null : $value);
+                break;
+            default:
+                return new Response('', Response::HTTP_BAD_REQUEST);
+        }
+
+        $this->entityManager->flush();
+
+        return new Response($value);
     }
 
     #[Route('/{id}/delete', name: 'app_workout_delete', methods: ['POST'], requirements: ['id' => '\d+'])]

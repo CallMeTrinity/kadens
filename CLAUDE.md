@@ -622,6 +622,50 @@ navigateur (non automatisable ici).
   via `preferredCalendarView()` lu sur `RequestStack`) retombent sur la vue
   mémorisée — une action faite en vue semaine ré-atterrit en semaine, un refresh
   garde la vue. Pas de migration.
+  **Éditeur de séance : zéro bouton d'enregistrement, tout en automatique (sans
+  migration).** Aligné sur l'éditeur de plan. (1) **En-tête à édition en ligne** :
+  le formulaire d'en-tête (champ titre + repli `<details>` « Détails de la séance »
+  pour la description + bouton « Enregistrer la séance ») laisse place à un
+  `kd-pagehead` avec titre `<h1>` et description éditables **en ligne**
+  (contrôleur `inline-edit`, enregistrement au blur/Entrée), postant vers le nouvel
+  endpoint `WorkoutController::updateMeta` (`POST /workout/{id}/meta`, CSRF
+  `workout_meta{id}`, `field`=title|description, renvoie la valeur nettoyée en texte
+  brut — calqué sur `app_plan_template_meta`). Repli sans JS : `<details>`
+  `kd-metafallback` avec le `WorkoutType` complet. (2) **Paramètres d'exercice
+  auto-enregistrés** : `_prescribed_form.html.twig` prend un paramètre `auto_action`
+  (ex. `change->composer#submitForm`) posé sur chaque champ ; quand il est fourni, le
+  bouton « Enregistrer l'exercice » disparaît (le compositeur passe `auto_action`, la
+  mini-modale du plan garde son bouton). Comme le stream re-rend tout `#workout-blocks`
+  (le panneau de params se referme, le focus saute), `composer_controller.js`
+  mémorise le champ actif avant l'envoi (nom unique grâce aux formulaires nommés) puis
+  `restoreFocus` ré-ouvre son panneau `.kd-cexo__params` et lui rend le focus + le
+  curseur après le re-render (rAF). Le garde `kd-composer__head` de `onSubmit` est
+  retiré (l'en-tête n'est plus un formulaire de la section). CSS mort des anciennes
+  classes d'en-tête (`kd-composer__head/__headmain/__title/__details/__detailsbody/
+  __headactions`) supprimé ; `.kd-composer__meta` et `.kd-eyebrow--accent` conservés.
+  Pas de migration.
+  **Index filtrables : recherche pondérée + facettes + tri (sans migration).** Les
+  trois pages de liste (exercices, séances, plans) gagnent un tri et des filtres,
+  100 % client (offline-safe). Le contrôleur `filter_controller.js` est réécrit : il
+  ne fait plus un simple `includes`, il **classe** les résultats (score : 4 nom exact,
+  3 préfixe du nom, 2 dans le nom, 1 ailleurs — activité/zones) et réordonne la liste
+  en place ; en l'absence de recherche, le `<select>` de tri ordonne (nom A→Z/Z→A,
+  récence, et selon la page durée / nb blocs / nb semaines / nb séances). Les
+  **facettes** sont des puces génériques par groupe (`data-facet-group`/`-value` sur la
+  puce, `data-facet-<groupe>` sur l'item, valeurs séparées par des espaces) : activité
+  partout, plus **portée** (perso / bibliothèque) sur les exercices. Barre d'outils
+  factorisée dans `templates/components/_filterbar.html.twig` (params `placeholder`,
+  `total`, `countNoun`, `sortOptions`, `facetGroups`), à placer dans un
+  `data-controller="filter"` au-dessus du conteneur `data-filter-target="list"`. Chaque
+  item porte `data-filter-name` (base du classement), `data-filter-text` (haystack),
+  `data-sort-*` et `data-facet-*`. Côté serveur, `ExerciseController`/`WorkoutController`/
+  `PlanTemplateController::index` calculent les activités présentes (via
+  `WorkoutMetrics::distinctActivities` ; le workout utilise `findLibraryForOwnerWithContent`
+  pour éviter le N+1) et passent `activityFacets` + `items` (`{workout|template,
+  activities}`). Les cartes séance/plan affichent aussi les badges d'activité
+  (`.kd-cellbadges`). Nouvelles classes CSS `.kd-filterbar`/`__row`, `.kd-sort`/`__select`
+  (l'ancien `.kd-toolbar` n'est plus utilisé). Icônes importées : `arrow-up-down`,
+  `list-filter`. Pas de migration.
 
 ---
 

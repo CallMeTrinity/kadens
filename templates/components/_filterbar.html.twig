@@ -1,0 +1,54 @@
+{# ============================================================================
+   Barre d'outils des index filtrables (bibliothèque, séances, plans).
+   Pilotée par le contrôleur Stimulus `filter` (recherche pondérée + facettes +
+   tri, 100 % client / offline-safe). À placer DANS un `data-controller="filter"`,
+   au-dessus du conteneur `data-filter-target="list"`.
+
+   Paramètres :
+     - placeholder : texte du champ de recherche
+     - total       : effectif initial (compteur)
+     - countNoun   : nom au singulier ("exercice", "séance", "plan")
+     - sortOptions : list de { key, label, dir?('asc'|'desc'), numeric?(bool) }
+     - facetGroups : list de { group, allLabel, facets:[{value,label,count}] }
+   ============================================================================ #}
+<div class="kd-filterbar">
+    <div class="kd-filterbar__row">
+        <div class="kd-search">
+            {{ ux_icon('lucide:search') }}
+            <input type="search" class="kd-input" placeholder="{{ placeholder }}"
+                   aria-label="{{ placeholder }}"
+                   data-filter-target="input" data-action="input->filter#search">
+        </div>
+
+        {% if sortOptions is defined and sortOptions %}
+            <label class="kd-sort">
+                {{ ux_icon('lucide:arrow-up-down') }}
+                <select class="kd-input kd-sort__select" aria-label="Trier"
+                        data-filter-target="sort" data-action="change->filter#sort">
+                    {% for opt in sortOptions %}
+                        <option value="{{ opt.key }}"
+                                {%- if opt.dir is defined %} data-dir="{{ opt.dir }}"{% endif %}
+                                {%- if opt.numeric is defined and opt.numeric %} data-numeric="1"{% endif %}>{{ opt.label }}</option>
+                    {% endfor %}
+                </select>
+            </label>
+        {% endif %}
+
+        <span class="kd-count"><span data-filter-target="count">{{ total }}</span> {{ countNoun }}{{ total > 1 ? 's' }}</span>
+    </div>
+
+    {% for grp in facetGroups|default([]) %}
+        {% if grp.facets %}
+            <div class="kd-libfilters">
+                <button type="button" class="kd-libfilter kd-libfilter--on"
+                        data-filter-target="facet" data-facet-group="{{ grp.group }}" data-facet-value="all"
+                        data-action="filter#pickFacet">{{ grp.allLabel }} · {{ total }}</button>
+                {% for f in grp.facets %}
+                    <button type="button" class="kd-libfilter"
+                            data-filter-target="facet" data-facet-group="{{ grp.group }}" data-facet-value="{{ f.value }}"
+                            data-action="filter#pickFacet">{{ f.label }} · {{ f.count }}</button>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endfor %}
+</div>

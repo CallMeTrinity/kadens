@@ -43,8 +43,40 @@ final class PlanTemplateController extends AbstractController
     #[Route('', name: 'app_plan_template_index', methods: ['GET'])]
     public function index(PlanTemplateRepository $planTemplateRepository): Response
     {
+        $templates = $planTemplateRepository->findBy(['owner' => $this->getUser()], ['title' => 'ASC']);
+
+        $items = [];
+        $counts = [];
+        foreach ($templates as $template) {
+            // Activités distinctes de toutes les séances du plan (union), pour les facettes.
+            $seen = [];
+            foreach ($template->getPlanItems() as $planItem) {
+                $workout = $planItem->getWorkout();
+                if (null === $workout) {
+                    continue;
+                }
+                foreach ($this->workoutMetrics->distinctActivities($workout) as $activity) {
+                    $seen[$activity->value] = $activity;
+                }
+            }
+            $activities = array_values($seen);
+            $items[] = ['template' => $template, 'activities' => $activities];
+            foreach ($activities as $activity) {
+                $counts[$activity->value] = ($counts[$activity->value] ?? 0) + 1;
+            }
+        }
+
+        $facets = [];
+        foreach (ActivityType::cases() as $case) {
+            if (isset($counts[$case->value])) {
+                $facets[] = ['value' => $case->value, 'label' => $case->getLabel(), 'count' => $counts[$case->value]];
+            }
+        }
+
         return $this->render('plan_template/index.html.twig', [
-            'planTemplates' => $planTemplateRepository->findBy(['owner' => $this->getUser()], ['createdAt' => 'DESC']),
+            'items' => $items,
+            'total' => \count($items),
+            'activityFacets' => $facets,
         ]);
     }
 

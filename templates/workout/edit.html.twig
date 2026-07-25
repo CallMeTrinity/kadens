@@ -28,35 +28,59 @@
     {% set exCount = 0 %}
     {% for b in workout.blocks %}{% set exCount = exCount + b.prescribedExercises|length %}{% endfor %}
 
+    {# En-tête à édition en ligne : titre + description semi-invisibles (comme le
+       plan). Cliquer le titre ou la description ouvre un champ, enregistré au blur
+       ou à Entrée via le contrôleur `inline-edit` (aucun bouton). #}
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow kd-eyebrow--accent">Compositeur de séance</p>
+            <h1 class="kd-title kd-inlineedit"
+                data-controller="inline-edit"
+                data-inline-edit-url-value="{{ path('app_workout_meta', {id: workout.id}) }}"
+                data-inline-edit-token-value="{{ csrf_token('workout_meta' ~ workout.id) }}"
+                data-inline-edit-field-value="title"
+                data-inline-edit-target="display"
+                data-value="{{ workout.title }}"
+                data-action="click->inline-edit#start"
+                title="Cliquer pour renommer">{{ workout.title }}</h1>
+
+            <p class="kd-composer__meta">
+                {{ workout.blocks|length }} blocs · {{ exCount }} exercices
+                {%- if workout.estimatedDurationMinutes %} · ≈ {{ workout.estimatedDurationMinutes }} min estimées{% endif -%}
+            </p>
+
+            <p class="kd-lead kd-inlineedit kd-inlineedit--desc{{ workout.description ? '' : ' kd-inlineedit--empty' }}"
+               data-controller="inline-edit"
+               data-inline-edit-url-value="{{ path('app_workout_meta', {id: workout.id}) }}"
+               data-inline-edit-token-value="{{ csrf_token('workout_meta' ~ workout.id) }}"
+               data-inline-edit-field-value="description"
+               data-inline-edit-type-value="textarea"
+               data-inline-edit-placeholder-value="+ Ajouter une description"
+               data-inline-edit-target="display"
+               data-value="{{ workout.description }}"
+               data-action="click->inline-edit#start"
+               title="Cliquer pour modifier">{{ workout.description ?: '+ Ajouter une description' }}</p>
+        </div>
+    </div>
+
+    {# Repli sans JS pour éditer les infos (en JS : édition en ligne dans l'en-tête). #}
+    <details class="kd-editsection kd-metafallback">
+        <summary>Modifier les infos (formulaire)</summary>
+        <div class="kd-card" style="max-width:640px;">
+            {{ form_start(form) }}
+                {{ form_widget(form) }}
+                <div class="kd-formactions">
+                    <button type="submit" class="kd-btn kd-btn--primary">
+                        {{ ux_icon('lucide:save') }} Enregistrer
+                    </button>
+                </div>
+            {{ form_end(form) }}
+        </div>
+    </details>
+
     {# data-turbo="false" : Turbo n'intercepte aucun formulaire ici ; le contrôleur
        `composer` applique lui-même les Turbo Streams via fetch (voir le contrôleur). #}
     <section class="kd-composer" data-controller="composer" data-turbo="false">
-
-        {# ---- En-tête : titre éditable + méta + enregistrer ---- #}
-        {{ form_start(form, { attr: { class: 'kd-composer__head' } }) }}
-            <div class="kd-composer__headmain">
-                <p class="kd-eyebrow kd-eyebrow--accent">Compositeur de séance</p>
-                {{ form_widget(form.title, { attr: {
-                    class: 'kd-composer__title',
-                    placeholder: 'Titre de la séance',
-                } }) }}
-                <p class="kd-composer__meta">
-                    {{ workout.blocks|length }} blocs · {{ exCount }} exercices
-                    {%- if workout.estimatedDurationMinutes %} · ≈ {{ workout.estimatedDurationMinutes }} min estimées{% endif -%}
-                </p>
-                <details class="kd-composer__details">
-                    <summary>{{ ux_icon('lucide:settings-2') }} Détails de la séance</summary>
-                    <div class="kd-composer__detailsbody">
-                        {{ form_row(form.description) }}
-                    </div>
-                </details>
-            </div>
-            <div class="kd-composer__headactions">
-                <button type="submit" class="kd-btn kd-btn--primary">
-                    {{ ux_icon('lucide:save') }} Enregistrer la séance
-                </button>
-            </div>
-        {{ form_end(form) }}
 
         {# ---- Corps : bibliothèque (gauche) + blocs (droite) ---- #}
         <div class="kd-composer__body">

@@ -482,6 +482,39 @@ turbo-frame { display: block; }
 }
 
 /* ----------------------------------------------------------------------------
+   Barre de filtres d'index (recherche pondérée + tri + facettes) — contrôleur `filter`
+   ---------------------------------------------------------------------------- */
+.kd-filterbar { margin-bottom: var(--kd-space-9); }
+.kd-filterbar__row {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-6);
+  flex-wrap: wrap;
+}
+.kd-filterbar .kd-libfilters { margin-top: var(--kd-space-6); }
+.kd-sort {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+.kd-sort > svg {
+  position: absolute;
+  left: var(--kd-space-4);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 15px; height: 15px;
+  color: var(--color-text-placeholder);
+  pointer-events: none;
+}
+.kd-sort__select {
+  width: auto;
+  padding-left: 34px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ----------------------------------------------------------------------------
    Tag neutre (liste de valeurs : zones travaillées, mots-clés)
    ---------------------------------------------------------------------------- */
 .kd-tags { display: flex; flex-wrap: wrap; gap: var(--kd-space-2); }
@@ -2055,62 +2088,14 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
   overflow: hidden;
 }
 
-/* ---- En-tête ---- */
-.kd-composer__head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: var(--kd-space-10);
-  padding: var(--kd-space-9) var(--kd-space-11) var(--kd-space-8);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface-raised);
-}
-.kd-composer__headmain { flex: 1; min-width: 0; }
+/* ---- En-tête (méta sous le titre inline de l'en-tête de page) ---- */
 .kd-eyebrow--accent { color: var(--color-primary); }
-.kd-composer__title {
-  display: block;
-  width: 100%;
-  margin: var(--kd-space-2) 0 0;
-  padding: 0;
-  border: none;
-  outline: none;
-  background: transparent;
-  font-family: var(--font-display);
-  font-weight: var(--kd-weight-semibold);
-  font-size: 26px;
-  line-height: 1.1;
-  color: var(--color-text);
-}
-.kd-composer__title::placeholder { color: var(--color-text-placeholder); }
 .kd-composer__meta {
   margin: var(--kd-space-2) 0 0;
   font-family: var(--font-body);
   font-size: 13px;
   color: var(--color-text-secondary);
 }
-.kd-composer__details { margin-top: var(--kd-space-4); }
-.kd-composer__details > summary {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kd-space-2);
-  cursor: pointer;
-  font-family: var(--font-body);
-  font-size: 12px;
-  font-weight: var(--kd-weight-semibold);
-  color: var(--color-text-secondary);
-  list-style: none;
-}
-.kd-composer__details > summary::-webkit-details-marker { display: none; }
-.kd-composer__details > summary svg { width: 14px; height: 14px; }
-.kd-composer__detailsbody {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--kd-space-6);
-  margin-top: var(--kd-space-5);
-  max-width: 560px;
-}
-.kd-composer__detailsbody .kd-field { flex: 1 1 220px; margin: 0; }
-.kd-composer__headactions { flex: none; }
 
 /* ---- Corps deux volets ---- */
 .kd-composer__body { display: flex; align-items: stretch; }
@@ -2626,9 +2611,6 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
   .kd-composer__body { flex-direction: column; }
   .kd-composer__lib { width: auto; border-right: none; border-bottom: 1px solid var(--color-border); }
   .kd-libpanel__list { max-height: 360px; }
-  .kd-composer__head { flex-direction: column; align-items: flex-start; gap: var(--kd-space-6); }
-  .kd-composer__headactions { width: 100%; }
-  .kd-composer__headactions .kd-btn { width: 100%; justify-content: center; }
 }
 
 /* ============================================================================
