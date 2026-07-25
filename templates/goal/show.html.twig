@@ -1,0 +1,134 @@
+{% extends 'base.html.twig' %}
+{% import 'components/_activity.html.twig' as activity %}
+
+{% block title %}{{ goal.title }} — Objectif{% endblock %}
+
+{% block body %}
+    {% for message in app.flashes('success') %}
+        <p class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }} {{ message }}</p>
+    {% endfor %}
+    {% for message in app.flashes('error') %}
+        <p class="kd-flash kd-flash--error" role="alert">{{ ux_icon('lucide:x') }} {{ message }}</p>
+    {% endfor %}
+
+    <a href="{{ path('app_goal_index') }}" class="kd-backlink">
+        {{ ux_icon('lucide:arrow-left') }} Objectifs
+    </a>
+
+    {% set days = goal.daysUntil %}
+    <header class="kd-goalhero">
+        <div class="kd-goalhero__count">
+            {% if days == 0 %}
+                <span class="kd-goalhero__num kd-goalhero__num--now">Jour J</span>
+            {% elseif days > 0 %}
+                <span class="kd-goalhero__num">J-{{ days }}</span>
+                <span class="kd-goalhero__unit">{{ days > 1 ? 'jours' : 'jour' }}</span>
+            {% else %}
+                <span class="kd-goalhero__num kd-goalhero__num--past">J+{{ -days }}</span>
+                <span class="kd-goalhero__unit">écoulé{{ -days > 1 ? 's' }}</span>
+            {% endif %}
+        </div>
+        <div class="kd-goalhero__main">
+            <div class="kd-goalhero__top">
+                <span class="kd-prio kd-prio--{{ goal.priority.value }}" title="{{ goal.priority.label }}">{{ goal.priority.shortLabel }}</span>
+                <h1 class="kd-title">{{ goal.title }}</h1>
+            </div>
+            <ul class="kd-vitals">
+                <li class="kd-vitals__item">{{ ux_icon('lucide:calendar-days') }} {{ goal.targetDate|date('d/m/Y') }}</li>
+                {% if goal.activity %}<li class="kd-vitals__item">{{ goal.activity.label }}</li>{% endif %}
+                {% if goal.targetValue %}<li class="kd-vitals__item">{{ ux_icon('lucide:target') }} {{ goal.targetValue }}</li>{% endif %}
+                <li class="kd-vitals__item">{{ goal.priority.label }}</li>
+            </ul>
+        </div>
+        <div class="kd-goalhero__actions">
+            <a href="{{ path('app_goal_edit', {id: goal.id}) }}" class="kd-btn kd-btn--secondary">
+                {{ ux_icon('lucide:square-pen') }} Éditer
+            </a>
+            <form method="post" action="{{ path('app_goal_delete', {id: goal.id}) }}"
+                  onsubmit="return confirm('Supprimer cet objectif ?');">
+                <input type="hidden" name="_token" value="{{ csrf_token('delete_goal' ~ goal.id) }}">
+                <button type="submit" class="kd-btn kd-btn--danger">{{ ux_icon('lucide:trash-2') }} Supprimer</button>
+            </form>
+        </div>
+    </header>
+
+    {% if goal.description %}
+        <section class="kd-card kd-section__block">
+            <p class="kd-profile__bio">{{ goal.description|nl2br }}</p>
+        </section>
+    {% endif %}
+
+    {# ---------------------- PRÉPARER AVEC UN PLAN -------------------------- #}
+    {% if not goal.isPast %}
+        <section class="kd-card kd-section__block">
+            <h2 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:calendar-range') }} Préparer avec un plan</h2>
+            <p class="kd-lead" style="margin-top:0;">On raisonne à l'envers : Kadens cale la dernière semaine du plan sur ton échéance et calcule la date de départ.</p>
+            {% if plans is empty %}
+                <div class="kd-empty">
+                    {{ ux_icon('lucide:layers') }}
+                    <div>Tu n'as pas encore de plan. <a href="{{ path('app_plan_template_new') }}">Crée une trame</a> pour l'ancrer sur cette date.</div>
+                </div>
+            {% else %}
+                <form method="post" action="{{ path('app_goal_prepare', {id: goal.id}) }}" class="kd-goalprepare">
+                    <input type="hidden" name="_token" value="{{ csrf_token('prepare_goal' ~ goal.id) }}">
+                    <div class="kd-field">
+                        <label class="kd-label" for="goal-prepare-plan">Plan à poser</label>
+                        <select name="planTemplate" id="goal-prepare-plan" class="kd-input kd-select" required>
+                            <option value="">Choisir un plan…</option>
+                            {% for plan in plans %}
+                                <option value="{{ plan.id }}">{{ plan.title }}{% if plan.durationWeeks %} ({{ plan.durationWeeks }} sem.){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="kd-btn kd-btn--primary">
+                        {{ ux_icon('lucide:calendar-plus') }} Ancrer sur l'échéance
+                    </button>
+                </form>
+            {% endif %}
+        </section>
+    {% endif %}
+
+    {# ---------------------- SÉANCES MENANT À L'ÉCHÉANCE -------------------- #}
+    <section class="kd-section">
+        <div class="kd-pagehead kd-pagehead--sub">
+            <div>
+                <p class="kd-eyebrow kd-eyebrow--accent">Préparation</p>
+                <h2 class="kd-title kd-title--sm">Séances menant à l'échéance</h2>
+            </div>
+        </div>
+        {% if leadUp is empty %}
+            <div class="kd-card">
+                <div class="kd-empty">
+                    {{ ux_icon('lucide:calendar-off') }}
+                    <div>Aucune séance planifiée avant cette date. Pose un plan ci-dessus ou ajoute des séances au calendrier.</div>
+                </div>
+            </div>
+        {% else %}
+            <ul class="kd-goallead kd-section__block">
+                {% for s in leadUp %}
+                    <li class="kd-goallead__row">
+                        <span class="kd-goallead__date">{{ s.scheduledDate|date('d/m') }}</span>
+                        <a href="{{ path('app_workout_show', {id: s.workout.id}) }}" class="kd-goallead__title">{{ s.workout.title }}</a>
+                        <span class="kd-badge kd-badge--{{ s.status.value }}">{{ s.status.label }}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </section>
+
+    {# ------------------------------ RÉSULTAT ------------------------------- #}
+    {% if goal.outcome %}
+        <section class="kd-card kd-section__block">
+            <h2 class="kd-card__title kd-profile__grouphead">{{ ux_icon(goal.outcome.icon) }} Résultat</h2>
+            <p><span class="kd-badge kd-badge--{{ goal.outcome.modifier }}">{{ goal.outcome.label }}</span></p>
+            {% if goal.resultNote %}<p class="kd-profile__bio">{{ goal.resultNote|nl2br }}</p>{% endif %}
+        </section>
+    {% elseif goal.isPast %}
+        <section class="kd-card kd-section__block">
+            <div class="kd-empty">
+                {{ ux_icon('lucide:flag') }}
+                <div>L'échéance est passée. <a href="{{ path('app_goal_edit', {id: goal.id}) }}">Renseigne le résultat</a> pour boucler.</div>
+            </div>
+        </section>
+    {% endif %}
+{% endblock %}

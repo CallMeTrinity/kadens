@@ -32,6 +32,33 @@
         </a>
     </header>
 
+    {# ============================ OBJECTIFS À VENIR ======================== #}
+    <section class="kd-section">
+        <div class="kd-pagehead kd-pagehead--sub">
+            <div>
+                <p class="kd-eyebrow kd-eyebrow--accent">Objectifs</p>
+                <h2 class="kd-title kd-title--sm">Vers quoi tu t'entraînes</h2>
+            </div>
+            <a href="{{ path('app_goal_index') }}" class="kd-btn kd-btn--ghost">
+                {{ ux_icon('lucide:target') }} Tous les objectifs
+            </a>
+        </div>
+        {% if upcomingGoals is empty %}
+            <div class="kd-card kd-section__block">
+                <div class="kd-empty">
+                    {{ ux_icon('lucide:target') }}
+                    <div>Aucune échéance en vue. <a href="{{ path('app_goal_new') }}">Fixe-toi un objectif</a> pour donner un cap à tes plans.</div>
+                </div>
+            </div>
+        {% else %}
+            <div class="kd-goallist kd-section__block">
+                {% for goal in upcomingGoals %}
+                    {{ include('goal/_card.html.twig', {goal: goal}) }}
+                {% endfor %}
+            </div>
+        {% endif %}
+    </section>
+
     {# ============================ STATS GÉNÉRALES ========================== #}
     <section class="kd-section">
         <div class="kd-pagehead kd-pagehead--sub">

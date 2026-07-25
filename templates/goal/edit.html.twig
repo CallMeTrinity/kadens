@@ -1,0 +1,20 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Éditer {{ goal.title }}{% endblock %}
+
+{% block body %}
+    <a href="{{ path('app_goal_show', {id: goal.id}) }}" class="kd-backlink">
+        {{ ux_icon('lucide:arrow-left') }} {{ goal.title }}
+    </a>
+
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow kd-eyebrow--accent">Objectifs</p>
+            <h1 class="kd-title">Éditer « {{ goal.title }} »</h1>
+        </div>
+    </div>
+
+    <div class="kd-card" style="max-width:640px;">
+        {{ include('goal/_form.html.twig', {button_label: 'Mettre à jour', cancel_path: path('app_goal_show', {id: goal.id})}) }}
+    </div>
+{% endblock %}

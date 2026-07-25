@@ -69,6 +69,8 @@
         </div>
     </div>
 
+    {% if nextGoal %}{{ include('calendar/_goal_banner.html.twig', {goal: nextGoal}) }}{% endif %}
+
     <div data-controller="caladd">
         {{ include('calendar/_addbar.html.twig', {year: monthPivot.year, month: monthPivot.month}) }}
 
@@ -87,6 +89,11 @@
                             </button>
                         </span>
                     </header>
+                    {% for goal in day.goals %}
+                        <a href="{{ path('app_goal_show', {id: goal.id}) }}" class="kd-calgoal kd-calgoal--week" title="{{ goal.priority.label }} — {{ goal.title }}">
+                            {{ ux_icon('lucide:target') }}<span>{{ goal.title }}</span>
+                        </a>
+                    {% endfor %}
                     <div class="kd-weekday__events">
                         {% for scheduled in day.scheduled %}
                             {{ include('components/_cal_event.html.twig', {

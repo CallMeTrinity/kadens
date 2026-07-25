@@ -1,0 +1,28 @@
+{# Carte d'objectif pour les listes (index, profil). Attend `goal`. #}
+{% import 'components/_activity.html.twig' as activity %}
+{% set days = goal.daysUntil %}
+<a href="{{ path('app_goal_show', {id: goal.id}) }}" class="kd-goalcard{{ goal.isPast ? ' is-past' }}">
+    <div class="kd-goalcard__count">
+        {% if days == 0 %}
+            <span class="kd-goalcard__num kd-goalcard__num--now">Jour J</span>
+        {% elseif days > 0 %}
+            <span class="kd-goalcard__num">J-{{ days }}</span>
+        {% else %}
+            <span class="kd-goalcard__num kd-goalcard__num--past">J+{{ -days }}</span>
+        {% endif %}
+        <span class="kd-goalcard__date">{{ goal.targetDate|date('d/m/Y') }}</span>
+    </div>
+    <div class="kd-goalcard__body">
+        <div class="kd-goalcard__top">
+            <span class="kd-prio kd-prio--{{ goal.priority.value }}" title="{{ goal.priority.label }}">{{ goal.priority.shortLabel }}</span>
+            <h3 class="kd-goalcard__title">{{ goal.title }}</h3>
+        </div>
+        <div class="kd-goalcard__meta">
+            {% if goal.activity %}{{ activity.badge(goal.activity) }}{% endif %}
+            {% if goal.targetValue %}<span class="kd-goalcard__target">{{ ux_icon('lucide:target') }} {{ goal.targetValue }}</span>{% endif %}
+            {% if goal.outcome %}
+                <span class="kd-badge kd-badge--{{ goal.outcome.modifier }}">{{ ux_icon(goal.outcome.icon) }} {{ goal.outcome.label }}</span>
+            {% endif %}
+        </div>
+    </div>
+</a>

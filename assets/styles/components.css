@@ -3436,3 +3436,282 @@ textarea.kd-inlineedit__input { min-height: 3.2em; resize: vertical; }
   margin-top: var(--kd-space-2);
   background: linear-gradient(to top, var(--color-surface) 60%, transparent);
 }
+
+/* ============================================================================
+   OBJECTIFS DATÉS (Goal) — cartes, hero, compte à rebours, marqueurs calendrier.
+   Priorité : A ressort en accent primaire (LE pic visé), B/C restent sobres.
+   La couleur reste réservée aux activités/statuts ; la priorité joue sur le
+   contraste, pas sur une couleur métier.
+   ============================================================================ */
+
+/* --- Badge de priorité A/B/C --- */
+.kd-prio {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 var(--kd-space-2);
+  border-radius: var(--kd-radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: var(--kd-weight-bold);
+  line-height: 1;
+}
+.kd-prio--a { background: var(--color-primary-tint); color: var(--color-primary-on-tint); }
+.kd-prio--b { background: var(--color-surface-subtle); color: var(--color-text-strong); border: 1px solid var(--color-border); }
+.kd-prio--c { background: transparent; color: var(--color-text-secondary); border: 1px solid var(--color-border); }
+
+/* --- Liste d'objectifs (index, profil) --- */
+.kd-goallist {
+  display: grid;
+  gap: var(--kd-space-4);
+}
+
+.kd-goalcard {
+  display: flex;
+  align-items: stretch;
+  gap: var(--kd-space-7);
+  text-decoration: none;
+  color: inherit;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-6) var(--kd-space-8);
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.kd-goalcard:hover { border-color: var(--color-border-strong); box-shadow: var(--shadow-card); }
+.kd-goalcard.is-past { opacity: .7; }
+
+.kd-goalcard__count {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 74px;
+  padding-right: var(--kd-space-7);
+  border-right: 1px solid var(--color-divider);
+}
+.kd-goalcard__num {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: var(--kd-weight-bold);
+  color: var(--color-primary);
+  line-height: 1;
+}
+.kd-goalcard__num--now { color: var(--color-primary); }
+.kd-goalcard__num--past { color: var(--color-text-secondary); }
+.kd-goalcard__date {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin-top: var(--kd-space-2);
+}
+
+.kd-goalcard__body { display: flex; flex-direction: column; gap: var(--kd-space-3); justify-content: center; min-width: 0; }
+.kd-goalcard__top { display: flex; align-items: center; gap: var(--kd-space-3); }
+.kd-goalcard__title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-strong);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-goalcard__meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--kd-space-4); }
+.kd-goalcard__target {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.kd-goalcard__target svg { width: 14px; height: 14px; }
+
+@media (max-width: 480px) {
+  .kd-goalcard { flex-direction: column; gap: var(--kd-space-4); }
+  .kd-goalcard__count {
+    flex-direction: row;
+    gap: var(--kd-space-3);
+    min-width: 0;
+    padding-right: 0;
+    padding-bottom: var(--kd-space-4);
+    border-right: none;
+    border-bottom: 1px solid var(--color-divider);
+    align-self: stretch;
+    justify-content: flex-start;
+  }
+  .kd-goalcard__date { margin-top: 0; }
+  .kd-goalcard__title { white-space: normal; }
+}
+
+/* --- En-tête de la page objectif (hero avec compte à rebours) --- */
+.kd-goalhero {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-9);
+  flex-wrap: wrap;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--kd-radius-xl);
+  padding: var(--kd-space-9) var(--kd-space-10);
+  margin-bottom: var(--kd-space-9);
+}
+.kd-goalhero__count {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-right: var(--kd-space-9);
+  border-right: 1px solid var(--color-divider);
+}
+.kd-goalhero__num {
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: var(--kd-weight-bold);
+  color: var(--color-primary);
+  line-height: 1;
+}
+.kd-goalhero__num--past { color: var(--color-text-secondary); }
+.kd-goalhero__unit {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--kd-tracking-eyebrow);
+  color: var(--color-text-faint);
+  margin-top: var(--kd-space-2);
+}
+.kd-goalhero__main { flex: 1 1 220px; min-width: 0; }
+.kd-goalhero__top { display: flex; align-items: center; gap: var(--kd-space-4); }
+.kd-goalhero__top .kd-title { margin: 0; }
+.kd-goalhero__actions { display: flex; gap: var(--kd-space-4); flex-wrap: wrap; align-items: center; }
+
+@media (max-width: 560px) {
+  .kd-goalhero__count { padding-right: 0; border-right: none; }
+}
+
+/* --- Formulaire : section résultat --- */
+.kd-goalresult {
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-6) var(--kd-space-7) var(--kd-space-3);
+  margin: var(--kd-space-4) 0 var(--kd-space-7);
+}
+.kd-goalresult__legend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  padding: 0 var(--kd-space-3);
+}
+.kd-goalresult__legend svg { width: 13px; height: 13px; }
+
+/* --- Formulaire « préparer avec un plan » --- */
+.kd-goalprepare {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--kd-space-5);
+  flex-wrap: wrap;
+  margin-top: var(--kd-space-5);
+}
+.kd-goalprepare .kd-field { flex: 1 1 260px; margin: 0; }
+
+/* --- Séances menant à l'échéance --- */
+.kd-goallead { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--kd-space-2); }
+.kd-goallead__row {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-6);
+  padding: var(--kd-space-4) var(--kd-space-6);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-md);
+}
+.kd-goallead__date {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-faint);
+  min-width: 44px;
+}
+.kd-goallead__title {
+  flex: 1 1 auto;
+  color: var(--color-text-strong);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-goallead__title:hover { color: var(--color-primary); }
+
+/* --- Bandeau compte à rebours (calendrier) --- */
+.kd-goalbanner {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-6);
+  text-decoration: none;
+  color: inherit;
+  background: var(--color-primary-tint);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-5) var(--kd-space-8);
+  margin-bottom: var(--kd-space-6);
+}
+.kd-goalbanner__icon { display: inline-flex; color: var(--color-primary-on-tint); }
+.kd-goalbanner__icon svg { width: 20px; height: 20px; }
+.kd-goalbanner__count {
+  flex: 0 0 auto;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: var(--kd-weight-bold);
+  color: var(--color-primary-on-tint);
+}
+.kd-goalbanner__body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kd-goalbanner__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--kd-tracking-eyebrow);
+  color: var(--color-primary-on-tint);
+  opacity: .8;
+}
+.kd-goalbanner__title {
+  font-size: 14px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-goalbanner__chev { flex: 0 0 auto; color: var(--color-primary-on-tint); }
+.kd-goalbanner__chev svg { width: 18px; height: 18px; }
+
+/* --- Marqueur d'objectif sur une case du calendrier --- */
+.kd-calgoal {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  text-decoration: none;
+  background: var(--color-primary-tint);
+  color: var(--color-primary-on-tint);
+  border-radius: var(--kd-radius-xs);
+  padding: 2px var(--kd-space-2);
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  line-height: 1.3;
+}
+.kd-calgoal svg { width: 12px; height: 12px; flex: 0 0 auto; }
+.kd-calgoal span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kd-calgoal--week { font-size: 12px; padding: var(--kd-space-2) var(--kd-space-3); margin-bottom: var(--kd-space-3); }
+.kd-calday--goal .kd-calday__num { color: var(--color-primary); font-weight: var(--kd-weight-bold); }

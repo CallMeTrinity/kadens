@@ -1,0 +1,65 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Objectifs — Kadens{% endblock %}
+
+{% block body %}
+    {% for message in app.flashes('success') %}
+        <p class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }} {{ message }}</p>
+    {% endfor %}
+    {% for message in app.flashes('error') %}
+        <p class="kd-flash kd-flash--error" role="alert">{{ ux_icon('lucide:x') }} {{ message }}</p>
+    {% endfor %}
+
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow kd-eyebrow--accent">Objectifs</p>
+            <h1 class="kd-title">Vers quoi tu t'entraînes</h1>
+            <p class="kd-lead">Les échéances qui donnent un cap à tes plans : courses, compétitions, tests de force, buts perso.</p>
+        </div>
+        <a href="{{ path('app_goal_new') }}" class="kd-btn kd-btn--primary">
+            {{ ux_icon('lucide:plus') }} Nouvel objectif
+        </a>
+    </div>
+
+    {# ------------------------------- À VENIR ------------------------------- #}
+    <section class="kd-section">
+        <div class="kd-pagehead kd-pagehead--sub">
+            <div>
+                <p class="kd-eyebrow kd-eyebrow--accent">À venir</p>
+                <h2 class="kd-title kd-title--sm">Prochaines échéances</h2>
+            </div>
+        </div>
+
+        {% if upcoming is empty %}
+            <div class="kd-card">
+                <div class="kd-empty">
+                    {{ ux_icon('lucide:target') }}
+                    <div>Aucun objectif à venir. <a href="{{ path('app_goal_new') }}">Fixe-toi une échéance</a> pour donner un cap à tes plans.</div>
+                </div>
+            </div>
+        {% else %}
+            <div class="kd-goallist kd-section__block">
+                {% for goal in upcoming %}
+                    {{ include('goal/_card.html.twig', {goal: goal}) }}
+                {% endfor %}
+            </div>
+        {% endif %}
+    </section>
+
+    {# ------------------------------- PASSÉS -------------------------------- #}
+    {% if past is not empty %}
+        <section class="kd-section">
+            <div class="kd-pagehead kd-pagehead--sub">
+                <div>
+                    <p class="kd-eyebrow">Historique</p>
+                    <h2 class="kd-title kd-title--sm">Échéances passées</h2>
+                </div>
+            </div>
+            <div class="kd-goallist kd-section__block">
+                {% for goal in past %}
+                    {{ include('goal/_card.html.twig', {goal: goal}) }}
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+{% endblock %}

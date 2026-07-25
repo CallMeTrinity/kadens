@@ -778,6 +778,48 @@ navigateur (non automatisable ici).
   `form_end` — elle a désormais sa propre carte. Anciennes classes `.kd-profile__fieldset/
   __legend` supprimées (CSS mort). Icône importée : `quote` (bio). Pas de migration
   (seul ajout PHP : le flag `derived`, additif, aucun test `ProfileStats` existant).
+  **Objectifs datés / événements cibles (hors-roadmap) — AVEC migration.** L'app
+  planifiait sans jamais donner de cap : on ajoute l'échéance vers laquelle on
+  s'entraîne (course, compétition, test de force, but perso). Nouvelle entité
+  **`Goal`** owner-only (pas de biblio globale, comme `ScheduledWorkout`) :
+  `title`, `activity` (nullable, code couleur/icône ; transverse si null),
+  `priority` (enum `GoalPriority` A/B/C, périodisation), `targetDate` (**journée
+  entière** `DATE_IMMUTABLE`, pas d'heure ni de fuseau), `targetValue` (**texte
+  libre assumé** — « sub 4h », « 180 kg » ; les objectifs sont trop hétérogènes
+  pour la normalisation en unités appliquée aux prescriptions), `description`,
+  `outcome` (enum `GoalOutcome` atteint/partiel/manqué, **nullable tant que
+  l'échéance n'est pas débriefée** — boucle prévu/réalisé au niveau de l'objectif),
+  `resultNote`, lifecycle `createdAt`/`updatedAt`. Méthodes dérivées `getDaysUntil()`
+  (compte à rebours, négatif si passée) et `isPast()`. Enums `GoalPriority`
+  (`shortLabel()` A/B/C) et `GoalOutcome` (`modifier()` réutilise les tokens de
+  statut done/planned/missed, `icon()`). **`GoalVoter`** owner-only (VIEW/EDIT/
+  DELETE). **`GoalRepository`** : `findUpcomingForOwner` (échéance ≥ aujourd'hui,
+  ASC), `findPastForOwner` (DESC), `findNextForOwner` (compte à rebours),
+  `findByOwnerBetween` (marquage calendrier). **`GoalController`** (`/goal`,
+  `access_control ^/goal` en `ROLE_USER`) : CRUD complet (index à deux sections
+  « à venir » / « passés », new, show, edit, delete CSRF) + **`prepare`** —
+  l'ancrage de plan sur une date d'arrivée, le cœur fédérateur : **on raisonne à
+  l'envers** (jour J → date de départ), la date de départ est calculée pour que la
+  DERNIÈRE semaine du plan tombe sur la semaine ISO de l'objectif, puis délègue à
+  `PlanScheduler::instantiate` (idempotent : refuse un plan déjà posé, message pour
+  vider d'abord). `GoalType` (form ; champs résultat dans une section à part).
+  **Intégrations** (valeur = relier profil + calendrier + plan) : nav « Objectifs »
+  (`lucide:target`) après Calendrier ; **profil** — section « Objectifs à venir »
+  en tête (3 prochains, via `GoalRepository::findUpcomingForOwner`) ; **calendrier**
+  — bandeau de compte à rebours du prochain objectif (`_goal_banner.html.twig`,
+  mois + semaine) et **marqueur d'objectif sur la case du jour J** (mois + semaine,
+  `CalendarController` injecte `goalsByDate` sur la fenêtre affichée + `nextGoal`,
+  helper `indexGoalsByDate`). Composant liste `goal/_card.html.twig` (carte à
+  compte à rebours J-N, réutilisé index + profil). Couche CSS `.kd-goal*` /
+  `.kd-prio--a/b/c` (priorité A en accent primaire, B/C sobres — la couleur reste
+  réservée activités/statuts, la priorité joue sur le contraste) / `.kd-calgoal*`
+  / `.kd-goalbanner*` / `.kd-goalhero*` / `.kd-goallead*`, tout tokenisé.
+  **Migration** `Version20260726090000` : table `goal` (FK owner `ON DELETE
+  CASCADE`). Tests : `GoalControllerTest` (CRUD, voter 403, ancrage de plan =
+  dernière semaine calée sur la semaine de l'échéance). Icône importée : `flag`
+  (le reste déjà local). **Suite : la « vue progression / évolution » est
+  spécifiée dans [`docs/feature-progression.md`](./docs/feature-progression.md),
+  à implémenter dans une session dédiée.**
 
 ---
 

@@ -62,6 +62,7 @@ final class CalendarController extends AbstractController
         ScheduledWorkoutRepository $scheduledWorkoutRepository,
         WorkoutRepository $workoutRepository,
         PlanTemplateRepository $planTemplateRepository,
+        \App\Repository\GoalRepository $goalRepository,
         \App\Service\PlanFlattener $planFlattener,
     ): Response {
         if ($month < 1 || $month > 12) {
@@ -70,6 +71,16 @@ final class CalendarController extends AbstractController
 
         $first = new \DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month));
         $weeks = $this->buildWeeks($first, $month, $scheduledWorkoutRepository);
+
+        // Objectifs tombant dans la fenêtre affichée (grille dense mois débords
+        // compris) + prochain objectif pour le bandeau de compte à rebours.
+        /** @var \App\Entity\User $user */
+        $user = $this->getUser();
+        $gridStart = $first->modify(sprintf('-%d days', (int) $first->format('N') - 1));
+        $last = $first->modify('last day of this month');
+        $gridEnd = $last->modify(sprintf('+%d days', 7 - (int) $last->format('N')));
+        $goalsByDate = $this->indexGoalsByDate($goalRepository->findByOwnerBetween($user, $gridStart, $gridEnd));
+        $nextGoal = $goalRepository->findNextForOwner($user);
 
         // Aperçu au survol : une mise à plat par séance distincte du mois,
         // indexée par id de Workout (source unique PlanFlattener, cf. plans).
@@ -98,6 +109,8 @@ final class CalendarController extends AbstractController
             'monthLabel' => self::MONTH_NAMES[$month].' '.$year,
             'weeks' => $weeks,
             'flattened' => $flattened,
+            'goalsByDate' => $goalsByDate,
+            'nextGoal' => $nextGoal,
             'weekPivot' => $weekPivot->format('Y-m-d'),
             'prev' => ['year' => (int) $prev->format('Y'), 'month' => (int) $prev->format('n')],
             'next' => ['year' => (int) $next->format('Y'), 'month' => (int) $next->format('n')],
@@ -150,6 +163,7 @@ final class CalendarController extends AbstractController
         ScheduledWorkoutRepository $scheduledWorkoutRepository,
         WorkoutRepository $workoutRepository,
         PlanTemplateRepository $planTemplateRepository,
+        \App\Repository\GoalRepository $goalRepository,
         \App\Service\PlanFlattener $planFlattener,
     ): Response {
         try {
@@ -173,6 +187,8 @@ final class CalendarController extends AbstractController
             $flattened[$workout->getId()] ??= $planFlattener->flattenWorkout($workout);
         }
 
+        $goalsByDate = $this->indexGoalsByDate($goalRepository->findByOwnerBetween($user, $monday, $sunday));
+
         $dayNames = [1 => 'Lundi', 2 => 'Mardi', 3 => 'Mercredi', 4 => 'Jeudi', 5 => 'Vendredi', 6 => 'Samedi', 7 => 'Dimanche'];
         $days = [];
         $totalMinutes = 0;
@@ -190,6 +206,7 @@ final class CalendarController extends AbstractController
                 'isPast' => $key < $todayKey,
                 'weekend' => (int) $cursor->format('N') >= 6,
                 'scheduled' => $scheduled,
+                'goals' => $goalsByDate[$key] ?? [],
             ];
             $cursor = $cursor->modify('+1 day');
         }
@@ -203,6 +220,7 @@ final class CalendarController extends AbstractController
             'isoWeek' => (int) $monday->format('W'),
             'days' => $days,
             'flattened' => $flattened,
+            'nextGoal' => $goalRepository->findNextForOwner($user),
             'counts' => $counts,
             'sessionCount' => array_sum($counts),
             'totalMinutes' => $totalMinutes,
@@ -341,6 +359,24 @@ final class CalendarController extends AbstractController
             'workoutActivities' => $activityFilters,
             'planCards' => $planCards,
         ];
+    }
+
+    /**
+     * Indexe des objectifs par date d'échéance (Y-m-d). Plusieurs objectifs peuvent
+     * tomber le même jour, d'où une liste par clé.
+     *
+     * @param list<\App\Entity\Goal> $goals
+     *
+     * @return array<string, list<\App\Entity\Goal>>
+     */
+    private function indexGoalsByDate(array $goals): array
+    {
+        $byDate = [];
+        foreach ($goals as $goal) {
+            $byDate[$goal->getTargetDate()->format('Y-m-d')][] = $goal;
+        }
+
+        return $byDate;
     }
 
     /**

@@ -1,0 +1,21 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Nouvel objectif{% endblock %}
+
+{% block body %}
+    <a href="{{ path('app_goal_index') }}" class="kd-backlink">
+        {{ ux_icon('lucide:arrow-left') }} Objectifs
+    </a>
+
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow kd-eyebrow--accent">Objectifs</p>
+            <h1 class="kd-title">Nouvel objectif</h1>
+            <p class="kd-lead">Une échéance datée vers laquelle t'entraîner. Le résultat se renseigne plus tard, une fois passé.</p>
+        </div>
+    </div>
+
+    <div class="kd-card" style="max-width:640px;">
+        {{ include('goal/_form.html.twig', {button_label: 'Créer l\'objectif'}) }}
+    </div>
+{% endblock %}

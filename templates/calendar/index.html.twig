@@ -46,6 +46,8 @@
         </div>
     </div>
 
+    {% if nextGoal %}{{ include('calendar/_goal_banner.html.twig', {goal: nextGoal}) }}{% endif %}
+
     <div data-controller="caladd">
         {{ include('calendar/_addbar.html.twig') }}
 
@@ -58,8 +60,15 @@
                 {% for week in weeks %}
                     {% for cell in week %}
                         {% set weekend = cell.date|date('N') in ['6', '7'] %}
-                        <div class="kd-calday{{ not cell.inMonth ? ' kd-calday--out' }}{{ cell.isToday ? ' kd-calday--today' }}{{ weekend ? ' kd-calday--weekend' }}">
+                        {% set cellGoals = goalsByDate[cell.date|date('Y-m-d')] ?? [] %}
+                        <div class="kd-calday{{ not cell.inMonth ? ' kd-calday--out' }}{{ cell.isToday ? ' kd-calday--today' }}{{ weekend ? ' kd-calday--weekend' }}{{ cellGoals is not empty ? ' kd-calday--goal' }}">
                             <span class="kd-calday__num">{{ cell.date|date('j') }}</span>
+
+                            {% for goal in cellGoals %}
+                                <a href="{{ path('app_goal_show', {id: goal.id}) }}" class="kd-calgoal" title="{{ goal.priority.label }} — {{ goal.title }}">
+                                    {{ ux_icon('lucide:target') }}<span>{{ goal.title }}</span>
+                                </a>
+                            {% endfor %}
 
                             {% if cell.scheduled|length %}
                                 <div class="kd-calday__events">
