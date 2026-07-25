@@ -143,11 +143,33 @@ final class PlanFlattenerTest extends TestCase
             '5 km @ 5:00/km',
         ];
 
-        yield 'duration avec zone' => [
+        yield 'duration avec zone (valeur libre héritée)' => [
             (new PrescribedExercise())
                 ->setPrescriptionType(PrescriptionType::DURATION)
                 ->setDurationSeconds(2400)->setIntensityZone('Z2'),
             '40:00 · Z2',
+        ];
+
+        yield 'distance_pace intervalles + zone + dénivelé' => [
+            (new PrescribedExercise())
+                ->setPrescriptionType(PrescriptionType::DISTANCE_PACE)
+                ->setSets(8)->setDistanceMeters(400)->setPaceSecondsPerKm(210)
+                ->setIntensityZone('z5')->setElevationGainMeters(100),
+            '8 × 400 m @ 3:30/km · Z5 VO2max · D+ 100 m',
+        ];
+
+        yield 'duration avec allure et zone Karvonen' => [
+            (new PrescribedExercise())
+                ->setPrescriptionType(PrescriptionType::DURATION)
+                ->setDurationSeconds(2700)->setPaceSecondsPerKm(300)->setIntensityZone('z2'),
+            '45:00 @ 5:00/km · Z2 Endurance',
+        ];
+
+        yield 'rpe transverse' => [
+            (new PrescribedExercise())
+                ->setPrescriptionType(PrescriptionType::SETS_REPS)
+                ->setSets(5)->setReps(5)->setRpe(9),
+            '5 × 5 · RPE 9',
         ];
     }
 }

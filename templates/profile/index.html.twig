@@ -141,6 +141,25 @@
             {% endfor %}
         </div>
 
+        {# Zones cardio : n'a de sens qu'avec une FC max renseignée (bornes BPM). #}
+        {% if hrZones|first.max is not null %}
+            <section class="kd-card kd-hrzones" style="margin-top:var(--kd-space-6);">
+                <h2 class="kd-card__title kd-profile__grouphead" style="margin-bottom:var(--kd-space-6);">
+                    {{ ux_icon('lucide:heart-pulse') }} Zones cardio
+                </h2>
+                <ul class="kd-hrzones__list">
+                    {% for band in hrZones %}
+                        <li class="kd-hrzone kd-hrzone--{{ band.zone.value }}">
+                            <span class="kd-hrzone__tag">{{ band.zone.value|upper }}</span>
+                            <span class="kd-hrzone__name">{{ band.zone.label }}</span>
+                            <span class="kd-hrzone__bpm">{{ band.min }}–{{ band.max }} bpm</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+                <p class="kd-hrzones__hint">Dérivées de ta FC max/repos (Karvonen). <a href="{{ path('app_profile_edit') }}">Ajuster</a>.</p>
+            </section>
+        {% endif %}
+
         {% if card.bio %}
             <section class="kd-card" style="margin-top:var(--kd-space-6);">
                 <h2 class="kd-card__title" style="margin-bottom:var(--kd-space-4);">Bio</h2>

@@ -7,6 +7,7 @@ use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
 use App\Entity\PrescribedExercise;
 use App\Entity\Workout;
+use App\Enum\IntensityZone;
 use App\Enum\PaceUnit;
 use App\Enum\PrescriptionType;
 
@@ -138,7 +139,7 @@ final class PlanFlattener
      */
     private function summarize(PrescribedExercise $pe): string
     {
-        return match ($pe->getPrescriptionType()) {
+        $summary = match ($pe->getPrescriptionType()) {
             PrescriptionType::SETS_REPS => $this->summarizeSetsReps($pe),
             PrescriptionType::SETS_TIME => $this->summarizeSetsTime($pe),
             PrescriptionType::AMRAP => $this->summarizeAmrap($pe),
@@ -147,6 +148,26 @@ final class PlanFlattener
             PrescriptionType::DURATION => $this->summarizeDuration($pe),
             null => '',
         };
+
+        // RPE : transverse à tous les types, ajouté en suffixe s'il est renseigné.
+        if (null !== $pe->getRpe()) {
+            $summary = trim($summary.sprintf(' · RPE %d', $pe->getRpe()));
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Libellé lisible d'une zone d'intensité stockée (« z4 » -> « Z4 Seuil »).
+     * Toute valeur hors enum (ancienne saisie libre) est renvoyée telle quelle.
+     */
+    private function intensityLabel(?string $zone): ?string
+    {
+        if (null === $zone || '' === $zone) {
+            return null;
+        }
+
+        return IntensityZone::tryFrom($zone)?->shortLabel() ?? $zone;
     }
 
     private function summarizeSetsReps(PrescribedExercise $pe): string
@@ -197,11 +218,24 @@ final class PlanFlattener
     {
         $summary = $this->units->distance($pe->getDistanceMeters());
 
+        // Intervalles : « 8 × 400 m » quand un nombre de répétitions est posé.
+        if (null !== $pe->getSets()) {
+            $summary = sprintf('%d × %s', $pe->getSets(), $summary);
+        }
+
         if (null !== $pe->getPaceSecondsPerKm()) {
             // Allure affichée dans l'unité naturelle de l'activité de l'exercice
             // (course min/km, vélo km/h, natation min/100m).
             $unit = PaceUnit::forActivity($pe->getExercise()?->getActivity());
             $summary .= ' @ '.$this->units->pace($pe->getPaceSecondsPerKm(), $unit);
+        }
+
+        if (null !== ($zone = $this->intensityLabel($pe->getIntensityZone()))) {
+            $summary .= ' · '.$zone;
+        }
+
+        if (null !== $pe->getElevationGainMeters()) {
+            $summary .= sprintf(' · D+ %d m', $pe->getElevationGainMeters());
         }
 
         return $summary;
@@ -211,8 +245,13 @@ final class PlanFlattener
     {
         $summary = $this->units->duration($pe->getDurationSeconds());
 
-        if (null !== $pe->getIntensityZone() && '' !== $pe->getIntensityZone()) {
-            $summary .= ' · '.$pe->getIntensityZone();
+        if (null !== $pe->getPaceSecondsPerKm()) {
+            $unit = PaceUnit::forActivity($pe->getExercise()?->getActivity());
+            $summary .= ' @ '.$this->units->pace($pe->getPaceSecondsPerKm(), $unit);
+        }
+
+        if (null !== ($zone = $this->intensityLabel($pe->getIntensityZone()))) {
+            $summary .= ' · '.$zone;
         }
 
         return $summary;

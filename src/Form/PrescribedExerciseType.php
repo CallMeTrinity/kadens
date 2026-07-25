@@ -2,31 +2,36 @@
 
 namespace App\Form;
 
-use App\Entity\Exercise;
 use App\Entity\PrescribedExercise;
 use App\Entity\User;
 use App\Enum\ActivityType;
 use App\Enum\DistanceUnit;
+use App\Enum\IntensityZone;
 use App\Enum\PaceUnit;
 use App\Enum\PrescriptionType;
-use App\Repository\ExerciseRepository;
-use Symfony\Bridge\Doctrine\Form\Type\EntityType;
+use App\Service\HeartRateZones;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\EnumType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
-use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
  * Un exercice prescrit dans un bloc. Tous les champs de valeurs sont exposés ;
  * seul le sous-ensemble pertinent (cf. PrescriptionType::fields()) est affiché
- * côté client et conservé côté serveur.
+ * côté client et conservé côté serveur. L'exercice lui-même n'est plus modifiable
+ * ici (on n'échange pas un exo une fois posé) : il est affiché en lecture seule.
  */
 class PrescribedExerciseType extends AbstractType
 {
+    public function __construct(
+        private readonly HeartRateZones $heartRateZones,
+    ) {
+    }
+
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
         /** @var User $user */
@@ -35,13 +40,6 @@ class PrescribedExerciseType extends AbstractType
         $distanceUnit = DistanceUnit::forActivity($options['activity']);
 
         $builder
-            ->add('exercise', EntityType::class, [
-                'class' => Exercise::class,
-                'label' => 'Exercice',
-                'choice_label' => 'name',
-                'placeholder' => 'Choisir un exercice',
-                'query_builder' => fn (ExerciseRepository $repository) => $repository->createLibraryQueryBuilder($user),
-            ])
             ->add('prescriptionType', EnumType::class, [
                 'class' => PrescriptionType::class,
                 'label' => 'Type d\'effort',
@@ -63,10 +61,12 @@ class PrescribedExerciseType extends AbstractType
                 'scale' => 2,
                 'attr' => ['min' => 0, 'step' => 0.5],
             ])
-            ->add('durationSeconds', IntegerType::class, [
-                'label' => 'Durée (s)',
+            ->add('durationSeconds', DurationType::class, [
+                // Saisie humaine mm:ss ou h:mm:ss (round-trip vers les secondes
+                // stockées) : « 45:00 » plutôt que 2700.
+                'label' => 'Durée (h:mm:ss)',
                 'required' => false,
-                'attr' => ['min' => 0],
+                'attr' => ['placeholder' => '45:00'],
             ])
             ->add('distanceMeters', DistanceType::class, [
                 // Unité déduite de l'activité de l'exercice prescrit (course/vélo
@@ -94,9 +94,26 @@ class PrescribedExerciseType extends AbstractType
                 'required' => false,
                 'attr' => ['min' => 0],
             ])
-            ->add('intensityZone', TextType::class, [
+            ->add('intensityZone', ChoiceType::class, [
+                // Choix Z1..Z5 (valeurs = IntensityZone->value, stockées telles
+                // quelles dans la colonne string). Les BPM affichés dans le libellé
+                // viennent des zones du profil (service HeartRateZones), donc chaque
+                // athlète voit ses propres repères.
                 'label' => 'Zone d\'intensité',
                 'required' => false,
+                'placeholder' => '—',
+                'choices' => $this->intensityChoices($user),
+            ])
+            ->add('elevationGainMeters', IntegerType::class, [
+                'label' => 'Dénivelé + (m)',
+                'required' => false,
+                'attr' => ['min' => 0, 'step' => 10],
+            ])
+            ->add('rpe', IntegerType::class, [
+                // Effort ressenti 1-10 (transverse à tous les types d'effort).
+                'label' => 'RPE (1-10)',
+                'required' => false,
+                'attr' => ['min' => 1, 'max' => 10],
             ])
             ->add('restSeconds', IntegerType::class, [
                 'label' => 'Repos (s)',
@@ -121,5 +138,28 @@ class PrescribedExerciseType extends AbstractType
         // formulaire d'ajout où l'exercice n'est pas encore choisi) -> min/km.
         $resolver->setDefault('activity', null);
         $resolver->setAllowedTypes('activity', ['null', ActivityType::class]);
+    }
+
+    /**
+     * Libellés de zone enrichis des BPM du profil : « Z4 · Seuil (146-160 bpm) ».
+     * Sans FC max renseignée, la fourchette est omise (« Z4 · Seuil »).
+     *
+     * @return array<string, string> libellé => valeur d'IntensityZone
+     */
+    private function intensityChoices(User $user): array
+    {
+        $choices = [];
+        foreach ($this->heartRateZones->forUser($user) as $band) {
+            $zone = $band['zone'];
+            $label = sprintf('%s · %s', strtoupper($zone->value), $zone->label());
+
+            if (null !== $band['min'] && null !== $band['max']) {
+                $label .= sprintf(' (%d-%d bpm)', $band['min'], $band['max']);
+            }
+
+            $choices[$label] = $zone->value;
+        }
+
+        return $choices;
     }
 }

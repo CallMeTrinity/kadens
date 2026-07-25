@@ -1,23 +1,33 @@
-{# Formulaire d'un exercice prescrit (ajout ou édition). Les champs de valeurs
-   pertinents sont montrés/masqués selon le type d'effort par le contrôleur
-   Stimulus « prescription-fields ». Le nettoyage définitif se fait côté serveur.
+{# Formulaire d'un exercice prescrit (édition). Les champs de valeurs pertinents
+   sont montrés/masqués selon le type d'effort par le contrôleur Stimulus
+   « prescription-fields ». Le nettoyage définitif se fait côté serveur.
    Paramètres : form (FormView), submit_label, auto_action.
+
+   L'exercice n'est plus modifiable ici (on n'échange pas un exo une fois posé) :
+   il est rappelé en lecture seule (badge d'activité + nom).
 
    auto_action (optionnel) : action Stimulus (ex. « change->composer#submitForm »)
    posée sur chaque champ pour un enregistrement automatique au changement. Quand il
    est fourni, le bouton d'enregistrement disparaît (tout est automatique). #}
+{% import 'components/_activity.html.twig' as activity %}
 {% set auto = auto_action|default(null) %}
+{% set exercise = form.vars.data.exercise %}
 <div data-controller="prescription-fields"
      data-prescription-fields-map-value="{{ prescription_type_fields_map()|json_encode|e('html_attr') }}">
     {{ form_start(form, { attr: { class: 'kd-form' } }) }}
-        {{ form_row(form.exercise, auto ? { attr: { 'data-action': auto } } : {}) }}
+        {# Rappel de l'activité (le nom est déjà porté par la ligne parente) : donne
+           le contexte utile pour lire les champs cardio (allure/zone/dénivelé). #}
+        {% if exercise %}
+            <p class="kd-prescribed__exo">{{ activity.badge(exercise.activity) }}</p>
+        {% endif %}
+
         {{ form_row(form.prescriptionType, { attr: {
             'data-prescription-fields-target': 'type',
             'data-action': auto ? ('prescription-fields#update ' ~ auto) : 'prescription-fields#update',
         } }) }}
 
         <div class="kd-fieldrow">
-            {% for field in ['sets', 'reps', 'weightKg', 'durationSeconds', 'distanceMeters', 'paceSecondsPerKm', 'targetReps', 'capSeconds', 'intensityZone'] %}
+            {% for field in ['sets', 'reps', 'weightKg', 'durationSeconds', 'distanceMeters', 'paceSecondsPerKm', 'intensityZone', 'elevationGainMeters', 'targetReps', 'capSeconds'] %}
                 <div data-prescription-fields-target="field" data-field="{{ field }}" style="flex:1 1 140px;">
                     {{ form_row(attribute(form, field), auto ? { attr: { 'data-action': auto } } : {}) }}
                 </div>
@@ -26,6 +36,7 @@
 
         <div class="kd-fieldrow">
             <div style="flex:0 0 140px;">{{ form_row(form.restSeconds, auto ? { attr: { 'data-action': auto } } : {}) }}</div>
+            <div style="flex:0 0 140px;">{{ form_row(form.rpe, auto ? { attr: { 'data-action': auto } } : {}) }}</div>
         </div>
         {{ form_row(form.notes, auto ? { attr: { 'data-action': auto } } : {}) }}
 

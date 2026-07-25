@@ -55,6 +55,12 @@ class PrescribedExercise
     private ?string $intensityZone = null;
 
     #[ORM\Column(nullable: true)]
+    private ?int $elevationGainMeters = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $rpe = null;
+
+    #[ORM\Column(nullable: true)]
     private ?int $restSeconds = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
@@ -217,6 +223,30 @@ class PrescribedExercise
     public function setIntensityZone(?string $intensityZone): static
     {
         $this->intensityZone = $intensityZone;
+
+        return $this;
+    }
+
+    public function getElevationGainMeters(): ?int
+    {
+        return $this->elevationGainMeters;
+    }
+
+    public function setElevationGainMeters(?int $elevationGainMeters): static
+    {
+        $this->elevationGainMeters = $elevationGainMeters;
+
+        return $this;
+    }
+
+    public function getRpe(): ?int
+    {
+        return $this->rpe;
+    }
+
+    public function setRpe(?int $rpe): static
+    {
+        $this->rpe = $rpe;
 
         return $this;
     }

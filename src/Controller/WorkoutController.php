@@ -39,6 +39,7 @@ final class WorkoutController extends AbstractController
     private const VALUE_FIELDS = [
         'sets', 'reps', 'weightKg', 'durationSeconds', 'distanceMeters',
         'paceSecondsPerKm', 'targetReps', 'capSeconds', 'intensityZone',
+        'elevationGainMeters',
     ];
 
     public function __construct(
@@ -286,28 +287,6 @@ final class WorkoutController extends AbstractController
     }
 
     // ---- Édition des exercices prescrits -----------------------------------
-
-    #[Route('/{id}/blocks/{blockId}/exercises', name: 'app_workout_prescribed_add', methods: ['POST'], requirements: ['id' => '\d+', 'blockId' => '\d+'])]
-    public function addPrescribed(Request $request, Workout $workout, int $blockId): Response
-    {
-        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
-        $block = $this->findBlock($workout, $blockId);
-
-        $prescribed = new PrescribedExercise();
-        $form = $this->createAddPrescribedForm($block, $prescribed);
-        $form->handleRequest($request);
-
-        if ($form->isSubmitted() && $form->isValid()) {
-            $prescribed->setPosition($this->nextPosition($block->getPrescribedExercises()->toArray()));
-            // addPrescribedExercise maintient les DEUX côtés (voir addBlock).
-            $block->addPrescribedExercise($prescribed);
-            $this->clearIrrelevantFields($prescribed);
-            $this->entityManager->persist($prescribed);
-            $this->entityManager->flush();
-        }
-
-        return $this->blocksResponse($request, $workout);
-    }
 
     #[Route('/{id}/exercises/quick-add', name: 'app_workout_prescribed_quick_add', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function quickAddPrescribed(Request $request, Workout $workout): Response
@@ -642,18 +621,6 @@ final class WorkoutController extends AbstractController
     {
         return $this->formFactory->createNamed('block_'.$block->getId(), BlockType::class, $block, [
             'action' => $this->generateUrl('app_workout_block_edit', [
-                'id' => $block->getWorkout()->getId(),
-                'blockId' => $block->getId(),
-            ]),
-        ]);
-    }
-
-    private function createAddPrescribedForm(Block $block, PrescribedExercise $prescribed): FormInterface
-    {
-        return $this->formFactory->createNamed('add_exercise_'.$block->getId(), PrescribedExerciseType::class, $prescribed, [
-            'user' => $this->getUser(),
-            'activity' => $prescribed->getExercise()?->getActivity(),
-            'action' => $this->generateUrl('app_workout_prescribed_add', [
                 'id' => $block->getWorkout()->getId(),
                 'blockId' => $block->getId(),
             ]),

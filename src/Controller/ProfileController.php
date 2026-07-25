@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Form\ProfileType;
+use App\Service\HeartRateZones;
 use App\Service\ProfileStats;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,7 +24,7 @@ final class ProfileController extends AbstractController
      * manuellement (comme l'ancien HomeController).
      */
     #[Route('/', name: 'app_profile', methods: ['GET'])]
-    public function index(ProfileStats $profileStats): Response
+    public function index(ProfileStats $profileStats, HeartRateZones $heartRateZones): Response
     {
         $user = $this->getUser();
         if (!$user instanceof User) {
@@ -32,6 +33,7 @@ final class ProfileController extends AbstractController
 
         return $this->render('profile/index.html.twig', [
             'stats' => $profileStats->for($user),
+            'hrZones' => $heartRateZones->forUser($user),
         ]);
     }
 

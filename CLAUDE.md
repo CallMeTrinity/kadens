@@ -722,6 +722,43 @@ navigateur (non automatisable ici).
   `.kd-feedrow*` / `.kd-subscribe`. Icônes importées : `rss`, `rotate-cw`. **Limite** :
   Google/Apple ne resynchronisent l'abonnement que toutes les 12-24 h (limite du client,
   pas de push temps réel possible sur un flux ICS).
+  **Enrichissement cardio des exercices + zones BPM au profil (hors-roadmap) — AVEC
+  migration.** Le modèle d'exercice cardio devient réaliste et les zones d'intensité
+  ont enfin une source. **Zones BPM au profil** : nouvel enum `IntensityZone` (Z1..Z5 :
+  Récupération/Endurance/Tempo/Seuil/VO2max, valeurs `z1..z5`, `shortLabel()` +
+  `defaultBounds()` en % de réserve) et service **`HeartRateZones`** (source unique
+  consommée par le form ET le profil) : dérivation **Karvonen** `bpm = repos + pct ×
+  (max − repos)` à partir de `User.maxHeartRate`/`restingHeartRate`, **surchargeable**
+  par zone via `User.hrZone1Max..hrZone4Max` (null = borne dérivée ; zones contiguës,
+  Z5 plafonne à la FC max). Sans FC max, les zones existent mais sans bornes BPM. Champs
+  ajoutés à `ProfileType` + affichage `templates/profile/index.html.twig` (section
+  `.kd-hrzones`/`.kd-hrzone*`, filet gauche en rampe d'intensité sobre — neutre, la
+  couleur reste réservée aux activités). **Prescription enrichie** : `PrescriptionType::fields()`
+  — `DISTANCE_PACE` gagne `sets` (répétitions du fractionné : « 8 × 400 m »),
+  `intensityZone`, `elevationGainMeters` ; `DURATION` gagne `paceSecondsPerKm` (allure
+  en plus de la zone). Nouveaux champs **nullable** sur `PrescribedExercise` : `rpe`
+  (effort ressenti 1-10, **transverse** à tous les types, hors `fields()`/`VALUE_FIELDS`,
+  jamais nettoyé) et `elevationGainMeters` (D+, dans `VALUE_FIELDS`). **`intensityZone`
+  reste une colonne string** (stocke `z1..z5` ; d'anciennes valeurs libres restent
+  affichées telles quelles via `IntensityZone::tryFrom(...)?->shortLabel() ?? $raw`).
+  **Formulaire prescrit** (`PrescribedExerciseType`) : le `<select>` **exercice est
+  retiré** (on n'échange pas un exo posé — remplacé par un rappel d'activité en lecture
+  seule, le nom étant déjà porté par la ligne parente) ; `durationSeconds` passe en
+  **`DurationType`** (saisie `mm:ss`/`h:mm:ss` au lieu de secondes brutes) ;
+  `intensityZone` passe en `ChoiceType` dont les libellés portent les BPM du profil
+  (« Z4 · Seuil (146-160 bpm) », injection `HeartRateZones` + option `user`) ; ajout
+  `rpe` et `elevationGainMeters`. Le `prescription_fields_controller.js` est inchangé
+  (piloté par la map). **Mort supprimé** : route `app_workout_prescribed_add` + méthode
+  `addPrescribed` + `createAddPrescribedForm` (dépendaient du select, non rendus depuis
+  le passage au compositeur/quick-add). **Résumés** (`PlanFlattener`, source unique dont
+  héritent rendu Twig, export Excel et flux ICS) : `summarizeDistancePace` préfixe `sets ×`,
+  ajoute zone (label enum) et « D+ N m » ; `summarizeDuration` ajoute l'allure ; wrapper
+  `summarize()` suffixe « · RPE N » (transverse). `WorkoutEstimator::distancePace` ×`sets`
+  (chaque répétition refait distance + récup). **Migration** `Version20260725202747` :
+  colonnes nullable sur `user` (FC + 4 zones) et `prescribed_exercise` (`rpe`,
+  `elevation_gain_meters`). Tests : `HeartRateZonesTest` (Karvonen + override) et cas
+  cardio ajoutés à `PlanFlattenerTest` (intervalles/zone/D+/allure/RPE). Icône importée :
+  `heart-pulse`.
 
 ---
 

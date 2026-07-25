@@ -109,6 +109,28 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(nullable: true)]
     private ?int $swim100mSeconds = null;
 
+    // --- Fiche athlète : zones cardio (BPM) ---------------------------------
+    // FC max/repos alimentent la dérivation Karvonen (service HeartRateZones) ;
+    // les hrZoneNMax surchargent la borne haute d'une zone (null = dérivée).
+
+    #[ORM\Column(nullable: true)]
+    private ?int $maxHeartRate = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $restingHeartRate = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $hrZone1Max = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $hrZone2Max = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $hrZone3Max = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $hrZone4Max = null;
+
     /**
      * @var Collection<int, Exercise>
      */
@@ -490,6 +512,78 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setSwim100mSeconds(?int $swim100mSeconds): static
     {
         $this->swim100mSeconds = $swim100mSeconds;
+
+        return $this;
+    }
+
+    public function getMaxHeartRate(): ?int
+    {
+        return $this->maxHeartRate;
+    }
+
+    public function setMaxHeartRate(?int $maxHeartRate): static
+    {
+        $this->maxHeartRate = $maxHeartRate;
+
+        return $this;
+    }
+
+    public function getRestingHeartRate(): ?int
+    {
+        return $this->restingHeartRate;
+    }
+
+    public function setRestingHeartRate(?int $restingHeartRate): static
+    {
+        $this->restingHeartRate = $restingHeartRate;
+
+        return $this;
+    }
+
+    public function getHrZone1Max(): ?int
+    {
+        return $this->hrZone1Max;
+    }
+
+    public function setHrZone1Max(?int $hrZone1Max): static
+    {
+        $this->hrZone1Max = $hrZone1Max;
+
+        return $this;
+    }
+
+    public function getHrZone2Max(): ?int
+    {
+        return $this->hrZone2Max;
+    }
+
+    public function setHrZone2Max(?int $hrZone2Max): static
+    {
+        $this->hrZone2Max = $hrZone2Max;
+
+        return $this;
+    }
+
+    public function getHrZone3Max(): ?int
+    {
+        return $this->hrZone3Max;
+    }
+
+    public function setHrZone3Max(?int $hrZone3Max): static
+    {
+        $this->hrZone3Max = $hrZone3Max;
+
+        return $this;
+    }
+
+    public function getHrZone4Max(): ?int
+    {
+        return $this->hrZone4Max;
+    }
+
+    public function setHrZone4Max(?int $hrZone4Max): static
+    {
+        $this->hrZone4Max = $hrZone4Max;
 
         return $this;
     }
