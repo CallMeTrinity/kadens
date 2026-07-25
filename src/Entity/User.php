@@ -42,6 +42,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $updatedAt = null;
 
+    // Jeton secret d'abonnement calendrier (ICS). Nullable tant que l'utilisateur
+    // n'a pas activé l'abonnement ; régénérer = révoquer l'ancien lien. Sert
+    // d'autorisation à lui seul (route /feed hors access_control, comme le partage
+    // public par slug), d'où l'entropie (32 octets → 64 hex) et l'unicité.
+    #[ORM\Column(length: 64, unique: true, nullable: true)]
+    private ?string $calendarFeedToken = null;
+
     // --- Fiche athlète : identité -------------------------------------------
 
     #[ORM\Column(type: 'date_immutable', nullable: true)]
@@ -236,6 +243,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getUpdatedAt(): ?\DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    public function getCalendarFeedToken(): ?string
+    {
+        return $this->calendarFeedToken;
+    }
+
+    public function setCalendarFeedToken(?string $calendarFeedToken): static
+    {
+        $this->calendarFeedToken = $calendarFeedToken;
+
+        return $this;
     }
 
     public function getBirthDate(): ?\DateTimeImmutable

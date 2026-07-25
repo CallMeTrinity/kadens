@@ -1,0 +1,84 @@
+{# Abonnement calendrier (ICS). Bouton « S'abonner » + <dialog> (contrôleur
+   dialog, top-layer). feedToken peut être null (abonnement pas encore activé).
+   Le lien de flux vit sous /feed, hors auth : le jeton EST l'autorisation.
+   Attend : feedToken (string|null), instantiatedPlans (list<PlanTemplate>). #}
+{% import _self as feed %}
+
+{% macro row(label, urlHttps) %}
+    {% set urlWebcal = urlHttps|replace({'https://': 'webcal://', 'http://': 'webcal://'}) %}
+    <div class="kd-feedrow" data-controller="clipboard" data-clipboard-url-value="{{ urlHttps }}">
+        <div class="kd-feedrow__label">{{ label }}</div>
+        <div class="kd-feedrow__url">
+            <input type="text" class="kd-input" readonly value="{{ urlHttps }}"
+                   onclick="this.select()" aria-label="Lien d'abonnement — {{ label }}">
+            <button type="button" class="kd-btn kd-btn--secondary kd-btn--sm" data-action="clipboard#copy">
+                {{ ux_icon('lucide:copy') }} Copier
+            </button>
+            <a class="kd-btn kd-btn--ghost kd-btn--sm" href="{{ urlWebcal }}"
+               title="Ouvrir dans l'app calendrier par défaut (Apple Calendar…)">
+                {{ ux_icon('lucide:calendar-plus') }} Ajouter
+            </a>
+        </div>
+        <p class="kd-feedrow__feedback" data-clipboard-target="feedback" role="status" aria-live="polite"></p>
+    </div>
+{% endmacro %}
+
+<div data-controller="dialog" class="kd-subscribe">
+    <button type="button" class="kd-btn kd-btn--secondary kd-btn--sm" data-action="dialog#open">
+        {{ ux_icon('lucide:rss') }} S'abonner
+    </button>
+
+    <dialog class="kd-modal kd-modal--picker" data-dialog-target="dialog" data-action="click->dialog#backdrop">
+        <div class="kd-modal__card kd-modal__card--picker">
+            <div class="kd-modal__head">
+                <div>
+                    <h2 class="kd-modal__title">S'abonner au calendrier</h2>
+                    <p class="kd-modal__sub">Ajoute ton planning à Google Agenda, Apple Calendar…</p>
+                </div>
+                <button type="button" class="kd-modal__close" data-action="dialog#close" aria-label="Fermer">
+                    {{ ux_icon('lucide:x') }}
+                </button>
+            </div>
+
+            {% if feedToken is null %}
+                <div class="kd-feed__intro">
+                    <p>Active un lien d'abonnement privé : ton agenda se synchronisera tout seul
+                       avec tes séances datées, sans rien réimporter.</p>
+                    <form method="post" action="{{ path('app_calendar_feed_token') }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('calendar_feed_token') }}">
+                        <button type="submit" class="kd-btn kd-btn--primary">
+                            {{ ux_icon('lucide:rss') }} Activer l'abonnement
+                        </button>
+                    </form>
+                </div>
+            {% else %}
+                <div class="kd-feed">
+                    {{ feed.row('Tout le calendrier', url('app_calendar_feed', {token: feedToken})) }}
+
+                    {% for plan in instantiatedPlans %}
+                        {{ feed.row(plan.title, url('app_calendar_feed_plan', {token: feedToken, planId: plan.id})) }}
+                    {% endfor %}
+
+                    <div class="kd-feed__help">
+                        <p class="kd-feed__helptitle">Ajouter à Google Agenda</p>
+                        <p>Autres agendas &gt; Ajouter &gt; À partir de l'URL, puis colle le lien.
+                           Google actualise l'abonnement toutes les 12 à 24 h (sa limite, pas la nôtre).</p>
+                        <p class="kd-feed__warn">
+                            {{ ux_icon('lucide:calendar-clock') }}
+                            Ce lien donne accès en lecture à ton planning sans mot de passe.
+                            Ne le partage pas ; régénère-le en cas de fuite.
+                        </p>
+                    </div>
+
+                    <form method="post" action="{{ path('app_calendar_feed_token') }}" class="kd-feed__regen"
+                          onsubmit="return confirm('Régénérer le lien ? Les abonnements en cours cesseront de se synchroniser jusqu\'à ce que tu remplaces le lien.');">
+                        <input type="hidden" name="_token" value="{{ csrf_token('calendar_feed_token') }}">
+                        <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm">
+                            {{ ux_icon('lucide:rotate-cw') }} Régénérer le lien
+                        </button>
+                    </form>
+                </div>
+            {% endif %}
+        </div>
+    </dialog>
+</div>

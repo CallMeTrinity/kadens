@@ -105,6 +105,33 @@ final class CalendarController extends AbstractController
         ]), 'month');
     }
 
+    /**
+     * Active ou régénère le jeton d'abonnement calendrier (ICS). Régénérer révoque
+     * l'ancien lien (nouveau secret). Sous /calendar donc protégé ; le flux lui-même
+     * vit sous /feed (hors auth), cf. PublicCalendarController.
+     */
+    #[Route('/feed/token', name: 'app_calendar_feed_token', methods: ['POST'])]
+    public function generateFeedToken(
+        Request $request,
+        \Doctrine\ORM\EntityManagerInterface $entityManager,
+    ): Response {
+        if (!$this->isCsrfTokenValid('calendar_feed_token', (string) $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Jeton CSRF invalide.');
+        }
+
+        /** @var \App\Entity\User $user */
+        $user = $this->getUser();
+        $regenerate = null !== $user->getCalendarFeedToken();
+        $user->setCalendarFeedToken(bin2hex(random_bytes(32)));
+        $entityManager->flush();
+
+        $this->addFlash('success', $regenerate
+            ? 'Lien d\'abonnement régénéré. L\'ancien lien ne fonctionne plus.'
+            : 'Abonnement calendrier activé. Copie le lien pour l\'ajouter à ton agenda.');
+
+        return $this->redirectToRoute('app_calendar_index');
+    }
+
     #[Route('/week', name: 'app_calendar_week_index', methods: ['GET'])]
     public function weekIndex(): Response
     {
@@ -242,10 +269,16 @@ final class CalendarController extends AbstractController
             'planTemplates' => $plans,
         ]);
 
+        /** @var \App\Entity\User $user */
+        $user = $this->getUser();
+
         return [
             'instantiateForm' => $instantiateForm,
-            'instantiatedPlans' => $scheduledWorkoutRepository->findInstantiatedPlansForOwner($this->getUser()),
+            'instantiatedPlans' => $scheduledWorkoutRepository->findInstantiatedPlansForOwner($user),
             'statuses' => \App\Enum\ScheduledStatus::cases(),
+            // Abonnement ICS : jeton (null tant que non activé) consommé par la
+            // modale « S'abonner » ; les URLs de flux sont bâties côté Twig via url().
+            'feedToken' => $user->getCalendarFeedToken(),
             ...$this->buildPickerCards($workoutRepository, $plans),
         ];
     }

@@ -111,6 +111,55 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     }
 
     /**
+     * Toutes les séances datées d'un utilisateur, contenu fetch-joint
+     * (blocs -> exercices prescrits -> exercice), triées par date. Alimente le flux
+     * ICS « tout le calendrier » : PlanFlattener bâtit la description de chaque
+     * événement sans N+1.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findAllForOwnerWithContent(User $owner): array
+    {
+        return $this->createQueryBuilder('s')
+            ->addSelect('w', 'b', 'pe', 'e')
+            ->join('s.workout', 'w')
+            ->leftJoin('w.blocks', 'b')
+            ->leftJoin('b.prescribedExercises', 'pe')
+            ->leftJoin('pe.exercise', 'e')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('owner', $owner)
+            ->orderBy('s.scheduledDate', 'ASC')
+            ->addOrderBy('s.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Séances datées issues d'un plan pour un utilisateur, contenu fetch-joint.
+     * Variante « avec contenu » de findBySourcePlanTemplateForOwner : alimente le
+     * flux ICS restreint à un plan instancié.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findBySourcePlanTemplateForOwnerWithContent(PlanTemplate $template, User $owner): array
+    {
+        return $this->createQueryBuilder('s')
+            ->addSelect('w', 'b', 'pe', 'e')
+            ->join('s.workout', 'w')
+            ->leftJoin('w.blocks', 'b')
+            ->leftJoin('b.prescribedExercises', 'pe')
+            ->leftJoin('pe.exercise', 'e')
+            ->andWhere('s.sourcePlanTemplate = :template')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('template', $template)
+            ->setParameter('owner', $owner)
+            ->orderBy('s.scheduledDate', 'ASC')
+            ->addOrderBy('s.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Répartition par statut, regroupée par plan source, pour un utilisateur.
      * Le plan source est nullable (séance isolée, ou plan supprimé qui a mis la
      * FK à NULL) : ces séances retombent dans un bucket « hors plan ».

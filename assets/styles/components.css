@@ -3103,3 +3103,49 @@ textarea.kd-inlineedit__input { min-height: 3.2em; resize: vertical; }
   margin-bottom: var(--kd-space-5);
 }
 .kd-profile__legend svg { width: 16px; height: 16px; color: var(--color-text-secondary); }
+
+/* ── Abonnement calendrier (ICS) ─────────────────────────────────────────────
+   Modale « S'abonner » : lien(s) de flux à copier + aide + régénération.
+   Réutilise .kd-modal*/.kd-input/.kd-btn ; couleur d'alerte = terracotta
+   (convention « action à mener »). */
+.kd-subscribe { display: inline-flex; }
+
+.kd-feed { display: flex; flex-direction: column; gap: var(--kd-space-7); }
+
+.kd-feed__intro { display: flex; flex-direction: column; gap: var(--kd-space-6); }
+.kd-feed__intro p { color: var(--color-text-secondary); line-height: 1.5; }
+
+.kd-feedrow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-3);
+  padding: var(--kd-space-6);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+}
+.kd-feedrow__label { font-weight: 600; color: var(--color-text-strong); }
+.kd-feedrow__url { display: flex; flex-wrap: wrap; gap: var(--kd-space-3); align-items: center; }
+.kd-feedrow__url .kd-input { flex: 1 1 12rem; min-width: 0; font-family: var(--font-mono); font-size: 0.8rem; }
+.kd-feedrow__feedback { min-height: 1em; font-size: 0.8rem; color: var(--color-primary); }
+.kd-feedrow__feedback:empty { display: none; }
+
+.kd-feed__help {
+  padding: var(--kd-space-6);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--kd-radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-4);
+}
+.kd-feed__helptitle { font-weight: 600; color: var(--color-text-strong); }
+.kd-feed__help p { color: var(--color-text-secondary); line-height: 1.5; font-size: 0.9rem; }
+.kd-feed__warn {
+  display: flex;
+  gap: var(--kd-space-3);
+  align-items: flex-start;
+  color: var(--color-primary);
+}
+.kd-feed__warn svg { flex: none; width: 18px; height: 18px; margin-top: 1px; }
+
+.kd-feed__regen { display: flex; justify-content: flex-end; }

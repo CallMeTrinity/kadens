@@ -695,6 +695,33 @@ navigateur (non automatisable ici).
   `ProfileStats::athleteCard`. **Migration** `Version20260725073629` : colonnes profil
   nullable sur `user`. Couche CSS `.kd-profile*` (tuiles de volume, fieldsets,
   en-têtes de groupe), tokenisée. Aucune icône nouvelle (toutes déjà locales).
+  **Abonnement calendrier ICS (hors-roadmap) — AVEC migration.** Le calendrier
+  peut générer un lien d'abonnement (webcal/ICS) à ajouter à Google Agenda, Apple
+  Calendar… **Auth par jeton, pas par session** : le flux est récupéré côté serveur
+  du client sans cookie, donc la route sort de `access_control` (nouveau préfixe
+  `/feed`) et le jeton secret EST l'autorisation — même philosophie que le partage
+  public par slug. Nouveau champ `User.calendarFeedToken` (nullable, unique, 64 hex ;
+  **Migration** `Version20260725120000`), généré à la demande, **régénérer = révoquer**
+  l'ancien lien. `PublicCalendarController` (hors voters) sert deux portées choisies
+  par l'URL : `/feed/{token}.ics` = tout le calendrier, `/feed/{token}/plan/{planId}.ics`
+  = un plan instancié (borné à l'owner). Service `IcsCalendarBuilder` (`src/Service/`)
+  **consomme `PlanFlattener`** (source unique de mise à plat, jamais réimplémentée) pour
+  la `DESCRIPTION` de chaque événement (blocs/exercices lisibles depuis le téléphone).
+  **Événements journée entière** (`VALUE=DATE`) : le modèle n'a qu'une `scheduledDate`
+  sans heure → aucun `VTIMEZONE`, aucun fuseau à gérer. `UID` stable par
+  `ScheduledWorkout` (Google met à jour au lieu de dupliquer) ; statut prévu/fait/manqué
+  codé par un préfixe de titre (✓/✗). Le builder respecte le format RFC 5545 à la main
+  (CRLF, pliage 75 octets **sans couper l'UTF-8**, échappement `,;\`+sauts de ligne),
+  aucune lib ajoutée. Deux méthodes repository fetch-join anti-N+1
+  (`findAllForOwnerWithContent`, `findBySourcePlanTemplateForOwnerWithContent`). UI :
+  bouton « S'abonner » dans l'en-tête du calendrier (mois + semaine) ouvrant une modale
+  (`calendar/_subscribe.html.twig`, contrôleur `dialog`) : activation/régénération du
+  jeton (POST `app_calendar_feed_token`, sous `/calendar` donc protégé, CSRF), liens à
+  copier (contrôleur `clipboard`) + variante `webcal://`, aide Google Agenda, garde-fous
+  (rafraîchi ~12-24 h côté Google ; lien à ne pas partager). Couche CSS `.kd-feed*` /
+  `.kd-feedrow*` / `.kd-subscribe`. Icônes importées : `rss`, `rotate-cw`. **Limite** :
+  Google/Apple ne resynchronisent l'abonnement que toutes les 12-24 h (limite du client,
+  pas de push temps réel possible sur un flux ICS).
 
 ---
 
