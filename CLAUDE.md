@@ -759,6 +759,25 @@ navigateur (non automatisable ici).
   `elevation_gain_meters`). Tests : `HeartRateZonesTest` (Karvonen + override) et cas
   cardio ajoutés à `PlanFlattenerTest` (intervalles/zone/D+/allure/RPE). Icône importée :
   `heart-pulse`.
+  **Refonte visuelle de la page profil + éditeur de fiche (sans migration).** La page
+  profil (`profile/index`) et son formulaire (`profile/edit`) étaient rustiques (pile de
+  cartes à styles inline, formulaire brut à fieldsets). **Lecture** : vrai en-tête
+  athlète `.kd-phero` (monogramme terracotta = initiale, nom, chips de vitals
+  `.kd-vitals` âge/sexe/poids/objectif lus sur `app.user`, bouton d'édition), rythme de
+  sections `.kd-section`/`.kd-section__block` (fin des `style=` inline), compteurs
+  biblio en `.kd-metric` (icône teintée + valeur), répartition par activité passée d'une
+  liste à des **barres proportionnelles** `.kd-actbar` (fill run/gym/neutre, largeur =
+  part du max), fiche en `.kd-deflist--profile` (variante label↔valeur ligne à ligne,
+  filet fin) où les **valeurs dérivées** (IMC, Total SBD, DOTS) sont accentuées via un
+  nouveau flag `derived` posé dans `ProfileStats::athleteCard` et rendues
+  `.kd-deflist__derived`. **Édition** : le formulaire passe d'un `<fieldset>` unique
+  brut à des **sections en cartes** `.kd-formsection` (en-tête icône+titre+hint), champs
+  en **grille 2 colonnes** `.kd-formgrid` (zones cardio en 4 col `.kd-formgrid--zones`),
+  **barre d'action collante** `.kd-editform__bar`. **Correctif** : la section
+  **Cardio & zones** (FC max/repos + Z1–Z4) n'était pas rendue et tombait en vrac via
+  `form_end` — elle a désormais sa propre carte. Anciennes classes `.kd-profile__fieldset/
+  __legend` supprimées (CSS mort). Icône importée : `quote` (bio). Pas de migration
+  (seul ajout PHP : le flag `derived`, additif, aucun test `ProfileStats` existant).
 
 ---
 

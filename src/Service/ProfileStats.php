@@ -65,7 +65,7 @@ final class ProfileStats
      * Fiche athlète prête à l'affichage : lignes {label, value} groupées, valeurs
      * déjà formatées via UnitFormatter (kg, mm:ss). value = null -> « — » côté vue.
      *
-     * @return array{identity: list<array{label: string, value: ?string}>, strength: list<array{label: string, value: ?string}>, endurance: list<array{label: string, value: ?string}>, bio: ?string, hasAny: bool}
+     * @return array{identity: list<array{label: string, value: ?string, derived?: bool}>, strength: list<array{label: string, value: ?string, derived?: bool}>, endurance: list<array{label: string, value: ?string, derived?: bool}>, bio: ?string, hasAny: bool}
      */
     private function athleteCard(User $user, ?float $dots): array
     {
@@ -79,7 +79,7 @@ final class ProfileStats
             ['label' => 'Sexe', 'value' => $user->getSex()?->getLabel()],
             ['label' => 'Taille', 'value' => null !== $user->getHeightCm() ? $user->getHeightCm().' cm' : null],
             ['label' => 'Poids', 'value' => $kg($user->getWeightKg())],
-            ['label' => 'IMC', 'value' => null !== $bmi ? str_replace('.', ',', (string) $bmi) : null],
+            ['label' => 'IMC', 'value' => null !== $bmi ? str_replace('.', ',', (string) $bmi) : null, 'derived' => true],
             ['label' => "Années d'entraînement", 'value' => null !== $user->getTrainingYears() ? $user->getTrainingYears().' ans' : null],
             ['label' => 'Objectif', 'value' => $user->getMainGoal()?->getLabel()],
         ];
@@ -88,10 +88,10 @@ final class ProfileStats
             ['label' => 'Squat', 'value' => $kg($user->getSquat1rmKg())],
             ['label' => 'Développé couché', 'value' => $kg($user->getBench1rmKg())],
             ['label' => 'Soulevé de terre', 'value' => $kg($user->getDeadlift1rmKg())],
-            ['label' => 'Total SBD', 'value' => $kg($total)],
+            ['label' => 'Total SBD', 'value' => $kg($total), 'derived' => true],
             ['label' => 'Développé militaire', 'value' => $kg($user->getOhp1rmKg())],
             ['label' => 'Traction lestée', 'value' => $kg($user->getWeightedPullupKg())],
-            ['label' => 'Score DOTS', 'value' => null !== $dots ? str_replace('.', ',', (string) $dots) : null],
+            ['label' => 'Score DOTS', 'value' => null !== $dots ? str_replace('.', ',', (string) $dots) : null, 'derived' => true],
         ];
 
         $endurance = [
