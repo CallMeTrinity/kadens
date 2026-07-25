@@ -68,6 +68,21 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   la condition du cache offline (Phase 9).
 - **Template vs instance datée** : `PlanTemplate` (sans dates) ≠ `ScheduledWorkout`
   (daté). `ScheduledWorkout.workout` est une **référence vivante**.
+- **Progression = fork à la pose (règle ajustée).** Poser une séance dans un plan en
+  crée une **copie privée** (`Workout.planLocal = true`), portée par le `PlanItem`.
+  Éditer une séance placée (progression) ne touche ni la séance de bibliothèque ni
+  les autres cases. Ces copies sont **exclues de la bibliothèque**
+  (`WorkoutRepository::findLibraryForOwner`). Une séance datée issue d'un plan
+  référence la **copie locale** (pas la séance biblio) : ses modifications se
+  reflètent donc d'office au calendrier. Nuance qui remplace l'ancien « les items
+  pointent la même séance partagée ».
+- **Plan vivant sur le calendrier.** L'instanciation est désormais **idempotente**
+  (`PlanScheduler`, ex-`PlanInstantiator`) : la relancer resynchronise au lieu de
+  dupliquer. `resync` est **add-only** — il ajoute au calendrier les cases posées
+  après l'instanciation (`ScheduledWorkout.sourcePlanItem` + `planAnchorDate`) et ne
+  touche jamais une séance datée existante (préserve dates/statuts, décision
+  « préserver le réalisé »). Retirer une case supprime ses séances datées `PLANNED`
+  et **préserve** les `DONE`/`MISSED`.
 - **Aucune IA dans l'app.** Le remplissage de la biblio passe par une commande
   d'import JSON (Phase 3), pas d'API en prod.
 
@@ -180,7 +195,17 @@ Socle Symfony en place (Docker, MariaDB, CI/CD). Design tokens posés.
   `^/export` en `ROLE_USER`. Liens « Exporter en Excel » sur `workout/show`,
   `plan_template/show` et l'en-tête du calendrier. Pas de migration (aucun changement
   de schéma).
-- **Phase 9 — PWA : faite.** App installable + consultation hors ligne. Fichiers
+- **Phase 9 — PWA : SUSPENDUE (mode hors connexion mis de côté).** La contrainte
+  offline (« pages auto-suffisantes, zéro AJAX post-chargement ») bridait la
+  dynamisation des vues : on la lève pour l'instant. `app.js` **n'enregistre plus**
+  de service worker et **désenregistre** ceux déjà installés + purge leurs caches
+  `kadens-*` (un SW obsolète servait une page en cache et donnait l'illusion qu'il
+  fallait recharger). `manifest`/métas PWA retirées de `base.html.twig` (seule la
+  `theme-color` reste). Les fichiers `public/sw.js`, `public/manifest.json`,
+  `public/offline.html`, `public/icons/` restent sur disque, inertes, pour une
+  réactivation ultérieure. Les polices self-hostées et le reste sont conservés.
+  *Ci-dessous, la description d'origine, à titre de référence pour la reprise.*
+- **Phase 9 — PWA (référence, inactive).** App installable + consultation hors ligne. Fichiers
   statiques servis à la racine (hors AssetMapper, pour le scope) : `public/manifest.json`
   (nom, icônes 192/512 `any` + `maskable`, `theme_color` terracotta, `background_color`
   page, `display: standalone`), `public/sw.js` (service worker **écrit à la main**,
@@ -272,6 +297,32 @@ navigateur (non automatisable ici).
   Classes `.kd-modal*` dans `components.css`. Suppression toujours par `confirm()`
   natif (dans la modale). Icône importée : `calendar-clock` (déplacer). Variante
   `.kd-flash--error` ajoutée.
+  **Pastille de séance en deux zones (raffinage).** La pastille `.kd-calevent`
+  n'est plus un seul bouton mais un conteneur à deux zones cliquables : **gauche**
+  (`.kd-calevent__toggle`, dans un `<form>` `.kd-calevent__statusform`) = cycle
+  rapide du statut prévu → fait → manqué → prévu ; **droite**
+  (`.kd-calevent__open`) = ouvre la modale. Le cycle passe par un endpoint dédié
+  `ScheduledWorkoutController::cycleStatus` (`POST /schedule/{id}/cycle-status`,
+  CSRF `cycle{id}`) qui avance le statut via `ScheduledStatus::next()` (nouvel
+  enum method) et **préserve la note d'écart** (contrairement à `updateStatus`) —
+  c'est un geste express. Repli sans JS : vrai bouton de formulaire. L'icône du
+  toggle et son filet gauche codent le statut (`circle-dot`/`check`/`x`).
+  **Modale améliorée** : en-tête + `.kd-modal__meta` (badge de statut + lien
+  « Voir la séance » en `.kd-btn--ghost`), puis section Statut refaite en
+  **segmenté** `.kd-segmented`/`.kd-segbtn--planned/done/missed` : trois boutons
+  submit (`name="status"`) marquant fait/manqué/prévu en un clic, la note
+  `completionNotes` partagée part avec (plus de `<select>` + bouton Enregistrer).
+  Sections Déplacer et Retirer inchangées. Icônes déjà locales (`check`, `x`,
+  `circle-dot`). Pas de migration.
+  **Aperçu au survol au calendrier.** Comme dans l'éditeur de plan, survoler une
+  pastille affiche le contenu de la séance (blocs/exercices) via le composant
+  partagé `_plan_preview.html.twig` + le contrôleur Stimulus `preview` (Popover
+  API, top-layer, échappe à l'`overflow-x` de la grille, aucun AJAX). La pastille
+  porte `data-controller="dialog preview"` + `mouseenter/leave`. `CalendarController`
+  construit une map `flattened` (id de `Workout` → `PlanFlattener::flattenWorkout`,
+  une par séance distincte du mois, `??=` anti-doublon) passée au template ;
+  le panneau reçoit `fw: flattened[scheduled.workout.id]`. Source unique de mise à
+  plat inchangée. Pas de migration.
   **Synthèse stylée** : `summary/index.html.twig` refait. En-tête `.kd-pagehead`
   (eyebrow « Synthèse » + titre + `.kd-lead`) avec nav prev/ce mois/suivant +
   retour calendrier en `.kd-btn`. Observance du mois en carte mise en avant
@@ -282,6 +333,395 @@ navigateur (non automatisable ici).
   `.kd-obar` dimensionnée par `flex`, légende `.kd-olegend` pastille+compteur ;
   couleur = statut fait/prévu/manqué, seul cas hors activité). Icônes importées :
   `calendar-check`, `calendar-off`, `calendar`. Toutes les vues sont désormais stylées.
+  **Compositeur de séance (éditeur refait, maquette 3a « création rapide par
+  glisser-déposer »).** L'éditeur `workout/edit` passe d'une pile de formulaires à
+  un compositeur deux volets, **sans changer le modèle server-driven**. Mise à jour
+  dynamique **par Turbo Stream appliqué à la main** : la `<section>` porte
+  `data-turbo="false"` (Turbo n'intercepte aucun formulaire du compositeur), et le
+  contrôleur `composer` capte toute soumission (bouton réel OU `requestSubmit` des
+  formulaires cachés), fait un `fetch` explicite en `Accept: text/vnd.turbo-stream.html`,
+  puis `renderStreamMessage` applique le flux au DOM. On ne dépend PAS du routage de
+  formulaire de Turbo (les frames échouaient sur les formulaires hors conteneur : une
+  soumission out-of-frame dégénérait en visite de page). `blocksResponse` renvoie un
+  `<turbo-stream action="update" target="workout-blocks">` (`update` = on remplace le
+  CONTENU du `<div id="workout-blocks">`, l'id survit à chaque mutation) quand
+  `getPreferredFormat()` vaut stream, sinon redirection (repli sans JS).
+  **Piège majeur corrigé (« il faut recharger pour voir l'ajout ») :** les endpoints
+  d'ajout ne posaient que le côté propriétaire (`$prescribed->setBlock($block)`,
+  `$block->setWorkout($workout)`), donc la collection inverse en mémoire restait
+  périmée et le stream re-rendu dans la foulée ne montrait pas l'élément (visible
+  seulement après rechargement, quand Doctrine relit la base). On passe désormais par
+  `Block::addPrescribedExercise` / `Workout::addBlock` qui maintiennent **les deux
+  côtés**. Vaut pour `addBlock`, `addPrescribed` et `quickAddPrescribed`. Volet gauche = bibliothèque
+  (`_composer_library.html.twig`, exercices perso+globaux via `findLibraryForUser`) :
+  recherche + filtres d'activité **100 % client offline-safe** (portés par le
+  contrôleur Stimulus `composer`, pas par `filter`), et ajout par bouton `+` (bloc
+  actif) **ou glisser-déposer** dans un bloc. Volet droit = les blocs en cartes
+  `.kd-cblock` : en-tête inline (rôle `<select>` + libellé auto-soumis sur `change`,
+  stepper de tours `− ↻ N +`, monter/descendre, supprimer) ; exercices en lignes
+  compactes `.kd-cexo` (poignée, code 2 lettres teinté par activité, nom, pastille
+  résumé issue de `PlanFlattener`, `⚙` dépliant le panneau de paramètres = form
+  prescrit inline + réordonner). Deux nouveaux endpoints minces sur `WorkoutController`,
+  tous deux renvoyant le stream des blocs : `prescribed_quick_add` (POST exerciseId+
+  blockId, type par défaut `SETS_REPS`, à affiner ensuite) et `prescribed_reorder`
+  (POST prescribedId+targetBlockId+afterId, gère le déplacement intra/inter-blocs et
+  renumérote les positions de 0..n). Le glisser-déposer et le stepper sont de la
+  **progressive enhancement** (contrôleur `composer_controller.js`, deux formulaires
+  cachés hors `#workout-blocks` — donc préservés par la mise à jour — porteurs du
+  jeton CSRF + URL, soumis par le JS) : sans JS, monter/descendre
+  et les boutons de sauvegarde restent le repli fonctionnel. `PlanFlattener` reste la
+  source unique du résumé (aucune mise à plat réimplémentée). Couche CSS `.kd-composer*`
+  / `.kd-libpanel*` / `.kd-libx*` / `.kd-cblock*` / `.kd-cexo*` + `.kd-page--wide`
+  ajoutée à `components.css`, tout tokenisé. Icônes importées : `repeat`,
+  `grip-vertical`, `sliders-horizontal`, `eye`, `settings-2`. Pas de migration.
+  **Affinages éditeur (lot d'ergonomie).** Sans changement de schéma ni de modèle
+  server-driven : (1) **durée estimée dérivée du contenu** — nouveau service
+  `WorkoutEstimator` (10 reps ≈ 1 min, repos par défaut 2 min si absent, sommée par
+  bloc × tours ; distance×allure via mètres/allure). Le champ `estimatedDurationMinutes`
+  n'est plus saisi (retiré de `WorkoutType` et de l'éditeur) : il est recalculé et
+  persisté à chaque mutation dans `blocksResponse`. Toutes les vues lisant
+  `workout.estimatedDurationMinutes` restent valides. (2) **Allure saisie en min/km**
+  (`m:ss`, ex. `5:30`) via un `PaceType` (form type, `CallbackTransformer` vers/depuis
+  les secondes/km stockées) — l'utilisateur ne convertit plus en secondes. (3) **Type
+  d'effort par défaut déduit de l'activité** à l'ajout express (`defaultPrescriptionType` :
+  course/vélo/natation → `DISTANCE_PACE`, sinon `SETS_REPS`). (4) **Duplication de
+  séance** : route `app_workout_duplicate` (POST + CSRF) copie profonde blocs→exercices
+  (cascade persist), nouveau slug `… (copie)`, redirige vers l'éditeur ; boutons sur
+  `show` et l'index. (5) **Ordre des blocs re-rendu dynamiquement** : `_blocks.html.twig`
+  trie les blocs par position en mémoire (même piège `#[OrderBy]` que les exercices, cf.
+  mémoire projet). (6) **Suppressions sans `confirm()` et asynchrones** (bloc + exercice) :
+  paramètre `confirm` retiré de `_action_form`. (7) **Correctif glisser-déposer** :
+  relâcher immédiatement une carte de bibliothèque ne la fait plus disparaître
+  (`onLibDrop` ne retirait plus `evt.item` — la carte d'origine — dans le cas « pas de
+  dépôt réel »). (8) Libellé repos « Repos » (au lieu de « Repos après ») et repos
+  exposé dans la pastille résumé de l'éditeur. (9) Fix CSS `.kd-cblock__role` (padding
+  droit pour la flèche du `<select>`, libellé de rôle plus tronqué). Icônes : `copy`
+  déjà importée. Pas de migration.
+  **Éditeur de plan (refonte, notion de progression).** L'éditeur de trame passe au
+  compositeur : glisser-déposer, duplication de semaine, édition rapide, progression
+  indépendante par case, et plan vivant sur le calendrier. **Modèle** :
+  `Workout.planLocal` (copie privée d'une case, exclue de la biblio),
+  `ScheduledWorkout.sourcePlanItem` (case source, `ON DELETE SET NULL`) +
+  `planAnchorDate` (ancre d'instanciation). Migration `Version20260724120000`.
+  **Services** : `WorkoutCloner` (copie profonde unique, réutilisée par la
+  duplication de séance, la pose dans un plan et la duplication de semaine ;
+  recalcule la durée estimée) ; `PlanScheduler` (remplace `PlanInstantiator`,
+  instanciation **idempotente** + `resync` add-only préservant le réalisé, cf. §3).
+  **Contrôleur** (`PlanTemplateController`) : `addItem` clone la séance choisie
+  (fork à la pose) + resync ; `deleteItem` retire les séances datées `PLANNED`,
+  préserve `DONE`/`MISSED`, nettoie la copie orpheline ; `duplicateWeek` (POST) copie
+  une semaine sur la suivante (clones indépendants) + resync ; `moveItem` (POST,
+  glisser-déposer) change semaine/jour **et réaligne les séances datées encore
+  `PLANNED` sur la nouvelle date** (`PlanScheduler::rescheduleItem`, ancre =
+  `planAnchorDate` ; `DONE`/`MISSED` conservées, leur date = réalisé) ; la duplication de
+  plan clone aussi les copies (plans indépendants). Le stream de grille passe en
+  `action="update"` (l'id `#plan-grid` survit aux mutations, même piège que
+  `#workout-blocks`). **Front** : contrôleur Stimulus `plangrid` (SortableJS
+  inter-cases via une poignée `.kd-planitem__handle` ; sur dépôt, POST `fetch` +
+  `renderStreamMessage`) qui porte aussi la **mini-modale d'édition rapide** (cf.
+  section suivante). Amélioration progressive : sans JS, poser/retirer/dupliquer
+  par formulaire reste le repli (glisser-déposer et édition rapide requièrent JS).
+  Classes CSS `.kd-planitem__handle/__title/__meta`, `.kd-planweek__dup`.
+  Icônes déjà locales (`copy`,
+  `grip-vertical`, `clock`, `sliders-horizontal`, `x`). **Limite connue** : supprimer
+  une séance datée issue d'un plan directement au calendrier peut la voir réapparaître
+  au prochain `resync` (la case existe toujours) — pour l'enlever pour de bon, retirer
+  la case du plan. Re-instancier un plan déjà posé ignore la nouvelle date de départ
+  (une seule instance vivante par plan) : vider d'abord le planning pour ré-ancrer.
+  **Retrait rapide d'un plan instancié (calendrier).** Repli `.kd-caladd`
+  « Retirer un plan du planning » dans la `.kd-calbar`, listé seulement s'il existe
+  au moins une instance (`ScheduledWorkoutRepository::findInstantiatedPlansForOwner`,
+  `DISTINCT` sur `sourcePlanTemplate`). `ScheduledWorkoutController::clearPlan`
+  (`POST /schedule/plan/clear`, CSRF `clear_plan`, `planId` + `year`/`month` dans le
+  corps → redirige vers le mois affiché) supprime **toutes** les séances datées du
+  plan, **y compris DONE/MISSED** (action explicite et globale, contrairement au
+  retrait d'une case qui préserve le réalisé). Le `PlanTemplate` et ses copies locales
+  sont conservés : seule l'instanciation calendrier disparaît. C'est le moyen direct
+  de « vider le planning pour ré-ancrer ». Amélioration progressive : `planId` passe
+  par le corps du formulaire (pas l'URL), donc le repli sans JS marche ; garde-fou
+  `confirm()`. Voter `PlanTemplateVoter::VIEW` + filtre `owner` sur la requête. Pas de
+  migration.
+  **Édition rapide au plan : mini-modale inline (remplace l'iframe).** Cliquer une
+  séance dans l'éditeur de plan n'ouvre plus le compositeur complet en iframe
+  `?embed=1` mais une **mini-modale** ciblée sur les valeurs. Le contrôleur
+  `plangrid` charge en `fetch` le panneau des exercices de la copie locale
+  (`app_workout_quick_panel` → fragment `workout/_quick_panel.html.twig`, sans
+  layout) dans `#quick-panel` : exercices groupés par bloc, chacun en `<details>`
+  dépliant son formulaire `PrescribedExerciseType` (reps/séries/charge/repos…, champs
+  pilotés par `prescription-fields`). Enregistrer poste vers
+  `app_workout_prescribed_quick_edit` (`POST /workout/{id}/exercises/{prescribedId}/quick-edit`)
+  qui renvoie `workout/stream/quick_panel.stream.html.twig` (`action="update"` sur
+  `#quick-panel`, même piège d'id que `#workout-blocks`) : recalcule la durée
+  estimée, re-rend le panneau (pastille résumé à jour). La modale porte
+  `data-turbo="false"` ; `plangrid` intercepte les soumissions **du panneau
+  uniquement** (`panelTarget.contains(form)`) — les formulaires de trame gardent leur
+  repli natif. Un lien **« Édition complète »** (`data-full-url`) renvoie au
+  compositeur pour la structure (blocs, ordre, glisser-déposer). À la fermeture, la
+  page est rechargée **seulement** si un enregistrement a eu lieu (`this.dirty`), pour
+  refléter durée/titre sur les cases. Le contrôleur réutilise
+  `createPrescribedForm($prescribed, $route)` (paramétré par la route d'action) et un
+  nouveau `quickPanelContext`. **Mode `embed`/iframe supprimé** (mort) :
+  `base.html.twig`, `workout/edit.html.twig`, classes `.kd-modal--wide/__frame` et
+  `.kd-page--embed` retirées. Nouvelles classes `.kd-modal--quick`,
+  `.kd-modal__card--quick/__headactions`, `.kd-quickedit*`, `.kd-quickblock*`,
+  `.kd-quickexo*`. Icône `square-pen` (déjà locale). Pas de migration.
+  **Lot UX éditeur de plan (amont, sans migration).** Sept axes, tous en amélioration
+  progressive et sans changer le modèle server-driven ni le schéma :
+  1. **Palette de séances + mode tampon** (remplace le `<select>` par case, illisible à
+     200 séances). Volet gauche `_palette.html.twig` (recherche + filtres d'activité
+     100 % client, calqué sur `_composer_library`), cartes `.kd-palettecard`. Poser :
+     **armer** une séance (clic) puis **tamponner** les cases (clic), ou glisser-déposer
+     (Sortable clone, même groupe `kd-plan-workouts` que les cases). Nouvel endpoint
+     `app_plan_template_item_place` (POST workoutId+week+day) partageant
+     `placeWorkoutInCell` avec `addItem` (fork à la pose inchangé). Le `<details>` d'ajout
+     par case reste le **repli sans JS**. Contexte `paletteContext()` chargé une fois au
+     rendu (hors flux de grille), via `WorkoutRepository::findLibraryForOwnerWithContent`
+     (fetch-join anti N+1).
+  2. **Détail de case + aperçu au survol.** `flattenWorkout` enrichi (additif) de
+     `activities` (distinctes) + `exerciseCount` via nouveau `WorkoutMetrics`. Les cases
+     montrent badges d'activité (icône seule) + nb d'exos. Au survol, aperçu blocs/
+     exercices promu en **top-layer via Popover API** (`popover="manual"`, positionné en
+     JS) pour échapper à l'`overflow` de la grille — le clic reste l'édition rapide.
+  3. **Édition en ligne « semi-invisible ».** L'encadré Informations disparaît :
+     titre/description s'éditent en cliquant l'en-tête (contrôleur générique
+     `inline_edit_controller.js`, endpoint `app_plan_template_meta` renvoyant la valeur
+     nettoyée en texte brut). Idem pour la **note de case** (`app_plan_template_item_note`).
+     Repli sans JS : `<details>` « Modifier les infos (formulaire) » avec le
+     `PlanTemplateType` complet.
+  4. **Gestion des semaines en ligne.** `app_plan_template_week_add` /
+     `app_plan_template_week_remove` (détache les cases via nouveau helper `detachItem` —
+     factorisé avec `deleteItem`, préserve DONE/MISSED —, décale les semaines suivantes et
+     **réaligne le calendrier** via `PlanScheduler::rescheduleItem`).
+  5. **Dupliquer une semaine vers une cible libre.** `app_plan_template_week_copy` (POST
+     `target`) remplace `duplicateWeek` (S+1) : clone les cases vers la semaine choisie
+     (copies `planLocal` indépendantes), **remplace** le contenu de la cible.
+  6. **Volume par semaine ventilé par activité** (demande utilisateur). Nouveau
+     `PlanVolumeAggregator::byWeek` (consomme `WorkoutMetrics::volume`) : salle = séries
+     par groupe musculaire (attribuées à chaque `targetArea`, × tours) + tonnage ;
+     course/vélo/natation = distance/durée. Affiché en chips dans l'en-tête de semaine +
+     détail dépliable. `UnitFormatter` **extrait de `PlanFlattener`** (source unique
+     km/mm:ss/allure, `PlanFlattener` délègue).
+  7. **Partage public du plan** (comme les séances). `PublicShareController::plan`
+     (`/s/plan/{slug}`) + `planWeeks` (`/s/plan/{slug}/semaines/{de}-{à}`, plage stateless
+     encodée dans l'URL). `_plan_read.html.twig` prend `public`/`weeks` (séances
+     cliquables vers leur page publique `/s/{slug}`, filtre de semaines via `|filter`).
+     Boutons copier-lien/page-publique + sélecteur de plage (`share_range_controller.js`)
+     sur `plan_template/show`. `PlanTemplate` a déjà un slug (garde-fou `ensureSlug` sur
+     show/edit), donc **aucune migration**. Reste sous `/s` : pas de changement
+     `security.yaml`.
+  Nouveaux services : `WorkoutMetrics`, `UnitFormatter`, `PlanVolumeAggregator`. Nouveaux
+  contrôleurs Stimulus : `inline_edit`, `share_range` (plus extensions de `plangrid` :
+  filtre client, armer/tamponner, drag palette, aperçu). Nouvelles classes CSS
+  `.kd-planeditor`, `.kd-palettecard*`, `.kd-cellbadges`, `.kd-planpreview*`,
+  `.kd-inlineedit*`, `.kd-planweek__tools/__copy/__select/__add`, `.kd-weekvol*`,
+  `.kd-sharerange*`. Icônes ajoutées : `calendar-plus`, `external-link` (autres déjà
+  locales). Tests unitaires `WorkoutMetricsTest`. **Limite** : le retrait/copie de semaine
+  suit la règle « préserver le réalisé » (supprime les datées `PLANNED`, garde
+  `DONE`/`MISSED`) ; comme ailleurs, une case portée par la trame peut réapparaître au
+  `resync` tant qu'elle existe.
+  **Correctifs éditeur de plan + allure par activité (sans migration).**
+  (1) **Placement uniquement par la palette** : le `<details>` « + Séance » par case
+  (repli sans JS) et son `PlanItemType` sont supprimés (redondants avec armer/tamponner
+  + glisser-déposer). Route `app_plan_template_item_add`, `createAddItemForm`,
+  `addItemForms` et `PlanItemType.php` retirés ; il ne reste que
+  `app_plan_template_item_place`. Poser une séance requiert donc JS (choix assumé).
+  (2) **Grille d'édition en agenda vertical permanent** (`.kd-plangrid--edit` : un jour
+  par ligne, quelle que soit la largeur) : dans le volet contraint par la palette, une
+  grille 7 colonnes était illisible. (3) **Tampon sur case occupée** : en mode armé
+  (`.is-arming`), les séances posées passent en `pointer-events:none` pour que tout le
+  cadre de la case (agrandi + padding) tamponne, au lieu du seul espace vide.
+  (4) **Aperçu au survol en lecture** : le popover de contenu (blocs/exercices) est
+  extrait dans `templates/components/_plan_preview.html.twig` (attend `fw` =
+  `flattenWorkout`), réutilisé par l'éditeur (`_grid`) ET la consultation
+  (`_plan_read`, éditeur + page publique) via un nouveau contrôleur Stimulus léger
+  `preview` (Popover API, positionnement top-layer, aucun AJAX). (5) **Allure dans
+  l'unité naturelle de l'activité** : nouvel enum `PaceUnit` (min/km course, km/h vélo,
+  min/100m natation) portant la conversion aller/retour depuis les secondes/km stockées
+  (unité normalisée inchangée en base). `PaceType` prend une option `unit` ;
+  `PrescribedExerciseType` la déduit de l'activité de l'exercice prescrit (option
+  `activity`, dérivée dans `WorkoutController::createPrescribedForm`/
+  `createAddPrescribedForm`) et adapte label/placeholder. `UnitFormatter::pace` et
+  `PlanFlattener::summarizeDistancePace` formatent via `PaceUnit::forActivity(...)`
+  (l'export Excel en hérite). Tests : `PlanFlattenerTest::paceUnitCases`.
+  (6) **Distance dans l'unité naturelle de l'activité** (pendant de la 5) : enum
+  `DistanceUnit` (km course/vélo, mètres natation et reste) + `DistanceType` (option
+  `unit`), câblés dans `PrescribedExerciseType` via la même option `activity`. Le
+  stockage reste en mètres ; l'AFFICHAGE ne change pas (`UnitFormatter::distance` : m
+  sous 1 km, km au-delà, déjà lisible). Tests : `DistanceUnitTest`.
+  **Calendrier : vue semaine + refonte (sans migration).** Le calendrier a
+  désormais deux vues, basculables via un segmenté « Mois / Semaine »
+  (`.kd-viewtoggle` dans un nouvel en-tête `.kd-calhead`), server-driven et
+  auto-suffisantes (aucun AJAX). **Vue semaine** : `CalendarController::week`
+  (`/calendar/week/{date}`, ancrage au lundi ISO de la semaine contenant la date ;
+  `/calendar/week` sans date → aujourd'hui) rend `calendar/week.html.twig` — grille
+  7 jours (`.kd-week`/`.kd-weekday`, agenda vertical < 900px), cartes de séance
+  détaillées, jour vide « Repos », aujourd'hui/week-end/passé différenciés. Un
+  **bandeau de synthèse** `.kd-weekbar` (nb de séances, volume estimé cumulé,
+  observance `done/(done+missed)`, chips fait/prévu/manqué) réutilise
+  `countByStatusForOwnerBetween` sur la fenêtre lundi→dimanche. Le pivot mois de la
+  bascule/export part du jeudi de la semaine (règle ISO). **Composant partagé**
+  `templates/components/_cal_event.html.twig` : la pastille + sa modale (extraites de
+  `calendar/index`, dédupliquées) sont désormais consommées par les deux vues ;
+  paramètre `detailed` (carte haute de la semaine : nb d'exos + marqueur « En
+  retard »), paramètre `overdue`. La pastille montre désormais une **méta** (icônes
+  d'activité teintées run/gym + durée estimée) tirée de `PlanFlattener::flattenWorkout`
+  (déjà chargé). **Barre d'ajout** extraite en `calendar/_addbar.html.twig` (poser /
+  instancier / retirer un plan), partagée mois+semaine. **Polish vue mois** : colonnes
+  week-end teintées, séance passée encore `PLANNED` marquée (filet gauche terracotta
+  pointillé = action à mener). Contrôleur factorisé (`buildAddContext`,
+  `formatWeekLabel`). Nouvelles classes CSS `.kd-calhead`, `.kd-viewtoggle*`,
+  `.kd-calevent__meta/__act/__dur/__exos/__flag`, `.kd-calevent--detailed`,
+  `.kd-calday--weekend`, `.kd-weekbar`, `.kd-weekstat*`, `.kd-weekchip*`, `.kd-week`,
+  `.kd-weekday*`. Icônes déjà locales (`calendar-days`, `calendar-range`, `clock`,
+  `calendar-clock`…). Pas de migration.
+  **Ajout au calendrier : modales à cartes (remplacent les dropdowns, sans migration).**
+  Les `<details>` « Poser une séance » / « Instancier un plan » de `_addbar` (dropdowns
+  natifs, illisibles à beaucoup de séances) laissent place à de vraies modales à cartes
+  cherchables/triables/filtrables, calquées sur la palette de l'éditeur de trame.
+  **Poser une séance** : plus de bouton en tête ; chaque case de jour porte un « + »
+  (`.kd-calday__add`, révélé au survol / focus, toujours atténué en tactile) qui ouvre
+  la modale et fixe la date. Les séances de biblio y sont des **cartes-boutons submit**
+  (`.kd-palettecard--btn`) : clic = pose immédiate via l'endpoint lean
+  `ScheduledWorkoutController::place` (`POST /schedule/place`, CSRF `schedule_place`,
+  `workoutId`+`date`, refuse un `planLocal`, `WorkoutVoter::VIEW`) — calqué sur
+  `app_plan_template_item_place`. L'ancien `add()` + `ScheduleWorkoutType` sont
+  **supprimés**. **Instancier un plan** garde un bouton en tête mais ouvre une modale :
+  cartes de plans (clic = sélection, pilote le `<select>` caché du `PlanInstantiationType`),
+  puis date de départ + « Instancier » (submit désactivé tant qu'aucun plan choisi).
+  Recherche/tri/filtre d'activité **100 % client** via le nouveau contrôleur Stimulus
+  `caladd` (`assets/controllers/caladd_controller.js`) ; les outils (recherche, tri,
+  filtres) vivent **hors du `<form>`** pour qu'un Entrée ne déclenche pas de pose
+  accidentelle. Le wrapper `data-controller="caladd"` (posé par `calendar/index` et
+  `calendar/week`) englobe l'`_addbar` (qui porte les deux `<dialog>`) **et** la grille
+  (ses « + »). « Retirer un plan » reste un `<details>` inchangé. Comme le reste du
+  calendrier : redirection vers le mois, pas de Turbo Stream ; poser/instancier requiert
+  JS (choix assumé, cf. palette de plan). Nouveaux repères de carte construits dans
+  `CalendarController::buildPickerCards` (via `WorkoutMetrics` +
+  `findLibraryForOwnerWithContent`, anti N+1). Classes CSS `.kd-calday__add(--week)`,
+  `.kd-modal--picker`, `.kd-modal__card--picker`, `.kd-picker*`, `.kd-palettecard--btn`,
+  `.kd-weekday__right`. Icônes déjà locales (`plus`, `layers`, `search`, `calendar-plus`…).
+  Pas de migration.
+  **Changement de statut asynchrone + vue mémorisée (sans migration).** Le
+  changement de statut d'une séance datée (cycle rapide de la pastille ET
+  segmenté de la modale) ne recharge plus la page : il répond en **Turbo Stream**
+  `action="replace"` sur `#cal-event-{id}` (nouvel id porté par le composant
+  `_cal_event`, template `calendar/stream/cal_event.stream.html.twig`). Turbo
+  applique le flux nativement (formulaires interceptés, `Accept:
+  text/vnd.turbo-stream.html`) — pas de contrôleur Stimulus dédié. `cycleStatus`
+  et `updateStatus` renvoient le stream quand `getPreferredFormat() ===
+  TurboBundle::STREAM_FORMAT`, sinon **redirection** (repli sans JS conservé). Le
+  formulaire porte un champ caché `detailed` (0/1) pour que la pastille re-rendue
+  garde sa forme selon la vue (compacte en mois, haute en semaine) ; `overdue` est
+  recalculé côté serveur. Aucun flash sur la réponse stream (il resterait en
+  session et s'afficherait plus tard). **Ceci lève, pour le seul cas du statut, la
+  règle « pas de Turbo Stream au calendrier »** — les autres mutations (poser /
+  instancier / déplacer / retirer) restent en redirection. **Vue résistante au
+  refresh** : `CalendarController` pose un cookie `kd_calview` (`month`/`week`) au
+  rendu de chaque vue (`rememberView`) ; `app_calendar_index` **et** toutes les
+  redirections de `ScheduledWorkoutController` (`redirectToMonth`/`monthFromPayload`,
+  via `preferredCalendarView()` lu sur `RequestStack`) retombent sur la vue
+  mémorisée — une action faite en vue semaine ré-atterrit en semaine, un refresh
+  garde la vue. Pas de migration.
+  **Éditeur de séance : zéro bouton d'enregistrement, tout en automatique (sans
+  migration).** Aligné sur l'éditeur de plan. (1) **En-tête à édition en ligne** :
+  le formulaire d'en-tête (champ titre + repli `<details>` « Détails de la séance »
+  pour la description + bouton « Enregistrer la séance ») laisse place à un
+  `kd-pagehead` avec titre `<h1>` et description éditables **en ligne**
+  (contrôleur `inline-edit`, enregistrement au blur/Entrée), postant vers le nouvel
+  endpoint `WorkoutController::updateMeta` (`POST /workout/{id}/meta`, CSRF
+  `workout_meta{id}`, `field`=title|description, renvoie la valeur nettoyée en texte
+  brut — calqué sur `app_plan_template_meta`). Repli sans JS : `<details>`
+  `kd-metafallback` avec le `WorkoutType` complet. (2) **Paramètres d'exercice
+  auto-enregistrés** : `_prescribed_form.html.twig` prend un paramètre `auto_action`
+  (ex. `change->composer#submitForm`) posé sur chaque champ ; quand il est fourni, le
+  bouton « Enregistrer l'exercice » disparaît (le compositeur passe `auto_action`, la
+  mini-modale du plan garde son bouton). Comme le stream re-rend tout `#workout-blocks`
+  (le panneau de params se referme, le focus saute), `composer_controller.js`
+  mémorise le champ actif avant l'envoi (nom unique grâce aux formulaires nommés) puis
+  `restoreFocus` ré-ouvre son panneau `.kd-cexo__params` et lui rend le focus + le
+  curseur après le re-render (rAF). Le garde `kd-composer__head` de `onSubmit` est
+  retiré (l'en-tête n'est plus un formulaire de la section). CSS mort des anciennes
+  classes d'en-tête (`kd-composer__head/__headmain/__title/__details/__detailsbody/
+  __headactions`) supprimé ; `.kd-composer__meta` et `.kd-eyebrow--accent` conservés.
+  Pas de migration.
+  **Index filtrables : recherche pondérée + facettes + tri (sans migration).** Les
+  trois pages de liste (exercices, séances, plans) gagnent un tri et des filtres,
+  100 % client (offline-safe). Le contrôleur `filter_controller.js` est réécrit : il
+  ne fait plus un simple `includes`, il **classe** les résultats (score : 4 nom exact,
+  3 préfixe du nom, 2 dans le nom, 1 ailleurs — activité/zones) et réordonne la liste
+  en place ; en l'absence de recherche, le `<select>` de tri ordonne (nom A→Z/Z→A,
+  récence, et selon la page durée / nb blocs / nb semaines / nb séances). Les
+  **facettes** sont des puces génériques par groupe (`data-facet-group`/`-value` sur la
+  puce, `data-facet-<groupe>` sur l'item, valeurs séparées par des espaces) : activité
+  partout, plus **portée** (perso / bibliothèque) sur les exercices. Barre d'outils
+  factorisée dans `templates/components/_filterbar.html.twig` (params `placeholder`,
+  `total`, `countNoun`, `sortOptions`, `facetGroups`), à placer dans un
+  `data-controller="filter"` au-dessus du conteneur `data-filter-target="list"`. Chaque
+  item porte `data-filter-name` (base du classement), `data-filter-text` (haystack),
+  `data-sort-*` et `data-facet-*`. Côté serveur, `ExerciseController`/`WorkoutController`/
+  `PlanTemplateController::index` calculent les activités présentes (via
+  `WorkoutMetrics::distinctActivities` ; le workout utilise `findLibraryForOwnerWithContent`
+  pour éviter le N+1) et passent `activityFacets` + `items` (`{workout|template,
+  activities}`). Les cartes séance/plan affichent aussi les badges d'activité
+  (`.kd-cellbadges`). Nouvelles classes CSS `.kd-filterbar`/`__row`, `.kd-sort`/`__select`
+  (l'ancien `.kd-toolbar` n'est plus utilisé). Icônes importées : `arrow-up-down`,
+  `list-filter`. Pas de migration.
+  **Page profil (remplace accueil + synthèse) — AVEC migration.** `HomeController`
+  et `SummaryController` (+ `templates/home`, `templates/summary`) sont **supprimés**
+  au profit d'un unique **`ProfileController`**. Le **profil est la page d'accueil**
+  (`/` = `app_profile`, garde manuelle `getUser()` comme l'ex-home car `/` n'est pas
+  dans `access_control`) ; l'édition est `app_profile_edit` (`/profile/edit`) sous la
+  nouvelle règle `access_control ^/profile` (remplace `^/summary`). Nav : item
+  « Profil » (`lucide:user`) remplace « Accueil », l'onglet « Synthèse » est retiré ;
+  marque + page de login repointées sur `app_profile`. Le fragment
+  `templates/components/_status_stats.html.twig` est **conservé** (réutilisé pour
+  l'observance du profil). **Deux volets** : (1) **stats générales** via le nouveau
+  service `ProfileStats` (compose l'existant, aucune mise à plat réimplémentée) —
+  compteurs biblio, observance du mois ET « tous temps », répartition des séances
+  faites par activité, et **volume réalisé agrégé sur l'historique** (tonnage/séries,
+  distances course/vélo/natation) en itérant les séances `DONE` via
+  `WorkoutMetrics::volume` ; formatage par `UnitFormatter`. Deux méthodes ajoutées à
+  `ScheduledWorkoutRepository` : `countByStatusForOwner` (agrégat sans borne de date)
+  et `findDoneWithContentForOwner` (fetch-join anti N+1 des séances faites).
+  (2) **fiche athlète éditable** : nouveaux champs **tous nullable** sur `User`
+  (identité : `birthDate`→âge dérivé, `sex`, `heightCm`, `weightKg`→IMC dérivé,
+  `trainingYears`, `mainGoal`, `bio` ; force kg : squat/bench/deadlift/ohp/traction
+  lestée + total SBD & score **DOTS** dérivés ; endurance : temps 5K/10K/semi/marathon
+  + 100m nat en secondes, `cyclingFtpWatts`) + `updatedAt`/`PreUpdate`. Enums
+  `Sex`/`TrainingGoal`. `ProfileType` (thème global) ; nouveau **`DurationType`**
+  calqué sur `PaceType` (round-trip secondes ↔ `mm:ss`/`h:mm:ss`, réutilise
+  `UnitFormatter::duration`). Vue lecture (`profile/index`) : stats + fiche en
+  `.kd-deflist` groupées (Identité/Force/Endurance) via la carte construite par
+  `ProfileStats::athleteCard`. **Migration** `Version20260725073629` : colonnes profil
+  nullable sur `user`. Couche CSS `.kd-profile*` (tuiles de volume, fieldsets,
+  en-têtes de groupe), tokenisée. Aucune icône nouvelle (toutes déjà locales).
+  **Abonnement calendrier ICS (hors-roadmap) — AVEC migration.** Le calendrier
+  peut générer un lien d'abonnement (webcal/ICS) à ajouter à Google Agenda, Apple
+  Calendar… **Auth par jeton, pas par session** : le flux est récupéré côté serveur
+  du client sans cookie, donc la route sort de `access_control` (nouveau préfixe
+  `/feed`) et le jeton secret EST l'autorisation — même philosophie que le partage
+  public par slug. Nouveau champ `User.calendarFeedToken` (nullable, unique, 64 hex ;
+  **Migration** `Version20260725120000`), généré à la demande, **régénérer = révoquer**
+  l'ancien lien. `PublicCalendarController` (hors voters) sert deux portées choisies
+  par l'URL : `/feed/{token}.ics` = tout le calendrier, `/feed/{token}/plan/{planId}.ics`
+  = un plan instancié (borné à l'owner). Service `IcsCalendarBuilder` (`src/Service/`)
+  **consomme `PlanFlattener`** (source unique de mise à plat, jamais réimplémentée) pour
+  la `DESCRIPTION` de chaque événement (blocs/exercices lisibles depuis le téléphone).
+  **Événements journée entière** (`VALUE=DATE`) : le modèle n'a qu'une `scheduledDate`
+  sans heure → aucun `VTIMEZONE`, aucun fuseau à gérer. `UID` stable par
+  `ScheduledWorkout` (Google met à jour au lieu de dupliquer) ; statut prévu/fait/manqué
+  codé par un préfixe de titre (✓/✗). Le builder respecte le format RFC 5545 à la main
+  (CRLF, pliage 75 octets **sans couper l'UTF-8**, échappement `,;\`+sauts de ligne),
+  aucune lib ajoutée. Deux méthodes repository fetch-join anti-N+1
+  (`findAllForOwnerWithContent`, `findBySourcePlanTemplateForOwnerWithContent`). UI :
+  bouton « S'abonner » dans l'en-tête du calendrier (mois + semaine) ouvrant une modale
+  (`calendar/_subscribe.html.twig`, contrôleur `dialog`) : activation/régénération du
+  jeton (POST `app_calendar_feed_token`, sous `/calendar` donc protégé, CSRF), liens à
+  copier (contrôleur `clipboard`) + variante `webcal://`, aide Google Agenda, garde-fous
+  (rafraîchi ~12-24 h côté Google ; lien à ne pas partager). Couche CSS `.kd-feed*` /
+  `.kd-feedrow*` / `.kd-subscribe`. Icônes importées : `rss`, `rotate-cw`. **Limite** :
+  Google/Apple ne resynchronisent l'abonnement que toutes les 12-24 h (limite du client,
+  pas de push temps réel possible sur un flux ICS).
 
 ---
 

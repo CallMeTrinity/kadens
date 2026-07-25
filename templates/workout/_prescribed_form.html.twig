@@ -1,33 +1,40 @@
 {# Formulaire d'un exercice prescrit (ajout ou édition). Les champs de valeurs
    pertinents sont montrés/masqués selon le type d'effort par le contrôleur
    Stimulus « prescription-fields ». Le nettoyage définitif se fait côté serveur.
-   Paramètres : form (FormView), submit_label. #}
+   Paramètres : form (FormView), submit_label, auto_action.
+
+   auto_action (optionnel) : action Stimulus (ex. « change->composer#submitForm »)
+   posée sur chaque champ pour un enregistrement automatique au changement. Quand il
+   est fourni, le bouton d'enregistrement disparaît (tout est automatique). #}
+{% set auto = auto_action|default(null) %}
 <div data-controller="prescription-fields"
      data-prescription-fields-map-value="{{ prescription_type_fields_map()|json_encode|e('html_attr') }}">
     {{ form_start(form, { attr: { class: 'kd-form' } }) }}
-        {{ form_row(form.exercise) }}
+        {{ form_row(form.exercise, auto ? { attr: { 'data-action': auto } } : {}) }}
         {{ form_row(form.prescriptionType, { attr: {
             'data-prescription-fields-target': 'type',
-            'data-action': 'prescription-fields#update',
+            'data-action': auto ? ('prescription-fields#update ' ~ auto) : 'prescription-fields#update',
         } }) }}
 
         <div class="kd-fieldrow">
             {% for field in ['sets', 'reps', 'weightKg', 'durationSeconds', 'distanceMeters', 'paceSecondsPerKm', 'targetReps', 'capSeconds', 'intensityZone'] %}
                 <div data-prescription-fields-target="field" data-field="{{ field }}" style="flex:1 1 140px;">
-                    {{ form_row(attribute(form, field)) }}
+                    {{ form_row(attribute(form, field), auto ? { attr: { 'data-action': auto } } : {}) }}
                 </div>
             {% endfor %}
         </div>
 
         <div class="kd-fieldrow">
-            <div style="flex:0 0 140px;">{{ form_row(form.restSeconds) }}</div>
+            <div style="flex:0 0 140px;">{{ form_row(form.restSeconds, auto ? { attr: { 'data-action': auto } } : {}) }}</div>
         </div>
-        {{ form_row(form.notes) }}
+        {{ form_row(form.notes, auto ? { attr: { 'data-action': auto } } : {}) }}
 
-        <div class="kd-formactions">
-            <button type="submit" class="kd-btn kd-btn--primary kd-btn--sm">
-                {{ ux_icon('lucide:check') }} {{ submit_label|default('Enregistrer') }}
-            </button>
-        </div>
+        {% if not auto %}
+            <div class="kd-formactions">
+                <button type="submit" class="kd-btn kd-btn--primary kd-btn--sm">
+                    {{ ux_icon('lucide:check') }} {{ submit_label|default('Enregistrer') }}
+                </button>
+            </div>
+        {% endif %}
     {{ form_end(form) }}
 </div>

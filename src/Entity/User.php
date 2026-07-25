@@ -2,6 +2,8 @@
 
 namespace App\Entity;
 
+use App\Enum\Sex;
+use App\Enum\TrainingGoal;
 use App\Repository\UserRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -36,6 +38,76 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $updatedAt = null;
+
+    // Jeton secret d'abonnement calendrier (ICS). Nullable tant que l'utilisateur
+    // n'a pas activé l'abonnement ; régénérer = révoquer l'ancien lien. Sert
+    // d'autorisation à lui seul (route /feed hors access_control, comme le partage
+    // public par slug), d'où l'entropie (32 octets → 64 hex) et l'unicité.
+    #[ORM\Column(length: 64, unique: true, nullable: true)]
+    private ?string $calendarFeedToken = null;
+
+    // --- Fiche athlète : identité -------------------------------------------
+
+    #[ORM\Column(type: 'date_immutable', nullable: true)]
+    private ?\DateTimeImmutable $birthDate = null;
+
+    #[ORM\Column(nullable: true, enumType: Sex::class)]
+    private ?Sex $sex = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $heightCm = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $weightKg = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $trainingYears = null;
+
+    #[ORM\Column(nullable: true, enumType: TrainingGoal::class)]
+    private ?TrainingGoal $mainGoal = null;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $bio = null;
+
+    // --- Fiche athlète : records de force (1RM, en kg) ----------------------
+
+    #[ORM\Column(nullable: true)]
+    private ?float $squat1rmKg = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $bench1rmKg = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $deadlift1rmKg = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $ohp1rmKg = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $weightedPullupKg = null;
+
+    // --- Fiche athlète : records d'endurance (temps en secondes) ------------
+
+    #[ORM\Column(nullable: true)]
+    private ?int $run5kSeconds = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $run10kSeconds = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $halfMarathonSeconds = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $marathonSeconds = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $cyclingFtpWatts = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $swim100mSeconds = null;
 
     /**
      * @var Collection<int, Exercise>
@@ -73,6 +145,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function onPrePersist(): void
     {
         $this->createdAt ??= new \DateTimeImmutable();
+    }
+
+    #[ORM\PreUpdate]
+    public function onPreUpdate(): void
+    {
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function getId(): ?int
@@ -160,6 +238,275 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->createdAt = $createdAt;
 
         return $this;
+    }
+
+    public function getUpdatedAt(): ?\DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
+
+    public function getCalendarFeedToken(): ?string
+    {
+        return $this->calendarFeedToken;
+    }
+
+    public function setCalendarFeedToken(?string $calendarFeedToken): static
+    {
+        $this->calendarFeedToken = $calendarFeedToken;
+
+        return $this;
+    }
+
+    public function getBirthDate(): ?\DateTimeImmutable
+    {
+        return $this->birthDate;
+    }
+
+    public function setBirthDate(?\DateTimeImmutable $birthDate): static
+    {
+        $this->birthDate = $birthDate;
+
+        return $this;
+    }
+
+    /**
+     * Âge dérivé de la date de naissance (jamais stocké, ne vieillit pas).
+     */
+    public function getAge(): ?int
+    {
+        return $this->birthDate?->diff(new \DateTimeImmutable())->y;
+    }
+
+    public function getSex(): ?Sex
+    {
+        return $this->sex;
+    }
+
+    public function setSex(?Sex $sex): static
+    {
+        $this->sex = $sex;
+
+        return $this;
+    }
+
+    public function getHeightCm(): ?int
+    {
+        return $this->heightCm;
+    }
+
+    public function setHeightCm(?int $heightCm): static
+    {
+        $this->heightCm = $heightCm;
+
+        return $this;
+    }
+
+    public function getWeightKg(): ?float
+    {
+        return $this->weightKg;
+    }
+
+    public function setWeightKg(?float $weightKg): static
+    {
+        $this->weightKg = $weightKg;
+
+        return $this;
+    }
+
+    public function getTrainingYears(): ?int
+    {
+        return $this->trainingYears;
+    }
+
+    public function setTrainingYears(?int $trainingYears): static
+    {
+        $this->trainingYears = $trainingYears;
+
+        return $this;
+    }
+
+    public function getMainGoal(): ?TrainingGoal
+    {
+        return $this->mainGoal;
+    }
+
+    public function setMainGoal(?TrainingGoal $mainGoal): static
+    {
+        $this->mainGoal = $mainGoal;
+
+        return $this;
+    }
+
+    public function getBio(): ?string
+    {
+        return $this->bio;
+    }
+
+    public function setBio(?string $bio): static
+    {
+        $this->bio = $bio;
+
+        return $this;
+    }
+
+    public function getSquat1rmKg(): ?float
+    {
+        return $this->squat1rmKg;
+    }
+
+    public function setSquat1rmKg(?float $squat1rmKg): static
+    {
+        $this->squat1rmKg = $squat1rmKg;
+
+        return $this;
+    }
+
+    public function getBench1rmKg(): ?float
+    {
+        return $this->bench1rmKg;
+    }
+
+    public function setBench1rmKg(?float $bench1rmKg): static
+    {
+        $this->bench1rmKg = $bench1rmKg;
+
+        return $this;
+    }
+
+    public function getDeadlift1rmKg(): ?float
+    {
+        return $this->deadlift1rmKg;
+    }
+
+    public function setDeadlift1rmKg(?float $deadlift1rmKg): static
+    {
+        $this->deadlift1rmKg = $deadlift1rmKg;
+
+        return $this;
+    }
+
+    public function getOhp1rmKg(): ?float
+    {
+        return $this->ohp1rmKg;
+    }
+
+    public function setOhp1rmKg(?float $ohp1rmKg): static
+    {
+        $this->ohp1rmKg = $ohp1rmKg;
+
+        return $this;
+    }
+
+    public function getWeightedPullupKg(): ?float
+    {
+        return $this->weightedPullupKg;
+    }
+
+    public function setWeightedPullupKg(?float $weightedPullupKg): static
+    {
+        $this->weightedPullupKg = $weightedPullupKg;
+
+        return $this;
+    }
+
+    /**
+     * Total SBD (squat + bench + deadlift) dérivé, si les trois lifts sont
+     * renseignés. Base du score de force normalisé.
+     */
+    public function getSbdTotalKg(): ?float
+    {
+        if (null === $this->squat1rmKg || null === $this->bench1rmKg || null === $this->deadlift1rmKg) {
+            return null;
+        }
+
+        return $this->squat1rmKg + $this->bench1rmKg + $this->deadlift1rmKg;
+    }
+
+    public function getRun5kSeconds(): ?int
+    {
+        return $this->run5kSeconds;
+    }
+
+    public function setRun5kSeconds(?int $run5kSeconds): static
+    {
+        $this->run5kSeconds = $run5kSeconds;
+
+        return $this;
+    }
+
+    public function getRun10kSeconds(): ?int
+    {
+        return $this->run10kSeconds;
+    }
+
+    public function setRun10kSeconds(?int $run10kSeconds): static
+    {
+        $this->run10kSeconds = $run10kSeconds;
+
+        return $this;
+    }
+
+    public function getHalfMarathonSeconds(): ?int
+    {
+        return $this->halfMarathonSeconds;
+    }
+
+    public function setHalfMarathonSeconds(?int $halfMarathonSeconds): static
+    {
+        $this->halfMarathonSeconds = $halfMarathonSeconds;
+
+        return $this;
+    }
+
+    public function getMarathonSeconds(): ?int
+    {
+        return $this->marathonSeconds;
+    }
+
+    public function setMarathonSeconds(?int $marathonSeconds): static
+    {
+        $this->marathonSeconds = $marathonSeconds;
+
+        return $this;
+    }
+
+    public function getCyclingFtpWatts(): ?int
+    {
+        return $this->cyclingFtpWatts;
+    }
+
+    public function setCyclingFtpWatts(?int $cyclingFtpWatts): static
+    {
+        $this->cyclingFtpWatts = $cyclingFtpWatts;
+
+        return $this;
+    }
+
+    public function getSwim100mSeconds(): ?int
+    {
+        return $this->swim100mSeconds;
+    }
+
+    public function setSwim100mSeconds(?int $swim100mSeconds): static
+    {
+        $this->swim100mSeconds = $swim100mSeconds;
+
+        return $this;
+    }
+
+    /**
+     * IMC dérivé (poids / taille²), arrondi à une décimale, si taille et poids
+     * sont renseignés.
+     */
+    public function getBmi(): ?float
+    {
+        if (null === $this->weightKg || null === $this->heightCm || $this->heightCm <= 0) {
+            return null;
+        }
+
+        $meters = $this->heightCm / 100;
+
+        return round($this->weightKg / ($meters * $meters), 1);
     }
 
     /**

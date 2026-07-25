@@ -25,6 +25,7 @@ enum TargetArea: string
     case HAMSTRINGS = 'hamstrings';
     case ADDUCTORS = 'adductors';
     case CALVES = 'calves';
+    case SHINS = 'shins';
 
     case FULL_BODY = 'full_body';
 
@@ -46,6 +47,7 @@ enum TargetArea: string
             self::HAMSTRINGS => 'Ischio-jambiers',
             self::ADDUCTORS => 'Adducteurs',
             self::CALVES => 'Mollets',
+            self::SHINS => 'Tibias',
             self::FULL_BODY => 'Corps entier',
         };
     }

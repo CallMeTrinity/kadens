@@ -23,6 +23,12 @@
             <a href="{{ path('app_export_workout', {id: workout.id}) }}" class="kd-btn kd-btn--ghost kd-btn--sm">
                 {{ ux_icon('lucide:file-down') }} Excel
             </a>
+            <form method="post" action="{{ path('app_workout_duplicate', {id: workout.id}) }}" style="margin:0;">
+                <input type="hidden" name="_token" value="{{ csrf_token('duplicate' ~ workout.id) }}">
+                <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm">
+                    {{ ux_icon('lucide:copy') }} Dupliquer
+                </button>
+            </form>
             <button type="button" class="kd-btn kd-btn--ghost kd-btn--sm" data-action="clipboard#copy">
                 {{ ux_icon('lucide:link-2') }} Copier le lien
             </button>

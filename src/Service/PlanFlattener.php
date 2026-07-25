@@ -7,6 +7,7 @@ use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
 use App\Entity\PrescribedExercise;
 use App\Entity\Workout;
+use App\Enum\PaceUnit;
 use App\Enum\PrescriptionType;
 
 /**
@@ -21,7 +22,7 @@ use App\Enum\PrescriptionType;
  *
  * @phpstan-type FlatPrescribed array{prescribed: PrescribedExercise, exercise: \App\Entity\Exercise|null, type: PrescriptionType|null, summary: string, rest: ?int, notes: ?string}
  * @phpstan-type FlatBlock array{block: Block, exercises: list<FlatPrescribed>}
- * @phpstan-type FlatWorkout array{workout: Workout, blocks: list<FlatBlock>}
+ * @phpstan-type FlatWorkout array{workout: Workout, blocks: list<FlatBlock>, activities: list<\App\Enum\ActivityType>, exerciseCount: int}
  * @phpstan-type FlatItem array{item: PlanItem, workout: FlatWorkout}
  * @phpstan-type FlatDay array{dayOfWeek: int, items: list<FlatItem>}
  * @phpstan-type FlatWeek array{weekNumber: int, days: list<FlatDay>}
@@ -29,6 +30,12 @@ use App\Enum\PrescriptionType;
  */
 final class PlanFlattener
 {
+    public function __construct(
+        private readonly UnitFormatter $units,
+        private readonly WorkoutMetrics $metrics,
+    ) {
+    }
+
     /**
      * Mise à plat d'un plan complet : une grille semaines × jours (1..7, ISO :
      * 1=lundi..7=dimanche), chaque case portant la liste des séances placées,
@@ -88,6 +95,10 @@ final class PlanFlattener
         return [
             'workout' => $workout,
             'blocks' => $blocks,
+            // Repères de lecture (badges de case, cartes de palette) : dérivés du
+            // contenu, pas stockés. Voir WorkoutMetrics.
+            'activities' => $this->metrics->distinctActivities($workout),
+            'exerciseCount' => $this->metrics->exerciseCount($workout),
         ];
     }
 
@@ -143,7 +154,7 @@ final class PlanFlattener
         $summary = trim(sprintf('%s × %s', $pe->getSets() ?? '?', $pe->getReps() ?? '?'));
 
         if (null !== $pe->getWeightKg()) {
-            $summary .= ' @ '.$this->formatWeight($pe->getWeightKg());
+            $summary .= ' @ '.$this->units->weight($pe->getWeightKg());
         }
 
         return $summary;
@@ -151,10 +162,10 @@ final class PlanFlattener
 
     private function summarizeSetsTime(PrescribedExercise $pe): string
     {
-        $summary = sprintf('%s × %s', $pe->getSets() ?? '?', $this->formatDuration($pe->getDurationSeconds()));
+        $summary = sprintf('%s × %s', $pe->getSets() ?? '?', $this->units->duration($pe->getDurationSeconds()));
 
         if (null !== $pe->getWeightKg()) {
-            $summary .= ' @ '.$this->formatWeight($pe->getWeightKg());
+            $summary .= ' @ '.$this->units->weight($pe->getWeightKg());
         }
 
         return $summary;
@@ -162,7 +173,7 @@ final class PlanFlattener
 
     private function summarizeAmrap(PrescribedExercise $pe): string
     {
-        $summary = 'AMRAP '.$this->formatDuration($pe->getDurationSeconds());
+        $summary = 'AMRAP '.$this->units->duration($pe->getDurationSeconds());
 
         if (null !== $pe->getTargetReps()) {
             $summary .= sprintf(' · cible %d reps', $pe->getTargetReps());
@@ -176,7 +187,7 @@ final class PlanFlattener
         $summary = sprintf('%s reps for time', $pe->getTargetReps() ?? '?');
 
         if (null !== $pe->getCapSeconds()) {
-            $summary .= ' · cap '.$this->formatDuration($pe->getCapSeconds());
+            $summary .= ' · cap '.$this->units->duration($pe->getCapSeconds());
         }
 
         return $summary;
@@ -184,10 +195,13 @@ final class PlanFlattener
 
     private function summarizeDistancePace(PrescribedExercise $pe): string
     {
-        $summary = $this->formatDistance($pe->getDistanceMeters());
+        $summary = $this->units->distance($pe->getDistanceMeters());
 
         if (null !== $pe->getPaceSecondsPerKm()) {
-            $summary .= ' @ '.$this->formatPace($pe->getPaceSecondsPerKm());
+            // Allure affichée dans l'unité naturelle de l'activité de l'exercice
+            // (course min/km, vélo km/h, natation min/100m).
+            $unit = PaceUnit::forActivity($pe->getExercise()?->getActivity());
+            $summary .= ' @ '.$this->units->pace($pe->getPaceSecondsPerKm(), $unit);
         }
 
         return $summary;
@@ -195,66 +209,12 @@ final class PlanFlattener
 
     private function summarizeDuration(PrescribedExercise $pe): string
     {
-        $summary = $this->formatDuration($pe->getDurationSeconds());
+        $summary = $this->units->duration($pe->getDurationSeconds());
 
         if (null !== $pe->getIntensityZone() && '' !== $pe->getIntensityZone()) {
             $summary .= ' · '.$pe->getIntensityZone();
         }
 
         return $summary;
-    }
-
-    private function formatWeight(float $kg): string
-    {
-        // Affiche un entier sans décimales inutiles (60 kg plutôt que 60,00 kg).
-        $formatted = rtrim(rtrim(number_format($kg, 2, ',', ' '), '0'), ',');
-
-        return $formatted.' kg';
-    }
-
-    private function formatDistance(?int $meters): string
-    {
-        if (null === $meters) {
-            return '?';
-        }
-
-        if ($meters >= 1000) {
-            $km = rtrim(rtrim(number_format($meters / 1000, 2, ',', ' '), '0'), ',');
-
-            return $km.' km';
-        }
-
-        return $meters.' m';
-    }
-
-    /**
-     * Secondes -> mm:ss (ou h:mm:ss au-delà d'une heure).
-     */
-    private function formatDuration(?int $seconds): string
-    {
-        if (null === $seconds) {
-            return '?';
-        }
-
-        $hours = intdiv($seconds, 3600);
-        $minutes = intdiv($seconds % 3600, 60);
-        $secs = $seconds % 60;
-
-        if ($hours > 0) {
-            return sprintf('%d:%02d:%02d', $hours, $minutes, $secs);
-        }
-
-        return sprintf('%d:%02d', $minutes, $secs);
-    }
-
-    /**
-     * Secondes par km -> m:ss/km.
-     */
-    private function formatPace(int $secondsPerKm): string
-    {
-        $minutes = intdiv($secondsPerKm, 60);
-        $secs = $secondsPerKm % 60;
-
-        return sprintf('%d:%02d/km', $minutes, $secs);
     }
 }

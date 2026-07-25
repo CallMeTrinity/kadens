@@ -2,6 +2,8 @@
 
 namespace App\Repository;
 
+use App\Entity\PlanItem;
+use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -66,6 +68,98 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     }
 
     /**
+     * Nombre de séances par statut pour un utilisateur, sur toute la période (pas
+     * de borne de date). Alimente l'observance « tous temps » et le total de
+     * séances faites de la page profil. Une seule requête agrégée, pas d'hydratation.
+     *
+     * @return array<string, int> clés = valeurs de ScheduledStatus, valeurs = compte.
+     */
+    public function countByStatusForOwner(User $owner): array
+    {
+        $rows = $this->createQueryBuilder('s')
+            ->select('s.status AS status', 'COUNT(s.id) AS cnt')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('owner', $owner)
+            ->groupBy('s.status')
+            ->getQuery()
+            ->getResult();
+
+        return $this->mapStatusCounts($rows);
+    }
+
+    /**
+     * Séances FAITES d'un utilisateur, avec tout leur contenu fetch-joint
+     * (blocs -> exercices prescrits -> exercice), pour agréger le volume réalisé
+     * sur l'historique (tonnage, distances) sans N+1. Alimente ProfileStats.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findDoneWithContentForOwner(User $owner): array
+    {
+        return $this->createQueryBuilder('s')
+            ->addSelect('w', 'b', 'pe', 'e')
+            ->join('s.workout', 'w')
+            ->leftJoin('w.blocks', 'b')
+            ->leftJoin('b.prescribedExercises', 'pe')
+            ->leftJoin('pe.exercise', 'e')
+            ->andWhere('s.owner = :owner')
+            ->andWhere('s.status = :done')
+            ->setParameter('owner', $owner)
+            ->setParameter('done', \App\Enum\ScheduledStatus::DONE)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Toutes les séances datées d'un utilisateur, contenu fetch-joint
+     * (blocs -> exercices prescrits -> exercice), triées par date. Alimente le flux
+     * ICS « tout le calendrier » : PlanFlattener bâtit la description de chaque
+     * événement sans N+1.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findAllForOwnerWithContent(User $owner): array
+    {
+        return $this->createQueryBuilder('s')
+            ->addSelect('w', 'b', 'pe', 'e')
+            ->join('s.workout', 'w')
+            ->leftJoin('w.blocks', 'b')
+            ->leftJoin('b.prescribedExercises', 'pe')
+            ->leftJoin('pe.exercise', 'e')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('owner', $owner)
+            ->orderBy('s.scheduledDate', 'ASC')
+            ->addOrderBy('s.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Séances datées issues d'un plan pour un utilisateur, contenu fetch-joint.
+     * Variante « avec contenu » de findBySourcePlanTemplateForOwner : alimente le
+     * flux ICS restreint à un plan instancié.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findBySourcePlanTemplateForOwnerWithContent(PlanTemplate $template, User $owner): array
+    {
+        return $this->createQueryBuilder('s')
+            ->addSelect('w', 'b', 'pe', 'e')
+            ->join('s.workout', 'w')
+            ->leftJoin('w.blocks', 'b')
+            ->leftJoin('b.prescribedExercises', 'pe')
+            ->leftJoin('pe.exercise', 'e')
+            ->andWhere('s.sourcePlanTemplate = :template')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('template', $template)
+            ->setParameter('owner', $owner)
+            ->orderBy('s.scheduledDate', 'ASC')
+            ->addOrderBy('s.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Répartition par statut, regroupée par plan source, pour un utilisateur.
      * Le plan source est nullable (séance isolée, ou plan supprimé qui a mis la
      * FK à NULL) : ces séances retombent dans un bucket « hors plan ».
@@ -106,6 +200,62 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
         }
 
         return array_values($byPlan);
+    }
+
+    /**
+     * Séances datées issues d'un plan pour un utilisateur (l'« instance vivante »
+     * de ce plan sur son calendrier). Sert au resync : ajouter les cases nouvelles,
+     * retrouver l'ancre. La séance (copie locale) est jointe pour le rendu.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findBySourcePlanTemplateForOwner(PlanTemplate $template, User $owner): array
+    {
+        return $this->createQueryBuilder('s')
+            ->addSelect('w')
+            ->join('s.workout', 'w')
+            ->andWhere('s.sourcePlanTemplate = :template')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('template', $template)
+            ->setParameter('owner', $owner)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Plans actuellement posés sur le calendrier de l'utilisateur (au moins une
+     * séance datée en provient), dédupliqués et triés par titre. Alimente le
+     * retrait rapide d'un plan instancié depuis le calendrier.
+     *
+     * @return list<PlanTemplate>
+     */
+    public function findInstantiatedPlansForOwner(User $owner): array
+    {
+        return $this->getEntityManager()->createQueryBuilder()
+            ->select('p')
+            ->distinct()
+            ->from(PlanTemplate::class, 'p')
+            ->innerJoin(ScheduledWorkout::class, 's', 'WITH', 's.sourcePlanTemplate = p')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('owner', $owner)
+            ->orderBy('p.title', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Séances datées issues d'une case précise du plan. Sert au retrait d'une case :
+     * on retire les séances encore PLANNED, on préserve celles DONE/MISSED.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findBySourcePlanItem(PlanItem $item): array
+    {
+        return $this->createQueryBuilder('s')
+            ->andWhere('s.sourcePlanItem = :item')
+            ->setParameter('item', $item)
+            ->getQuery()
+            ->getResult();
     }
 
     /**

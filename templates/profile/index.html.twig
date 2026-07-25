@@ -1,0 +1,151 @@
+{% extends 'base.html.twig' %}
+{% import 'components/_activity.html.twig' as activity %}
+
+{% block title %}Profil — Kadens{% endblock %}
+
+{% block body %}
+    {% for message in app.flashes('success') %}
+        <p class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }} {{ message }}</p>
+    {% endfor %}
+
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow">Profil</p>
+            <h1 class="kd-title">{{ app.user.userIdentifier }}</h1>
+            <p class="kd-lead">Tes stats d'entraînement et ta fiche athlète.</p>
+        </div>
+        <div>
+            <a href="{{ path('app_profile_edit') }}" class="kd-btn kd-btn--primary">
+                {{ ux_icon('lucide:square-pen') }} Modifier ma fiche
+            </a>
+        </div>
+    </div>
+
+    {# ============================ STATS GÉNÉRALES ============================ #}
+    <p class="kd-eyebrow" style="margin-bottom:var(--kd-space-6);">Statistiques</p>
+
+    <div class="kd-grid kd-grid--2" style="margin-bottom:var(--kd-space-6); align-items:start;">
+        <section class="kd-card">
+            <h2 class="kd-card__title" style="margin-bottom:var(--kd-space-6);">Ce mois</h2>
+            {{ include('components/_status_stats.html.twig', {stats: stats.month, hero: true}) }}
+        </section>
+        <section class="kd-card">
+            <h2 class="kd-card__title" style="margin-bottom:var(--kd-space-6);">Depuis le début</h2>
+            {{ include('components/_status_stats.html.twig', {stats: stats.allTime}) }}
+        </section>
+    </div>
+
+    {# Compteurs bibliothèque #}
+    <div class="kd-grid kd-grid--3" style="margin-bottom:var(--kd-space-6);">
+        <div class="kd-card" style="display:flex; align-items:center; gap:var(--kd-space-6);">
+            <span class="kd-navcard__icon">{{ ux_icon('lucide:clipboard-list') }}</span>
+            <div><div class="kd-stat__value">{{ stats.counts.workouts }}</div><div class="kd-stat__label">Séances</div></div>
+        </div>
+        <div class="kd-card" style="display:flex; align-items:center; gap:var(--kd-space-6);">
+            <span class="kd-navcard__icon">{{ ux_icon('lucide:layers') }}</span>
+            <div><div class="kd-stat__value">{{ stats.counts.plans }}</div><div class="kd-stat__label">Plans</div></div>
+        </div>
+        <div class="kd-card" style="display:flex; align-items:center; gap:var(--kd-space-6);">
+            <span class="kd-navcard__icon">{{ ux_icon('lucide:dumbbell') }}</span>
+            <div><div class="kd-stat__value">{{ stats.counts.exercises }}</div><div class="kd-stat__label">Exercices</div></div>
+        </div>
+    </div>
+
+    {# Volume réalisé + répartition par activité #}
+    {% set vol = stats.volume %}
+    <div class="kd-grid kd-grid--2" style="margin-bottom:var(--kd-space-6); align-items:start;">
+        <section class="kd-card">
+            <h2 class="kd-card__title" style="margin-bottom:var(--kd-space-6);">Volume réalisé</h2>
+            <div class="kd-profile__tiles">
+                <div class="kd-profile__tile">
+                    <span class="kd-profile__tileicon">{{ ux_icon('lucide:dumbbell') }}</span>
+                    <div class="kd-stat__value">{{ vol.tonnageLabel }}</div>
+                    <div class="kd-stat__label">Tonnage soulevé · {{ vol.gymSets }} séries</div>
+                </div>
+                {% if vol.running.meters > 0 or vol.running.seconds > 0 %}
+                    <div class="kd-profile__tile">
+                        <span class="kd-profile__tileicon">{{ ux_icon('lucide:footprints') }}</span>
+                        <div class="kd-stat__value">{{ vol.running.distanceLabel }}</div>
+                        <div class="kd-stat__label">Course · {{ vol.running.durationLabel }}</div>
+                    </div>
+                {% endif %}
+                {% if vol.cycling.meters > 0 or vol.cycling.seconds > 0 %}
+                    <div class="kd-profile__tile">
+                        <span class="kd-profile__tileicon">{{ ux_icon('lucide:bike') }}</span>
+                        <div class="kd-stat__value">{{ vol.cycling.distanceLabel }}</div>
+                        <div class="kd-stat__label">Vélo · {{ vol.cycling.durationLabel }}</div>
+                    </div>
+                {% endif %}
+                {% if vol.swimming.meters > 0 or vol.swimming.seconds > 0 %}
+                    <div class="kd-profile__tile">
+                        <span class="kd-profile__tileicon">{{ ux_icon('lucide:waves') }}</span>
+                        <div class="kd-stat__value">{{ vol.swimming.distanceLabel }}</div>
+                        <div class="kd-stat__label">Natation · {{ vol.swimming.durationLabel }}</div>
+                    </div>
+                {% endif %}
+            </div>
+        </section>
+
+        <section class="kd-card">
+            <h2 class="kd-card__title" style="margin-bottom:var(--kd-space-6);">Répartition par activité</h2>
+            {% if stats.activityCounts is empty %}
+                <div class="kd-empty">
+                    {{ ux_icon('lucide:activity') }}
+                    <div>Aucune séance faite pour l'instant.</div>
+                </div>
+            {% else %}
+                <ul class="kd-list">
+                    {% for row in stats.activityCounts %}
+                        <li class="kd-list__row" style="padding:var(--kd-space-3) 0;">
+                            {{ activity.badge(row.activity) }}
+                            <span style="margin-left:auto; font-family:var(--font-mono); color:var(--color-text-strong);">
+                                {{ row.sessions }} séance{{ row.sessions > 1 ? 's' }}
+                            </span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </section>
+    </div>
+
+    {# ============================== FICHE ATHLÈTE =========================== #}
+    {% set card = stats.athlete %}
+    <p class="kd-eyebrow" style="margin:var(--kd-space-10) 0 var(--kd-space-6);">Fiche athlète</p>
+
+    {% if not card.hasAny %}
+        <div class="kd-card">
+            <div class="kd-empty">
+                {{ ux_icon('lucide:user') }}
+                <div>Ta fiche est vide. <a href="{{ path('app_profile_edit') }}">Renseigne tes infos</a> (taille, poids, records…).</div>
+            </div>
+        </div>
+    {% else %}
+        <div class="kd-grid kd-grid--3" style="align-items:start;">
+            {% set groups = [
+                { title: 'Identité',  icon: 'lucide:user',     rows: card.identity },
+                { title: 'Force',     icon: 'lucide:dumbbell', rows: card.strength },
+                { title: 'Endurance', icon: 'lucide:footprints', rows: card.endurance },
+            ] %}
+            {% for g in groups %}
+                <section class="kd-card">
+                    <h2 class="kd-card__title kd-profile__grouphead" style="margin-bottom:var(--kd-space-6);">
+                        {{ ux_icon(g.icon) }} {{ g.title }}
+                    </h2>
+                    <dl class="kd-deflist">
+                        {% for r in g.rows %}
+                            <dt>{{ r.label }}</dt>
+                            <dd>{{ r.value ?? '—' }}</dd>
+                        {% endfor %}
+                    </dl>
+                </section>
+            {% endfor %}
+        </div>
+
+        {% if card.bio %}
+            <section class="kd-card" style="margin-top:var(--kd-space-6);">
+                <h2 class="kd-card__title" style="margin-bottom:var(--kd-space-4);">Bio</h2>
+                <p style="white-space:pre-line; color:var(--color-text);">{{ card.bio }}</p>
+            </section>
+        {% endif %}
+    {% endif %}
+{% endblock %}

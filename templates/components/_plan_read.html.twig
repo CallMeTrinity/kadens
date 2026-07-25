@@ -1,7 +1,15 @@
 {# Rendu lecture seule d'un plan mis à plat par PlanFlattener::flattenPlanTemplate.
-   Auto-suffisant : aucun AJAX post-rendu, condition du cache offline (Phase 9).
-   Attend une variable `flat` (grille dense semaines × jours). #}
+   Auto-suffisant : aucun AJAX post-rendu. Attend une variable `flat` (grille dense
+   semaines × jours).
+
+   Paramètres optionnels :
+   - `public` (défaut false) : en page publique, les séances pointent leur page
+     publique (/s/{slug}) et non la route propriétaire (auth-gated).
+   - `weeks` (défaut null) : liste de numéros de semaines à afficher (partage d'une
+     plage). Null = toutes. #}
 {% set template = flat.template %}
+{% set public = public|default(false) %}
+{% set weeks = weeks|default(null) %}
 {% set dayNames = {1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Jeu', 5: 'Ven', 6: 'Sam', 7: 'Dim'} %}
 
 <header class="kd-workouthead">
@@ -19,7 +27,7 @@
 </header>
 
 <div class="kd-planweeks">
-    {% for week in flat.weeks %}
+    {% for week in flat.weeks|filter(week => weeks is null or week.weekNumber in weeks) %}
         {% set weekCount = 0 %}
         {% for day in week.days %}{% set weekCount = weekCount + day.items|length %}{% endfor %}
         <section class="kd-planweek">
@@ -34,12 +42,19 @@
                         <div class="kd-planday__name">{{ dayNames[day.dayOfWeek] }}</div>
                         <div class="kd-planday__items">
                             {% for entry in day.items %}
-                                <div class="kd-planentry">
-                                    <a class="kd-planday__item" href="{{ path('app_workout_show', {id: entry.item.workout.id}) }}">
+                                {# Aperçu du contenu de la séance au survol (Popover API,
+                                   contrôleur `preview`). Auto-suffisant, aucun AJAX. #}
+                                <div class="kd-planentry" data-controller="preview"
+                                     data-action="mouseenter->preview#show mouseleave->preview#hide">
+                                    <a class="kd-planday__item"
+                                       href="{{ public
+                                           ? path('app_public_share', {slug: entry.workout.workout.slug})
+                                           : path('app_workout_show', {id: entry.item.workout.id}) }}">
                                         {{ ux_icon('lucide:clipboard-list') }}
                                         <span>{{ entry.workout.workout.title }}</span>
                                     </a>
                                     {% if entry.item.notes %}<p class="kd-planday__notes">{{ entry.item.notes|nl2br }}</p>{% endif %}
+                                    {{ include('components/_plan_preview.html.twig', {fw: entry.workout}) }}
                                 </div>
                             {% else %}
                                 <span class="kd-planday__rest">Repos</span>

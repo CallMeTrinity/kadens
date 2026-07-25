@@ -1,4 +1,5 @@
 {% extends 'base.html.twig' %}
+{% import 'components/_activity.html.twig' as activity %}
 
 {% block title %}Mes séances{% endblock %}
 
@@ -19,17 +20,23 @@
     </div>
 
     <div data-controller="filter">
-        <div class="kd-toolbar">
-            <div class="kd-search">
-                {{ ux_icon('lucide:search') }}
-                <input type="search" class="kd-input" placeholder="Rechercher une séance…"
-                       aria-label="Rechercher une séance"
-                       data-filter-target="input" data-action="input->filter#filter">
-            </div>
-            <span class="kd-count"><span data-filter-target="count">{{ workouts|length }}</span> séance{{ workouts|length > 1 ? 's' }}</span>
-        </div>
+        {{ include('components/_filterbar.html.twig', {
+            placeholder: 'Rechercher une séance…',
+            total: total,
+            countNoun: 'séance',
+            sortOptions: [
+                { key: 'name', label: 'Nom (A→Z)', dir: 'asc' },
+                { key: 'name', label: 'Nom (Z→A)', dir: 'desc' },
+                { key: 'created', label: 'Plus récent', dir: 'desc', numeric: true },
+                { key: 'duration', label: 'Durée (longue → courte)', dir: 'desc', numeric: true },
+                { key: 'blocks', label: 'Blocs (nombreux → rares)', dir: 'desc', numeric: true },
+            ],
+            facetGroups: [
+                { group: 'activity', allLabel: 'Toutes activités', facets: activityFacets },
+            ],
+        }) }}
 
-        {% if workouts is empty %}
+        {% if items is empty %}
             <div class="kd-card kd-empty">
                 {{ ux_icon('lucide:clipboard-list') }}
                 <div>Aucune séance pour l'instant.</div>
@@ -38,11 +45,18 @@
                 </a>
             </div>
         {% else %}
-            <div class="kd-grid kd-grid--3">
-                {% for workout in workouts %}
+            <div class="kd-grid kd-grid--3" data-filter-target="list">
+                {% for item in items %}
+                    {% set workout = item.workout %}
                     <article class="kd-libcard"
                              data-filter-target="item"
-                             data-filter-text="{{ workout.title }}">
+                             data-filter-name="{{ workout.title }}"
+                             data-filter-text="{{ workout.title }} {% for a in item.activities %}{{ a.label }} {% endfor %}"
+                             data-facet-activity="{% for a in item.activities %}{{ a.value }}{{ not loop.last ? ' ' }}{% endfor %}"
+                             data-sort-name="{{ workout.title|lower }}"
+                             data-sort-created="{{ workout.createdAt ? workout.createdAt|date('U') : 0 }}"
+                             data-sort-duration="{{ workout.estimatedDurationMinutes ?? 0 }}"
+                             data-sort-blocks="{{ workout.blocks|length }}">
                         <div class="kd-libcard__head">
                             <span class="kd-libcard__icon">{{ ux_icon('lucide:clipboard-list') }}</span>
                             <div class="kd-libcard__body">
@@ -56,6 +70,12 @@
                             </div>
                         </div>
 
+                        {% if item.activities %}
+                            <div class="kd-cellbadges">
+                                {% for a in item.activities %}{{ activity.badge(a, false) }}{% endfor %}
+                            </div>
+                        {% endif %}
+
                         <div class="kd-libcard__foot">
                             <a href="{{ path('app_workout_show', {id: workout.id}) }}" class="kd-btn kd-btn--ghost kd-btn--sm">
                                 {{ ux_icon('lucide:arrow-right') }} Voir
@@ -63,6 +83,12 @@
                             <a href="{{ path('app_workout_edit', {id: workout.id}) }}" class="kd-btn kd-btn--ghost kd-btn--sm kd-libcard__foot-sep">
                                 {{ ux_icon('lucide:square-pen') }} Éditer
                             </a>
+                            <form method="post" action="{{ path('app_workout_duplicate', {id: workout.id}) }}" style="margin:0;">
+                                <input type="hidden" name="_token" value="{{ csrf_token('duplicate' ~ workout.id) }}">
+                                <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm" title="Dupliquer" aria-label="Dupliquer">
+                                    {{ ux_icon('lucide:copy') }}
+                                </button>
+                            </form>
                         </div>
                     </article>
                 {% endfor %}

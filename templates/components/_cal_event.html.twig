@@ -1,0 +1,125 @@
+{# ============================================================================
+   Pastille de séance datée + modale d'édition — partagée par la vue mois
+   (`calendar/index`) et la vue semaine (`calendar/week`).
+
+   Deux zones cliquables : gauche = cycle rapide du statut (prévu → fait →
+   manqué) ; droite = ouvre la modale (statut / déplacer / retirer). Filet
+   gauche = statut (seul cas où la couleur code l'état, pas l'activité).
+   Aperçu du contenu au survol via le composant `_plan_preview` (Popover API).
+
+   Attend :
+     - scheduled : ScheduledWorkout
+     - fw        : PlanFlattener::flattenWorkout(scheduled.workout) (aperçu + méta)
+     - statuses  : ScheduledStatus::cases()
+     - detailed  : bool (optionnel) — carte haute de la vue semaine (méta + note)
+     - overdue   : bool (optionnel) — séance passée encore « prévue »
+   ============================================================================ #}
+{% import 'components/_activity.html.twig' as activity %}
+{% set st = scheduled.status.value %}
+{% set nextStatus = scheduled.status.next %}
+{% set detailed = detailed|default(false) %}
+{% set overdue = overdue|default(false) %}
+
+<div id="cal-event-{{ scheduled.id }}" class="kd-calevent kd-calevent--{{ st }}{{ detailed ? ' kd-calevent--detailed' }}{{ overdue ? ' is-overdue' }}"
+     data-controller="dialog preview"
+     data-action="mouseenter->preview#show mouseleave->preview#hide">
+    {# Zone gauche : cycle rapide du statut (prévue → faite → manquée). #}
+    <form method="post" action="{{ path('app_scheduled_workout_cycle_status', {id: scheduled.id}) }}" class="kd-calevent__statusform">
+        <input type="hidden" name="_token" value="{{ csrf_token('cycle' ~ scheduled.id) }}">
+        {# Vue courante : permet au flux Turbo de re-rendre la pastille à l'identique. #}
+        <input type="hidden" name="detailed" value="{{ detailed ? 1 : 0 }}">
+        <button type="submit" class="kd-calevent__toggle"
+                aria-label="Statut : {{ scheduled.status.label }}. Marquer « {{ nextStatus.label }} »"
+                title="{{ scheduled.status.label }} · cliquer pour marquer « {{ nextStatus.label }} »">
+            {% if st == 'done' %}{{ ux_icon('lucide:check') }}
+            {% elseif st == 'missed' %}{{ ux_icon('lucide:x') }}
+            {% else %}{{ ux_icon('lucide:circle-dot') }}{% endif %}
+        </button>
+    </form>
+
+    {# Zone droite : ouvre la modale d'édition détaillée. #}
+    <button type="button" class="kd-calevent__open" data-action="dialog#open" title="{{ scheduled.workout.title }}">
+        <span class="kd-calevent__title">{{ scheduled.workout.title }}</span>
+        {% if fw.activities|length or scheduled.workout.estimatedDurationMinutes %}
+            <span class="kd-calevent__meta">
+                {% for act in fw.activities %}
+                    <span class="kd-calevent__act kd-calevent__act--{{ activity.modifier(act) ?: 'neutral' }}"
+                          title="{{ act.label }}">{{ ux_icon(activity.icon(act)|trim) }}</span>
+                {% endfor %}
+                {% if scheduled.workout.estimatedDurationMinutes %}
+                    <span class="kd-calevent__dur">{{ ux_icon('lucide:clock') }}{{ scheduled.workout.estimatedDurationMinutes }}′</span>
+                {% endif %}
+                {% if detailed and fw.exerciseCount %}
+                    <span class="kd-calevent__exos">{{ fw.exerciseCount }} exo{{ fw.exerciseCount > 1 ? 's' }}</span>
+                {% endif %}
+            </span>
+        {% endif %}
+        {% if detailed and overdue %}
+            <span class="kd-calevent__flag">{{ ux_icon('lucide:calendar-clock') }} En retard</span>
+        {% endif %}
+    </button>
+
+    <dialog class="kd-modal" data-dialog-target="dialog" data-action="click->dialog#backdrop">
+        <div class="kd-modal__card">
+            <div class="kd-modal__head">
+                <div>
+                    <h2 class="kd-modal__title">{{ scheduled.workout.title }}</h2>
+                    <p class="kd-modal__sub">{{ scheduled.scheduledDate|date('d/m/Y') }}</p>
+                </div>
+                <button type="button" class="kd-modal__close" data-action="dialog#close" aria-label="Fermer">
+                    {{ ux_icon('lucide:x') }}
+                </button>
+            </div>
+
+            <div class="kd-modal__meta">
+                <span class="kd-badge kd-badge--{{ st }}"><span class="kd-badge__dot"></span>{{ scheduled.status.label }}</span>
+                <a class="kd-btn kd-btn--ghost kd-btn--sm" href="{{ path('app_workout_show', {id: scheduled.workout.id}) }}">
+                    {{ ux_icon('lucide:external-link') }} Voir la séance
+                </a>
+            </div>
+
+            {# Prévu vs réalisé : marquer fait/manqué en un clic + noter un écart léger. #}
+            <div class="kd-modal__section">
+                <p class="kd-modal__section-title">Statut</p>
+                <form method="post" action="{{ path('app_scheduled_workout_status', {id: scheduled.id}) }}" class="kd-modal__form">
+                    <input type="hidden" name="_token" value="{{ csrf_token('status' ~ scheduled.id) }}">
+                    <input type="hidden" name="detailed" value="{{ detailed ? 1 : 0 }}">
+                    <div class="kd-field">
+                        <textarea name="completionNotes" rows="2" class="kd-input kd-input--area" placeholder="Écart / ressenti (optionnel)">{{ scheduled.completionNotes }}</textarea>
+                    </div>
+                    <div class="kd-segmented" role="group" aria-label="Marquer le statut">
+                        {% for status in statuses %}
+                            <button type="submit" name="status" value="{{ status.value }}"
+                                    class="kd-segbtn kd-segbtn--{{ status.value }}{{ status == scheduled.status ? ' is-active' }}">
+                                {% if status.value == 'done' %}{{ ux_icon('lucide:check') }}
+                                {% elseif status.value == 'missed' %}{{ ux_icon('lucide:x') }}
+                                {% else %}{{ ux_icon('lucide:circle-dot') }}{% endif %}
+                                {{ status.label }}
+                            </button>
+                        {% endfor %}
+                    </div>
+                </form>
+            </div>
+
+            <div class="kd-modal__section">
+                <p class="kd-modal__section-title">Déplacer</p>
+                <form method="post" action="{{ path('app_scheduled_workout_move', {id: scheduled.id}) }}" class="kd-modal__inline">
+                    <input type="hidden" name="_token" value="{{ csrf_token('move' ~ scheduled.id) }}">
+                    <div class="kd-field">
+                        <input type="date" name="scheduledDate" value="{{ scheduled.scheduledDate|date('Y-m-d') }}" class="kd-input" required>
+                    </div>
+                    <button type="submit" class="kd-btn kd-btn--secondary">{{ ux_icon('lucide:calendar-clock') }} Déplacer</button>
+                </form>
+            </div>
+
+            <div class="kd-modal__section">
+                <form method="post" action="{{ path('app_scheduled_workout_delete', {id: scheduled.id}) }}" onsubmit="return confirm('Retirer cette séance du planning ?');">
+                    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ scheduled.id) }}">
+                    <button type="submit" class="kd-btn kd-btn--danger">{{ ux_icon('lucide:trash-2') }} Retirer du planning</button>
+                </form>
+            </div>
+        </div>
+    </dialog>
+
+    {{ include('components/_plan_preview.html.twig', {fw: fw}) }}
+</div>

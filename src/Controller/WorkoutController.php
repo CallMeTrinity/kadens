@@ -3,16 +3,23 @@
 namespace App\Controller;
 
 use App\Entity\Block;
+use App\Entity\Exercise;
 use App\Entity\PrescribedExercise;
 use App\Entity\Workout;
+use App\Enum\ActivityType;
 use App\Enum\BlockRole;
+use App\Enum\PrescriptionType;
 use App\Form\BlockType;
 use App\Form\PrescribedExerciseType;
 use App\Form\WorkoutType;
+use App\Repository\ExerciseRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\WorkoutVoter;
 use App\Service\PlanFlattener;
 use App\Service\SlugGenerator;
+use App\Service\WorkoutCloner;
+use App\Service\WorkoutEstimator;
+use App\Service\WorkoutMetrics;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormFactoryInterface;
@@ -37,15 +44,53 @@ final class WorkoutController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly FormFactoryInterface $formFactory,
+        private readonly PlanFlattener $planFlattener,
+        private readonly ExerciseRepository $exerciseRepository,
+        private readonly WorkoutEstimator $estimator,
     ) {
     }
 
     #[Route('', name: 'app_workout_index', methods: ['GET'])]
-    public function index(WorkoutRepository $workoutRepository): Response
+    public function index(WorkoutRepository $workoutRepository, WorkoutMetrics $workoutMetrics): Response
     {
+        // Fetch-join du contenu : les activités distinctes par séance servent aux
+        // facettes/filtres de l'index (sans ce join ce serait un N+1).
+        $workouts = $workoutRepository->findLibraryForOwnerWithContent($this->getUser());
+
+        $items = [];
+        $counts = [];
+        foreach ($workouts as $workout) {
+            $activities = $workoutMetrics->distinctActivities($workout);
+            $items[] = ['workout' => $workout, 'activities' => $activities];
+            foreach ($activities as $activity) {
+                $counts[$activity->value] = ($counts[$activity->value] ?? 0) + 1;
+            }
+        }
+
         return $this->render('workout/index.html.twig', [
-            'workouts' => $workoutRepository->findBy(['owner' => $this->getUser()], ['createdAt' => 'DESC']),
+            'items' => $items,
+            'total' => \count($items),
+            'activityFacets' => $this->buildActivityFacets($counts),
         ]);
+    }
+
+    /**
+     * Puces d'activité présentes, ordonnées selon l'enum, avec leur effectif.
+     *
+     * @param array<string, int> $counts
+     *
+     * @return list<array{value: string, label: string, count: int}>
+     */
+    private function buildActivityFacets(array $counts): array
+    {
+        $facets = [];
+        foreach (ActivityType::cases() as $case) {
+            if (isset($counts[$case->value])) {
+                $facets[] = ['value' => $case->value, 'label' => $case->getLabel(), 'count' => $counts[$case->value]];
+            }
+        }
+
+        return $facets;
     }
 
     #[Route('/new', name: 'app_workout_new', methods: ['GET', 'POST'])]
@@ -100,7 +145,43 @@ final class WorkoutController extends AbstractController
         return $this->render('workout/edit.html.twig', [
             'workout' => $workout,
             'form' => $form,
-        ] + $this->blocksContext($workout));
+        ] + $this->blocksContext($workout) + $this->libraryContext());
+    }
+
+    /**
+     * Édition en ligne d'un champ de la séance (titre/description) depuis l'en-tête
+     * cliquable du compositeur (contrôleur `inline-edit`, même pattern que le plan).
+     * Renvoie la valeur persistée (texte brut) que le JS réaffiche ; repli sans JS =
+     * le formulaire complet replié dans l'éditeur.
+     */
+    #[Route('/{id}/meta', name: 'app_workout_meta', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function updateMeta(Request $request, Workout $workout): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
+        $payload = $request->getPayload();
+
+        if (!$this->isCsrfTokenValid('workout_meta'.$workout->getId(), $payload->getString('_token'))) {
+            return new Response('', Response::HTTP_FORBIDDEN);
+        }
+
+        $value = trim($payload->getString('value'));
+        switch ($payload->getString('field')) {
+            case 'title':
+                if ('' === $value) {
+                    return new Response('Le titre ne peut pas être vide.', Response::HTTP_UNPROCESSABLE_ENTITY);
+                }
+                $workout->setTitle($value);
+                break;
+            case 'description':
+                $workout->setDescription('' === $value ? null : $value);
+                break;
+            default:
+                return new Response('', Response::HTTP_BAD_REQUEST);
+        }
+
+        $this->entityManager->flush();
+
+        return new Response($value);
     }
 
     #[Route('/{id}/delete', name: 'app_workout_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
@@ -118,6 +199,24 @@ final class WorkoutController extends AbstractController
         return $this->redirectToRoute('app_workout_index');
     }
 
+    #[Route('/{id}/duplicate', name: 'app_workout_duplicate', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function duplicate(Request $request, Workout $workout, WorkoutCloner $cloner): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::VIEW, $workout);
+
+        if (!$this->isCsrfTokenValid('duplicate'.$workout->getId(), $request->getPayload()->getString('_token'))) {
+            return $this->redirectToRoute('app_workout_show', ['id' => $workout->getId()]);
+        }
+
+        // Copie de bibliothèque (planLocal = false) : réutilisable et listée.
+        $copy = $cloner->cloneWorkout($workout, $this->getUser(), $workout->getTitle().' (copie)', false);
+        $this->entityManager->flush();
+
+        $this->addFlash('success', 'Séance dupliquée. Compose-la maintenant.');
+
+        return $this->redirectToRoute('app_workout_edit', ['id' => $copy->getId()]);
+    }
+
     // ---- Édition des blocs -------------------------------------------------
 
     #[Route('/{id}/blocks', name: 'app_workout_block_add', methods: ['POST'], requirements: ['id' => '\d+'])]
@@ -130,8 +229,11 @@ final class WorkoutController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $block->setWorkout($workout);
             $block->setPosition($this->nextPosition($workout->getBlocks()->toArray()));
+            // addBlock maintient les DEUX côtés de la relation. Sans ça, la
+            // collection en mémoire reste inchangée et le stream re-rendu dans la
+            // foulée ne montre pas le nouveau bloc (visible seulement au rechargement).
+            $workout->addBlock($block);
             $this->entityManager->persist($block);
             $this->entityManager->flush();
         }
@@ -196,10 +298,67 @@ final class WorkoutController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $prescribed->setBlock($block);
             $prescribed->setPosition($this->nextPosition($block->getPrescribedExercises()->toArray()));
+            // addPrescribedExercise maintient les DEUX côtés (voir addBlock).
+            $block->addPrescribedExercise($prescribed);
             $this->clearIrrelevantFields($prescribed);
             $this->entityManager->persist($prescribed);
+            $this->entityManager->flush();
+        }
+
+        return $this->blocksResponse($request, $workout);
+    }
+
+    #[Route('/{id}/exercises/quick-add', name: 'app_workout_prescribed_quick_add', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function quickAddPrescribed(Request $request, Workout $workout): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
+        $payload = $request->getPayload();
+
+        if ($this->isCsrfTokenValid('prescribed_quick_add'.$workout->getId(), $payload->getString('_token'))) {
+            $block = $this->findBlock($workout, $payload->getInt('blockId'));
+            $exercise = $this->findLibraryExercise($payload->getInt('exerciseId'));
+
+            if (null !== $exercise) {
+                // Ajout express : type par défaut déduit de l'activité (distance ×
+                // allure pour course/vélo/natation, séries × répétitions sinon), à
+                // affiner ensuite via le panneau de paramètres. Aucune valeur n'est posée.
+                $prescribed = (new PrescribedExercise())
+                    ->setExercise($exercise)
+                    ->setPrescriptionType($this->defaultPrescriptionType($exercise))
+                    ->setPosition($this->nextPosition($block->getPrescribedExercises()->toArray()));
+                // addPrescribedExercise maintient les DEUX côtés de la relation :
+                // sans ça, la collection en mémoire reste vide et le stream re-rendu
+                // ne montre pas l'ajout (visible seulement après rechargement).
+                $block->addPrescribedExercise($prescribed);
+                $this->entityManager->persist($prescribed);
+                $this->entityManager->flush();
+
+                // Placement précis si le glisser-déposer fournit un point de dépôt
+                // (afterId = 0 -> tête du bloc, sinon juste après cet exercice).
+                // Champ absent/vide (bouton +) -> l'exercice reste en fin de bloc.
+                $afterRaw = $payload->get('afterId');
+                if (null !== $afterRaw && '' !== $afterRaw) {
+                    $this->repositionPrescribed($prescribed, $block, (int) $afterRaw);
+                    $this->entityManager->flush();
+                }
+            }
+        }
+
+        return $this->blocksResponse($request, $workout);
+    }
+
+    #[Route('/{id}/exercises/reorder', name: 'app_workout_prescribed_reorder', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function reorderPrescribed(Request $request, Workout $workout): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
+        $payload = $request->getPayload();
+
+        if ($this->isCsrfTokenValid('prescribed_reorder'.$workout->getId(), $payload->getString('_token'))) {
+            $prescribed = $this->findPrescribed($workout, $payload->getInt('prescribedId'));
+            $targetBlock = $this->findBlock($workout, $payload->getInt('targetBlockId'));
+            // afterId = 0 -> place en tête du bloc cible ; sinon juste après cet exercice.
+            $this->repositionPrescribed($prescribed, $targetBlock, $payload->getInt('afterId'));
             $this->entityManager->flush();
         }
 
@@ -221,6 +380,57 @@ final class WorkoutController extends AbstractController
         }
 
         return $this->blocksResponse($request, $workout);
+    }
+
+    // ---- Édition rapide (mini-modale de l'éditeur de plan) ------------------
+
+    /**
+     * Panneau d'édition rapide d'une séance : ses exercices prescrits avec leurs
+     * paramètres éditables (reps/séries/repos…), groupés par bloc. Fragment injecté
+     * dans la modale de l'éditeur de plan (fetch), sans layout. La séance est la
+     * copie locale portée par la case (référence vivante) : l'éditer se reflète au
+     * calendrier sans toucher la biblio ni les autres cases. Pour la structure
+     * (ajout/suppression de blocs, glisser-déposer), l'utilisateur passe par le lien
+     * « Édition complète » vers le compositeur.
+     */
+    #[Route('/{id}/quick-panel', name: 'app_workout_quick_panel', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function quickPanel(Workout $workout): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
+
+        return $this->render('workout/_quick_panel.html.twig', $this->quickPanelContext($workout));
+    }
+
+    /**
+     * Enregistre les paramètres d'un exercice depuis la mini-modale. Même
+     * traitement que editPrescribed, mais renvoie le stream du panneau rapide
+     * (#quick-panel) et non celui du compositeur (#workout-blocks). Sans JS, repli
+     * par redirection vers le compositeur.
+     */
+    #[Route('/{id}/exercises/{prescribedId}/quick-edit', name: 'app_workout_prescribed_quick_edit', methods: ['POST'], requirements: ['id' => '\d+', 'prescribedId' => '\d+'])]
+    public function quickEditPrescribed(Request $request, Workout $workout, int $prescribedId): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
+        $prescribed = $this->findPrescribed($workout, $prescribedId);
+
+        $form = $this->createPrescribedForm($prescribed, 'app_workout_prescribed_quick_edit');
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $this->clearIrrelevantFields($prescribed);
+            // La durée estimée dérive du contenu : on la recalcule (elle s'affiche
+            // sur la case du plan, rafraîchie à la fermeture de la modale).
+            $workout->setEstimatedDurationMinutes($this->estimator->estimateMinutes($workout));
+            $this->entityManager->flush();
+        }
+
+        if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
+            $request->setRequestFormat(TurboBundle::STREAM_FORMAT);
+
+            return $this->render('workout/stream/quick_panel.stream.html.twig', $this->quickPanelContext($workout));
+        }
+
+        return $this->redirectToRoute('app_workout_edit', ['id' => $workout->getId()]);
     }
 
     #[Route('/{id}/exercises/{prescribedId}/delete', name: 'app_workout_prescribed_delete', methods: ['POST'], requirements: ['id' => '\d+', 'prescribedId' => '\d+'])]
@@ -275,6 +485,74 @@ final class WorkoutController extends AbstractController
         }
 
         throw $this->createNotFoundException('Exercice prescrit introuvable dans cette séance.');
+    }
+
+    /**
+     * Exercice de la bibliothèque visible par l'utilisateur courant (perso ou
+     * global). Renvoie null si l'id n'existe pas ou appartient à un autre membre.
+     */
+    private function findLibraryExercise(int $id): ?Exercise
+    {
+        $exercise = $this->exerciseRepository->find($id);
+        if (null === $exercise) {
+            return null;
+        }
+
+        $owner = $exercise->getOwner();
+
+        return (null === $owner || $owner === $this->getUser()) ? $exercise : null;
+    }
+
+    /**
+     * Type d'effort par défaut à l'ajout express, déduit de l'activité : les
+     * activités d'endurance (course, vélo, natation) partent sur « distance ×
+     * allure », les autres sur « séries × répétitions ».
+     */
+    private function defaultPrescriptionType(Exercise $exercise): PrescriptionType
+    {
+        return match ($exercise->getActivity()) {
+            ActivityType::RUNNING, ActivityType::CYCLING, ActivityType::SWIMMING => PrescriptionType::DISTANCE_PACE,
+            default => PrescriptionType::SETS_REPS,
+        };
+    }
+
+    /**
+     * Replace un exercice prescrit dans le bloc cible, juste après $afterId
+     * (0 = en tête). Gère le déplacement inter-blocs et renumérote les positions
+     * du bloc cible de 0..n pour un ordre dense sans trou.
+     */
+    private function repositionPrescribed(PrescribedExercise $prescribed, Block $targetBlock, int $afterId): void
+    {
+        $source = $prescribed->getBlock();
+        if ($source !== $targetBlock) {
+            $source?->removePrescribedExercise($prescribed);
+            $targetBlock->addPrescribedExercise($prescribed);
+        }
+
+        // Ordre courant du bloc cible sans l'élément déplacé, trié par position.
+        $others = array_filter(
+            $targetBlock->getPrescribedExercises()->toArray(),
+            static fn (PrescribedExercise $pe) => $pe !== $prescribed,
+        );
+        usort($others, static fn (PrescribedExercise $a, PrescribedExercise $b) => $a->getPosition() <=> $b->getPosition());
+
+        $ordered = [];
+        if (0 === $afterId) {
+            $ordered[] = $prescribed;
+        }
+        foreach ($others as $pe) {
+            $ordered[] = $pe;
+            if ($pe->getId() === $afterId) {
+                $ordered[] = $prescribed;
+            }
+        }
+        if (!in_array($prescribed, $ordered, true)) {
+            $ordered[] = $prescribed; // afterId introuvable -> à la fin
+        }
+
+        foreach ($ordered as $index => $pe) {
+            $pe->setPosition($index);
+        }
     }
 
     /**
@@ -358,6 +636,7 @@ final class WorkoutController extends AbstractController
     {
         return $this->formFactory->createNamed('add_exercise_'.$block->getId(), PrescribedExerciseType::class, $prescribed, [
             'user' => $this->getUser(),
+            'activity' => $prescribed->getExercise()?->getActivity(),
             'action' => $this->generateUrl('app_workout_prescribed_add', [
                 'id' => $block->getWorkout()->getId(),
                 'blockId' => $block->getId(),
@@ -365,15 +644,40 @@ final class WorkoutController extends AbstractController
         ]);
     }
 
-    private function createPrescribedForm(PrescribedExercise $prescribed): FormInterface
+    private function createPrescribedForm(PrescribedExercise $prescribed, string $route = 'app_workout_prescribed_edit'): FormInterface
     {
         return $this->formFactory->createNamed('prescribed_'.$prescribed->getId(), PrescribedExerciseType::class, $prescribed, [
             'user' => $this->getUser(),
-            'action' => $this->generateUrl('app_workout_prescribed_edit', [
+            'activity' => $prescribed->getExercise()?->getActivity(),
+            'action' => $this->generateUrl($route, [
                 'id' => $prescribed->getBlock()->getWorkout()->getId(),
                 'prescribedId' => $prescribed->getId(),
             ]),
         ]);
+    }
+
+    /**
+     * Contexte de rendu du panneau d'édition rapide : les formulaires prescrits
+     * (postant vers la route quick-edit) et les résumés lisibles par exercice.
+     *
+     * @return array<string, mixed>
+     */
+    private function quickPanelContext(Workout $workout): array
+    {
+        $prescribedForms = [];
+        foreach ($workout->getBlocks() as $block) {
+            foreach ($block->getPrescribedExercises() as $prescribed) {
+                $prescribedForms[$prescribed->getId()] = $this
+                    ->createPrescribedForm($prescribed, 'app_workout_prescribed_quick_edit')
+                    ->createView();
+            }
+        }
+
+        return [
+            'workout' => $workout,
+            'prescribedForms' => $prescribedForms,
+            'summaries' => $this->prescribedSummaries($workout),
+        ];
     }
 
     /**
@@ -385,12 +689,10 @@ final class WorkoutController extends AbstractController
     private function blocksContext(Workout $workout): array
     {
         $blockForms = [];
-        $addExerciseForms = [];
         $prescribedForms = [];
 
         foreach ($workout->getBlocks() as $block) {
             $blockForms[$block->getId()] = $this->createBlockForm($block)->createView();
-            $addExerciseForms[$block->getId()] = $this->createAddPrescribedForm($block, new PrescribedExercise())->createView();
 
             foreach ($block->getPrescribedExercises() as $prescribed) {
                 $prescribedForms[$prescribed->getId()] = $this->createPrescribedForm($prescribed)->createView();
@@ -401,17 +703,85 @@ final class WorkoutController extends AbstractController
             'workout' => $workout,
             'addBlockForm' => $this->createAddBlockForm($workout, (new Block())->setRole(BlockRole::MAIN))->createView(),
             'blockForms' => $blockForms,
-            'addExerciseForms' => $addExerciseForms,
             'prescribedForms' => $prescribedForms,
+            'summaries' => $this->prescribedSummaries($workout),
         ];
     }
 
     /**
-     * Répond à une mutation de l'éditeur : Turbo Stream si la requête l'accepte,
-     * sinon repli par redirection vers la page d'édition (dégradation sans JS).
+     * Résumé lisible (pastille du compositeur) par exercice prescrit, indexé par
+     * id. On réutilise PlanFlattener : aucune mise à plat n'est réimplémentée ici.
+     *
+     * @return array<int, string>
+     */
+    private function prescribedSummaries(Workout $workout): array
+    {
+        $summaries = [];
+        foreach ($this->planFlattener->flattenWorkout($workout)['blocks'] as $flatBlock) {
+            foreach ($flatBlock['exercises'] as $flat) {
+                // On expose aussi le repos dans la pastille de l'éditeur : sans ça
+                // il n'apparaissait nulle part pendant la composition.
+                $summary = $flat['summary'];
+                if (null !== $flat['rest']) {
+                    $rest = 'repos '.$flat['rest'].' s';
+                    $summary = '' !== $summary ? $summary.' · '.$rest : $rest;
+                }
+                $summaries[$flat['prescribed']->getId()] = $summary;
+            }
+        }
+
+        return $summaries;
+    }
+
+    /**
+     * Contexte de la bibliothèque affichée dans le compositeur : exercices
+     * visibles par l'utilisateur (perso + global) et compteurs par activité.
+     *
+     * @return array<string, mixed>
+     */
+    private function libraryContext(): array
+    {
+        $exercises = $this->exerciseRepository->findLibraryForUser($this->getUser());
+
+        $countsByActivity = [];
+        foreach ($exercises as $exercise) {
+            $key = $exercise->getActivity()->value;
+            $countsByActivity[$key] = ($countsByActivity[$key] ?? 0) + 1;
+        }
+
+        // Filtres d'activité présents, dans l'ordre canonique de l'enum.
+        $activityFilters = [];
+        foreach (ActivityType::cases() as $activity) {
+            if (isset($countsByActivity[$activity->value])) {
+                $activityFilters[] = [
+                    'value' => $activity->value,
+                    'label' => $activity->getLabel(),
+                    'count' => $countsByActivity[$activity->value],
+                ];
+            }
+        }
+
+        return [
+            'library' => $exercises,
+            'libraryCount' => \count($exercises),
+            'libraryActivities' => $activityFilters,
+        ];
+    }
+
+    /**
+     * Répond à une mutation de l'éditeur. Le contrôleur `composer` poste en
+     * `fetch` avec un Accept « text/vnd.turbo-stream.html » : on renvoie alors un
+     * Turbo Stream qui met à jour (action="update") le conteneur #workout-blocks,
+     * appliqué côté client sans recharger. Sans JS (Accept text/html), repli par
+     * redirection vers la page d'édition.
      */
     private function blocksResponse(Request $request, Workout $workout): Response
     {
+        // La durée estimée est toujours dérivée du contenu : on la recalcule après
+        // chaque mutation (l'utilisateur ne la saisit plus).
+        $workout->setEstimatedDurationMinutes($this->estimator->estimateMinutes($workout));
+        $this->entityManager->flush();
+
         if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
             $request->setRequestFormat(TurboBundle::STREAM_FORMAT);
 

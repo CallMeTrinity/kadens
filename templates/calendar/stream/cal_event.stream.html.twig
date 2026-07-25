@@ -1,0 +1,17 @@
+{# Réponse à un changement de statut d'une séance datée (cycle rapide ou modale).
+   action="replace" : on remplace la pastille entière `#cal-event-{id}` par sa
+   version à jour (statut, filet, modale, aperçu) — pas de rechargement de page,
+   donc la vue mois/semaine courante est préservée. Le fragment re-rendu reporte
+   le même id, la cible survit aux mutations suivantes. Contexte fourni par
+   ScheduledWorkoutController::streamCalEvent(). #}
+<turbo-stream action="replace" target="cal-event-{{ scheduled.id }}">
+    <template>
+        {{ include('components/_cal_event.html.twig', {
+            scheduled: scheduled,
+            fw: fw,
+            statuses: statuses,
+            detailed: detailed,
+            overdue: overdue,
+        }) }}
+    </template>
+</turbo-stream>

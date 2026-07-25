@@ -21,7 +21,7 @@
  *   - non-GET / cross-origin           → laissés au réseau (jamais mis en cache).
  */
 
-const VERSION = 'kadens-v1';
+const VERSION = 'kadens-v2';
 const CACHE = `kadens-${VERSION}`;
 
 // Coquille minimale précachée à l'installation. Les assets digestés (CSS/JS/

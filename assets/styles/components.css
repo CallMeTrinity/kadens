@@ -7,6 +7,16 @@
    sémantiques (--color-*, --font-*) définis dans tokens.css.
    ============================================================================ */
 
+/* Reset : l'attribut [hidden] doit toujours masquer, même sur un élément dont le
+   CSS force un display (flex/grid). Sans ça, `el.hidden = true` reste visible sur
+   nos cartes (.kd-libcard, .kd-libx…) et casse tous les filtres client. */
+[hidden] { display: none !important; }
+
+/* Reset : <turbo-frame> est un custom element, donc `display: inline` par défaut
+   (Turbo n'injecte aucun style). Sans ça, tout conteneur passé en frame casse sa
+   mise en page (blocs à la suite, grilles écrasées). On le remet en bloc. */
+turbo-frame { display: block; }
+
 /* ----------------------------------------------------------------------------
    Header / navigation applicative
    ---------------------------------------------------------------------------- */
@@ -472,6 +482,39 @@
 }
 
 /* ----------------------------------------------------------------------------
+   Barre de filtres d'index (recherche pondérée + tri + facettes) — contrôleur `filter`
+   ---------------------------------------------------------------------------- */
+.kd-filterbar { margin-bottom: var(--kd-space-9); }
+.kd-filterbar__row {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-6);
+  flex-wrap: wrap;
+}
+.kd-filterbar .kd-libfilters { margin-top: var(--kd-space-6); }
+.kd-sort {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+.kd-sort > svg {
+  position: absolute;
+  left: var(--kd-space-4);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 15px; height: 15px;
+  color: var(--color-text-placeholder);
+  pointer-events: none;
+}
+.kd-sort__select {
+  width: auto;
+  padding-left: 34px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ----------------------------------------------------------------------------
    Tag neutre (liste de valeurs : zones travaillées, mots-clés)
    ---------------------------------------------------------------------------- */
 .kd-tags { display: flex; flex-wrap: wrap; gap: var(--kd-space-2); }
@@ -901,6 +944,26 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--color-activity-gym-text);
+}
+
+/* Sélecteur de plage de semaines à partager (page de consultation d'un plan). */
+.kd-sharerange {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-3);
+  margin-bottom: var(--kd-space-8);
+  padding: var(--kd-space-4) var(--kd-space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  background: var(--color-surface-raised);
+}
+.kd-sharerange__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--kd-tracking-eyebrow);
+  color: var(--color-text-faint);
 }
 
 /* ----------------------------------------------------------------------------
@@ -1346,56 +1409,36 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
 }
 .kd-planitem__del svg { width: 13px; height: 13px; }
 
-/* Repli « Ajouter une séance » dans une case */
-.kd-planadd { margin-top: var(--kd-space-1); }
-.kd-planadd > summary {
-  list-style: none;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kd-space-1);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: var(--kd-weight-semibold);
-  letter-spacing: var(--kd-tracking-eyebrow);
-  text-transform: uppercase;
-  color: var(--color-primary);
-  padding: var(--kd-space-1) 0;
-}
-.kd-planadd > summary::-webkit-details-marker { display: none; }
-.kd-planadd > summary svg { width: 12px; height: 12px; }
-.kd-planadd__form {
+/* Éditeur : agenda vertical (un jour par ligne). Le volet de trame étant
+   contraint par la palette à gauche, une grille 7 colonnes serait illisible : on
+   déroule les jours en lignes, chacune large et lisible, quelle que soit la
+   largeur d'écran. */
+.kd-plangrid--edit {
   display: flex;
   flex-direction: column;
-  gap: var(--kd-space-4);
-  margin-top: var(--kd-space-4);
+  gap: var(--kd-space-3);
 }
-
-/* Bascule agenda vertical : édition à 1024px, lecture à 880px */
-.kd-plangrid--edit { gap: var(--kd-space-4); }
-
-@media (max-width: 1024px) {
-  .kd-plangrid--edit { grid-template-columns: 1fr; }
-  .kd-plangrid--edit .kd-planday {
-    flex-direction: row;
-    align-items: flex-start;
-    min-height: 0;
-    gap: var(--kd-space-5);
-  }
-  .kd-plangrid--edit .kd-planday__name { flex: 0 0 44px; padding-top: 4px; }
-  .kd-plangrid--edit .kd-planday__body { flex: 1 1 auto; }
-  .kd-plangrid--edit .kd-planday.is-empty { border-style: solid; }
+.kd-plangrid--edit .kd-planday {
+  flex-direction: row;
+  align-items: flex-start;
+  min-height: 0;
+  gap: var(--kd-space-5);
 }
+.kd-plangrid--edit .kd-planday__name { flex: 0 0 44px; padding-top: 4px; }
+.kd-plangrid--edit .kd-planday__body { flex: 1 1 auto; min-width: 0; }
+.kd-plangrid--edit .kd-planday.is-empty { border-style: solid; }
+
+/* Lecture : 7 colonnes, agenda vertical sous 880px */
 @media (max-width: 880px) {
   .kd-plangrid { grid-template-columns: 1fr; gap: var(--kd-space-2); }
-  .kd-plangrid:not(.kd-plangrid--edit) .kd-planday {
+  .kd-plangrid .kd-planday {
     flex-direction: row;
     align-items: flex-start;
     min-height: 0;
     gap: var(--kd-space-5);
   }
-  .kd-plangrid:not(.kd-plangrid--edit) .kd-planday__name { flex: 0 0 44px; padding-top: 4px; }
-  .kd-plangrid:not(.kd-plangrid--edit) .kd-planday.is-empty { border-style: solid; }
+  .kd-plangrid .kd-planday__name { flex: 0 0 44px; padding-top: 4px; }
+  .kd-plangrid .kd-planday.is-empty { border-style: solid; }
 }
 
 /* ----------------------------------------------------------------------------
@@ -1441,6 +1484,44 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   gap: var(--kd-space-6);
 }
 
+/* En-tête du calendrier : bascule de vue à gauche, navigation à droite. */
+.kd-calhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-6);
+}
+
+/* Bascule segmentée Mois / Semaine. */
+.kd-viewtoggle {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-pill);
+  background: var(--color-surface-subtle);
+}
+.kd-viewtoggle__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  padding: var(--kd-space-3) var(--kd-space-6);
+  border-radius: var(--kd-radius-pill);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: background-color .12s ease, color .12s ease;
+}
+.kd-viewtoggle__btn svg { width: 15px; height: 15px; }
+.kd-viewtoggle__btn:hover { color: var(--color-text-strong); }
+.kd-viewtoggle__btn.is-active {
+  background: var(--color-surface-raised);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-card);
+}
+
 /* Cadre défilable : le mois garde ses 7 colonnes et défile plutôt que de
    s'écraser sur petit écran (la structure hebdomadaire reste lisible). */
 .kd-cal { overflow-x: auto; }
@@ -1475,6 +1556,7 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   background: var(--color-surface-raised);
 }
 .kd-calday--out { background: var(--color-surface-subtle); }
+.kd-calday--weekend:not(.kd-calday--out) { background: color-mix(in srgb, var(--color-surface-subtle) 55%, var(--color-surface-raised)); }
 .kd-calday__num {
   align-self: flex-end;
   display: inline-flex;
@@ -1502,14 +1584,13 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   min-width: 0;
 }
 
-/* Pastille de séance datée — bouton ouvrant la modale d'édition.
-   Filet gauche = statut (prévu / fait / manqué). */
+/* Pastille de séance datée — deux zones cliquables distinctes.
+   Gauche = cycle rapide du statut (prévu → fait → manqué) ; droite = ouvre la
+   modale. Filet gauche = statut (prévu / fait / manqué). */
 .kd-calevent {
   display: flex;
-  align-items: center;
-  gap: var(--kd-space-2);
+  align-items: stretch;
   width: 100%;
-  text-align: left;
   font-family: var(--font-body);
   font-size: 12px;
   font-weight: var(--kd-weight-medium);
@@ -1519,30 +1600,222 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-status-planned);
   border-radius: var(--kd-radius-sm);
-  padding: var(--kd-space-2) var(--kd-space-3);
-  cursor: pointer;
-  transition: border-color .12s ease, background-color .12s ease;
+  overflow: hidden;
+  transition: border-color .12s ease;
 }
-.kd-calevent:hover { background: var(--color-surface-raised); border-color: var(--color-border-strong); }
+.kd-calevent:hover { border-color: var(--color-border-strong); }
 .kd-calevent--planned { border-left-color: var(--color-status-planned); }
 .kd-calevent--done    { border-left-color: var(--color-status-done); }
 .kd-calevent--missed  { border-left-color: var(--color-status-missed); }
-.kd-calevent__title {
+
+/* Le formulaire de cycle enveloppe le bouton toggle : il ne prend pas de place
+   propre, le bouton porte tout. */
+.kd-calevent__statusform { display: flex; }
+
+/* Zone gauche : bouton de cycle du statut. L'icône est teintée par le statut. */
+.kd-calevent__toggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--kd-space-2);
+  border: 0;
+  border-right: 1px solid var(--color-divider);
+  background: transparent;
+  color: var(--color-status-planned);
+  cursor: pointer;
+  transition: background-color .12s ease, color .12s ease;
+}
+.kd-calevent__toggle:hover { background: var(--color-surface-raised); }
+.kd-calevent__toggle svg { width: 14px; height: 14px; }
+.kd-calevent--done .kd-calevent__toggle   { color: var(--color-status-done); }
+.kd-calevent--missed .kd-calevent__toggle { color: var(--color-status-missed); }
+
+/* Zone droite : ouvre la modale. Colonne = titre + méta (activités / durée). */
+.kd-calevent__open {
   flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  text-align: left;
+  padding: var(--kd-space-2) var(--kd-space-3);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color .12s ease;
+}
+.kd-calevent__open:hover { background: var(--color-surface-raised); }
+.kd-calevent__title {
+  align-self: stretch;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.kd-calevent__dot {
-  flex: 0 0 auto;
-  width: 6px; height: 6px;
-  border-radius: var(--kd-radius-full);
-  background: var(--color-status-planned);
-}
-.kd-calevent--done .kd-calevent__dot   { background: var(--color-status-done); }
-.kd-calevent--missed .kd-calevent__dot { background: var(--color-status-missed); }
 .kd-calevent--done .kd-calevent__title { text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--color-status-done) 55%, transparent); }
+
+/* Méta compacte de la pastille : icônes d'activité + durée estimée (+ nb d'exos
+   en vue semaine). Couleur d'icône par activité (run/gym), reste neutre. */
+.kd-calevent__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-faint);
+}
+.kd-calevent__act { display: inline-flex; }
+.kd-calevent__act svg { width: 12px; height: 12px; }
+.kd-calevent__act--run { color: var(--color-primary); }
+.kd-calevent__act--gym { color: var(--color-activity-gym); }
+.kd-calevent__act--neutral { color: var(--color-text-faint); }
+.kd-calevent__dur { display: inline-flex; align-items: center; gap: 2px; }
+.kd-calevent__dur svg { width: 11px; height: 11px; }
+.kd-calevent__exos {
+  padding: 0 var(--kd-space-2);
+  border-radius: var(--kd-radius-pill);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-secondary);
+}
+
+/* Séance passée encore « prévue » : marqueur d'action à mener (terracotta). */
+.kd-calevent.is-overdue { border-left-style: dashed; border-left-color: var(--color-primary); }
+.kd-calevent__flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-primary);
+}
+.kd-calevent__flag svg { width: 11px; height: 11px; }
+
+/* Variante détaillée (vue semaine) : la pastille respire un peu plus. */
+.kd-calevent--detailed .kd-calevent__open { padding: var(--kd-space-3) var(--kd-space-4); gap: 3px; }
+.kd-calevent--detailed .kd-calevent__title { white-space: normal; }
+
+/* ----------------------------------------------------------------------------
+   Vue semaine — bandeau de synthèse + grille 7 jours
+   ---------------------------------------------------------------------------- */
+.kd-weekbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-8);
+  padding: var(--kd-space-7) var(--kd-space-8);
+  margin-bottom: var(--kd-space-7);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--kd-radius-lg);
+  background: var(--color-surface-raised);
+}
+.kd-weekstat { display: flex; flex-direction: column; line-height: 1.1; }
+.kd-weekstat--sep { padding-left: var(--kd-space-8); border-left: 1px solid var(--color-divider); }
+.kd-weekstat__val {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: var(--kd-weight-bold);
+  color: var(--color-text-strong);
+}
+.kd-weekstat__lbl {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-weekchips { display: flex; flex-wrap: wrap; gap: var(--kd-space-4); margin-left: auto; }
+.kd-weekchip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  padding: var(--kd-space-2) var(--kd-space-5);
+  border-radius: var(--kd-radius-pill);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-secondary);
+}
+.kd-weekchip svg { width: 12px; height: 12px; }
+.kd-weekchip--done { color: var(--color-status-done); }
+.kd-weekchip--planned { color: var(--color-text-secondary); }
+.kd-weekchip--missed { color: var(--color-status-missed); }
+
+/* Grille des 7 jours : colonnes égales, bascule en agenda vertical sur mobile. */
+.kd-week {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--kd-space-4);
+}
+.kd-weekday {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-4);
+  min-height: 160px;
+  padding: var(--kd-space-5);
+  border: 1px solid var(--color-border-cell);
+  border-radius: var(--kd-radius-md);
+  background: var(--color-surface-raised);
+}
+.kd-weekday--weekend { background: color-mix(in srgb, var(--color-surface-subtle) 55%, var(--color-surface-raised)); }
+.kd-weekday--past { opacity: .72; }
+.kd-weekday--today { border-color: var(--color-primary); box-shadow: inset 0 0 0 1px var(--color-primary); }
+.kd-weekday__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--kd-space-3);
+  padding-bottom: var(--kd-space-3);
+  border-bottom: 1px solid var(--color-divider);
+}
+.kd-weekday__name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-weekday__num {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: var(--kd-weight-bold);
+  color: var(--color-text-secondary);
+}
+.kd-weekday--today .kd-weekday__name,
+.kd-weekday--today .kd-weekday__num { color: var(--color-primary); }
+.kd-weekday__events { display: flex; flex-direction: column; gap: var(--kd-space-3); }
+.kd-weekday__rest {
+  margin: 0;
+  padding: var(--kd-space-4) 0;
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--color-text-placeholder);
+}
+
+@media (max-width: 900px) {
+  .kd-week { grid-template-columns: 1fr; }
+  .kd-weekday { min-height: 0; flex-direction: row; align-items: flex-start; gap: var(--kd-space-6); }
+  .kd-weekday__head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 64px;
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+  .kd-weekday__events { flex: 1 1 auto; min-width: 0; }
+  .kd-weekchips { margin-left: 0; }
+}
 
 /* ----------------------------------------------------------------------------
    Modale réutilisable (élément natif <dialog> + contrôleur Stimulus `dialog`)
@@ -1625,6 +1898,57 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   flex-wrap: wrap;
 }
 .kd-modal__inline .kd-field { flex: 1 1 160px; margin: 0; }
+
+/* En-tête secondaire de modale : badge de statut + lien vers la séance. */
+.kd-modal__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kd-space-4);
+  flex-wrap: wrap;
+  margin-bottom: var(--kd-space-2);
+}
+
+/* Segmenté de statut : trois boutons soumettant le formulaire avec leur valeur.
+   Le bouton actif reflète le statut courant ; la couleur code le statut. */
+.kd-segmented {
+  display: flex;
+  gap: var(--kd-space-2);
+}
+.kd-segbtn {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--kd-space-2);
+  padding: var(--kd-space-3) var(--kd-space-2);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-md);
+  cursor: pointer;
+  transition: border-color .12s ease, background-color .12s ease, color .12s ease;
+}
+.kd-segbtn svg { width: 15px; height: 15px; }
+.kd-segbtn:hover { border-color: var(--color-border-strong); background: var(--color-surface-raised); }
+.kd-segbtn--done.is-active {
+  color: var(--color-status-done);
+  border-color: color-mix(in srgb, var(--color-status-done) 45%, transparent);
+  background: color-mix(in srgb, var(--color-status-done) 10%, transparent);
+}
+.kd-segbtn--planned.is-active {
+  color: var(--color-status-planned);
+  border-color: color-mix(in srgb, var(--color-status-planned) 55%, transparent);
+  background: color-mix(in srgb, var(--color-status-planned) 12%, transparent);
+}
+.kd-segbtn--missed.is-active {
+  color: var(--color-status-missed);
+  border-color: color-mix(in srgb, var(--color-status-missed) 45%, transparent);
+  background: color-mix(in srgb, var(--color-status-missed) 9%, transparent);
+}
 
 /* ----------------------------------------------------------------------------
    Synthèse « prévu vs réalisé » (Phase 7)
@@ -1746,3 +2070,1082 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
 a.kd-summplan__title:hover { color: var(--color-primary); }
 .kd-summplan__title svg { width: 15px; height: 15px; color: var(--color-text-faint); }
 .kd-summplan__title--loose { color: var(--color-text-secondary); }
+
+/* ============================================================================
+   Compositeur de séance (éditeur) — écran 3a « création rapide par glisser-
+   déposer ». Deux volets : bibliothèque à gauche, blocs à droite. Persistance
+   server-driven inchangée (Turbo Streams) ; ce style n'ajoute que la mise en
+   page dense et les contrôles inline. Tout piloté par les tokens.
+   ============================================================================ */
+
+.kd-page--wide { max-width: 1320px; }
+
+.kd-composer {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-xl);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+/* ---- En-tête (méta sous le titre inline de l'en-tête de page) ---- */
+.kd-eyebrow--accent { color: var(--color-primary); }
+.kd-composer__meta {
+  margin: var(--kd-space-2) 0 0;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* ---- Corps deux volets ---- */
+.kd-composer__body { display: flex; align-items: stretch; }
+.kd-composer__lib {
+  width: 326px;
+  flex: none;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+}
+.kd-composer__main {
+  flex: 1;
+  min-width: 0;
+  padding: var(--kd-space-8) var(--kd-space-8) var(--kd-space-9);
+}
+
+/* ============================================================================
+   Bibliothèque (volet gauche)
+   ============================================================================ */
+.kd-libpanel { display: flex; flex-direction: column; height: 100%; }
+.kd-libpanel__head {
+  padding: var(--kd-space-7) var(--kd-space-7) var(--kd-space-5);
+  border-bottom: 1px solid var(--color-divider);
+}
+.kd-libpanel__title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow-lg);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-libpanel__count { color: var(--color-text-placeholder); }
+.kd-libsearch {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  margin-top: var(--kd-space-4);
+  padding: var(--kd-space-3) var(--kd-space-4);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--kd-radius-md);
+  background: var(--color-surface-raised);
+}
+.kd-libsearch svg { width: 15px; height: 15px; color: var(--color-text-placeholder); }
+.kd-libsearch input {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--color-text);
+}
+.kd-libfilters { display: flex; flex-wrap: wrap; gap: var(--kd-space-2); margin-top: var(--kd-space-4); }
+.kd-libfilter {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  padding: var(--kd-space-1) var(--kd-space-4);
+  border: 1px solid var(--color-border-pill);
+  border-radius: var(--kd-radius-pill);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.kd-libfilter:hover { border-color: var(--color-primary); }
+.kd-libfilter--on {
+  background: var(--color-primary-tint);
+  border-color: var(--color-primary-tint);
+  color: var(--color-primary-on-tint);
+}
+.kd-libpanel__list {
+  flex: 1;
+  min-height: 0;
+  max-height: 620px;
+  overflow-y: auto;
+  padding: var(--kd-space-5) var(--kd-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-3);
+}
+.kd-libpanel__empty {
+  margin: var(--kd-space-6) 0;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--color-text-placeholder);
+  text-align: center;
+}
+.kd-libpanel__hint {
+  margin: 0;
+  padding: var(--kd-space-4) var(--kd-space-6);
+  border-top: 1px solid var(--color-divider);
+  font-family: var(--font-body);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--color-text-faint);
+}
+.kd-libpanel__hint strong { color: var(--color-primary-on-tint); }
+
+.kd-libx {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kd-space-4);
+  padding: var(--kd-space-4);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border-strong);
+  border-radius: var(--kd-radius-lg);
+  cursor: grab;
+}
+.kd-libx:hover { box-shadow: var(--shadow-card); }
+.kd-libx:active { cursor: grabbing; }
+.kd-libx--run { border-left-color: var(--color-activity-run); }
+.kd-libx--gym { border-left-color: var(--color-activity-gym); }
+.kd-libx__code {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--kd-radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-bold);
+  background: var(--color-fill);
+  color: var(--color-text-secondary);
+}
+.kd-libx--run .kd-libx__code { background: var(--color-activity-run-tint); color: var(--color-activity-run); }
+.kd-libx--gym .kd-libx__code { background: var(--color-activity-gym-tint); color: var(--color-activity-gym); }
+.kd-libx__body { flex: 1; min-width: 0; }
+.kd-libx__name {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--color-text-strong);
+}
+.kd-libx__meta {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-1);
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-faint);
+}
+.kd-libx__meta svg { width: 12px; height: 12px; }
+.kd-libx .kd-tags { margin-top: var(--kd-space-2); }
+.kd-libx__add {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--kd-radius-sm);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface-raised);
+  color: var(--color-primary-on-tint);
+  cursor: pointer;
+}
+.kd-libx__add:hover { border-color: var(--color-primary); background: var(--color-primary-tint); }
+.kd-libx__add svg { width: 15px; height: 15px; }
+
+/* ============================================================================
+   Éditeur de trame — deux volets (palette + grille) et mode tampon
+   ============================================================================ */
+.kd-planeditor {
+  display: flex;
+  align-items: flex-start;
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  /* `clip` (et non `hidden`) : borde/arrondit les coins sans devenir un
+     conteneur de défilement, condition pour que la palette `sticky` s'ancre
+     sur le viewport et non sur cet encadré. */
+  overflow: clip;
+  background: var(--color-surface);
+}
+.kd-planeditor .kd-composer__main { padding: var(--kd-space-6); }
+
+/* La palette reste visible pendant qu'on scrolle la grille des semaines. */
+.kd-planeditor .kd-composer__lib {
+  position: sticky;
+  top: var(--kd-space-4);
+  align-self: flex-start;
+  max-height: calc(100vh - var(--kd-space-4) * 2);
+  display: flex;
+  flex-direction: column;
+}
+/* La liste se réduit et scrolle dans la palette quand la fenêtre est courte. */
+.kd-planeditor .kd-composer__lib .kd-libpanel { flex: 1; min-height: 0; }
+
+@media (max-width: 1100px) {
+  .kd-planeditor { flex-direction: column; align-items: stretch; }
+  .kd-planeditor .kd-composer__lib {
+    position: static;
+    max-height: none;
+    width: auto;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .kd-planeditor .kd-libpanel__list { max-height: 320px; }
+}
+
+/* Carte de séance de la palette (dérivée de .kd-libx) */
+.kd-palettecard {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kd-space-4);
+  padding: var(--kd-space-4);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-border-strong);
+  border-radius: var(--kd-radius-lg);
+  cursor: grab;
+}
+.kd-palettecard:hover { box-shadow: var(--shadow-card); }
+.kd-palettecard:active { cursor: grabbing; }
+.kd-palettecard--armed {
+  border-color: var(--color-primary);
+  border-left-color: var(--color-primary);
+  background: var(--color-primary-tint);
+  box-shadow: var(--shadow-card);
+}
+.kd-palettecard__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-3);
+  margin-top: 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-faint);
+}
+.kd-palettecard__meta span { display: inline-flex; align-items: center; gap: 2px; }
+.kd-palettecard__meta svg { width: 12px; height: 12px; }
+
+/* Badges d'activité compacts (icône seule) — palette + cases de trame */
+.kd-cellbadges { display: inline-flex; flex-wrap: wrap; gap: 3px; margin-top: var(--kd-space-2); }
+.kd-cellbadges .kd-badge { padding: 2px; }
+.kd-cellbadges .kd-badge svg { width: 12px; height: 12px; }
+
+/* Mode tampon : une séance armée -> les cases invitent au dépôt au clic. Toute
+   la case (y compris une case déjà occupée) devient une cible de tampon : les
+   séances posées passent en pointer-events:none pour laisser le clic tamponner,
+   au lieu d'ouvrir l'édition rapide. */
+.kd-editsection.is-arming .kd-planday__items {
+  min-height: 40px;
+  padding: var(--kd-space-2);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--kd-radius-sm);
+  cursor: copy;
+}
+.kd-editsection.is-arming .kd-planday__items:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-tint);
+}
+.kd-editsection.is-arming .kd-planentry { pointer-events: none; }
+
+/* ============================================================================
+   Blocs (volet droit)
+   ============================================================================ */
+.kd-cblocks { display: flex; flex-direction: column; gap: var(--kd-space-6); }
+.kd-cblocks__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--kd-space-4);
+  padding: var(--kd-space-13) var(--kd-space-8);
+  border: 1.5px dashed var(--color-border-strong);
+  border-radius: var(--kd-radius-lg);
+  text-align: center;
+  color: var(--color-text-placeholder);
+}
+.kd-cblocks__empty svg { width: 26px; height: 26px; }
+.kd-cblocks__empty p { margin: 0; font-family: var(--font-body); font-size: 13px; }
+.kd-cblocks__add { align-self: flex-start; }
+.kd-cblocks__addbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: var(--kd-weight-semibold);
+  padding: var(--kd-space-4) var(--kd-space-6);
+  border: 1.5px dashed var(--color-border-muted);
+  border-radius: var(--kd-radius-lg);
+  background: transparent;
+  color: var(--color-primary-on-tint);
+  cursor: pointer;
+}
+.kd-cblocks__addbtn:hover { border-color: var(--color-primary); }
+.kd-cblocks__addbtn svg { width: 15px; height: 15px; }
+
+.kd-cblock {
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  background: var(--color-surface-raised);
+  overflow: hidden;
+  transition: border-color .12s, box-shadow .12s;
+}
+.kd-cblock--active { border-color: var(--color-primary); box-shadow: var(--shadow-accent); }
+.kd-cblock__head {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-4);
+  padding: var(--kd-space-4) var(--kd-space-5);
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--color-surface);
+}
+.kd-cblock__form {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-4);
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+.kd-cblock__dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: var(--kd-radius-full);
+  background: var(--color-primary);
+}
+.kd-cblock__role {
+  flex: none;
+  width: auto;
+  /* Assez de place à droite pour la flèche du <select> (héritée de .kd-select :
+     posée à 12px du bord, 16px de large) : sinon le libellé « Corps de séance »
+     passe sous la flèche et paraît tronqué. min-width évite tout écrasement. */
+  min-width: fit-content;
+  padding: var(--kd-space-1) var(--kd-space-10) var(--kd-space-1) var(--kd-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--kd-radius-sm);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--color-text-strong);
+  cursor: pointer;
+}
+.kd-cblock__role:hover { border-color: var(--color-border-strong); }
+.kd-cblock__label {
+  flex: 1;
+  min-width: 0;
+  padding: var(--kd-space-1) var(--kd-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--kd-radius-sm);
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text-secondary);
+}
+.kd-cblock__label:hover { border-color: var(--color-border-strong); }
+.kd-cblock__label:focus { outline: none; border-color: var(--color-primary); background: var(--color-surface-raised); }
+.kd-cblock__rounds {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  padding: 3px var(--kd-space-2);
+  border-radius: var(--kd-radius-pill);
+  background: var(--color-primary-tint);
+  color: var(--color-primary-on-tint);
+}
+.kd-cblock__rounds svg { width: 13px; height: 13px; }
+.kd-cblock__step {
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: var(--kd-radius-full);
+  background: var(--color-surface-raised);
+  color: var(--color-primary-on-tint);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.kd-cblock__roundsval {
+  width: 30px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-primary-on-tint);
+  -moz-appearance: textfield;
+}
+.kd-cblock__roundsval::-webkit-outer-spin-button,
+.kd-cblock__roundsval::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.kd-cblock__roundslabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+}
+.kd-cblock__actions { flex: none; display: flex; align-items: center; gap: var(--kd-space-1); }
+.kd-cblock__actions form { display: inline-flex; margin: 0; }
+
+.kd-cblock__items { padding: var(--kd-space-3) var(--kd-space-4); display: flex; flex-direction: column; gap: var(--kd-space-2); }
+.kd-cblock__drop {
+  margin: var(--kd-space-1);
+  padding: var(--kd-space-7);
+  border: 1.5px dashed var(--color-border-strong);
+  border-radius: var(--kd-radius-lg);
+  text-align: center;
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--color-text-placeholder);
+}
+
+/* ---- Ligne d'exercice ---- */
+.kd-cexo {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--kd-radius-lg);
+  background: var(--color-surface-raised);
+}
+.kd-cexo--open { border-color: var(--color-border-strong); }
+
+/* Retour visuel SortableJS (glisser-déposer). ghost = emplacement de dépôt,
+   chosen = élément saisi, active = clone qui suit le curseur. Appliqué aux
+   lignes d'exercices comme aux cartes de bibliothèque. */
+.kd-drag-ghost {
+  border: 1px dashed var(--color-primary) !important;
+  background: var(--color-primary-tint) !important;
+}
+.kd-drag-ghost > * { visibility: hidden; }
+.kd-drag-chosen { cursor: grabbing; }
+.kd-drag-active {
+  box-shadow: var(--shadow-raised, 0 6px 16px rgba(0, 0, 0, .18));
+  opacity: .96;
+}
+.kd-cexo__handle:active { cursor: grabbing; }
+.kd-cexo__row { display: flex; align-items: center; gap: var(--kd-space-4); padding: var(--kd-space-3) var(--kd-space-4); }
+.kd-cexo__handle { flex: none; display: flex; color: var(--color-ink-outside, var(--color-text-placeholder)); cursor: grab; }
+.kd-cexo__handle svg { width: 15px; height: 15px; }
+.kd-cexo__code {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--kd-radius-sm);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-bold);
+  background: var(--color-fill);
+  color: var(--color-text-secondary);
+}
+.kd-cexo__code--run { background: var(--color-activity-run-tint); color: var(--color-activity-run); }
+.kd-cexo__code--gym { background: var(--color-activity-gym-tint); color: var(--color-activity-gym); }
+.kd-cexo__body { flex: 1; min-width: 0; }
+.kd-cexo__name {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--color-text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-cexo__type { font-family: var(--font-mono); font-size: 10px; color: var(--color-text-faint); margin-top: 2px; }
+.kd-cexo__pill {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-strong);
+  background: var(--color-fill);
+  padding: var(--kd-space-2) var(--kd-space-4);
+  border-radius: var(--kd-radius-sm);
+  white-space: nowrap;
+}
+.kd-cexo__btn {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--kd-radius-sm);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.kd-cexo__btn:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.kd-cexo__btn svg { width: 15px; height: 15px; }
+.kd-cexo__row .kd-microactions,
+.kd-cexo__row form { margin: 0; }
+
+.kd-cexo__params {
+  padding: var(--kd-space-5);
+  border-top: 1px solid var(--color-divider-soft);
+  background: var(--color-surface);
+}
+.kd-cexo__params .kd-form { gap: var(--kd-space-5); }
+.kd-cexo__reorder { display: flex; gap: var(--kd-space-2); margin-top: var(--kd-space-4); }
+.kd-cexo__reorder form { display: inline-flex; margin: 0; }
+
+/* ---- Responsive : les deux volets s'empilent ---- */
+@media (max-width: 900px) {
+  .kd-composer__body { flex-direction: column; }
+  .kd-composer__lib { width: auto; border-right: none; border-bottom: 1px solid var(--color-border); }
+  .kd-libpanel__list { max-height: 360px; }
+}
+
+/* ============================================================================
+   Éditeur de trame — glisser-déposer des séances + édition rapide (mini-modale)
+   ========================================================================== */
+
+/* Astuce d'usage sous le titre de section */
+.kd-editsection__hint {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--color-text-soft);
+  margin: 0 0 var(--kd-space-6);
+  max-width: 60ch;
+}
+
+/* Bouton « Dupliquer sur S{n+1} » poussé à droite de l'en-tête de semaine */
+.kd-planweek__tools {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.kd-planweek__copy { margin: 0; display: inline-flex; align-items: center; gap: var(--kd-space-2); }
+.kd-planweek__copy form,
+.kd-planweek__tools form { margin: 0; display: inline-flex; align-items: center; gap: var(--kd-space-2); }
+.kd-planweek__select {
+  font-family: var(--font-body);
+  font-size: 12px;
+  padding: 3px var(--kd-space-3);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--kd-radius-sm);
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+.kd-planweek__add { margin: var(--kd-space-6) 0 0; display: flex; justify-content: center; }
+
+/* Charge de la semaine ventilée par activité (chips + détail dépliable). */
+.kd-weekvol {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-3);
+  margin-bottom: var(--kd-space-6);
+}
+.kd-weekvol__sessions {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+.kd-weekvol__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px var(--kd-space-3);
+  border-radius: var(--kd-radius-pill);
+  background: var(--color-fill);
+  color: var(--color-text-secondary);
+}
+.kd-weekvol__chip svg { width: 12px; height: 12px; }
+.kd-weekvol__chip--run { background: var(--color-activity-run-tint); color: var(--color-activity-run-text); }
+.kd-weekvol__chip--gym { background: var(--color-activity-gym-tint); color: var(--color-activity-gym-text); }
+.kd-weekvol__detail { flex-basis: 100%; font-family: var(--font-body); font-size: 12px; }
+.kd-weekvol__detail > summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+.kd-weekvol__areas {
+  list-style: none;
+  margin: var(--kd-space-3) 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 2px var(--kd-space-6);
+}
+.kd-weekvol__areas li { display: flex; justify-content: space-between; gap: var(--kd-space-3); color: var(--color-text-secondary); }
+.kd-weekvol__areas li span { font-family: var(--font-mono); color: var(--color-text-faint); }
+.kd-weekvol__tonnage { margin: var(--kd-space-3) 0 0; font-size: 11px; color: var(--color-text-faint); }
+
+/* Case = zone de dépôt : garde une hauteur minimale même vide pour accepter un drop */
+.kd-planday__items { min-height: 26px; }
+
+/* Séance placée : poignée + titre cliquable (ouvre le compositeur) + méta */
+.kd-planentry { cursor: default; }
+.kd-planitem__handle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-text-placeholder);
+  cursor: grab;
+}
+.kd-planitem__handle:active { cursor: grabbing; }
+.kd-planitem__handle svg { width: 13px; height: 13px; }
+.kd-planitem__link {
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  /* Colonne : le titre garde toute la largeur de la carte (sinon, en case étroite,
+     la durée à largeur fixe l'écrase jusqu'à le faire disparaître). */
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  overflow: hidden;
+}
+.kd-planitem__title {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-planitem__meta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-faint);
+}
+.kd-planitem__meta { flex-wrap: wrap; }
+.kd-planitem__meta span { display: inline-flex; align-items: center; gap: 2px; }
+.kd-planitem__meta svg { width: 11px; height: 11px; }
+.kd-planitem__delform { display: inline-flex; margin: 0; }
+
+/* Aperçu de séance au survol d'une case — promu en top-layer (popover), donc non
+   rogné par l'overflow de la grille. Positionné par le contrôleur plangrid. */
+.kd-planpreview { display: none; }
+.kd-planpreview:popover-open {
+  display: block;
+  position: fixed;
+  inset: auto;                 /* neutralise le centrage UA du popover */
+  margin: 0;
+  width: min(300px, calc(100vw - 2 * var(--kd-space-6)));
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: var(--kd-space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-pop, var(--shadow-card));
+}
+.kd-planpreview__title {
+  margin: 0 0 var(--kd-space-3);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 13px;
+  color: var(--color-text-strong);
+}
+.kd-planpreview__block { margin-top: var(--kd-space-3); }
+.kd-planpreview__blockname {
+  margin: 0 0 2px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--kd-tracking-eyebrow-lg);
+  color: var(--color-text-faint);
+}
+.kd-planpreview__exos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.kd-planpreview__exos li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--kd-space-4);
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.kd-planpreview__exoname { min-width: 0; }
+.kd-planpreview__sum { flex: 0 0 auto; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-faint); }
+.kd-planpreview__empty { margin: 2px 0 0; font-size: 12px; color: var(--color-text-placeholder); }
+
+/* ----------------------------------------------------------------------------
+   Édition en ligne « semi-invisible » (contrôleur inline-edit)
+   Le texte a l'air normal au repos ; un liseré discret apparaît au survol, un
+   champ bordé au focus. Utilisé pour le titre/description du plan et les notes
+   de case.
+   ---------------------------------------------------------------------------- */
+.kd-inlineedit { cursor: text; border-radius: var(--kd-radius-sm); }
+.kd-inlineedit:hover { box-shadow: inset 0 0 0 1px var(--color-border-strong); }
+.kd-inlineedit--empty { color: var(--color-text-placeholder); font-style: italic; }
+.kd-inlineedit--desc { white-space: pre-wrap; }
+.kd-inlineedit--note { white-space: pre-wrap; }
+.kd-inlineedit__input {
+  font: inherit;
+  color: inherit;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 2px 4px;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--kd-radius-sm);
+  background: var(--color-surface-raised);
+  outline: none;
+}
+textarea.kd-inlineedit__input { min-height: 3.2em; resize: vertical; }
+.kd-metafallback > summary {
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+/* ----------------------------------------------------------------------------
+   Mini-modale d'édition rapide (éditeur de plan)
+   Le panneau (#quick-panel) liste les exercices de la copie locale avec leurs
+   paramètres éditables. Chrome resserré + corps défilable ; le lien « Édition
+   complète » renvoie au compositeur. Couleur neutre (trame multi-activités).
+   ---------------------------------------------------------------------------- */
+.kd-modal--quick { width: min(560px, calc(100vw - 2 * var(--kd-space-6))); }
+.kd-modal__card--quick {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: min(88vh, 820px);
+}
+.kd-modal__card--quick .kd-modal__head {
+  margin: 0;
+  align-items: center;
+  padding: var(--kd-space-5) var(--kd-space-6);
+  border-bottom: 1px solid var(--color-divider);
+}
+.kd-modal__card--quick .kd-modal__title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  font-size: 15px;
+}
+.kd-modal__card--quick .kd-modal__title svg { width: 16px; height: 16px; color: var(--color-primary); }
+.kd-modal__headactions { flex: none; display: inline-flex; align-items: center; gap: var(--kd-space-3); }
+
+/* Corps défilable */
+.kd-quickedit {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--kd-space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-6);
+}
+.kd-quickedit__loading,
+.kd-quickedit__error,
+.kd-quickedit__empty {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--color-text-faint);
+  margin: 0;
+}
+.kd-quickedit__empty svg { width: 18px; height: 18px; }
+
+/* Un bloc dans le panneau rapide */
+.kd-quickblock { display: flex; flex-direction: column; gap: var(--kd-space-3); }
+.kd-quickblock__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kd-space-4);
+}
+.kd-quickblock__role {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-quickblock__rounds {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+.kd-quickblock__rounds svg { width: 12px; height: 12px; }
+.kd-quickblock__empty {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--color-text-placeholder);
+  margin: 0;
+  padding-left: var(--kd-space-2);
+}
+
+/* Un exercice : ligne repliable, le formulaire de paramètres se déplie */
+.kd-quickexo {
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-md);
+  background: var(--color-surface);
+  overflow: hidden;
+}
+.kd-quickexo[open] { border-color: var(--color-border-strong); }
+.kd-quickexo__sum {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-4);
+  padding: var(--kd-space-3) var(--kd-space-4);
+  cursor: pointer;
+  list-style: none;
+}
+.kd-quickexo__sum::-webkit-details-marker { display: none; }
+.kd-quickexo__name {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-quickexo__chevron { flex: none; display: flex; color: var(--color-text-faint); transition: transform .15s ease; }
+.kd-quickexo__chevron svg { width: 15px; height: 15px; }
+.kd-quickexo[open] .kd-quickexo__chevron { transform: rotate(180deg); }
+.kd-quickexo__form {
+  padding: var(--kd-space-4) var(--kd-space-4) var(--kd-space-5);
+  border-top: 1px solid var(--color-divider);
+}
+
+/* ============================================================================
+   Ajout au calendrier : « + » par jour + modales de sélection (poser une séance /
+   instancier un plan). Remplacent les anciens dropdowns de la barre d'ajout.
+   ============================================================================ */
+
+/* Bouton « + » d'un jour (grille mois) : poussé en bas de la case, révélé au
+   survol / focus. Sur pointeur grossier (tactile), toujours visible en atténué. */
+.kd-calday__add {
+  margin-top: auto;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--kd-radius-sm);
+  background: transparent;
+  color: var(--color-text-placeholder);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity .12s ease, color .12s ease, border-color .12s ease, background-color .12s ease;
+}
+.kd-calday:hover .kd-calday__add,
+.kd-calday__add:focus-visible { opacity: 1; }
+.kd-calday__add:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: var(--color-primary-tint);
+}
+.kd-calday__add svg { width: 15px; height: 15px; }
+@media (hover: none) {
+  .kd-calday__add { opacity: .55; }
+}
+
+/* Variante vue semaine : « + » compact dans l'en-tête du jour, à côté du numéro. */
+.kd-weekday__right { display: inline-flex; align-items: center; gap: var(--kd-space-3); }
+.kd-calday__add--week {
+  margin-top: 0;
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  opacity: 0;
+}
+.kd-weekday:hover .kd-calday__add--week,
+.kd-calday__add--week:focus-visible { opacity: 1; }
+@media (hover: none) {
+  .kd-calday__add--week { opacity: .55; }
+}
+
+/* Modale de sélection (cartes) — plus large que la modale d'édition standard,
+   corps = outils (recherche + tri) + filtres + liste de cartes défilable. */
+.kd-modal--picker { width: min(560px, calc(100vw - 2 * var(--kd-space-6))); }
+.kd-modal__card--picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-5);
+  max-height: min(80vh, 720px);
+  padding: var(--kd-space-8) var(--kd-space-8) var(--kd-space-7);
+}
+.kd-modal__card--picker .kd-modal__head { margin-bottom: 0; }
+.kd-picker__date::first-letter { text-transform: uppercase; }
+
+/* Ligne d'outils : recherche extensible + tri compact. */
+.kd-picker__tools { display: flex; align-items: center; gap: var(--kd-space-4); }
+.kd-picker__tools .kd-libsearch { flex: 1; margin-top: 0; }
+.kd-picker__sort { flex: 0 0 auto; width: auto; font-size: 12px; }
+
+/* La liste de cartes occupe l'espace restant et défile. */
+.kd-picker { display: flex; flex-direction: column; gap: var(--kd-space-5); min-height: 0; flex: 1; }
+.kd-picker__list {
+  flex: 1;
+  min-height: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-3);
+  padding-right: var(--kd-space-2);
+}
+.kd-picker__hidden { display: none; }
+
+/* Carte-bouton : réinitialise l'apparence bouton, garde le look .kd-palettecard. */
+.kd-palettecard--btn {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.kd-palettecard--btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+.kd-palettecard--btn .kd-libx__body { display: flex; flex-direction: column; }
+.kd-palettecard--btn .kd-palettecard__meta { display: flex; }
+.kd-palettecard--btn .kd-cellbadges { display: inline-flex; }
+
+/* Pied de la modale plan : date de départ + bouton « Instancier ». */
+.kd-picker__foot {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--kd-space-4);
+  flex-wrap: wrap;
+  padding-top: var(--kd-space-5);
+  border-top: 1px solid var(--color-divider);
+}
+.kd-picker__foot .kd-field { flex: 1 1 160px; margin: 0; }
+
+/* ----------------------------------------------------------------------------
+   Profil — tuiles de volume, en-têtes de groupe, fieldsets d'édition
+   ---------------------------------------------------------------------------- */
+
+/* Tuiles de volume réalisé (tonnage, distances). */
+.kd-profile__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--kd-space-5);
+}
+.kd-profile__tile {
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-md);
+  padding: var(--kd-space-6);
+}
+.kd-profile__tileicon {
+  display: inline-flex;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--kd-space-3);
+}
+.kd-profile__tileicon svg { width: 18px; height: 18px; }
+
+/* En-tête de groupe de fiche : icône + libellé alignés. */
+.kd-profile__grouphead {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+}
+.kd-profile__grouphead svg { width: 16px; height: 16px; color: var(--color-text-secondary); }
+
+/* Fieldsets de l'éditeur de fiche (regroupement identité / force / endurance). */
+.kd-profile__fieldset {
+  border: 0;
+  border-top: 1px solid var(--color-divider);
+  padding: var(--kd-space-7) 0 0;
+  margin: var(--kd-space-7) 0 0;
+}
+.kd-profile__fieldset:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+  margin-top: 0;
+}
+.kd-profile__legend {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 14px;
+  color: var(--color-text-strong);
+  padding: 0;
+  margin-bottom: var(--kd-space-5);
+}
+.kd-profile__legend svg { width: 16px; height: 16px; color: var(--color-text-secondary); }
+
+/* ── Abonnement calendrier (ICS) ─────────────────────────────────────────────
+   Modale « S'abonner » : lien(s) de flux à copier + aide + régénération.
+   Réutilise .kd-modal*/.kd-input/.kd-btn ; couleur d'alerte = terracotta
+   (convention « action à mener »). */
+.kd-subscribe { display: inline-flex; }
+
+.kd-feed { display: flex; flex-direction: column; gap: var(--kd-space-7); }
+
+.kd-feed__intro { display: flex; flex-direction: column; gap: var(--kd-space-6); }
+.kd-feed__intro p { color: var(--color-text-secondary); line-height: 1.5; }
+
+.kd-feedrow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-3);
+  padding: var(--kd-space-6);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+}
+.kd-feedrow__label { font-weight: 600; color: var(--color-text-strong); }
+.kd-feedrow__url { display: flex; flex-wrap: wrap; gap: var(--kd-space-3); align-items: center; }
+.kd-feedrow__url .kd-input { flex: 1 1 12rem; min-width: 0; font-family: var(--font-mono); font-size: 0.8rem; }
+.kd-feedrow__feedback { min-height: 1em; font-size: 0.8rem; color: var(--color-primary); }
+.kd-feedrow__feedback:empty { display: none; }
+
+.kd-feed__help {
+  padding: var(--kd-space-6);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: var(--kd-radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-4);
+}
+.kd-feed__helptitle { font-weight: 600; color: var(--color-text-strong); }
+.kd-feed__help p { color: var(--color-text-secondary); line-height: 1.5; font-size: 0.9rem; }
+.kd-feed__warn {
+  display: flex;
+  gap: var(--kd-space-3);
+  align-items: flex-start;
+  color: var(--color-primary);
+}
+.kd-feed__warn svg { flex: none; width: 18px; height: 18px; margin-top: 1px; }
+
+.kd-feed__regen { display: flex; justify-content: flex-end; }

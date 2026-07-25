@@ -1,0 +1,71 @@
+{# Palette de séances (volet gauche de l'éditeur de trame). Purement client pour
+   la recherche/filtre (offline-safe, contrôleur `plangrid`). Poser une séance :
+   cliquer la carte pour l'ARMER puis cliquer les cases (mode tampon), ou glisser
+   la carte dans une case. Repli sans JS : le <details> « Séance » par case.
+   Contexte : paletteCards (chaque : workout, activities, exerciseCount, filterText),
+   paletteCount, paletteActivities, template. #}
+{% import 'components/_activity.html.twig' as activity %}
+
+<div class="kd-libpanel kd-palette"
+     data-plangrid-target="palette"
+     data-place-url="{{ path('app_plan_template_item_place', {id: template.id}) }}"
+     data-place-token="{{ csrf_token('plan_place' ~ template.id) }}">
+    <div class="kd-libpanel__head">
+        <div class="kd-libpanel__title">
+            <span>Séances</span>
+            <span class="kd-libpanel__count">{{ paletteCount }}</span>
+        </div>
+
+        <div class="kd-libsearch">
+            {{ ux_icon('lucide:search') }}
+            <input type="search" placeholder="Rechercher une séance…"
+                   data-action="input->plangrid#filterLib">
+        </div>
+
+        <div class="kd-libfilters">
+            <button type="button" class="kd-libfilter kd-libfilter--on"
+                    data-activity-pill data-activity="all"
+                    data-action="plangrid#pickActivity">Tous · {{ paletteCount }}</button>
+            {% for act in paletteActivities %}
+                <button type="button" class="kd-libfilter"
+                        data-activity-pill data-activity="{{ act.value }}"
+                        data-action="plangrid#pickActivity">{{ act.label }} · {{ act.count }}</button>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="kd-libpanel__list" data-plangrid-target="paletteList">
+        {% for card in paletteCards %}
+            {% set w = card.workout %}
+            <div class="kd-palettecard"
+                 data-plangrid-target="palettecard"
+                 data-workout-id="{{ w.id }}"
+                 data-activity="{% for a in card.activities %}{{ a.value }}{{ not loop.last ? ' ' }}{% endfor %}"
+                 data-filter-text="{{ card.filterText }}"
+                 data-action="click->plangrid#armWorkout">
+                <span class="kd-libx__code">{{ w.title|slice(0, 2)|upper }}</span>
+                <div class="kd-libx__body">
+                    <div class="kd-libx__name">{{ w.title }}</div>
+                    <div class="kd-palettecard__meta">
+                        {% if w.estimatedDurationMinutes %}
+                            <span>{{ ux_icon('lucide:clock') }} {{ w.estimatedDurationMinutes }} min</span>
+                        {% endif %}
+                        <span>{{ card.exerciseCount }} exos</span>
+                    </div>
+                    {% if card.activities %}
+                        <div class="kd-cellbadges">
+                            {% for a in card.activities %}{{ activity.badge(a, false) }}{% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        {% else %}
+            <p class="kd-libpanel__empty">Aucune séance en bibliothèque. Crée-en une d'abord.</p>
+        {% endfor %}
+    </div>
+
+    <p class="kd-libpanel__hint">
+        Clique une séance pour l'<strong>armer</strong>, puis clique les cases pour la poser.
+        Ou glisse-la dans une case.
+    </p>
+</div>
