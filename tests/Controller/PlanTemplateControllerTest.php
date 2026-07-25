@@ -123,7 +123,11 @@ final class PlanTemplateControllerTest extends WebTestCase
         $copiedItem = $copy->getPlanItems()->first();
         self::assertSame(2, $copiedItem->getWeekNumber());
         self::assertSame(5, $copiedItem->getDayOfWeek());
-        self::assertSame($workout->getId(), $copiedItem->getWorkout()->getId());
+        // Duplication de plan = plans indépendants : la case porte une COPIE clonée
+        // (planLocal), pas la même séance, pour que les progressions ne se partagent pas.
+        self::assertNotSame($workout->getId(), $copiedItem->getWorkout()->getId());
+        self::assertSame('Sortie longue', $copiedItem->getWorkout()->getTitle());
+        self::assertTrue($copiedItem->getWorkout()->isPlanLocal());
         self::assertResponseRedirects('/plan-template/'.$copy->getId().'/edit');
     }
 

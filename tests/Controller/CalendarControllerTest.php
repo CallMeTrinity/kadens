@@ -2,6 +2,7 @@
 
 namespace App\Tests\Controller;
 
+use App\Entity\Exercise;
 use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
@@ -31,6 +32,11 @@ final class CalendarControllerTest extends WebTestCase
         }
         foreach ($this->em->getRepository(Workout::class)->findAll() as $workout) {
             $this->em->remove($workout);
+        }
+        // Purge FK-safe : les exercices (laissés par d'autres classes de test)
+        // référencent user ; les supprimer avant de retirer les utilisateurs.
+        foreach ($this->em->getRepository(Exercise::class)->findAll() as $exercise) {
+            $this->em->remove($exercise);
         }
         foreach ($this->em->getRepository(User::class)->findAll() as $user) {
             $this->em->remove($user);
@@ -65,11 +71,16 @@ final class CalendarControllerTest extends WebTestCase
         $workout = $this->createWorkout($user, 'Fractionné');
 
         $this->client->loginUser($user);
-        $this->client->request('GET', '/calendar/2026/3');
+        $crawler = $this->client->request('GET', '/calendar/2026/3');
 
-        $this->client->submitForm('Planifier', [
-            'schedule_workout[workout]' => $workout->getId(),
-            'schedule_workout[scheduledDate]' => '2026-03-10',
+        // Poser une séance passe désormais par l'endpoint `place` (carte-bouton de la
+        // modale) : plus de ScheduleWorkoutType. On rejoue ce POST directement, avec
+        // le jeton CSRF rendu dans le formulaire de la modale.
+        $token = $crawler->filter('form[action$="/schedule/place"] input[name="_token"]')->attr('value');
+        $this->client->request('POST', '/schedule/place', [
+            '_token' => $token,
+            'workoutId' => $workout->getId(),
+            'date' => '2026-03-10',
         ]);
 
         $this->em->clear();
@@ -94,13 +105,15 @@ final class CalendarControllerTest extends WebTestCase
         $this->em->flush();
 
         $this->client->loginUser($user);
-        $this->client->request('GET', '/calendar/2026/1');
+        $crawler = $this->client->request('GET', '/calendar/2026/1');
 
+        // Le bouton « Instancier » est désactivé tant qu'aucune carte de plan n'est
+        // choisie (piloté par JS) : on soumet le formulaire de la modale directement.
         // 2026-01-07 est un mercredi -> ancre lundi 2026-01-05, item tombe le 07.
-        $this->client->submitForm('Instancier', [
-            'plan_instantiation[planTemplate]' => $template->getId(),
-            'plan_instantiation[startDate]' => '2026-01-07',
-        ]);
+        $form = $crawler->filter('form[action$="/schedule/plan"]')->form();
+        $form['plan_instantiation[planTemplate]'] = (string) $template->getId();
+        $form['plan_instantiation[startDate]'] = '2026-01-07';
+        $this->client->submit($form);
 
         $this->em->clear();
         $scheduled = $this->em->getRepository(ScheduledWorkout::class)->findAll();

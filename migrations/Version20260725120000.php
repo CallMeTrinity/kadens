@@ -20,12 +20,12 @@ final class Version20260725120000 extends AbstractMigration
     public function up(Schema $schema): void
     {
         $this->addSql('ALTER TABLE user ADD calendar_feed_token VARCHAR(64) DEFAULT NULL');
-        $this->addSql('CREATE UNIQUE INDEX UNIQ_CALENDAR_FEED_TOKEN ON user (calendar_feed_token)');
+        $this->addSql('CREATE UNIQUE INDEX UNIQ_8D93D6493CF23682 ON user (calendar_feed_token)');
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql('DROP INDEX UNIQ_CALENDAR_FEED_TOKEN ON user');
+        $this->addSql('DROP INDEX UNIQ_8D93D6493CF23682 ON user');
         $this->addSql('ALTER TABLE user DROP calendar_feed_token');
     }
 }

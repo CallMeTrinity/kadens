@@ -98,15 +98,17 @@ final class WorkoutControllerTest extends WebTestCase
         self::assertSame(PrescriptionType::SETS_REPS, $prescribed->getPrescriptionType());
         $prescribedId = $prescribed->getId();
 
-        // Affinage inline (panneau paramètres) ; on renseigne aussi distanceMeters
-        // (hors sous-ensemble) pour vérifier qu'il est annulé côté serveur.
-        $this->client->request('GET', '/workout/'.$workout->getId().'/edit');
-        $this->client->submitForm('Enregistrer l\'exercice', [
-            'prescribed_'.$prescribedId.'[sets]' => '4',
-            'prescribed_'.$prescribedId.'[reps]' => '8',
-            'prescribed_'.$prescribedId.'[weightKg]' => '60',
-            'prescribed_'.$prescribedId.'[distanceMeters]' => '999',
-        ]);
+        // Affinage inline (panneau paramètres). Le compositeur auto-enregistre : le
+        // bouton « Enregistrer l'exercice » n'existe plus, on soumet le formulaire
+        // prescrit directement. On renseigne aussi distanceMeters (hors sous-ensemble)
+        // pour vérifier qu'il est annulé côté serveur.
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId().'/edit');
+        $form = $crawler->filter('form[name="prescribed_'.$prescribedId.'"]')->form();
+        $form['prescribed_'.$prescribedId.'[sets]'] = '4';
+        $form['prescribed_'.$prescribedId.'[reps]'] = '8';
+        $form['prescribed_'.$prescribedId.'[weightKg]'] = '60';
+        $form['prescribed_'.$prescribedId.'[distanceMeters]'] = '999';
+        $this->client->submit($form);
 
         $this->em->clear();
         $prescribed = $this->em->getRepository(PrescribedExercise::class)->findOneBy([]);
