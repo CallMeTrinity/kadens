@@ -1,0 +1,30 @@
+{# Ligne de résumé d'un exercice prescrit dans le compositeur (code, nom, type,
+   pastille de résumé, bouton paramètres, retrait). Adressable par id : une
+   édition de paramètres ne re-rend QUE cette ligne (stream ciblé), pas tout
+   #workout-blocks, pour ne pas refermer le panneau de params ni perdre le focus.
+   Paramètres : workout, prescribed, summary (chaîne, défaut ''). #}
+{% import 'components/_activity.html.twig' as activity %}
+{% set ex = prescribed.exercise %}
+{% set mod = ex ? activity.modifier(ex.activity) : '' %}
+{% set summary = summary|default('') %}
+<div class="kd-cexo__row" id="cexo-row-{{ prescribed.id }}">
+    <span class="kd-cexo__handle" title="Glisser pour réordonner">{{ ux_icon('lucide:grip-vertical') }}</span>
+    <span class="kd-cexo__code{{ mod ? ' kd-cexo__code--' ~ mod }}">{{ ex ? ex.name|slice(0, 2)|upper : '??' }}</span>
+    <div class="kd-cexo__body">
+        <div class="kd-cexo__name">{{ ex ? ex.name : 'Exercice supprimé' }}</div>
+        <div class="kd-cexo__type">{{ prescribed.prescriptionType ? prescribed.prescriptionType.label }}</div>
+    </div>
+    {% if summary is not empty %}
+        <span class="kd-cexo__pill">{{ summary }}</span>
+    {% endif %}
+    <button type="button" class="kd-cexo__btn" data-action="composer#toggleParams" title="Paramètres" aria-label="Paramètres">
+        {{ ux_icon('lucide:sliders-horizontal') }}
+    </button>
+    {{ include('workout/_action_form.html.twig', {
+        action: path('app_workout_prescribed_delete', {id: workout.id, prescribedId: prescribed.id}),
+        token: csrf_token('prescribed_delete' ~ prescribed.id),
+        icon: 'lucide:x',
+        variant: 'danger',
+        label: 'Retirer l\'exercice'
+    }) }}
+</div>

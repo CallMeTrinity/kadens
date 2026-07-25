@@ -2,7 +2,6 @@
    déplacer, supprimer) puis les exercices en lignes compactes. Le corps du bloc
    est une zone de dépôt (glisser depuis la bibliothèque ou réordonner une ligne).
    Contexte hérité : workout, blockForms, prescribedForms, summaries. #}
-{% import 'components/_activity.html.twig' as activity %}
 {% set blockForm = blockForms[block.id] %}
 
 <article class="kd-cblock"
@@ -64,33 +63,14 @@
            ne s'appliquant qu'au load DB. On mirroir donc l'ordre « position ASC » ici,
            sinon le re-render du stream montre l'ordre périmé (correct au rechargement). #}
         {% for prescribed in block.prescribedExercises|sort((a, b) => a.position <=> b.position) %}
-            {% set ex = prescribed.exercise %}
-            {% set mod = ex ? activity.modifier(ex.activity) : '' %}
             <div class="kd-cexo"
                  data-composer-target="exo"
                  data-prescribed-id="{{ prescribed.id }}"
                  data-block-id="{{ block.id }}">
-                <div class="kd-cexo__row">
-                    <span class="kd-cexo__handle" title="Glisser pour réordonner">{{ ux_icon('lucide:grip-vertical') }}</span>
-                    <span class="kd-cexo__code{{ mod ? ' kd-cexo__code--' ~ mod }}">{{ ex ? ex.name|slice(0, 2)|upper : '??' }}</span>
-                    <div class="kd-cexo__body">
-                        <div class="kd-cexo__name">{{ ex ? ex.name : 'Exercice supprimé' }}</div>
-                        <div class="kd-cexo__type">{{ prescribed.prescriptionType ? prescribed.prescriptionType.label }}</div>
-                    </div>
-                    {% if summaries[prescribed.id]|default('') is not empty %}
-                        <span class="kd-cexo__pill">{{ summaries[prescribed.id] }}</span>
-                    {% endif %}
-                    <button type="button" class="kd-cexo__btn" data-action="composer#toggleParams" title="Paramètres" aria-label="Paramètres">
-                        {{ ux_icon('lucide:sliders-horizontal') }}
-                    </button>
-                    {{ include('workout/_action_form.html.twig', {
-                        action: path('app_workout_prescribed_delete', {id: workout.id, prescribedId: prescribed.id}),
-                        token: csrf_token('prescribed_delete' ~ prescribed.id),
-                        icon: 'lucide:x',
-                        variant: 'danger',
-                        label: 'Retirer l\'exercice'
-                    }) }}
-                </div>
+                {{ include('workout/_cexo_row.html.twig', {
+                    prescribed: prescribed,
+                    summary: summaries[prescribed.id]|default('')
+                }) }}
 
                 <div class="kd-cexo__params" hidden>
                     {{ include('workout/_prescribed_form.html.twig', {

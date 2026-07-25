@@ -62,11 +62,14 @@ export default class extends Controller {
      * section). On envoie la requête en `fetch` (format stream) et on applique le flux
      * renvoyé, sans recharger.
      *
-     * L'enregistrement des paramètres d'un exercice est automatique (sur `change`) :
-     * comme le stream re-rend tout #workout-blocks, le panneau de params se referme et
-     * le focus est perdu. On mémorise donc le champ actif (nom unique par formulaire
-     * nommé) avant l'envoi, puis on ré-ouvre son panneau et lui rend le focus après le
-     * re-render.
+     * L'enregistrement des paramètres d'un exercice est automatique (sur `change`).
+     * Ces formulaires vivent dans `.kd-cexo__params` : le serveur renvoie alors un
+     * stream CIBLÉ qui ne remplace que la ligne de résumé de l'exercice, pas tout
+     * #workout-blocks. Le formulaire reste donc intact — panneau ouvert, curseur en
+     * place — et on ne touche PAS au focus (sinon on déplacerait le curseur du
+     * champ suivant que l'utilisateur est en train de remplir). Pour les AUTRES
+     * mutations (bloc, ajout, réordonnancement…), #workout-blocks est reconstruit :
+     * on mémorise le champ actif pour le lui rendre après le re-render.
      */
     async onSubmit(event) {
         const form = event.target;
@@ -74,8 +77,10 @@ export default class extends Controller {
 
         event.preventDefault();
 
+        const isParamSave = form.closest('.kd-cexo__params') !== null;
+
         const active = document.activeElement;
-        const activeName = active && active.name ? active.name : null;
+        const activeName = !isParamSave && active && active.name ? active.name : null;
         const caret = active && typeof active.selectionStart === 'number' ? active.selectionStart : null;
 
         try {
@@ -85,13 +90,13 @@ export default class extends Controller {
                 headers: { Accept: 'text/vnd.turbo-stream.html' },
                 credentials: 'same-origin',
             });
-            const html = await response.text();
-            renderStreamMessage(html);
-            this.restoreFocus(activeName, caret);
+            renderStreamMessage(await response.text());
+            if (!isParamSave) this.restoreFocus(activeName, caret);
         } catch (error) {
-            // Repli : en cas d'échec réseau, on recharge la page d'édition.
             console.error('Composer submit failed:', error);
-            window.location.reload();
+            // Sur un save de paramètre, ne PAS recharger : ça effacerait la saisie
+            // en cours. On recharge seulement pour les mutations structurelles.
+            if (!isParamSave) window.location.reload();
         }
     }
 

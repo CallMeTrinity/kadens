@@ -376,10 +376,26 @@ final class WorkoutController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $this->clearIrrelevantFields($prescribed);
+            // La durée estimée dérive du contenu : on la recalcule à chaque save.
+            $workout->setEstimatedDurationMinutes($this->estimator->estimateMinutes($workout));
             $this->entityManager->flush();
         }
 
-        return $this->blocksResponse($request, $workout);
+        // Enregistrement silencieux : on ne re-rend QUE la ligne de résumé de cet
+        // exercice (pastille + type), pas tout #workout-blocks. Le panneau de
+        // paramètres (le formulaire en cours de saisie) reste intact et ouvert,
+        // le focus n'est pas perturbé. Sans JS : repli par redirection.
+        if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
+            $request->setRequestFormat(TurboBundle::STREAM_FORMAT);
+
+            return $this->render('workout/stream/prescribed_row.stream.html.twig', [
+                'workout' => $workout,
+                'prescribed' => $prescribed,
+                'summary' => $this->prescribedSummaries($workout)[$prescribed->getId()] ?? '',
+            ]);
+        }
+
+        return $this->redirectToRoute('app_workout_edit', ['id' => $workout->getId()]);
     }
 
     // ---- Édition rapide (mini-modale de l'éditeur de plan) ------------------
