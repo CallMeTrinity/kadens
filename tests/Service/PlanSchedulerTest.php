@@ -7,11 +7,12 @@ use App\Entity\PlanTemplate;
 use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ScheduledStatus;
-use App\Service\PlanInstantiator;
+use App\Repository\ScheduledWorkoutRepository;
+use App\Service\PlanScheduler;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 
-final class PlanInstantiatorTest extends TestCase
+final class PlanSchedulerTest extends TestCase
 {
     private function makeTemplate(): PlanTemplate
     {
@@ -29,20 +30,23 @@ final class PlanInstantiatorTest extends TestCase
         return $template;
     }
 
-    private function makeInstantiator(): PlanInstantiator
+    private function makeScheduler(): PlanScheduler
     {
-        // L'EntityManager est un stub : on ne teste que la projection des dates,
-        // pas la persistance. persist/flush sont des no-ops.
+        // Stubs : on ne teste que la projection des dates, pas la persistance.
+        // persist/flush sont des no-ops, et le plan est vu comme jamais instancié
+        // (findBySourcePlanTemplateForOwner renvoie [] -> branche de création).
         $em = $this->createStub(EntityManagerInterface::class);
+        $repository = $this->createStub(ScheduledWorkoutRepository::class);
+        $repository->method('findBySourcePlanTemplateForOwner')->willReturn([]);
 
-        return new PlanInstantiator($em);
+        return new PlanScheduler($em, $repository);
     }
 
     public function testMapsWeekAndDayToRealDatesFromMidWeekStart(): void
     {
         // 2026-01-07 est un mercredi : l'ancre est le lundi de sa semaine ISO
         // (2026-01-05).
-        $created = $this->makeInstantiator()->instantiate(
+        $created = $this->makeScheduler()->instantiate(
             $this->makeTemplate(),
             new User(),
             new \DateTimeImmutable('2026-01-07'),
@@ -59,7 +63,7 @@ final class PlanInstantiatorTest extends TestCase
     {
         // 2026-01-11 est un dimanche (jour ISO 7) : l'ancre reste le lundi de la
         // même semaine ISO (2026-01-05), pas la semaine suivante.
-        $created = $this->makeInstantiator()->instantiate(
+        $created = $this->makeScheduler()->instantiate(
             $this->makeTemplate(),
             new User(),
             new \DateTimeImmutable('2026-01-11'),
@@ -74,7 +78,7 @@ final class PlanInstantiatorTest extends TestCase
         $owner = new User();
         $template = $this->makeTemplate();
 
-        $created = $this->makeInstantiator()->instantiate($template, $owner, new \DateTimeImmutable('2026-01-05'));
+        $created = $this->makeScheduler()->instantiate($template, $owner, new \DateTimeImmutable('2026-01-05'));
 
         foreach ($created as $scheduled) {
             self::assertSame($owner, $scheduled->getOwner());
