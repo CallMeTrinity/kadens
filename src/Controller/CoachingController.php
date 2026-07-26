@@ -15,8 +15,10 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Hub de la relation coach ↔ athlète, ouvert à **tout** utilisateur (l'espace de
- * travail du coach, lui, vit sous /coach et exige ROLE_COACH).
+ * Page unique de la relation coach ↔ athlète, ouverte à **tout** utilisateur :
+ * les deux sens (mes coachs / mes athlètes) et les demandes des deux sens y
+ * cohabitent. Seule la fiche de travail d'un athlète vit ailleurs (/coach,
+ * ROLE_COACH).
  *
  * On ne gère ici que le lien : demander, accepter, refuser, terminer. Aucun
  * contenu n'est créé ni consulté depuis ces routes.
@@ -63,9 +65,7 @@ final class CoachingController extends AbstractController
             throw $this->createAccessDeniedException('Jeton CSRF invalide.');
         }
 
-        $redirect = 'coach' === $payload->getString('from')
-            ? $this->redirectToRoute('app_coach_dashboard')
-            : $this->redirectToRoute('app_coaching_index');
+        $redirect = $this->redirectToRoute('app_coaching_index');
 
         $email = trim($payload->getString('email'));
         $target = '' === $email ? null : $userRepository->findOneBy(['email' => $email]);

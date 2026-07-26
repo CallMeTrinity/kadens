@@ -69,6 +69,39 @@ final class CoachingControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
     }
 
+    /**
+     * Page unique : un coach y voit ses athlètes ET le formulaire d'invitation,
+     * qui vivaient auparavant sur un tableau de bord séparé (/coach).
+     */
+    public function testIndexShowsBothDirectionsForCoach(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED, $coach);
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/coaching');
+
+        self::assertResponseIsSuccessful();
+        $html = $crawler->html();
+        self::assertStringContainsString('athlete@example.com', $html);
+        self::assertStringContainsString('Inviter un athlète', $html);
+        self::assertStringContainsString('Demander à être coaché', $html);
+        // La fiche de travail reste accessible depuis la carte (nom + bouton).
+        self::assertGreaterThan(0, $crawler->filter('a[href="/coach/athlete/'.$athlete->getId().'"]')->count());
+    }
+
+    /** Un non-coach ne voit ni le formulaire d'invitation ni la section athlètes. */
+    public function testIndexHidesCoachSideForPlainUser(): void
+    {
+        $this->client->loginUser($this->createUser('athlete@example.com'));
+        $crawler = $this->client->request('GET', '/coaching');
+
+        self::assertResponseIsSuccessful();
+        self::assertStringNotContainsString('Inviter un athlète', $crawler->html());
+        self::assertStringContainsString('Demander à être coaché', $crawler->html());
+    }
+
     public function testAthleteRequestCreatesPendingRelation(): void
     {
         $athlete = $this->createUser('athlete@example.com');
@@ -103,20 +136,24 @@ final class CoachingControllerTest extends WebTestCase
         $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
 
         $this->client->loginUser($coach);
-        $this->submitRequest('coach@example.com', ['from' => 'coach']);
+        $this->submitRequest('coach@example.com');
 
         self::assertCount(0, $this->em->getRepository(Coaching::class)->findAll());
     }
 
+    /**
+     * Sans champ `role`, un ROLE_COACH est placé du côté coach de la relation :
+     * c'est le formulaire « Inviter un athlète » de la page unique.
+     */
     public function testCoachInviteCreatesRelationInCoachDirection(): void
     {
         $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
         $this->createUser('athlete@example.com');
 
         $this->client->loginUser($coach);
-        $this->submitRequest('athlete@example.com', ['from' => 'coach']);
+        $this->submitRequest('athlete@example.com');
 
-        self::assertResponseRedirects('/coach');
+        self::assertResponseRedirects('/coaching');
 
         $relation = $this->em->getRepository(Coaching::class)->findOneBy([]);
         self::assertNotNull($relation);

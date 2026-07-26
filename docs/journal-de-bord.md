@@ -967,3 +967,43 @@ sans effet fonctionnel — le `doctrine:schema:validate` reste donc « not in sy
 sur ce point précis, comme avant ce lot.
 
 **Tests** : 120 au vert (105 avant le lot).
+
+### Lot — Fusion des pages Coaching et Mes athlètes (26/07/2026)
+
+**Une seule page pour les deux sens de la relation.** `/coaching` (hub relation)
+et `/coach` (tableau de bord coach) affichaient les mêmes cartes, les mêmes
+demandes reçues/envoyées et le même formulaire à un `hidden` près : redondance
+pure, et deux entrées de menu pour une seule idée. `CoachController::dashboard()`
+et `coach/dashboard.html.twig` sont **supprimés**. `/coach` ne porte plus que la
+fiche de travail d'un athlète (`app_coach_athlete` et ses actions POST), donc
+`access_control ^/coach → ROLE_COACH` garde tout son sens et l'ordre des règles
+(`^/coaching` avant `^/coach`) reste nécessaire.
+
+**Ce que la fusion apporte côté UX**, au-delà du dédoublonnage :
+- les demandes sont **mutualisées** — une seule liste « à traiter » et une seule
+  « en attente », quel que soit le sens de la demande. Avant, un coach qui se
+  faisait aussi coacher devait regarder deux pages pour voir toutes ses demandes ;
+- l'**ordre des sections suit le rôle** : un `ROLE_COACH` voit « Mes athlètes »
+  d'abord, un athlète voit « Mes coachs » d'abord. D'où les deux macros
+  `coachesSection` / `athletesSection` dans `coaching/index.html.twig`, appelées
+  dans un ordre ou dans l'autre (`{% import _self %}`) plutôt que dupliquées ;
+- chaque formulaire reste **ancré sous sa liste** : « Demander à être coaché »
+  (avec `role=athlete`) sous les coachs, « Inviter un athlète » (sans `role`,
+  donc sens coach par défaut) sous les athlètes, réservé à `isCoach`. Un
+  sélecteur de sens unique aurait été plus compact mais moins évident.
+
+**Pièges traités.** Le champ `from=coach` du formulaire d'invitation ne servait
+qu'à choisir la page de retour : supprimé, `CoachingController::request()` a une
+seule redirection. `linkAthlete` vaut désormais `me.isCoach` et non `true` : un
+ex-coach (rôle retiré, relations résiduelles) verrait sinon un lien vers un 403 —
+c'est aussi pourquoi la section athlètes s'affiche encore, sans formulaire, quand
+il reste des relations sans le rôle. Dans le header, l'entrée « Mes athlètes »
+disparaît et « Coaching » s'allume via une **liste exacte**
+(`app_coaching_index`, `app_coach_athlete`) : le préfixe `app_coach` ne capte pas
+`app_coaching_index` (pas d'underscore), et `app_coaching` raterait la fiche
+athlète. Le retour depuis la fiche athlète pointe sur l'ancre `#athletes`.
+
+**Tests** : 121 au vert. `CoachControllerTest` perd ses deux tests de dashboard,
+remplacés par un test de la fiche athlète refusée sans `ROLE_COACH` ;
+`CoachingControllerTest` gagne deux tests de rendu (page complète pour un coach,
+côté coach masqué pour un simple utilisateur).

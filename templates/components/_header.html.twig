@@ -17,25 +17,20 @@
     { label: 'Calendrier',  icon: 'lucide:calendar-days',  path: 'app_calendar_index',       match: 'app_calendar' },
 ] %}
 
-{# Entrées du menu de compte. L'espace de travail coach n'a de sens que pour un
-   ROLE_COACH : les autres ne voient que le hub relation, où ils reçoivent et
-   acceptent les demandes. #}
+{# Entrées du menu de compte. « Coaching » couvre les deux sens de la relation
+   (mes coachs / mes athlètes) : une seule entrée, quel que soit le rôle. Elle
+   s'allume aussi sur la fiche athlète (app_coach_athlete), qui n'a pas d'entrée
+   propre — d'où la liste exacte : `app_coach` comme préfixe ne capterait pas
+   `app_coaching_index`, et `app_coaching` raterait la fiche athlète. #}
 {# `routes` (liste exacte) plutôt que `match` (préfixe) quand le préfixe
    déborderait : « app_profile » couvrirait sinon app_profile_settings, et deux
    entrées s'allumeraient en même temps. #}
 {% set menuItems = [
     { label: 'Mon profil',  icon: 'lucide:user',        path: 'app_profile',          routes: ['app_profile', 'app_profile_edit'] },
     { label: 'Objectifs',   icon: 'lucide:target',      path: 'app_goal_index',       match: 'app_goal' },
-    { label: 'Coaching',    icon: 'lucide:users',       path: 'app_coaching_index',   match: 'app_coaching' },
+    { label: 'Coaching',    icon: 'lucide:users',       path: 'app_coaching_index',   routes: ['app_coaching_index', 'app_coach_athlete'] },
+    { label: 'Paramètres',  icon: 'lucide:settings-2',  path: 'app_profile_settings', routes: ['app_profile_settings'] },
 ] %}
-{% if app.user.isCoach %}
-    {% set menuItems = menuItems|merge([
-        { label: 'Mes athlètes', icon: 'lucide:user-check', path: 'app_coach_dashboard', match: 'app_coach' },
-    ]) %}
-{% endif %}
-{% set menuItems = menuItems|merge([
-    { label: 'Paramètres', icon: 'lucide:settings-2', path: 'app_profile_settings', routes: ['app_profile_settings'] },
-]) %}
 
 {# Le repère de page courante ne doit pas disparaître parce que la page est passée
    dans le menu : le déclencheur s'allume quand la route courante y appartient. #}

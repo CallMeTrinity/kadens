@@ -7,7 +7,6 @@ use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ScheduledStatus;
-use App\Repository\CoachingRepository;
 use App\Repository\GoalRepository;
 use App\Repository\PlanTemplateRepository;
 use App\Repository\ScheduledWorkoutRepository;
@@ -27,6 +26,10 @@ use Symfony\Component\Routing\Attribute\Route;
 /**
  * Espace de travail du coach (ROLE_COACH, cf. access_control).
  *
+ * Il n'y a **pas de tableau de bord ici** : la liste des athlètes et la gestion
+ * des relations vivent sur `/coaching`, page unique pour les deux sens de la
+ * relation. `/coach` ne porte que la fiche de travail d'un athlète donné.
+ *
  * Principe directeur : **le contenu créé ici est possédé par l'athlète**
  * (`setOwner($athlete)`). Ces actions sont volontairement minces — elles créent
  * la coquille puis renvoient vers les éditeurs habituels (compositeur de séance,
@@ -42,22 +45,8 @@ final class CoachController extends AbstractController
 {
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly CoachingRepository $coachingRepository,
         private readonly CoachingResolver $coachingResolver,
     ) {
-    }
-
-    #[Route('', name: 'app_coach_dashboard', methods: ['GET'])]
-    public function dashboard(): Response
-    {
-        /** @var User $user */
-        $user = $this->getUser();
-
-        return $this->render('coach/dashboard.html.twig', [
-            'relations' => $this->coachingRepository->findAcceptedAthletes($user),
-            'sent' => $this->coachingRepository->findPendingSentBy($user),
-            'received' => $this->coachingRepository->findPendingReceivedBy($user),
-        ]);
     }
 
     /**

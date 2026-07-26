@@ -56,20 +56,20 @@ final class CoachControllerTest extends WebTestCase
         $this->em->flush();
     }
 
-    public function testDashboardIsForbiddenWithoutCoachRole(): void
+    /**
+     * Il n'y a plus de tableau de bord coach : la liste des athlètes vit sur
+     * /coaching. Seule la fiche athlète reste sous /coach, donc sous ROLE_COACH.
+     */
+    public function testAthletePageForbiddenWithoutCoachRole(): void
     {
-        $this->client->loginUser($this->createUser('athlete@example.com'));
-        $this->client->request('GET', '/coach');
+        $coach = $this->createUser('nocoach@example.com');
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+
+        $this->client->loginUser($coach);
+        $this->client->request('GET', '/coach/athlete/'.$athlete->getId());
 
         self::assertResponseStatusCodeSame(403);
-    }
-
-    public function testDashboardIsReachableForCoach(): void
-    {
-        $this->client->loginUser($this->createUser('coach@example.com', ['ROLE_COACH']));
-        $this->client->request('GET', '/coach');
-
-        self::assertResponseIsSuccessful();
     }
 
     /** ROLE_COACH ouvre /coach, pas l'accès à un athlète donné. */

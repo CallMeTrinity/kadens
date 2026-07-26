@@ -194,12 +194,17 @@ consigner chaque nouveau lot terminé (cf. §7).
 Résumé : toutes les phases du ROADMAP sont livrées. Socle Symfony en place
 (Docker, MariaDB, CI/CD), design tokens posés, et couche visuelle « Carnet
 clair » déployée sur toutes les vues. Au-delà du ROADMAP : objectifs datés,
-séries détaillées, **relation coach ↔ athlète** (hub `/coaching`, espace
-coach `/coach`, `ROLE_COACH`) — cf. §3 pour la règle de propriété — et
-**paramètres de compte** (`/profile/settings` : changement de mot de passe,
-création de compte par `app:user:create`).
+séries détaillées, **relation coach ↔ athlète** (page unique `/coaching` pour les
+deux sens, fiche de travail par athlète sous `/coach`, `ROLE_COACH`) — cf. §3 pour
+la règle de propriété — et **paramètres de compte** (`/profile/settings` :
+changement de mot de passe, création de compte par `app:user:create`).
 
-Dernier lot (fluidité d'édition & navigation) : création en un clic, éditeurs sans
+Dernier lot (fusion Coaching / Mes athlètes) : le tableau de bord coach disparaît,
+`/coaching` porte les deux sens de la relation (demandes mutualisées, sections
+ordonnées selon le rôle, formulaire d'invitation réservé aux coachs), et `/coach`
+ne garde que la fiche athlète.
+
+Lot précédent (fluidité d'édition & navigation) : création en un clic, éditeurs sans
 formulaire de métadonnées, semaines ajoutées une par une ou par paquet, compteur de
 séries synchronisé dans les deux sens, **nav réduite à 4 entrées + menu de compte**
 sur l'avatar, profil complet de l'athlète visible par son coach, et **relation

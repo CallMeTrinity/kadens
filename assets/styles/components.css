@@ -98,7 +98,7 @@ turbo-frame { display: block; }
 }
 /* Menu de compte — <details> natif (clavier + sans-JS), panneau flottant.
    Porte tout ce qui relève du compte et non du travail quotidien : profil,
-   objectifs, coaching, athlètes, paramètres, déconnexion. */
+   objectifs, coaching, paramètres, déconnexion. */
 .kd-usermenu { position: relative; }
 .kd-usermenu__trigger {
   display: inline-flex;
@@ -4220,7 +4220,8 @@ textarea.kd-inlineedit__input { min-height: 3.2em; resize: vertical; }
 }
 
 /* ============================================================================
-   COACHING — relation coach ↔ athlète (hub /coaching, espace coach /coach).
+   COACHING — relation coach ↔ athlète (page unique /coaching, fiche de travail
+   par athlète sous /coach).
    Aucune couleur métier propre : le statut de relation réutilise les tokens de
    statut de séance (done / planned / missed) via CoachingStatus::modifier(),
    comme le fait GoalOutcome. Le reste est neutre.
