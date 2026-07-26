@@ -22,7 +22,14 @@ export default class extends Controller {
         token: String,
         type: { type: String, default: 'input' }, // 'input' | 'textarea'
         placeholder: String,
+        // Ouvre le champ dès l'affichage : on arrive sur un brouillon fraîchement
+        // créé, dont le titre par défaut est à remplacer tout de suite.
+        autofocus: Boolean,
     };
+
+    connect() {
+        if (this.autofocusValue) this.start();
+    }
 
     start() {
         if (this.editing) return;

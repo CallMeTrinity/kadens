@@ -14,9 +14,9 @@
             <h1 class="kd-title">Séances</h1>
             <p class="kd-lead">Tes séances : blocs, exercices et paramètres. La brique assemblée dans les plans et le calendrier.</p>
         </div>
-        <a href="{{ path('app_workout_new') }}" class="kd-btn kd-btn--primary">
-            {{ ux_icon('lucide:plus') }} Nouvelle séance
-        </a>
+        {{ include('components/_create_button.html.twig', {
+            route: 'app_workout_new', token: 'workout_new', label: 'Nouvelle séance',
+        }) }}
     </div>
 
     <div data-controller="filter">
@@ -40,9 +40,10 @@
             <div class="kd-card kd-empty">
                 {{ ux_icon('lucide:clipboard-list') }}
                 <div>Aucune séance pour l'instant.</div>
-                <a href="{{ path('app_workout_new') }}" class="kd-btn kd-btn--secondary kd-btn--sm" style="margin-top:var(--kd-space-6);">
-                    {{ ux_icon('lucide:plus') }} Créer la première
-                </a>
+                {{ include('components/_create_button.html.twig', {
+                    route: 'app_workout_new', token: 'workout_new', label: 'Créer la première',
+                    class: 'kd-btn kd-btn--secondary kd-btn--sm', style: 'margin-top:var(--kd-space-6);',
+                }) }}
             </div>
         {% else %}
             <div class="kd-grid kd-grid--3" data-filter-target="list">

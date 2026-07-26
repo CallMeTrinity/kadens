@@ -13,11 +13,11 @@ use App\Enum\PrescriptionType;
 use App\Form\BlockType;
 use App\Form\PrescribedExerciseType;
 use App\Form\PrescribedSetType;
-use App\Form\WorkoutType;
 use App\Repository\ExerciseRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\WorkoutVoter;
 use App\Service\PlanFlattener;
+use App\Service\SetSynchronizer;
 use App\Service\SlugGenerator;
 use App\Service\WorkoutCloner;
 use App\Service\WorkoutEstimator;
@@ -44,12 +44,19 @@ final class WorkoutController extends AbstractController
         'elevationGainMeters',
     ];
 
+    /**
+     * Titre d'un brouillon créé en un clic. Sert aussi de repère pour savoir si le
+     * slug mérite d'être régénéré au premier vrai renommage (cf. updateMeta).
+     */
+    public const DRAFT_WORKOUT_TITLE = 'Nouvelle séance';
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly FormFactoryInterface $formFactory,
         private readonly PlanFlattener $planFlattener,
         private readonly ExerciseRepository $exerciseRepository,
         private readonly WorkoutEstimator $estimator,
+        private readonly SetSynchronizer $setSynchronizer,
     ) {
     }
 
@@ -96,27 +103,30 @@ final class WorkoutController extends AbstractController
         return $facets;
     }
 
-    #[Route('/new', name: 'app_workout_new', methods: ['GET', 'POST'])]
+    /**
+     * Crée un brouillon titré par défaut et bascule directement sur le compositeur
+     * (pas d'écran de formulaire intermédiaire : le titre s'édite en ligne, et
+     * l'éditeur l'ouvre tout de suite grâce au paramètre `rename`). Même geste que
+     * `CoachController::newWorkout`, qui procédait déjà ainsi.
+     */
+    #[Route('/new', name: 'app_workout_new', methods: ['POST'])]
     public function new(Request $request, SlugGenerator $slugGenerator): Response
     {
-        $workout = new Workout();
-        $form = $this->createForm(WorkoutType::class, $workout);
-        $form->handleRequest($request);
-
-        if ($form->isSubmitted() && $form->isValid()) {
-            $workout->setOwner($this->getUser());
-            $workout->setSlug($slugGenerator->generate($workout->getTitle(), Workout::class));
-            $this->entityManager->persist($workout);
-            $this->entityManager->flush();
-
-            $this->addFlash('success', 'Séance créée. Compose-la maintenant.');
-
-            return $this->redirectToRoute('app_workout_edit', ['id' => $workout->getId()]);
+        if (!$this->isCsrfTokenValid('workout_new', $request->getPayload()->getString('_token'))) {
+            throw $this->createAccessDeniedException();
         }
 
-        return $this->render('workout/new.html.twig', [
-            'form' => $form,
-        ]);
+        $title = trim($request->getPayload()->getString('title')) ?: self::DRAFT_WORKOUT_TITLE;
+
+        $workout = (new Workout())
+            ->setOwner($this->getUser())
+            ->setTitle($title)
+            ->setSlug($slugGenerator->generate($title, Workout::class));
+
+        $this->entityManager->persist($workout);
+        $this->entityManager->flush();
+
+        return $this->redirectToRoute('app_workout_edit', ['id' => $workout->getId(), 'rename' => 1]);
     }
 
     #[Route('/{id}', name: 'app_workout_show', methods: ['GET'], requirements: ['id' => '\d+'])]
@@ -129,36 +139,29 @@ final class WorkoutController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/edit', name: 'app_workout_edit', methods: ['GET', 'POST'], requirements: ['id' => '\d+'])]
-    public function edit(Request $request, Workout $workout): Response
+    /**
+     * Le compositeur. Titre et description s'éditent en ligne (endpoint `meta`),
+     * le contenu par les endpoints de blocs/exercices : plus aucun formulaire de
+     * métadonnées ici, donc plus de POST sur cette route.
+     */
+    #[Route('/{id}/edit', name: 'app_workout_edit', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function edit(Workout $workout): Response
     {
         $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
 
-        $form = $this->createForm(WorkoutType::class, $workout);
-        $form->handleRequest($request);
-
-        if ($form->isSubmitted() && $form->isValid()) {
-            $this->entityManager->flush();
-
-            $this->addFlash('success', 'Séance mise à jour.');
-
-            return $this->redirectToRoute('app_workout_edit', ['id' => $workout->getId()]);
-        }
-
         return $this->render('workout/edit.html.twig', [
             'workout' => $workout,
-            'form' => $form,
         ] + $this->blocksContext($workout) + $this->libraryContext());
     }
 
     /**
      * Édition en ligne d'un champ de la séance (titre/description) depuis l'en-tête
      * cliquable du compositeur (contrôleur `inline-edit`, même pattern que le plan).
-     * Renvoie la valeur persistée (texte brut) que le JS réaffiche ; repli sans JS =
-     * le formulaire complet replié dans l'éditeur.
+     * Renvoie la valeur persistée (texte brut) que le JS réaffiche. C'est le SEUL
+     * chemin d'édition des métadonnées : il n'y a plus de formulaire de repli.
      */
     #[Route('/{id}/meta', name: 'app_workout_meta', methods: ['POST'], requirements: ['id' => '\d+'])]
-    public function updateMeta(Request $request, Workout $workout): Response
+    public function updateMeta(Request $request, Workout $workout, SlugGenerator $slugGenerator): Response
     {
         $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
         $payload = $request->getPayload();
@@ -174,6 +177,7 @@ final class WorkoutController extends AbstractController
                     return new Response('Le titre ne peut pas être vide.', Response::HTTP_UNPROCESSABLE_ENTITY);
                 }
                 $workout->setTitle($value);
+                $this->refreshDraftSlug($workout, $value, $slugGenerator);
                 break;
             case 'description':
                 $workout->setDescription('' === $value ? null : $value);
@@ -185,6 +189,19 @@ final class WorkoutController extends AbstractController
         $this->entityManager->flush();
 
         return new Response($value);
+    }
+
+    /**
+     * Une séance créée en un clic naît avec un slug dérivé du titre par défaut
+     * (`nouvelle-seance-7`). On le régénère au premier renommage, mais UNIQUEMENT
+     * dans ce cas : une séance déjà nommée garde son slug, sinon chaque renommage
+     * casserait son lien de partage public.
+     */
+    private function refreshDraftSlug(Workout $workout, string $title, SlugGenerator $slugGenerator): void
+    {
+        if ($slugGenerator->derivesFrom($workout->getSlug(), self::DRAFT_WORKOUT_TITLE)) {
+            $workout->setSlug($slugGenerator->generate($title, Workout::class));
+        }
     }
 
     #[Route('/{id}/delete', name: 'app_workout_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
@@ -351,15 +368,35 @@ final class WorkoutController extends AbstractController
     {
         $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
         $prescribed = $this->findPrescribed($workout, $prescribedId);
+        $detailedBefore = $prescribed->hasDetailedSets();
+        $countBefore = $prescribed->getWorkingSetCount();
 
         $form = $this->createPrescribedForm($prescribed);
         $form->handleRequest($request);
 
+        $listChanged = false;
         if ($form->isSubmitted() && $form->isValid()) {
+            // En mode détaillé, le compteur `sets` pilote la liste : le monter ou le
+            // descendre ajoute/retire des séries de travail en fin (l'échauffement
+            // n'est jamais touché). C'est l'autre sens de la synchro.
+            if ($detailedBefore && $prescribed->getSets() !== $countBefore) {
+                foreach ($this->setSynchronizer->applyScalarToDetailed($prescribed, (int) $prescribed->getSets()) as $created) {
+                    $this->entityManager->persist($created);
+                }
+                $this->setSynchronizer->syncScalarFromDetailed($prescribed);
+                $listChanged = true;
+            }
+
             $this->clearIrrelevantFields($prescribed);
             // La durée estimée dérive du contenu : on la recalcule à chaque save.
             $workout->setEstimatedDurationMinutes($this->estimator->estimateMinutes($workout));
             $this->entityManager->flush();
+        }
+
+        // La liste de séries a changé : le panneau entier doit être re-rendu, sinon
+        // les lignes ajoutées/retirées n'apparaissent qu'au rechargement.
+        if ($listChanged) {
+            return $this->setsResponse($request, $workout, $prescribed);
         }
 
         // Enregistrement silencieux : on ne re-rend QUE la ligne de résumé de cet
@@ -383,9 +420,13 @@ final class WorkoutController extends AbstractController
 
     /**
      * Passe un exercice en « séries détaillées » (première fois : éclate le compteur
-     * scalaire en N lignes explicites) ou ajoute une série (recopiée de la dernière).
-     * Chaque série peut ensuite porter son propre type (échauffement, dégressive,
-     * drop set…) et ses valeurs — ce que le compteur `sets`/`reps` ne permet pas.
+     * scalaire en N lignes explicites) ou ajoute une série de travail (valeurs
+     * reprises de la dernière). Chaque série peut ensuite porter son propre type
+     * (échauffement, dégressive, drop set…) et ses valeurs — ce que le compteur
+     * `sets`/`reps` ne permet pas.
+     *
+     * Le compteur scalaire suit le décompte des séries de travail (SetSynchronizer) :
+     * les deux modes affichent toujours le même nombre.
      */
     #[Route('/{id}/exercises/{prescribedId}/sets', name: 'app_workout_set_add', methods: ['POST'], requirements: ['id' => '\d+', 'prescribedId' => '\d+'])]
     public function addSet(Request $request, Workout $workout, int $prescribedId): Response
@@ -402,15 +443,15 @@ final class WorkoutController extends AbstractController
                     $prescribed->addDetailedSet($this->newSetFrom($prescribed, $i));
                 }
             } else {
-                // Ajout d'une série recopiée de la dernière (on duplique puis on ajuste).
-                $last = $prescribed->getDetailedSets()->last() ?: null;
-                $set = (new PrescribedSet())
-                    ->setPosition($this->nextPosition($prescribed->getDetailedSets()->toArray()))
-                    ->setReps($last?->getReps())
-                    ->setWeightKg($last?->getWeightKg())
-                    ->setDurationSeconds($last?->getDurationSeconds());
-                $prescribed->addDetailedSet($set);
+                // Ajout d'une série de TRAVAIL, valeurs reprises de la dernière.
+                // Toujours NORMAL : ajouter une série, c'est ajouter du travail, et
+                // le compteur scalaire doit monter d'autant.
+                $this->setSynchronizer->applyScalarToDetailed(
+                    $prescribed,
+                    $prescribed->getWorkingSetCount() + 1,
+                );
             }
+            $this->setSynchronizer->syncScalarFromDetailed($prescribed);
             foreach ($prescribed->getDetailedSets() as $set) {
                 $this->entityManager->persist($set);
             }
@@ -421,7 +462,9 @@ final class WorkoutController extends AbstractController
 
     /**
      * Revient au mode simple : retire toutes les séries détaillées. Le compteur
-     * scalaire (jamais effacé) reprend la main. Geste réversible.
+     * scalaire reprend la main — et il est juste, puisqu'il a suivi chaque mutation
+     * de la collection (SetSynchronizer). Geste réversible : on repart du nombre de
+     * séries de travail réellement décrit, pas de celui d'avant le détail.
      */
     #[Route('/{id}/exercises/{prescribedId}/sets/clear', name: 'app_workout_set_clear', methods: ['POST'], requirements: ['id' => '\d+', 'prescribedId' => '\d+'])]
     public function clearSets(Request $request, Workout $workout, int $prescribedId): Response
@@ -439,9 +482,13 @@ final class WorkoutController extends AbstractController
     }
 
     /**
-     * Enregistre une série (type + valeurs). Comme editPrescribed : on ne re-rend
-     * QUE la ligne de résumé (pastille), pas la liste des séries — le champ en cours
-     * de saisie n'est pas re-rendu, le focus reste. Repli sans JS : redirection.
+     * Enregistre une série (type + valeurs). En général on ne re-rend QUE la ligne
+     * de résumé (pastille) : le champ en cours de saisie n'est pas re-rendu, le
+     * focus reste. Exception : si le décompte de travail a bougé (une ligne est
+     * passée en échauffement, ou en est sortie), le compteur `sets` affiché dans le
+     * panneau devient faux — on re-rend alors tout le panneau. Ça ne concerne que
+     * le `<select>` de type, jamais la saisie de reps/charge.
+     * Repli sans JS : redirection.
      */
     #[Route('/{id}/sets/{setId}', name: 'app_workout_set_edit', methods: ['POST'], requirements: ['id' => '\d+', 'setId' => '\d+'])]
     public function editSet(Request $request, Workout $workout, int $setId): Response
@@ -449,13 +496,19 @@ final class WorkoutController extends AbstractController
         $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
         $set = $this->findSet($workout, $setId);
         $prescribed = $set->getPrescribedExercise();
+        $countBefore = $prescribed->getWorkingSetCount();
 
         $form = $this->createSetForm($set);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $this->setSynchronizer->syncScalarFromDetailed($prescribed);
             $workout->setEstimatedDurationMinutes($this->estimator->estimateMinutes($workout));
             $this->entityManager->flush();
+        }
+
+        if ($prescribed->getWorkingSetCount() !== $countBefore) {
+            return $this->setsResponse($request, $workout, $prescribed);
         }
 
         if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
@@ -480,12 +533,10 @@ final class WorkoutController extends AbstractController
 
         if ($this->isCsrfTokenValid('set_delete'.$setId, $request->getPayload()->getString('_token'))) {
             $prescribed->removeDetailedSet($set);
-            // Renumérotation dense des positions restantes (0..n).
-            $remaining = $prescribed->getDetailedSets()->toArray();
-            usort($remaining, static fn (PrescribedSet $a, PrescribedSet $b) => $a->getPosition() <=> $b->getPosition());
-            foreach ($remaining as $index => $remainingSet) {
-                $remainingSet->setPosition($index);
-            }
+            // Renumérotation dense des positions restantes (0..n), puis report du
+            // décompte de travail dans le compteur scalaire.
+            $this->setSynchronizer->renumber($prescribed);
+            $this->setSynchronizer->syncScalarFromDetailed($prescribed);
         }
 
         return $this->setsResponse($request, $workout, $prescribed);
@@ -788,6 +839,9 @@ final class WorkoutController extends AbstractController
         return $this->formFactory->createNamed('prescribed_'.$prescribed->getId(), PrescribedExerciseType::class, $prescribed, [
             'user' => $this->getUser(),
             'activity' => $prescribed->getExercise()?->getActivity(),
+            // Séries détaillées : les valeurs par série sortent du formulaire,
+            // seul le compteur `sets` reste (cf. PrescribedExerciseType).
+            'detailed' => $prescribed->hasDetailedSets(),
             'action' => $this->generateUrl($route, [
                 'id' => $prescribed->getBlock()->getWorkout()->getId(),
                 'prescribedId' => $prescribed->getId(),

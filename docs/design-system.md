@@ -181,6 +181,18 @@ progression, histogramme) restent des cibles.
   `--kd-radius-pill`, souvent en `--font-mono`.
 - **Champ de recherche** : bordure `--color-border-strong`, placeholder
   `--color-text-placeholder`, icône `⌕`.
+- **Menu de compte** (`.kd-usermenu`) : déclencheur = pastille avatar (lettre
+  initiale, fond `--color-primary`) + chevron ; panneau flottant
+  `--color-surface-raised`, filet `--color-border`, rayon `--kd-radius-lg`,
+  `--shadow-card`. Porte ce qui relève du compte (profil, objectifs, coaching,
+  athlètes, paramètres, déconnexion) — la barre principale ne garde que les quatre
+  entrées du travail quotidien. **Implémenté en `<details>`/`<summary>` natif** :
+  clavier et sans-JS, condition du cache offline. Le déclencheur prend `is-active`
+  quand la page courante appartient au menu, pour ne pas perdre le repère.
+- **Objectif rattaché** : pill `--color-primary-tint` / `--color-primary-on-tint`
+  (`.kd-plangoals__pill`, badge `.kd-badge--accent`). L'objectif est un **accent
+  primaire**, jamais une couleur d'activité — cohérent avec la tuile « objectif »
+  terracotta des maquettes.
 - **Tuile de séance** (matrice/calendrier) : filet gauche `3px` à la couleur de
   l'activité, fond tint correspondant, rayon `0 7px 7px 0`. La tuile
   « objectif » est terracotta plein avec `--shadow-accent`.

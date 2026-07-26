@@ -3,6 +3,7 @@
 namespace App\Tests\Controller;
 
 use App\Entity\Exercise;
+use App\Entity\Goal;
 use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
 use App\Entity\User;
@@ -22,8 +23,13 @@ final class PlanTemplateControllerTest extends WebTestCase
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine.orm.entity_manager');
 
+        // Ordre FK-safe : les plans portent la jointure vers les objectifs, ils
+        // passent donc avant eux, et les deux avant les utilisateurs.
         foreach ($this->em->getRepository(PlanTemplate::class)->findAll() as $template) {
             $this->em->remove($template);
+        }
+        foreach ($this->em->getRepository(Goal::class)->findAll() as $goal) {
+            $this->em->remove($goal);
         }
         foreach ($this->em->getRepository(Workout::class)->findAll() as $workout) {
             $this->em->remove($workout);
@@ -44,24 +50,86 @@ final class PlanTemplateControllerTest extends WebTestCase
         self::assertResponseRedirects('/login');
     }
 
-    public function testCreatePlanGeneratesSlug(): void
+    /**
+     * La création est un simple POST depuis l'index : pas d'écran de formulaire,
+     * on atterrit sur l'éditeur avec un brouillon de 4 semaines dont le titre
+     * s'ouvre d'emblée (`rename=1`).
+     */
+    public function testCreatePlanLandsOnEditorWithFourWeeks(): void
     {
         $user = $this->createUser('owner@example.com');
         $this->client->loginUser($user);
 
-        $this->client->request('GET', '/plan-template/new');
-        self::assertResponseIsSuccessful();
+        $this->client->request('GET', '/plan-template');
+        $this->client->submitForm('Nouveau plan');
 
-        $this->client->submitForm('Créer', [
-            'plan_template[title]' => 'Plan 5k 8 semaines',
-            'plan_template[durationWeeks]' => '8',
-        ]);
-
-        $created = $this->em->getRepository(PlanTemplate::class)->findOneBy(['title' => 'Plan 5k 8 semaines']);
+        $created = $this->em->getRepository(PlanTemplate::class)->findOneBy(['title' => 'Nouveau plan']);
         self::assertNotNull($created);
-        self::assertSame('plan-5k-8-semaines', $created->getSlug());
+        self::assertSame('nouveau-plan', $created->getSlug());
+        self::assertSame(4, $created->getDurationWeeks());
         self::assertNotNull($created->getCreatedAt());
-        self::assertResponseRedirects('/plan-template/'.$created->getId().'/edit');
+        self::assertResponseRedirects('/plan-template/'.$created->getId().'/edit?rename=1');
+    }
+
+    /**
+     * Les semaines s'ajoutent une par une ou par paquet, et le plafond borne le
+     * paquet au lieu de le refuser entièrement.
+     */
+    public function testAddWeeksOneByOneAndInBatch(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $template = $this->createPlanTemplate($user, 'Plan 5k', 4);
+        $this->client->loginUser($user);
+
+        $url = '/plan-template/'.$template->getId().'/weeks/add';
+        $crawler = $this->client->request('GET', '/plan-template/'.$template->getId().'/edit');
+        $token = $crawler->filter('form[action="'.$url.'"] input[name="_token"]')->first()->attr('value');
+
+        $this->client->request('POST', $url, ['_token' => $token]);
+        $this->em->clear();
+        self::assertSame(5, $this->em->getRepository(PlanTemplate::class)->find($template->getId())->getDurationWeeks());
+
+        $this->client->request('POST', $url, ['_token' => $token, 'count' => 6]);
+        $this->em->clear();
+        self::assertSame(11, $this->em->getRepository(PlanTemplate::class)->find($template->getId())->getDurationWeeks());
+
+        // Paquet qui dépasse : borné à 52, pas rejeté.
+        $this->client->request('POST', $url, ['_token' => $token, 'count' => 90]);
+        $this->em->clear();
+        self::assertSame(52, $this->em->getRepository(PlanTemplate::class)->find($template->getId())->getDurationWeeks());
+    }
+
+    /**
+     * Le rattachement se pose aussi depuis l'éditeur de plan (bandeau #plan-goals),
+     * pas seulement depuis la fiche objectif : la relation se navigue dans les deux
+     * sens.
+     */
+    public function testAttachGoalFromThePlanEditor(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $template = $this->createPlanTemplate($user, 'Prépa trail', 4);
+
+        $goal = (new Goal())
+            ->setOwner($user)
+            ->setTitle('Trail 42k')
+            ->setTargetDate(new \DateTimeImmutable('+10 weeks'));
+        $this->em->persist($goal);
+        $this->em->flush();
+
+        $templateId = $template->getId();
+        $url = '/plan-template/'.$templateId.'/goals';
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/plan-template/'.$templateId.'/edit');
+        $token = $crawler->filter('form[action="'.$url.'"] input[name="_token"]')->first()->attr('value');
+
+        $this->client->request('POST', $url, ['_token' => $token, 'action' => 'attach', 'goalId' => $goal->getId()]);
+        $this->em->clear();
+        self::assertCount(1, $this->em->getRepository(PlanTemplate::class)->find($templateId)->getGoals());
+
+        $this->client->request('POST', $url, ['_token' => $token, 'action' => 'detach', 'goalId' => $goal->getId()]);
+        $this->em->clear();
+        self::assertCount(0, $this->em->getRepository(PlanTemplate::class)->find($templateId)->getGoals());
     }
 
     public function testPlaceItemForksWorkoutInCell(): void

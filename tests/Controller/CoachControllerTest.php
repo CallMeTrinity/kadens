@@ -99,6 +99,57 @@ final class CoachControllerTest extends WebTestCase
         self::assertStringContainsString('Fractionné 30/30', $crawler->html());
     }
 
+    /**
+     * Le coach a besoin des mesures et records de l'athlète pour programmer : la
+     * page athlète rend les mêmes fragments que la page profil, en lecture seule.
+     */
+    public function testAthletePageShowsAthleteProfileAndStats(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $athlete->setSquat1rmKg(140.0);
+        $this->em->flush();
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/coach/athlete/'.$athlete->getId());
+
+        self::assertResponseIsSuccessful();
+        $html = $crawler->html();
+        self::assertStringContainsString('Fiche athlète', $html);
+        self::assertStringContainsString('Statistiques', $html);
+        self::assertStringContainsString('140', $html);
+        // La fiche appartient à l'athlète : aucun lien d'édition côté coach.
+        self::assertStringNotContainsString('/profile/edit', $html);
+    }
+
+    /**
+     * GoalVoter accorde l'accès au coach accepté, comme les autres voters : sans
+     * cette branche, cliquer un objectif depuis la page athlète donnait un 403.
+     */
+    public function testAcceptedCoachCanViewAthleteGoal(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+
+        $goal = (new Goal())
+            ->setOwner($athlete)
+            ->setTitle('Trail 42k')
+            ->setTargetDate(new \DateTimeImmutable('+10 weeks'));
+        $this->em->persist($goal);
+        $this->em->flush();
+
+        $this->client->loginUser($coach);
+        $this->client->request('GET', '/goal/'.$goal->getId());
+        self::assertResponseIsSuccessful();
+
+        // Un tiers sans relation reste refusé.
+        $this->client->loginUser($this->createUser('stranger@example.com'));
+        $this->client->request('GET', '/goal/'.$goal->getId());
+        self::assertResponseStatusCodeSame(403);
+    }
+
     public function testCoachCreatesWorkoutOwnedByAthlete(): void
     {
         $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);

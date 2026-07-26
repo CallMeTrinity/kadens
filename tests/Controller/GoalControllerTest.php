@@ -153,6 +153,118 @@ final class GoalControllerTest extends WebTestCase
         return $user;
     }
 
+    /**
+     * Le lien objectif ↔ plan se pose et se défait depuis la fiche objectif, et
+     * plusieurs plans peuvent préparer la même échéance (prépa en blocs).
+     */
+    public function testAttachAndDetachPlansFromTheGoal(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $goal = $this->createGoal($user, 'Trail 42k', new \DateTimeImmutable('+10 weeks'));
+        $base = $this->createPlanTemplate($user, 'Bloc base', 6);
+        $spe = $this->createPlanTemplate($user, 'Bloc spécifique', 4);
+        $goalId = $goal->getId();
+
+        $this->client->loginUser($user);
+        $url = '/goal/'.$goalId.'/plans';
+        $crawler = $this->client->request('GET', '/goal/'.$goalId);
+        $token = $crawler->filter('form[action="'.$url.'"] input[name="_token"]')->first()->attr('value');
+
+        foreach ([$base, $spe] as $plan) {
+            $this->client->request('POST', $url, [
+                '_token' => $token, 'action' => 'attach', 'planTemplate' => $plan->getId(),
+            ]);
+        }
+        $this->em->clear();
+        self::assertCount(2, $this->em->getRepository(Goal::class)->find($goalId)->getPlanTemplates());
+
+        $this->client->request('POST', $url, [
+            '_token' => $token, 'action' => 'detach', 'planTemplate' => $spe->getId(),
+        ]);
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(Goal::class)->find($goalId);
+        self::assertCount(1, $reloaded->getPlanTemplates());
+        self::assertSame('Bloc base', $reloaded->getPlanTemplates()->first()->getTitle());
+    }
+
+    /**
+     * Un plan d'un autre membre n'est pas rattachable : le scoping se fait sur le
+     * propriétaire de l'objectif, pas sur l'utilisateur courant.
+     */
+    public function testCannotAttachAnotherMembersPlan(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $other = $this->createUser('other@example.com');
+        $goal = $this->createGoal($user, 'Trail 42k', new \DateTimeImmutable('+10 weeks'));
+        // Un plan à soi pour que le formulaire de rattachement soit rendu.
+        $this->createPlanTemplate($user, 'Mon plan', 4);
+        $foreign = $this->createPlanTemplate($other, 'Plan du voisin', 4);
+        $goalId = $goal->getId();
+
+        $this->client->loginUser($user);
+        $url = '/goal/'.$goalId.'/plans';
+        $crawler = $this->client->request('GET', '/goal/'.$goalId);
+        $token = $crawler->filter('form[action="'.$url.'"] input[name="_token"]')->first()->attr('value');
+
+        $this->client->request('POST', $url, [
+            '_token' => $token, 'action' => 'attach', 'planTemplate' => $foreign->getId(),
+        ]);
+
+        $this->em->clear();
+        self::assertCount(0, $this->em->getRepository(Goal::class)->find($goalId)->getPlanTemplates());
+    }
+
+    /**
+     * Créer un plan depuis la fiche objectif l'ouvre déjà rattaché : on part de
+     * l'échéance pour construire la préparation.
+     */
+    public function testNewPlanFromGoalArrivesAlreadyLinked(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $goal = $this->createGoal($user, 'Trail 42k', new \DateTimeImmutable('+10 weeks'));
+        $goalId = $goal->getId();
+
+        $this->client->loginUser($user);
+        $this->client->request('GET', '/goal/'.$goalId);
+        $this->client->submitForm('Nouveau plan pour cet objectif');
+
+        $created = $this->em->getRepository(PlanTemplate::class)->findOneBy(['title' => 'Nouveau plan']);
+        self::assertNotNull($created);
+        self::assertSame(4, $created->getDurationWeeks());
+        self::assertResponseRedirects('/plan-template/'.$created->getId().'/edit?rename=1');
+
+        $this->em->clear();
+        self::assertCount(1, $this->em->getRepository(Goal::class)->find($goalId)->getPlanTemplates());
+    }
+
+    /**
+     * Ancrer un plan sur l'échéance le rattache aussi : le lien ne se perd plus
+     * après l'instanciation au calendrier.
+     */
+    public function testPrepareAlsoLinksThePlanToTheGoal(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $goal = $this->createGoal($user, 'Trail 42k', new \DateTimeImmutable('+10 weeks'));
+        $workout = $this->createWorkout($user, 'Sortie longue');
+        $template = $this->createPlanTemplate($user, 'Prépa trail', 4);
+        $this->createPlanItem($template, $workout, 1, 1);
+        $goalId = $goal->getId();
+
+        $this->client->loginUser($user);
+        $prepareUrl = '/goal/'.$goalId.'/prepare';
+        $crawler = $this->client->request('GET', '/goal/'.$goalId);
+        $token = $crawler->filter('form[action="'.$prepareUrl.'"] input[name="_token"]')->first()->attr('value');
+
+        $this->client->request('POST', $prepareUrl, [
+            '_token' => $token,
+            'planTemplate' => $template->getId(),
+        ]);
+        self::assertResponseRedirects('/goal/'.$goalId);
+
+        $this->em->clear();
+        self::assertCount(1, $this->em->getRepository(Goal::class)->find($goalId)->getPlanTemplates());
+    }
+
     private function createGoal(User $owner, string $title, \DateTimeImmutable $date): Goal
     {
         $goal = (new Goal())

@@ -61,6 +61,17 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   dérivés `getWorkingSetCount`/`getTonnageKg`/`getTopWeightKg` sur `PrescribedExercise`,
   consommés par tous les services de calcul). L'échauffement (`SetType::WARMUP`) est
   exclu du volume de travail. Muscu uniquement (`SETS_REPS`/`SETS_TIME`).
+  **Synchro des deux modes (`SetSynchronizer`)** : le scalaire `sets` et la
+  collection décrivent la même chose, ils sont tenus d'accord **dans les deux sens**.
+  Référence commune = le nombre de séries **de travail** (échauffement exclu, aligné
+  sur `getWorkingSetCount()`). Toute mutation de la collection réécrit le scalaire ;
+  modifier le scalaire en mode détaillé ajoute/retire des lignes `NORMAL` en fin (et
+  ne touche jamais un échauffement). Conséquence : le champ « séries » reste **visible
+  et éditable** en mode détaillé, et revenir au mode simple repart du nombre réellement
+  décrit. Corollaire : les champs pilotés par la collection (`reps`/`weightKg`/
+  `durationSeconds`) ne sont **pas déclarés** dans `PrescribedExerciseType` quand
+  l'option `detailed` est vraie — les sauter dans le template ne suffit pas,
+  `form_end()` appelle `form_rest()` et les re-rendrait.
 - **Modèle d'exercice unique et flexible**, piloté par l'enum `PrescriptionType`
   (champs de valeurs nullable, seul le sous-ensemble pertinent est rempli). Pas
   d'héritage par activité.
@@ -101,7 +112,31 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   condition ; l'athlète **garde son contenu** quand la relation se termine. Les
   actions coach ne forkent aucun éditeur : elles créent la coquille et redirigent
   vers le compositeur / l'éditeur de plan normaux. `ROLE_COACH` s'accorde par
-  commande (`app:user:promote-coach`), jamais depuis l'app.
+  commande (`app:user:promote-coach`), jamais depuis l'app. `GoalVoter` porte la
+  même branche : la page athlète affiche ses échéances, elles doivent être
+  ouvrables. Corollaire : toute vue accessible au coach doit se scoper sur
+  **`$entity->getOwner()`**, jamais sur `$this->getUser()` (`GoalController::show`
+  et les rattachements objectif↔plan suivent cette règle).
+- **Objectif ↔ Plan : relation N:N, libre et réversible.** Table de jointure
+  `plan_template_goal`, côté propriétaire sur `PlanTemplate` (`addGoal`/`removeGoal`,
+  qui maintiennent **les deux côtés** — sinon un fragment re-rendu par Turbo Stream
+  dans la même requête montre un état périmé). Plusieurs plans par objectif (prépa
+  en blocs : base puis spécifique) et plusieurs objectifs par plan. Le lien
+  **documente l'intention**, il ne contraint ni les dates ni le contenu : l'ancrage
+  réel au calendrier reste `app_goal_prepare` (qui rattache au passage, pour que le
+  lien ne se perde plus). Se pose et se défait des deux côtés : bandeau `#plan-goals`
+  dans l'éditeur de plan, section « Plans de préparation » sur la fiche objectif.
+  Jamais affiché sur la page publique d'un plan (les objectifs sont privés).
+- **Création sans écran intermédiaire.** « Nouvelle séance » / « Nouveau plan » sont
+  des **POST** qui créent un brouillon titré par défaut (plan : 4 semaines) et
+  redirigent vers l'éditeur avec `rename=1`, qui ouvre le titre en édition en ligne.
+  Il n'y a plus de `WorkoutType` ni de `PlanTemplateType`. Le slug d'un brouillon est
+  régénéré au **premier** vrai renommage seulement (`SlugGenerator::derivesFrom`) :
+  une entité déjà nommée garde le sien, sinon son lien de partage public casserait.
+- **Métadonnées : édition en ligne uniquement.** Titre, description et nombre de
+  semaines n'ont plus de formulaire de repli — c'est un choix assumé : sans JS, ces
+  trois champs ne sont pas modifiables (le reste des éditeurs garde son repli par
+  redirection). Les routes `edit` de séance et de plan sont donc en **GET seul**.
 - **Pas d'inscription publique.** Les comptes se créent en console
   (`app:user:create`, rôle ROLE_USER), comme les promotions (`app:user:promote`,
   `app:user:promote-coach`). L'app n'expose que ce que le titulaire du compte peut
@@ -163,6 +198,12 @@ séries détaillées, **relation coach ↔ athlète** (hub `/coaching`, espace
 coach `/coach`, `ROLE_COACH`) — cf. §3 pour la règle de propriété — et
 **paramètres de compte** (`/profile/settings` : changement de mot de passe,
 création de compte par `app:user:create`).
+
+Dernier lot (fluidité d'édition & navigation) : création en un clic, éditeurs sans
+formulaire de métadonnées, semaines ajoutées une par une ou par paquet, compteur de
+séries synchronisé dans les deux sens, **nav réduite à 4 entrées + menu de compte**
+sur l'avatar, profil complet de l'athlète visible par son coach, et **relation
+Objectif ↔ Plan (N:N)** navigable des deux côtés.
 
 ---
 

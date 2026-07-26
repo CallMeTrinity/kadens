@@ -144,11 +144,34 @@
         </section>
     {% endfor %}
 
-    <form method="post" class="kd-planweek__add"
-          action="{{ path('app_plan_template_week_add', {id: template.id}) }}">
-        <input type="hidden" name="_token" value="{{ csrf_token('week_add' ~ template.id) }}">
-        <button type="submit" class="kd-btn kd-btn--secondary kd-btn--sm">
-            {{ ux_icon('lucide:calendar-plus') }} Ajouter une semaine
-        </button>
-    </form>
+    {# La durée du plan n'est plus un nombre qu'on saisit : elle se construit
+       semaine par semaine. Le champ « + N » est là pour ne pas cliquer douze fois
+       quand on connaît déjà la longueur du bloc. Deux formulaires distincts (même
+       intention CSRF) : le bouton « +1 » ne doit pas être bloqué par la validation
+       HTML5 du champ nombre. #}
+    {% set remaining = 52 - template.durationWeeks %}
+    <div class="kd-planweek__add">
+        {% if remaining > 0 %}
+            <form method="post" action="{{ path('app_plan_template_week_add', {id: template.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('week_add' ~ template.id) }}">
+                <button type="submit" class="kd-btn kd-btn--secondary kd-btn--sm">
+                    {{ ux_icon('lucide:calendar-plus') }} Ajouter une semaine
+                </button>
+            </form>
+
+            <form method="post" action="{{ path('app_plan_template_week_add', {id: template.id}) }}"
+                  class="kd-planweek__addmany">
+                <input type="hidden" name="_token" value="{{ csrf_token('week_add' ~ template.id) }}">
+                <label class="kd-planweek__addlabel" for="plan-add-weeks">ou d'un coup</label>
+                <input type="number" name="count" id="plan-add-weeks" value="4"
+                       min="1" max="{{ remaining }}" class="kd-input kd-planweek__addcount"
+                       aria-label="Nombre de semaines à ajouter">
+                <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm">
+                    {{ ux_icon('lucide:plus') }} Ajouter
+                </button>
+            </form>
+        {% else %}
+            <p class="kd-planweek__addfull">Plan au maximum : 52 semaines.</p>
+        {% endif %}
+    </div>
 </div>

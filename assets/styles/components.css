@@ -96,29 +96,88 @@ turbo-frame { display: block; }
   align-items: center;
   gap: var(--kd-space-5);
 }
-.kd-header__user {
+/* Menu de compte — <details> natif (clavier + sans-JS), panneau flottant.
+   Porte tout ce qui relève du compte et non du travail quotidien : profil,
+   objectifs, coaching, athlètes, paramètres, déconnexion. */
+.kd-usermenu { position: relative; }
+.kd-usermenu__trigger {
   display: inline-flex;
   align-items: center;
   gap: var(--kd-space-2);
-  font-family: var(--font-mono);
-  font-size: 11px;
+  padding: var(--kd-space-1) var(--kd-space-2);
+  border-radius: var(--kd-radius-pill);
+  cursor: pointer;
   color: var(--color-text-faint);
+  list-style: none;
 }
-.kd-header__user svg { width: 15px; height: 15px; }
-.kd-header__logout {
+.kd-usermenu__trigger::-webkit-details-marker { display: none; }
+.kd-usermenu__trigger:hover { background: var(--color-surface-subtle); }
+.kd-usermenu__trigger.is-active { color: var(--color-primary); }
+.kd-usermenu__trigger svg {
+  width: 14px;
+  height: 14px;
+  transition: transform .15s ease;
+}
+.kd-usermenu[open] .kd-usermenu__trigger svg { transform: rotate(180deg); }
+.kd-usermenu__avatar {
   display: inline-flex;
-  color: var(--color-text-faint);
-  padding: var(--kd-space-2);
-  border-radius: var(--kd-radius-sm);
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--kd-radius-full);
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 12px;
 }
-.kd-header__logout:hover { color: var(--color-primary); background: var(--color-surface-subtle); }
-.kd-header__logout svg { width: 16px; height: 16px; }
+.kd-usermenu__panel {
+  position: absolute;
+  top: calc(100% + var(--kd-space-3));
+  right: 0;
+  z-index: 40;
+  min-width: 208px;
+  padding: var(--kd-space-3);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  box-shadow: var(--shadow-card);
+}
+.kd-usermenu__who {
+  margin: 0 0 var(--kd-space-2);
+  padding: 0 var(--kd-space-3) var(--kd-space-3);
+  border-bottom: 1px solid var(--color-divider);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-faint);
+  overflow-wrap: anywhere;
+}
+.kd-usermenu__list { display: flex; flex-direction: column; }
+.kd-usermenu__link {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  padding: var(--kd-space-3);
+  border-radius: var(--kd-radius-md);
+  font-size: 13px;
+  color: var(--color-text-strong);
+}
+.kd-usermenu__link:hover { background: var(--color-surface-subtle); }
+.kd-usermenu__link.is-active { color: var(--color-primary); background: var(--color-primary-tint); }
+.kd-usermenu__link svg { width: 15px; height: 15px; flex: none; }
+.kd-usermenu__link--out {
+  margin-top: var(--kd-space-2);
+  padding-top: var(--kd-space-3);
+  border-top: 1px solid var(--color-divider);
+  border-radius: 0 0 var(--kd-radius-md) var(--kd-radius-md);
+  color: var(--color-text-secondary);
+}
 
 /* Nav condensée : on masque les libellés, on garde les icônes */
 @media (max-width: 780px) {
   .kd-nav__link span { display: none; }
   .kd-nav__link { padding: 7px var(--kd-space-3); }
-  .kd-header__user span { display: none; }
 }
 
 /* ----------------------------------------------------------------------------
@@ -284,6 +343,8 @@ turbo-frame { display: block; }
 }
 .kd-badge--run  { background: var(--color-activity-run-tint); color: var(--color-activity-run-text); }
 .kd-badge--gym  { background: var(--color-activity-gym-tint); color: var(--color-activity-gym-text); }
+/* Accent primaire — réservé à l'objectif (tuile terracotta des maquettes). */
+.kd-badge--accent { background: var(--color-primary-tint); color: var(--color-primary-on-tint); }
 
 /* Statuts prévu / réalisé — pastille + libellé */
 .kd-badge--done    { color: var(--color-status-done); }
@@ -2857,7 +2918,31 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
   background: var(--color-surface-raised);
   color: var(--color-text);
 }
-.kd-planweek__add { margin: var(--kd-space-6) 0 0; display: flex; justify-content: center; }
+/* Pied de trame : la durée du plan se construit semaine par semaine (bouton « +1 »)
+   ou par paquet (champ « + N »), il n'y a plus de champ « nombre de semaines ». */
+.kd-planweek__add {
+  margin: var(--kd-space-6) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--kd-space-4);
+}
+.kd-planweek__addmany { display: flex; align-items: center; gap: var(--kd-space-2); }
+.kd-planweek__addlabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-planweek__addcount { width: 4.5em; text-align: center; }
+.kd-planweek__addfull {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
 
 /* Charge de la semaine ventilée par activité (chips + détail dépliable). */
 .kd-weekvol {
@@ -3023,12 +3108,6 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
   outline: none;
 }
 textarea.kd-inlineedit__input { min-height: 3.2em; resize: vertical; }
-.kd-metafallback > summary {
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-text-faint);
-}
 
 /* ----------------------------------------------------------------------------
    Mini-modale d'édition rapide (éditeur de plan)
@@ -3686,6 +3765,78 @@ textarea.kd-inlineedit__input { min-height: 3.2em; resize: vertical; }
   display: grid;
   gap: var(--kd-space-4);
 }
+
+/* ----------------------------------------------------------------------------
+   Objectif ↔ Plan (relation N:N)
+   Le bandeau de l'éditeur de plan (« à quoi sert ce plan ») et la liste des plans
+   de préparation sur la fiche objectif. Couleur : terracotta, l'objectif est un
+   accent primaire dans les maquettes — jamais une couleur d'activité.
+   ---------------------------------------------------------------------------- */
+.kd-plangoals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-3);
+  margin: var(--kd-space-5) 0 0;
+}
+.kd-plangoals__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-plangoals__label svg { width: 13px; height: 13px; }
+.kd-plangoals__empty { font-size: 12px; color: var(--color-text-placeholder); }
+.kd-plangoals__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  padding: var(--kd-space-1) var(--kd-space-2) var(--kd-space-1) var(--kd-space-4);
+  border-radius: var(--kd-radius-pill);
+  background: var(--color-primary-tint);
+  font-size: 12px;
+}
+.kd-plangoals__pill a { color: var(--color-primary-on-tint); font-weight: var(--kd-weight-semibold); }
+.kd-plangoals__days { font-family: var(--font-mono); font-size: 10px; color: var(--color-primary); }
+.kd-plangoals__remove {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--color-primary);
+  border-radius: var(--kd-radius-full);
+}
+.kd-plangoals__remove:hover { background: var(--color-surface-raised); }
+.kd-plangoals__remove svg { width: 12px; height: 12px; }
+.kd-plangoals__add { display: flex; align-items: center; gap: var(--kd-space-2); }
+.kd-plangoals__select { max-width: 220px; }
+
+.kd-goalplans { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--kd-space-2); }
+.kd-goalplan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-3);
+  padding: var(--kd-space-3) 0;
+  border-bottom: 1px solid var(--color-divider-soft);
+}
+.kd-goalplan:last-child { border-bottom: 0; }
+.kd-goalplan__name { font-weight: var(--kd-weight-semibold); color: var(--color-text-strong); }
+.kd-goalplan__actions { margin-left: auto; display: flex; align-items: center; gap: var(--kd-space-2); }
+.kd-goalplans__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-3);
+  margin-top: var(--kd-space-5);
+}
+.kd-goalplans__attach { display: flex; align-items: center; gap: var(--kd-space-2); }
+.kd-goalplans__attach select { max-width: 260px; }
 
 .kd-goalcard {
   display: flex;

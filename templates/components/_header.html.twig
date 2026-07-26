@@ -2,6 +2,12 @@
     Header applicatif réutilisable — barre de navigation « Carnet clair ».
     Rendu uniquement pour un utilisateur connecté (inclus sous `if app.user`
     dans base.html.twig). L'état actif est déduit du préfixe de la route courante.
+
+    La barre ne porte que le travail quotidien (4 entrées). Tout ce qui relève du
+    compte — profil, objectifs, coaching, athlètes, paramètres — vit dans le menu
+    de l'avatar : un `<details>` natif, donc utilisable au clavier ET sans JS
+    (condition du cache offline). Le contrôleur `dismiss` n'ajoute que le confort
+    (fermeture au clic extérieur et à Échap).
 #}
 {% set route = app.request.attributes.get('_route') %}
 {% set items = [
@@ -9,16 +15,37 @@
     { label: 'Séances',     icon: 'lucide:clipboard-list', path: 'app_workout_index',        match: 'app_workout' },
     { label: 'Plans',       icon: 'lucide:layers',         path: 'app_plan_template_index',  match: 'app_plan_template' },
     { label: 'Calendrier',  icon: 'lucide:calendar-days',  path: 'app_calendar_index',       match: 'app_calendar' },
-    { label: 'Objectifs',   icon: 'lucide:target',         path: 'app_goal_index',           match: 'app_goal' },
-    { label: 'Coaching',    icon: 'lucide:users',          path: 'app_coaching_index',       match: 'app_coaching' },
 ] %}
-{# L'espace de travail coach n'a de sens que pour un ROLE_COACH : les autres ne
-   voient que le hub relation, où ils reçoivent et acceptent les demandes. #}
+
+{# Entrées du menu de compte. L'espace de travail coach n'a de sens que pour un
+   ROLE_COACH : les autres ne voient que le hub relation, où ils reçoivent et
+   acceptent les demandes. #}
+{# `routes` (liste exacte) plutôt que `match` (préfixe) quand le préfixe
+   déborderait : « app_profile » couvrirait sinon app_profile_settings, et deux
+   entrées s'allumeraient en même temps. #}
+{% set menuItems = [
+    { label: 'Mon profil',  icon: 'lucide:user',        path: 'app_profile',          routes: ['app_profile', 'app_profile_edit'] },
+    { label: 'Objectifs',   icon: 'lucide:target',      path: 'app_goal_index',       match: 'app_goal' },
+    { label: 'Coaching',    icon: 'lucide:users',       path: 'app_coaching_index',   match: 'app_coaching' },
+] %}
 {% if app.user.isCoach %}
-    {% set items = items|merge([
+    {% set menuItems = menuItems|merge([
         { label: 'Mes athlètes', icon: 'lucide:user-check', path: 'app_coach_dashboard', match: 'app_coach' },
     ]) %}
 {% endif %}
+{% set menuItems = menuItems|merge([
+    { label: 'Paramètres', icon: 'lucide:settings-2', path: 'app_profile_settings', routes: ['app_profile_settings'] },
+]) %}
+
+{# Le repère de page courante ne doit pas disparaître parce que la page est passée
+   dans le menu : le déclencheur s'allume quand la route courante y appartient. #}
+{% set activeMenuItem = null %}
+{% for item in menuItems %}
+    {% set hit = item.routes is defined
+        ? route in item.routes
+        : (route == item.match or route starts with item.match ~ '_') %}
+    {% if hit %}{% set activeMenuItem = item.label %}{% endif %}
+{% endfor %}
 
 <header class="kd-header">
     <div class="kd-header__inner">
@@ -39,12 +66,29 @@
         </nav>
 
         <div class="kd-header__end">
-            <a href="{{ path('app_profile') }}" class="kd-header__user">
-                {{ ux_icon('lucide:user') }}<span>{{ app.user.userIdentifier }}</span>
-            </a>
-            <a href="{{ path('app_logout') }}" class="kd-header__logout" title="Déconnexion" aria-label="Déconnexion">
-                {{ ux_icon('lucide:log-out') }}
-            </a>
+            <details class="kd-usermenu" data-controller="dismiss">
+                <summary class="kd-usermenu__trigger{{ activeMenuItem ? ' is-active' }}"
+                         aria-label="Menu du compte">
+                    <span class="kd-usermenu__avatar" aria-hidden="true">{{ app.user.userIdentifier|first|upper }}</span>
+                    {{ ux_icon('lucide:chevron-down') }}
+                </summary>
+                <div class="kd-usermenu__panel">
+                    <p class="kd-usermenu__who">{{ app.user.userIdentifier }}</p>
+                    <nav class="kd-usermenu__list" aria-label="Menu du compte">
+                        {% for item in menuItems %}
+                            {% set active = activeMenuItem == item.label %}
+                            <a href="{{ path(item.path) }}"
+                               class="kd-usermenu__link{{ active ? ' is-active' }}"
+                               {{ active ? 'aria-current="page"' }}>
+                                {{ ux_icon(item.icon) }}<span>{{ item.label }}</span>
+                            </a>
+                        {% endfor %}
+                        <a href="{{ path('app_logout') }}" class="kd-usermenu__link kd-usermenu__link--out">
+                            {{ ux_icon('lucide:log-out') }}<span>Déconnexion</span>
+                        </a>
+                    </nav>
+                </div>
+            </details>
         </div>
     </div>
 </header>

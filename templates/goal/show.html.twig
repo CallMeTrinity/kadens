@@ -58,6 +58,71 @@
         </section>
     {% endif %}
 
+    {# ------------------------ PLANS DE PRÉPARATION ------------------------- #}
+    {# Le pendant du bandeau d'objectifs de l'éditeur de plan : le lien se pose et
+       se défait des deux côtés. Rattacher documente l'intention (« ces plans
+       préparent cette échéance ») ; ancrer sur le calendrier, c'est le bloc
+       suivant. Plusieurs plans par objectif : une prépa se découpe souvent en
+       blocs (base puis spécifique). #}
+    <section class="kd-card kd-section__block">
+        <h2 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:layers') }} Plans de préparation</h2>
+
+        {% if goal.planTemplates is empty %}
+            <div class="kd-empty">
+                {{ ux_icon('lucide:layers') }}
+                <div>Aucun plan rattaché à cette échéance.</div>
+            </div>
+        {% else %}
+            <ul class="kd-goalplans">
+                {% for plan in goal.planTemplates %}
+                    <li class="kd-goalplan">
+                        <a href="{{ path('app_plan_template_show', {id: plan.id}) }}" class="kd-goalplan__name">{{ plan.title }}</a>
+                        {% if plan.durationWeeks %}
+                            <span class="kd-tag">{{ plan.durationWeeks }} sem.</span>
+                        {% endif %}
+                        <div class="kd-goalplan__actions">
+                            <a href="{{ path('app_plan_template_edit', {id: plan.id}) }}" class="kd-btn kd-btn--ghost kd-btn--sm">
+                                {{ ux_icon('lucide:square-pen') }} Éditer
+                            </a>
+                            <form method="post" action="{{ path('app_goal_plans', {id: goal.id}) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('goal_plans' ~ goal.id) }}">
+                                <input type="hidden" name="action" value="detach">
+                                <input type="hidden" name="planTemplate" value="{{ plan.id }}">
+                                <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm"
+                                        title="Détacher ce plan" aria-label="Détacher « {{ plan.title }} »">
+                                    {{ ux_icon('lucide:x') }}
+                                </button>
+                            </form>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <div class="kd-goalplans__tools">
+            {% if attachablePlans is not empty %}
+                <form method="post" action="{{ path('app_goal_plans', {id: goal.id}) }}" class="kd-goalplans__attach">
+                    <input type="hidden" name="_token" value="{{ csrf_token('goal_plans' ~ goal.id) }}">
+                    <input type="hidden" name="action" value="attach">
+                    <select name="planTemplate" class="kd-input kd-select" aria-label="Rattacher un plan existant" required>
+                        <option value="">Rattacher un plan existant…</option>
+                        {% for plan in attachablePlans %}
+                            <option value="{{ plan.id }}">{{ plan.title }}{% if plan.durationWeeks %} ({{ plan.durationWeeks }} sem.){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="kd-btn kd-btn--secondary kd-btn--sm">
+                        {{ ux_icon('lucide:link-2') }} Rattacher
+                    </button>
+                </form>
+            {% endif %}
+            {{ include('components/_create_button.html.twig', {
+                route: 'app_goal_plan_new', token: 'goal_plan_new' ~ goal.id,
+                params: {id: goal.id}, label: 'Nouveau plan pour cet objectif',
+                class: 'kd-btn kd-btn--secondary kd-btn--sm',
+            }) }}
+        </div>
+    </section>
+
     {# ---------------------- PRÉPARER AVEC UN PLAN -------------------------- #}
     {% if not goal.isPast %}
         <section class="kd-card kd-section__block">
@@ -66,7 +131,7 @@
             {% if plans is empty %}
                 <div class="kd-empty">
                     {{ ux_icon('lucide:layers') }}
-                    <div>Tu n'as pas encore de plan. <a href="{{ path('app_plan_template_new') }}">Crée une trame</a> pour l'ancrer sur cette date.</div>
+                    <div>Tu n'as pas encore de plan. Crée une trame ci-dessus pour l'ancrer sur cette date.</div>
                 </div>
             {% else %}
                 <form method="post" action="{{ path('app_goal_prepare', {id: goal.id}) }}" class="kd-goalprepare">

@@ -1,0 +1,49 @@
+{# Contenu de #plan-goals : à quoi sert ce plan. Le rattachement est libre et
+   réversible (relation N:N) — il documente l'intention, il ne contraint ni les
+   dates ni le contenu. Pour ancrer réellement le plan sur une échéance, c'est
+   « Préparer avec un plan » depuis la fiche objectif.
+
+   Contexte fourni par goalsContext() : template, linkedGoals, availableGoals.
+   Formulaires natifs : hors interception `plangrid`, Turbo global les prend en
+   charge et le contrôleur répond en stream ciblé. #}
+{% set goalsUrl = path('app_plan_template_goals', {id: template.id}) %}
+{% set token = csrf_token('plan_goals' ~ template.id) %}
+
+<div class="kd-plangoals">
+    <span class="kd-plangoals__label">{{ ux_icon('lucide:target') }} Objectifs préparés</span>
+
+    {% for goal in linkedGoals %}
+        {% set days = goal.daysUntil %}
+        <span class="kd-plangoals__pill">
+            <a href="{{ path('app_goal_show', {id: goal.id}) }}">{{ goal.title }}</a>
+            {% if days is not null %}
+                <span class="kd-plangoals__days">{{ days >= 0 ? 'J-' ~ days : 'passé' }}</span>
+            {% endif %}
+            <form method="post" action="{{ goalsUrl }}">
+                <input type="hidden" name="_token" value="{{ token }}">
+                <input type="hidden" name="action" value="detach">
+                <input type="hidden" name="goalId" value="{{ goal.id }}">
+                <button type="submit" class="kd-plangoals__remove"
+                        title="Détacher « {{ goal.title }} »" aria-label="Détacher « {{ goal.title }} »">
+                    {{ ux_icon('lucide:x') }}
+                </button>
+            </form>
+        </span>
+    {% else %}
+        <span class="kd-plangoals__empty">Aucun objectif rattaché.</span>
+    {% endfor %}
+
+    {% if availableGoals is not empty %}
+        <form method="post" action="{{ goalsUrl }}" class="kd-plangoals__add">
+            <input type="hidden" name="_token" value="{{ token }}">
+            <input type="hidden" name="action" value="attach">
+            <select name="goalId" class="kd-input kd-select kd-plangoals__select" aria-label="Rattacher un objectif" required>
+                <option value="">Rattacher un objectif…</option>
+                {% for goal in availableGoals %}
+                    <option value="{{ goal.id }}">{{ goal.title }}{% if goal.daysUntil is not null %} · J-{{ goal.daysUntil }}{% endif %}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm">{{ ux_icon('lucide:link-2') }} Rattacher</button>
+        </form>
+    {% endif %}
+</div>

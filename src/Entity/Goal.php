@@ -6,6 +6,8 @@ use App\Enum\ActivityType;
 use App\Enum\GoalOutcome;
 use App\Enum\GoalPriority;
 use App\Repository\GoalRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -64,6 +66,23 @@ class Goal
 
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $updatedAt = null;
+
+    /**
+     * Plans qui préparent cet objectif. Relation N:N : une préparation se découpe
+     * souvent en plusieurs blocs (base puis spécifique), et un même plan peut servir
+     * deux échéances. Côté inverse — la table de jointure est portée par
+     * PlanTemplate.
+     *
+     * @var Collection<int, PlanTemplate>
+     */
+    #[ORM\ManyToMany(targetEntity: PlanTemplate::class, mappedBy: 'goals')]
+    #[ORM\OrderBy(['title' => 'ASC'])]
+    private Collection $planTemplates;
+
+    public function __construct()
+    {
+        $this->planTemplates = new ArrayCollection();
+    }
 
     #[ORM\PrePersist]
     public function onPrePersist(): void
@@ -198,6 +217,14 @@ class Goal
     public function getUpdatedAt(): ?\DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    /**
+     * @return Collection<int, PlanTemplate>
+     */
+    public function getPlanTemplates(): Collection
+    {
+        return $this->planTemplates;
     }
 
     /**

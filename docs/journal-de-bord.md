@@ -860,3 +860,110 @@ bouton unique), icônes déjà locales (`settings-2`, `lock`). **Tests** :
 court, identique à l'actuel (tous en **422**, contrat Turbo des formulaires
 invalides) et succès vérifiant à la fois le nouveau hash et le **maintien de la
 session**.
+
+### Lot — Fluidité d'édition & resserrage de la navigation (26/07/2026)
+
+**Besoin** : l'app était complète mais gardait des écrans et des onglets qui
+existaient pour des raisons techniques, pas pour l'utilisateur — sept frictions
+traitées d'un bloc.
+
+**Création en un clic.** « Nouvelle séance » / « Nouveau plan » passaient par un
+écran de formulaire. Ils deviennent des **POST** (fragment
+`components/_create_button.html.twig`, réutilisé par les index, leurs états vides
+et la fiche objectif) qui créent un brouillon titré par défaut — plan à
+`DRAFT_PLAN_WEEKS = 4` semaines — puis redirigent vers l'éditeur avec `rename=1`.
+Le contrôleur `inline-edit` gagne une value `autofocus` : le titre s'ouvre,
+prérempli et sélectionné, taper le remplace. On généralise le geste que
+`CoachController::newWorkout`/`newPlan` faisait déjà, on n'invente pas un second
+pattern. **Piège traité** : tous les brouillons naissaient avec le slug
+`nouvelle-seance-N`. `SlugGenerator` gagne `base()` et `derivesFrom()` ; `updateMeta`
+régénère le slug au **premier** renommage seulement (racine du titre par défaut +
+suffixe numérique), donc une entité déjà nommée garde son lien de partage public.
+Suppression de `workout/new.html.twig`, `plan_template/new.html.twig`,
+`WorkoutType` et `PlanTemplateType`.
+
+**Éditeurs sans formulaire de métadonnées.** Le `<details>` « Modifier les infos
+(formulaire) » disparaît des deux éditeurs, les routes `edit` passent en **GET
+seul**. Régression assumée et documentée : sans JS, titre/description/semaines ne
+sont plus modifiables (le reste des éditeurs garde son repli par redirection).
+
+**Semaines une par une ou par paquet.** `addWeek` lit un `count` (défaut 1) et le
+**borne** à ce qui reste sous 52 au lieu de refuser tout le paquet. Pied de trame :
+bouton « Ajouter une semaine » + champ « ou d'un coup » (deux `<form>` distincts,
+même intention CSRF — le bouton « +1 » ne doit pas être bloqué par la validation
+HTML5 du champ nombre). Message explicite au plafond.
+
+**Compteur de séries synchronisé dans les deux sens.** Le scalaire `sets` et la
+collection `PrescribedSet` décrivaient la même chose sans jamais se parler : passer
+en détaillé, ajouter deux séries puis revenir au simple reperdait les deux.
+Nouveau service **`SetSynchronizer`** : `syncScalarFromDetailed()` (toute mutation
+de la collection réécrit le scalaire) et `applyScalarToDetailed()` (modifier le
+scalaire ajoute/retire des lignes `NORMAL` en fin). Référence commune = les séries
+**de travail**, échauffement exclu, aligné sur `getWorkingSetCount()` — un
+échauffement n'est donc jamais supprimé par une baisse du compteur. Câblé sur
+`addSet`/`deleteSet`/`editSet`/`editPrescribed` (`moveSet` ne change pas le
+décompte). Le champ « séries » **reste visible et éditable** en mode détaillé, avec
+un `.kd-help` qui dit la règle. Deux pièges de rendu : (1) `editSet` conserve son
+stream « ligne seule » (focus préservé pendant la saisie) mais bascule sur le
+panneau complet **si le décompte a bougé** — ça ne concerne que le `<select>` de
+type ; (2) `editPrescribed` fait de même quand `sets` a piloté la liste.
+**Correctif au passage** : `_prescribed_form` sautait `reps`/`weightKg`/
+`durationSeconds` en mode détaillé, mais `form_end()` appelle `form_rest()` qui les
+re-rendait en fin de formulaire, hors des cibles `prescription-fields` (donc jamais
+masqués par le type d'effort) et en double saisie contradictoire. Corrigé par une
+option `detailed` sur `PrescribedExerciseType` : un champ **non déclaré** ne peut
+être ni rendu ni écrasé. Tests : `SetSynchronizerTest` (7) et un fonctionnel
+« simple 4 → détailler → +2 → mode simple = 6 » — il n'existait aucun test sur
+`set_add`/`set_clear`.
+
+**Navigation à 4 entrées + menu de compte.** La barre ne garde que le travail
+quotidien (Exercices / Séances / Plans / Calendrier). Objectifs, Coaching, Mes
+athlètes, Mon profil et Paramètres passent dans un menu déroulant sur l'avatar,
+implémenté en **`<details>`/`<summary>` natif** — clavier et sans-JS, condition du
+cache offline. Le contrôleur `dismiss` n'ajoute que la fermeture au clic extérieur
+et à Échap. Le déclencheur s'allume quand la route courante appartient au menu
+(sinon on perdait le repère de page courante) ; les entrées `app_profile` et
+`app_profile_settings` utilisent une liste `routes` exacte, le préfixe débordait et
+allumait deux entrées à la fois. Couche CSS `.kd-usermenu*`. Aucune route ni
+contrôleur touché.
+
+**Profil complet de l'athlète côté coach.** `ProfileStats::for()` et
+`HeartRateZones::forUser()` prenaient déjà n'importe quel `User` : tout était dans
+le découpage des vues. Extraction de `profile/_stats.html.twig` et
+`profile/_athlete_sheet.html.twig` (paramètres `stats`, `hrZones`, `own`), inclus
+par la page profil (`own: true`) et par `coach/athlete` (`own: false` : aucun lien
+d'édition, la fiche appartient à l'athlète). **Correctif de sécurité** : `GoalVoter`
+était strictement owner-only alors que la page athlète rendait des cartes pointant
+vers `app_goal_show` — 403 garanti. Branche « coach accepté du propriétaire »
+ajoutée sur le modèle de `WorkoutVoter`. Conséquence directe traitée :
+`GoalController::show` scopait les plans et le lead-up sur `$this->getUser()`, il
+scope désormais sur `$goal->getOwner()` — sans quoi le coach voyait **son** contenu
+sur la fiche de son athlète.
+
+**Relation Objectif ↔ Plan (N:N).** Le lien plan↔objectif était transitoire :
+`prepare` instanciait puis oubliait. Table de jointure `plan_template_goal`
+(migration `Version20260726191020`), côté propriétaire sur `PlanTemplate`.
+`addGoal`/`removeGoal` maintiennent **les deux côtés** (piège connu du projet : un
+fragment re-rendu par Turbo Stream dans la même requête montrerait un état périmé).
+N:N assumé : une prépa se découpe en blocs (base puis spécifique), un plan peut
+servir deux échéances. Deux points d'entrée symétriques : bandeau `#plan-goals`
+dans l'éditeur de plan (stream ciblé, calqué sur `gridResponse()`) et section
+« Plans de préparation » sur la fiche objectif (rattacher un plan existant, ou
+`app_goal_plan_new` qui crée un brouillon **déjà lié**). `prepare` rattache
+désormais au passage. **Scoping** : les deux endpoints n'acceptent que du contenu
+dont l'`owner` est celui de l'entité courante, jamais `$this->getUser()` — c'est ce
+qui rend le coach correct. Badge d'objectif sur la vue plan, **jamais sur la page
+publique** (les objectifs sont privés). Tests : 4 sur `GoalControllerTest`
+(rattacher/détacher, refus d'un plan d'autrui, création déjà liée, `prepare` qui
+lie) et 1 sur `PlanTemplateControllerTest` (côté éditeur).
+
+**Au passage** : `--color-divider-soft` était utilisé dans `components.css` sans
+exister comme token sémantique (seule la primitive `--kd-divider-soft` était
+définie) — deux règles étaient donc silencieusement invalides. Token ajouté.
+La migration générée par `doctrine:migrations:diff` embarquait aussi des
+renommages d'index sans rapport (`prescribed_set`, `scheduled_workout`, `user` :
+noms posés à la main vs noms auto Doctrine) : écartés du fichier, c'est du bruit
+sans effet fonctionnel — le `doctrine:schema:validate` reste donc « not in sync »
+sur ce point précis, comme avant ce lot.
+
+**Tests** : 120 au vert (105 avant le lot).

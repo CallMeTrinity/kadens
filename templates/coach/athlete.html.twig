@@ -244,4 +244,11 @@
             </div>
         {% endif %}
     </section>
+
+    {# --------------------- SON PROFIL (lecture seule) ----------------------- #}
+    {# Mêmes fragments que la page profil de l'athlète : sans ses 1RM, ses records
+       et ses zones cardio, on ne peut pas programmer sérieusement. `own: false` :
+       la fiche lui appartient, le coach la lit (aucun lien d'édition). #}
+    {{ include('profile/_stats.html.twig', {stats: stats, own: false}) }}
+    {{ include('profile/_athlete_sheet.html.twig', {stats: stats, hrZones: hrZones, own: false}) }}
 {% endblock %}

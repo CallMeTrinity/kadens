@@ -1,0 +1,88 @@
+{# Fiche athlète : identité, force, endurance, zones cardio, bio.
+
+   Extrait de profile/index pour être réutilisé tel quel sur la page athlète du
+   coach — c'est exactement ce dont il a besoin pour programmer (1RM, records,
+   zones). Aucun `app.user` ici : tout vient des paramètres. Les liens d'édition
+   ne sont rendus que pour son propre profil (`own`) : la fiche appartient à
+   l'athlète, le coach la lit.
+
+   Paramètres :
+   - stats : sortie de ProfileStats::for($user) (on n'en lit que `athlete`)
+   - hrZones : sortie de HeartRateZones::forUser($user)
+   - own : true = c'est mon profil (liens d'édition, tutoiement) #}
+{% set own = own|default(false) %}
+{% set card = stats.athlete %}
+
+<section class="kd-section">
+    <div class="kd-pagehead kd-pagehead--sub">
+        <div>
+            <p class="kd-eyebrow kd-eyebrow--accent">Fiche athlète</p>
+            <h2 class="kd-title kd-title--sm">{{ own ? 'Tes mesures et records' : 'Mesures et records' }}</h2>
+        </div>
+        {% if own and card.hasAny %}
+            <a href="{{ path('app_profile_edit') }}" class="kd-btn kd-btn--ghost">
+                {{ ux_icon('lucide:square-pen') }} Éditer
+            </a>
+        {% endif %}
+    </div>
+
+    {% if not card.hasAny %}
+        <div class="kd-card">
+            <div class="kd-empty">
+                {{ ux_icon('lucide:user') }}
+                {% if own %}
+                    <div>Ta fiche est vide. <a href="{{ path('app_profile_edit') }}">Renseigne tes infos</a> (taille, poids, records…).</div>
+                {% else %}
+                    <div>Fiche vide : cet athlète n'a pas encore renseigné ses mesures ni ses records.</div>
+                {% endif %}
+            </div>
+        </div>
+    {% else %}
+        <div class="kd-grid kd-grid--3 kd-section__block" style="align-items:start;">
+            {% set groups = [
+                { title: 'Identité',  icon: 'lucide:user',       rows: card.identity },
+                { title: 'Force',     icon: 'lucide:dumbbell',   rows: card.strength },
+                { title: 'Endurance', icon: 'lucide:footprints', rows: card.endurance },
+            ] %}
+            {% for g in groups %}
+                <section class="kd-card">
+                    <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon(g.icon) }} {{ g.title }}</h3>
+                    <dl class="kd-deflist kd-deflist--profile">
+                        {% for r in g.rows %}
+                            <dt>{{ r.label }}</dt>
+                            <dd class="{{ r.derived ?? false ? 'kd-deflist__derived' }}{{ r.value is null ? ' kd-deflist__empty' }}">{{ r.value ?? '—' }}</dd>
+                        {% endfor %}
+                    </dl>
+                </section>
+            {% endfor %}
+        </div>
+
+        {# Zones cardio : n'a de sens qu'avec une FC max renseignée (bornes BPM). #}
+        {% if hrZones|first.max is not null %}
+            <section class="kd-card kd-hrzones kd-section__block">
+                <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:heart-pulse') }} Zones cardio</h3>
+                <ul class="kd-hrzones__list">
+                    {% for band in hrZones %}
+                        <li class="kd-hrzone kd-hrzone--{{ band.zone.value }}">
+                            <span class="kd-hrzone__tag">{{ band.zone.value|upper }}</span>
+                            <span class="kd-hrzone__name">{{ band.zone.label }}</span>
+                            <span class="kd-hrzone__bpm">{{ band.min }}–{{ band.max }} bpm</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+                {% if own %}
+                    <p class="kd-hrzones__hint">Dérivées de ta FC max/repos (Karvonen). <a href="{{ path('app_profile_edit') }}">Ajuster</a>.</p>
+                {% else %}
+                    <p class="kd-hrzones__hint">Dérivées de la FC max/repos de l'athlète (Karvonen).</p>
+                {% endif %}
+            </section>
+        {% endif %}
+
+        {% if card.bio %}
+            <section class="kd-card kd-section__block">
+                <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:quote') }} Bio</h3>
+                <p class="kd-profile__bio">{{ card.bio }}</p>
+            </section>
+        {% endif %}
+    {% endif %}
+</section>

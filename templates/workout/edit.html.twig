@@ -30,12 +30,15 @@
 
     {# En-tête à édition en ligne : titre + description semi-invisibles (comme le
        plan). Cliquer le titre ou la description ouvre un champ, enregistré au blur
-       ou à Entrée via le contrôleur `inline-edit` (aucun bouton). #}
+       ou à Entrée via le contrôleur `inline-edit` (aucun bouton). C'est le seul
+       chemin d'édition des métadonnées : il n'y a plus de formulaire.
+       `rename` (posé par la création en un clic) ouvre le titre d'emblée. #}
     <div class="kd-pagehead">
         <div>
             <p class="kd-eyebrow kd-eyebrow--accent">Compositeur de séance</p>
             <h1 class="kd-title kd-inlineedit"
                 data-controller="inline-edit"
+                data-inline-edit-autofocus-value="{{ app.request.query.get('rename') ? 'true' : 'false' }}"
                 data-inline-edit-url-value="{{ path('app_workout_meta', {id: workout.id}) }}"
                 data-inline-edit-token-value="{{ csrf_token('workout_meta' ~ workout.id) }}"
                 data-inline-edit-field-value="title"
@@ -62,21 +65,6 @@
                title="Cliquer pour modifier">{{ workout.description ?: '+ Ajouter une description' }}</p>
         </div>
     </div>
-
-    {# Repli sans JS pour éditer les infos (en JS : édition en ligne dans l'en-tête). #}
-    <details class="kd-editsection kd-metafallback">
-        <summary>Modifier les infos (formulaire)</summary>
-        <div class="kd-card" style="max-width:640px;">
-            {{ form_start(form) }}
-                {{ form_widget(form) }}
-                <div class="kd-formactions">
-                    <button type="submit" class="kd-btn kd-btn--primary">
-                        {{ ux_icon('lucide:save') }} Enregistrer
-                    </button>
-                </div>
-            {{ form_end(form) }}
-        </div>
-    </details>
 
     {# data-turbo="false" : Turbo n'intercepte aucun formulaire ici ; le contrôleur
        `composer` applique lui-même les Turbo Streams via fetch (voir le contrôleur). #}

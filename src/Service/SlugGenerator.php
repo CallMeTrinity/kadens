@@ -19,16 +19,39 @@ final class SlugGenerator
     }
 
     /**
+     * Racine du slug, sans suffixe d'unicité. Exposée pour reconnaître un slug
+     * encore issu d'un titre donné (ex. « nouvelle-seance », « nouvelle-seance-4 »
+     * pour un brouillon jamais renommé), cf. `derivesFrom()`.
+     */
+    public function base(string $text): string
+    {
+        $base = strtolower($this->slugger->slug($text)->toString());
+
+        return '' === $base ? 'sans-titre' : $base;
+    }
+
+    /**
+     * Le slug dérive-t-il encore de ce texte, c'est-à-dire sa racine suivie au plus
+     * d'un suffixe numérique d'unicité ? Sert à ne régénérer le slug d'un brouillon
+     * qu'au premier vrai renommage, sans jamais toucher celui d'une entité déjà
+     * nommée (ses URLs de partage public doivent rester stables).
+     */
+    public function derivesFrom(?string $slug, string $text): bool
+    {
+        if (null === $slug) {
+            return true;
+        }
+
+        return 1 === preg_match('/^'.preg_quote($this->base($text), '/').'(-\d+)?$/', $slug);
+    }
+
+    /**
      * @param class-string $entityClass entité cible (pour vérifier l'unicité)
      * @param string        $field       propriété portant le slug
      */
     public function generate(string $text, string $entityClass, string $field = 'slug'): string
     {
-        $base = strtolower($this->slugger->slug($text)->toString());
-
-        if ('' === $base) {
-            $base = 'sans-titre';
-        }
+        $base = $this->base($text);
 
         $repository = $this->entityManager->getRepository($entityClass);
 

@@ -14,9 +14,9 @@
             <h1 class="kd-title">Plans</h1>
             <p class="kd-lead">Tes trames multi-semaines : une grille de séances par jour, réutilisable et projetable sur le calendrier.</p>
         </div>
-        <a href="{{ path('app_plan_template_new') }}" class="kd-btn kd-btn--primary">
-            {{ ux_icon('lucide:plus') }} Nouveau plan
-        </a>
+        {{ include('components/_create_button.html.twig', {
+            route: 'app_plan_template_new', token: 'plan_new', label: 'Nouveau plan',
+        }) }}
     </div>
 
     <div data-controller="filter">
@@ -40,9 +40,10 @@
             <div class="kd-card kd-empty">
                 {{ ux_icon('lucide:layers') }}
                 <div>Aucun plan pour l'instant.</div>
-                <a href="{{ path('app_plan_template_new') }}" class="kd-btn kd-btn--secondary kd-btn--sm" style="margin-top:var(--kd-space-6);">
-                    {{ ux_icon('lucide:plus') }} Créer le premier
-                </a>
+                {{ include('components/_create_button.html.twig', {
+                    route: 'app_plan_template_new', token: 'plan_new', label: 'Créer le premier',
+                    class: 'kd-btn kd-btn--secondary kd-btn--sm', style: 'margin-top:var(--kd-space-6);',
+                }) }}
             </div>
         {% else %}
             <div class="kd-grid kd-grid--3" data-filter-target="list">

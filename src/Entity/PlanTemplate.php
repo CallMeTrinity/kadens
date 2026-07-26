@@ -53,10 +53,29 @@ class PlanTemplate
     #[ORM\OneToMany(targetEntity: ScheduledWorkout::class, mappedBy: 'sourcePlanTemplate')]
     private Collection $scheduledWorkouts;
 
+    /**
+     * Objectifs que ce plan prépare. Relation N:N : une préparation se découpe
+     * souvent en plusieurs blocs (base puis spécifique), et un même plan peut servir
+     * deux échéances. Côté PROPRIÉTAIRE — c'est ici que vit la table de jointure,
+     * donc c'est `addGoal`/`removeGoal` qui écrivent en base.
+     *
+     * Le rattachement est libre et réversible : il documente l'intention (« ce plan
+     * sert cette échéance »), il ne contraint ni les dates ni le contenu.
+     *
+     * @var Collection<int, Goal>
+     */
+    #[ORM\ManyToMany(targetEntity: Goal::class, inversedBy: 'planTemplates')]
+    #[ORM\JoinTable(name: 'plan_template_goal')]
+    #[ORM\JoinColumn(onDelete: 'CASCADE')]
+    #[ORM\InverseJoinColumn(onDelete: 'CASCADE')]
+    #[ORM\OrderBy(['targetDate' => 'ASC'])]
+    private Collection $goals;
+
     public function __construct()
     {
         $this->planItems = new ArrayCollection();
         $this->scheduledWorkouts = new ArrayCollection();
+        $this->goals = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -185,6 +204,38 @@ class PlanTemplate
             if ($planItem->getPlanTemplate() === $this) {
                 $planItem->setPlanTemplate(null);
             }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Goal>
+     */
+    public function getGoals(): Collection
+    {
+        return $this->goals;
+    }
+
+    /**
+     * Les deux côtés sont maintenus : sans ça, un fragment re-rendu par Turbo
+     * Stream dans la même requête (la fiche objectif, l'en-tête de plan) montrerait
+     * un état périmé — piège déjà rencontré ailleurs dans ce modèle.
+     */
+    public function addGoal(Goal $goal): static
+    {
+        if (!$this->goals->contains($goal)) {
+            $this->goals->add($goal);
+            $goal->getPlanTemplates()->add($this);
+        }
+
+        return $this;
+    }
+
+    public function removeGoal(Goal $goal): static
+    {
+        if ($this->goals->removeElement($goal)) {
+            $goal->getPlanTemplates()->removeElement($this);
         }
 
         return $this;

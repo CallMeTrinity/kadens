@@ -13,7 +13,9 @@ use App\Repository\PlanTemplateRepository;
 use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
 use App\Service\CoachingResolver;
+use App\Service\HeartRateZones;
 use App\Service\PlanScheduler;
+use App\Service\ProfileStats;
 use App\Service\SlugGenerator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bridge\Doctrine\Attribute\MapEntity;
@@ -69,6 +71,8 @@ final class CoachController extends AbstractController
         PlanTemplateRepository $planTemplateRepository,
         ScheduledWorkoutRepository $scheduledWorkoutRepository,
         GoalRepository $goalRepository,
+        ProfileStats $profileStats,
+        HeartRateZones $heartRateZones,
     ): Response {
         $this->denyUnlessCoachOf($athlete);
 
@@ -80,6 +84,10 @@ final class CoachController extends AbstractController
             'plans' => $planTemplateRepository->findBy(['owner' => $athlete], ['title' => 'ASC']),
             'upcoming' => $scheduledWorkoutRepository->findByOwnerBetween($athlete, $today, $today->modify('+8 weeks')),
             'goals' => $goalRepository->findUpcomingForOwner($athlete, 3),
+            // Mêmes services que la page profil : ils prennent n'importe quel User.
+            // Le coach a besoin des 1RM, records et zones cardio pour programmer.
+            'stats' => $profileStats->for($athlete),
+            'hrZones' => $heartRateZones->forUser($athlete),
         ]);
     }
 

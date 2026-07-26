@@ -139,6 +139,7 @@
   --color-border-strong:   var(--kd-border-strong);
   --color-border-cell:     var(--kd-border-cell);
   --color-divider:         var(--kd-divider);
+  --color-divider-soft:    var(--kd-divider-soft);
 
   /* Primaire (terracotta) */
   --color-primary:         var(--kd-terracotta);
