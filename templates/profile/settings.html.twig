@@ -1,0 +1,72 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Paramètres — Kadens{% endblock %}
+
+{% block body %}
+    <a href="{{ path('app_profile') }}" class="kd-backlink">
+        {{ ux_icon('lucide:arrow-left') }} Mon profil
+    </a>
+
+    {% for message in app.flashes('success') %}
+        <p class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }} {{ message }}</p>
+    {% endfor %}
+
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow kd-eyebrow--accent">Profil</p>
+            <h1 class="kd-title">Paramètres du compte</h1>
+            <p class="kd-lead">Tes identifiants et ta sécurité. Les mesures et records sont sur <a href="{{ path('app_profile_edit') }}">ta fiche athlète</a>.</p>
+        </div>
+    </div>
+
+    {% set u = app.user %}
+    <div class="kd-editform">
+        <section class="kd-card kd-formsection">
+            <header class="kd-formsection__head">
+                <span class="kd-formsection__icon">{{ ux_icon('lucide:user') }}</span>
+                <div>
+                    <h2 class="kd-formsection__title">Compte</h2>
+                    <p class="kd-formsection__hint">L'email sert d'identifiant de connexion. Il se change en console (<code>app:user:create</code> pour un nouveau compte).</p>
+                </div>
+            </header>
+            <dl class="kd-deflist kd-deflist--profile">
+                <dt>Email</dt>
+                <dd>{{ u.userIdentifier }}</dd>
+                <dt>Compte créé le</dt>
+                <dd>{{ u.createdAt ? u.createdAt|date('d/m/Y') : '—' }}</dd>
+                <dt>Rôle</dt>
+                <dd>{{ u.isCoach ? 'Athlète et coach' : 'Athlète' }}</dd>
+            </dl>
+        </section>
+
+        {{ form_start(form, {attr: {class: 'kd-editform'}}) }}
+            <section class="kd-card kd-formsection">
+                <header class="kd-formsection__head">
+                    <span class="kd-formsection__icon">{{ ux_icon('lucide:lock') }}</span>
+                    <div>
+                        <h2 class="kd-formsection__title">Mot de passe</h2>
+                        <p class="kd-formsection__hint">Le mot de passe actuel est demandé pour confirmer que c'est bien toi. Tu restes connecté après le changement.</p>
+                    </div>
+                </header>
+                <div class="kd-formgrid kd-formgrid--full">
+                    {{ form_row(form.currentPassword) }}
+                </div>
+                {# Les contraintes du RepeatedType (longueur, non-concordance,
+                   « identique à l'actuel ») portent sur le champ parent : on rend
+                   ses erreurs à part, les deux enfants étant affichés séparément. #}
+                {{ form_errors(form.plainPassword) }}
+                <div class="kd-formgrid">
+                    {{ form_row(form.plainPassword.first) }}
+                    {{ form_row(form.plainPassword.second) }}
+                </div>
+            </section>
+
+            <div class="kd-editform__bar">
+                <a href="{{ path('app_profile') }}" class="kd-btn kd-btn--ghost">Annuler</a>
+                <button type="submit" class="kd-btn kd-btn--primary">
+                    {{ ux_icon('lucide:save') }} Changer le mot de passe
+                </button>
+            </div>
+        {{ form_end(form) }}
+    </div>
+{% endblock %}

@@ -828,3 +828,35 @@ navigateur (non automatisable ici).
   basculer prévu/fait/manqué — accepté (il aide à la programmation), à séparer en
   attribut STATUS distinct si on veut réserver le « réalisé » à l'athlète ; (3) pas de
   repère visuel « créé par ton coach » côté athlète (aucune colonne auteur, par choix).
+
+### Lot — Création de compte en console & paramètres du profil (26/07/2026)
+
+**Besoin** : l'app n'a jamais eu d'inscription ni d'écran de compte — les users
+étaient créés à la main en base, et le mot de passe n'était changeable nulle part.
+**Décision** : pas d'inscription publique (usage perso / cercle restreint), la
+porte d'entrée reste la console ; l'app n'expose que ce que le titulaire peut
+changer lui-même, c'est-à-dire son mot de passe. **Commande** `app:user:create`
+(`src/Command/CreateUserCommand.php`) : email + mot de passe, rôle de base
+(`setRoles([])`, `getRoles()` ajoutant déjà ROLE_USER), refus si l'email est
+invalide ou déjà pris, minimum 8 caractères. Le mot de passe omis est demandé en
+**saisie masquée avec confirmation** (`askHidden` ×2) pour ne pas le laisser dans
+l'historique du shell ; en mode non interactif sans argument, la commande sort en
+`INVALID`. Les rôles au-delà restent `app:user:promote[-coach]`. **Écran**
+`/profile/settings` (`ProfileController::settings`, sous `^/profile` donc déjà
+couvert par access_control) : carte compte en lecture (email, date de création,
+rôle) + `ChangePasswordType` — `currentPassword` (contrainte `UserPassword`, donc
+valable seulement dans le firewall) et `plainPassword` en `RepeatedType`, tous deux
+**non mappés** (le hachage se fait dans le contrôleur, le formulaire ne voit que du
+clair). Deux pièges traités : (1) le contrôleur refuse un nouveau mot de passe
+identique à l'actuel (`isPasswordValid`), sinon on annonçait « mis à jour » sans
+rien changer ; (2) le hash fait partie du token en session — sans `Security::login($user)`
+après le flush, `ContextListener` voit un utilisateur « changé » et déconnecte
+l'auteur du changement à la requête suivante. Côté rendu, les erreurs du
+`RepeatedType` portent sur le champ **parent** : le template rend `form_errors(form.plainPassword)`
+à part, puis `first`/`second` séparément. **UI** : bouton « Paramètres » dans
+l'en-tête du profil (`.kd-phero__actions`, nouveau conteneur flex remplaçant le
+bouton unique), icônes déjà locales (`settings-2`, `lock`). **Tests** :
+`ProfileControllerTest` (6) — mauvais mot de passe actuel, non-concordance, trop
+court, identique à l'actuel (tous en **422**, contrat Turbo des formulaires
+invalides) et succès vérifiant à la fois le nouveau hash et le **maintien de la
+session**.

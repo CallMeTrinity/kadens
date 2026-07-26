@@ -27,9 +27,14 @@
                 </ul>
             {% endif %}
         </div>
-        <a href="{{ path('app_profile_edit') }}" class="kd-btn kd-btn--primary kd-phero__edit">
-            {{ ux_icon('lucide:square-pen') }} Modifier ma fiche
-        </a>
+        <div class="kd-phero__actions">
+            <a href="{{ path('app_profile_settings') }}" class="kd-btn kd-btn--ghost">
+                {{ ux_icon('lucide:settings-2') }} Paramètres
+            </a>
+            <a href="{{ path('app_profile_edit') }}" class="kd-btn kd-btn--primary">
+                {{ ux_icon('lucide:square-pen') }} Modifier ma fiche
+            </a>
+        </div>
     </header>
 
     {# ============================ OBJECTIFS À VENIR ======================== #}

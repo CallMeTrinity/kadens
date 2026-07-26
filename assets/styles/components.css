@@ -3434,6 +3434,14 @@ textarea.kd-inlineedit__input { min-height: 3.2em; resize: vertical; }
   word-break: break-word;
 }
 .kd-phero__edit { flex: none; align-self: center; }
+/* Plusieurs actions dans l'en-tête (paramètres + édition de la fiche). */
+.kd-phero__actions {
+  flex: none;
+  align-self: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kd-space-4);
+}
 
 .kd-vitals {
   list-style: none;

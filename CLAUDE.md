@@ -102,6 +102,11 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   actions coach ne forkent aucun éditeur : elles créent la coquille et redirigent
   vers le compositeur / l'éditeur de plan normaux. `ROLE_COACH` s'accorde par
   commande (`app:user:promote-coach`), jamais depuis l'app.
+- **Pas d'inscription publique.** Les comptes se créent en console
+  (`app:user:create`, rôle ROLE_USER), comme les promotions (`app:user:promote`,
+  `app:user:promote-coach`). L'app n'expose que ce que le titulaire du compte peut
+  changer lui-même : son mot de passe, dans `/profile/settings`. L'email reste un
+  identifiant fixe côté console.
 - **Aucune IA dans l'app.** Le remplissage de la biblio passe par une commande
   d'import JSON (Phase 3), pas d'API en prod.
 
@@ -154,8 +159,10 @@ consigner chaque nouveau lot terminé (cf. §7).
 Résumé : toutes les phases du ROADMAP sont livrées. Socle Symfony en place
 (Docker, MariaDB, CI/CD), design tokens posés, et couche visuelle « Carnet
 clair » déployée sur toutes les vues. Au-delà du ROADMAP : objectifs datés,
-séries détaillées, et **relation coach ↔ athlète** (hub `/coaching`, espace
-coach `/coach`, `ROLE_COACH`) — cf. §3 pour la règle de propriété.
+séries détaillées, **relation coach ↔ athlète** (hub `/coaching`, espace
+coach `/coach`, `ROLE_COACH`) — cf. §3 pour la règle de propriété — et
+**paramètres de compte** (`/profile/settings` : changement de mot de passe,
+création de compte par `app:user:create`).
 
 ---
 
