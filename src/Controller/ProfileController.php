@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\User;
 use App\Form\ProfileType;
+use App\Repository\CoachingRepository;
 use App\Repository\GoalRepository;
 use App\Service\HeartRateZones;
 use App\Service\ProfileStats;
@@ -25,8 +26,12 @@ final class ProfileController extends AbstractController
      * manuellement (comme l'ancien HomeController).
      */
     #[Route('/', name: 'app_profile', methods: ['GET'])]
-    public function index(ProfileStats $profileStats, HeartRateZones $heartRateZones, GoalRepository $goalRepository): Response
-    {
+    public function index(
+        ProfileStats $profileStats,
+        HeartRateZones $heartRateZones,
+        GoalRepository $goalRepository,
+        CoachingRepository $coachingRepository,
+    ): Response {
         $user = $this->getUser();
         if (!$user instanceof User) {
             return $this->redirectToRoute('app_login');
@@ -36,6 +41,10 @@ final class ProfileController extends AbstractController
             'stats' => $profileStats->for($user),
             'hrZones' => $heartRateZones->forUser($user),
             'upcomingGoals' => $goalRepository->findUpcomingForOwner($user, 3),
+            // Découvrabilité : une demande de coaching reçue doit se voir depuis
+            // la page d'accueil, pas seulement dans /coaching.
+            'coachingReceived' => $coachingRepository->findPendingReceivedBy($user),
+            'coachingActive' => $coachingRepository->findAcceptedCoaches($user),
         ]);
     }
 

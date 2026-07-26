@@ -48,6 +48,11 @@ security:
         - { path: ^/goal, roles: ROLE_USER }
         - { path: ^/profile, roles: ROLE_USER }
         - { path: ^/export, roles: ROLE_USER }
+        # ^/coaching (hub relation) avant ^/coach (espace coach) : sans cet ordre,
+        # la règle ROLE_COACH capterait /coaching, qui doit rester ouvert à tout
+        # utilisateur — c'est là que l'athlète répond aux demandes.
+        - { path: ^/coaching, roles: ROLE_USER }
+        - { path: ^/coach, roles: ROLE_COACH }
         # - { path: ^/admin, roles: ROLE_ADMIN }
 
 when@test:

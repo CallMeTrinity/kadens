@@ -4059,3 +4059,144 @@ textarea.kd-inlineedit__input { min-height: 3.2em; resize: vertical; }
   font-size: 11px;
   color: var(--color-text-faint);
 }
+
+/* ============================================================================
+   COACHING — relation coach ↔ athlète (hub /coaching, espace coach /coach).
+   Aucune couleur métier propre : le statut de relation réutilise les tokens de
+   statut de séance (done / planned / missed) via CoachingStatus::modifier(),
+   comme le fait GoalOutcome. Le reste est neutre.
+   ========================================================================== */
+
+.kd-coachlist {
+  display: grid;
+  gap: var(--kd-space-4);
+}
+
+/* ── Carte de relation : monogramme + identité + statut + actions ─────────── */
+.kd-coachcard {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-6);
+  flex-wrap: wrap;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-6) var(--kd-space-8);
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.kd-coachcard:hover { border-color: var(--color-border-strong); box-shadow: var(--shadow-card); }
+/* Relation inactive (demande en attente, refusée, terminée) : présente mais en retrait. */
+.kd-coachcard.is-muted { opacity: .75; }
+
+.kd-coachcard__avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--kd-radius-full);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-strong);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.kd-coachcard__body { flex: 1 1 14rem; min-width: 0; }
+.kd-coachcard__top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kd-space-3) var(--kd-space-4);
+}
+.kd-coachcard__name {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-strong);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kd-coachcard__name a { color: inherit; text-decoration: none; }
+.kd-coachcard__name a:hover { color: var(--color-primary); }
+.kd-coachcard__role {
+  margin: var(--kd-space-2) 0 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.kd-coachcard__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.kd-coachcard__actions form { margin: 0; }
+
+/* ── Formulaires courts (invitation, création, pose) : une ligne qui s'empile ─ */
+.kd-coachform {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--kd-space-4);
+  flex-wrap: wrap;
+}
+.kd-coachform__field { flex: 1 1 14rem; min-width: 0; }
+.kd-coachform__field--narrow { flex: 0 1 9rem; }
+.kd-coachform__hint {
+  flex-basis: 100%;
+  margin: var(--kd-space-3) 0 0;
+  font-size: 12px;
+  color: var(--color-text-faint);
+}
+/* Placé avant le formulaire, l'indice garde sa marge basse plutôt que haute. */
+.kd-card > .kd-coachform__hint:not(:last-child) { margin: 0 0 var(--kd-space-5); }
+
+/* ── Listes compactes (séances, plans, prochaines dates d'un athlète) ─────── */
+.kd-coachitems {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.kd-coachitem {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-4);
+  padding: var(--kd-space-4) 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+.kd-coachitem:last-child { border-bottom: none; }
+.kd-coachitem__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-strong);
+  text-decoration: none;
+  font-weight: var(--kd-weight-medium);
+}
+a.kd-coachitem__name:hover { color: var(--color-primary); }
+.kd-coachitem__meta {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+.kd-coachitem__date {
+  flex: none;
+  min-width: 42px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 640px) {
+  .kd-coachcard__actions { margin-left: 0; flex-basis: 100%; }
+  .kd-coachform__field,
+  .kd-coachform__field--narrow { flex-basis: 100%; }
+}

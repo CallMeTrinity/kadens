@@ -1,0 +1,247 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ athlete.userIdentifier }} — Espace coach — Kadens{% endblock %}
+
+{% block body %}
+    {% for message in app.flashes('success') %}
+        <p class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }} {{ message }}</p>
+    {% endfor %}
+    {% for message in app.flashes('error') %}
+        <p class="kd-flash kd-flash--error" role="alert">{{ ux_icon('lucide:x') }} {{ message }}</p>
+    {% endfor %}
+
+    {# ============================== EN-TÊTE ATHLÈTE ========================= #}
+    <header class="kd-phero">
+        <span class="kd-phero__avatar" aria-hidden="true">{{ athlete.userIdentifier|first|upper }}</span>
+        <div class="kd-phero__main">
+            <p class="kd-eyebrow kd-eyebrow--accent">Athlète suivi</p>
+            <h1 class="kd-phero__name">{{ athlete.userIdentifier }}</h1>
+            {% set vitals = [
+                athlete.age is not null ? athlete.age ~ ' ans',
+                athlete.sex ? athlete.sex.label,
+                athlete.weightKg is not null ? (athlete.weightKg|number_format(athlete.weightKg == athlete.weightKg|round ? 0 : 1, ',', ' ')) ~ ' kg',
+                athlete.mainGoal ? athlete.mainGoal.label,
+                athlete.trainingYears is not null ? athlete.trainingYears ~ ' an' ~ (athlete.trainingYears > 1 ? 's') ~ ' de pratique',
+            ]|filter(v => v) %}
+            {% if vitals is not empty %}
+                <ul class="kd-vitals">
+                    {% for v in vitals %}<li class="kd-vitals__item">{{ v }}</li>{% endfor %}
+                </ul>
+            {% endif %}
+        </div>
+        <a href="{{ path('app_coach_dashboard') }}" class="kd-btn kd-btn--ghost kd-phero__edit">
+            {{ ux_icon('lucide:arrow-left') }} Mes athlètes
+        </a>
+    </header>
+
+    {# ------------------------------ SES OBJECTIFS --------------------------- #}
+    {% if goals is not empty %}
+        <section class="kd-section">
+            <div class="kd-pagehead kd-pagehead--sub">
+                <div>
+                    <p class="kd-eyebrow kd-eyebrow--accent">Cap</p>
+                    <h2 class="kd-title kd-title--sm">Ses prochaines échéances</h2>
+                </div>
+            </div>
+            <div class="kd-goallist kd-section__block">
+                {% for goal in goals %}
+                    {{ include('goal/_card.html.twig', {goal: goal}) }}
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+
+    {# ------------------------------- CRÉER ---------------------------------- #}
+    <section class="kd-section">
+        <div class="kd-pagehead kd-pagehead--sub">
+            <div>
+                <p class="kd-eyebrow kd-eyebrow--accent">Créer</p>
+                <h2 class="kd-title kd-title--sm">Programmer pour {{ athlete.userIdentifier }}</h2>
+                <p class="kd-lead">Ce que tu crées ici lui appartient : tu ouvres ensuite le compositeur habituel pour le composer.</p>
+            </div>
+        </div>
+
+        <div class="kd-grid kd-grid--2 kd-section__block">
+            <section class="kd-card">
+                <h3 class="kd-card__title">{{ ux_icon('lucide:clipboard-list') }} Nouvelle séance</h3>
+                <form method="post" action="{{ path('app_coach_workout_new', {id: athlete.id}) }}" class="kd-coachform">
+                    <input type="hidden" name="_token" value="{{ csrf_token('coach_workout_new' ~ athlete.id) }}">
+                    <div class="kd-field kd-coachform__field">
+                        <label class="kd-label" for="coach_workout_title">Titre de la séance</label>
+                        <input class="kd-input" type="text" id="coach_workout_title" name="title"
+                               placeholder="Sortie longue en Z2" required>
+                    </div>
+                    <button type="submit" class="kd-btn kd-btn--primary">
+                        {{ ux_icon('lucide:plus') }} Créer et composer
+                    </button>
+                </form>
+            </section>
+
+            <section class="kd-card">
+                <h3 class="kd-card__title">{{ ux_icon('lucide:layers') }} Nouveau plan</h3>
+                <form method="post" action="{{ path('app_coach_plan_new', {id: athlete.id}) }}" class="kd-coachform">
+                    <input type="hidden" name="_token" value="{{ csrf_token('coach_plan_new' ~ athlete.id) }}">
+                    <div class="kd-field kd-coachform__field">
+                        <label class="kd-label" for="coach_plan_title">Titre du plan</label>
+                        <input class="kd-input" type="text" id="coach_plan_title" name="title"
+                               placeholder="Prépa semi — 8 semaines" required>
+                    </div>
+                    <div class="kd-field kd-coachform__field kd-coachform__field--narrow">
+                        <label class="kd-label" for="coach_plan_weeks">Semaines</label>
+                        <input class="kd-input" type="number" id="coach_plan_weeks" name="durationWeeks"
+                               value="4" min="1" max="52">
+                    </div>
+                    <button type="submit" class="kd-btn kd-btn--primary">
+                        {{ ux_icon('lucide:plus') }} Créer et composer
+                    </button>
+                </form>
+            </section>
+        </div>
+    </section>
+
+    {# ---------------------------- SA BIBLIOTHÈQUE --------------------------- #}
+    <section class="kd-section">
+        <div class="kd-pagehead kd-pagehead--sub">
+            <div>
+                <p class="kd-eyebrow kd-eyebrow--accent">Bibliothèque</p>
+                <h2 class="kd-title kd-title--sm">Ses séances</h2>
+            </div>
+        </div>
+
+        {% if workouts is empty %}
+            <div class="kd-card kd-section__block">
+                <div class="kd-empty">
+                    {{ ux_icon('lucide:clipboard-list') }}
+                    <div>Sa bibliothèque est vide. Crée-lui une séance ci-dessus.</div>
+                </div>
+            </div>
+        {% else %}
+            <div class="kd-card kd-section__block">
+                <ul class="kd-coachitems">
+                    {% for workout in workouts %}
+                        <li class="kd-coachitem">
+                            <a href="{{ path('app_workout_show', {id: workout.id}) }}" class="kd-coachitem__name">{{ workout.title }}</a>
+                            <a href="{{ path('app_workout_edit', {id: workout.id}) }}" class="kd-btn kd-btn--ghost kd-btn--sm">
+                                {{ ux_icon('lucide:square-pen') }} Composer
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            {# Pose directe sur son calendrier : le contrôleur refuse toute séance
+               qui ne lui appartient pas, ou qui est une copie privée de plan. #}
+            <section class="kd-card kd-section__block">
+                <h3 class="kd-card__title">{{ ux_icon('lucide:calendar-plus') }} Poser une séance sur son calendrier</h3>
+                <form method="post" action="{{ path('app_coach_schedule', {id: athlete.id}) }}" class="kd-coachform">
+                    <input type="hidden" name="_token" value="{{ csrf_token('coach_schedule' ~ athlete.id) }}">
+                    <div class="kd-field kd-coachform__field">
+                        <label class="kd-label" for="coach_schedule_workout">Séance</label>
+                        <select class="kd-input" id="coach_schedule_workout" name="workoutId" required>
+                            {% for workout in workouts %}
+                                <option value="{{ workout.id }}">{{ workout.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="kd-field kd-coachform__field kd-coachform__field--narrow">
+                        <label class="kd-label" for="coach_schedule_date">Date</label>
+                        <input class="kd-input" type="date" id="coach_schedule_date" name="date"
+                               value="{{ 'today'|date('Y-m-d') }}" required>
+                    </div>
+                    <button type="submit" class="kd-btn kd-btn--primary">
+                        {{ ux_icon('lucide:calendar-plus') }} Poser
+                    </button>
+                </form>
+            </section>
+        {% endif %}
+    </section>
+
+    {# ------------------------------- SES PLANS ------------------------------ #}
+    <section class="kd-section">
+        <div class="kd-pagehead kd-pagehead--sub">
+            <div>
+                <p class="kd-eyebrow kd-eyebrow--accent">Plans</p>
+                <h2 class="kd-title kd-title--sm">Ses plans multi-semaines</h2>
+            </div>
+        </div>
+
+        {% if plans is empty %}
+            <div class="kd-card kd-section__block">
+                <div class="kd-empty">
+                    {{ ux_icon('lucide:layers') }}
+                    <div>Aucun plan. Crée-lui une trame ci-dessus, il pourra aussi l'instancier lui-même.</div>
+                </div>
+            </div>
+        {% else %}
+            <div class="kd-card kd-section__block">
+                <ul class="kd-coachitems">
+                    {% for plan in plans %}
+                        <li class="kd-coachitem">
+                            <a href="{{ path('app_plan_template_show', {id: plan.id}) }}" class="kd-coachitem__name">{{ plan.title }}</a>
+                            <span class="kd-coachitem__meta">{{ plan.durationWeeks }} semaine{{ plan.durationWeeks > 1 ? 's' }}</span>
+                            <a href="{{ path('app_plan_template_edit', {id: plan.id}) }}" class="kd-btn kd-btn--ghost kd-btn--sm">
+                                {{ ux_icon('lucide:square-pen') }} Composer
+                            </a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            {# Instanciation idempotente : relancer resynchronise (add-only), ne duplique pas. #}
+            <section class="kd-card kd-section__block">
+                <h3 class="kd-card__title">{{ ux_icon('lucide:calendar-range') }} Poser un plan sur son calendrier</h3>
+                <form method="post" action="{{ path('app_coach_instantiate', {id: athlete.id}) }}" class="kd-coachform">
+                    <input type="hidden" name="_token" value="{{ csrf_token('coach_instantiate' ~ athlete.id) }}">
+                    <div class="kd-field kd-coachform__field">
+                        <label class="kd-label" for="coach_instantiate_plan">Plan</label>
+                        <select class="kd-input" id="coach_instantiate_plan" name="planId" required>
+                            {% for plan in plans %}
+                                <option value="{{ plan.id }}">{{ plan.title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="kd-field kd-coachform__field kd-coachform__field--narrow">
+                        <label class="kd-label" for="coach_instantiate_start">Début</label>
+                        <input class="kd-input" type="date" id="coach_instantiate_start" name="startDate"
+                               value="{{ 'monday this week'|date('Y-m-d') }}" required>
+                    </div>
+                    <button type="submit" class="kd-btn kd-btn--primary">
+                        {{ ux_icon('lucide:calendar-range') }} Instancier
+                    </button>
+                </form>
+                <p class="kd-coachform__hint">Relancer sur un plan déjà posé resynchronise sans redater : les séances existantes et leur statut sont préservés.</p>
+            </section>
+        {% endif %}
+    </section>
+
+    {# --------------------------- SON CALENDRIER ----------------------------- #}
+    <section class="kd-section">
+        <div class="kd-pagehead kd-pagehead--sub">
+            <div>
+                <p class="kd-eyebrow kd-eyebrow--accent">Calendrier</p>
+                <h2 class="kd-title kd-title--sm">Ses 8 prochaines semaines</h2>
+            </div>
+        </div>
+
+        {% if upcoming is empty %}
+            <div class="kd-card kd-section__block">
+                <div class="kd-empty">
+                    {{ ux_icon('lucide:calendar-off') }}
+                    <div>Rien de prévu dans les 8 prochaines semaines.</div>
+                </div>
+            </div>
+        {% else %}
+            <div class="kd-card kd-section__block">
+                <ul class="kd-coachitems">
+                    {% for scheduled in upcoming %}
+                        <li class="kd-coachitem">
+                            <span class="kd-coachitem__date">{{ scheduled.scheduledDate|date('d/m') }}</span>
+                            <span class="kd-coachitem__name">{{ scheduled.workout ? scheduled.workout.title : 'Séance supprimée' }}</span>
+                            <span class="kd-badge kd-badge--{{ scheduled.status.value }}">{{ scheduled.status.label }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+    </section>
+{% endblock %}

@@ -59,6 +59,28 @@
         {% endif %}
     </section>
 
+    {# =============================== COACHING =============================== #}
+    {% if coachingReceived is not empty or coachingActive is not empty %}
+        <section class="kd-section">
+            <div class="kd-pagehead kd-pagehead--sub">
+                <div>
+                    <p class="kd-eyebrow kd-eyebrow--accent">Coaching</p>
+                    <h2 class="kd-title kd-title--sm">
+                        {{ coachingReceived is not empty ? 'Une demande t\'attend' : 'Qui t\'entraîne' }}
+                    </h2>
+                </div>
+                <a href="{{ path('app_coaching_index') }}" class="kd-btn kd-btn--ghost">
+                    {{ ux_icon('lucide:users') }} Gérer mes relations
+                </a>
+            </div>
+            <div class="kd-coachlist kd-section__block">
+                {% for relation in coachingReceived|merge(coachingActive) %}
+                    {{ include('components/_coaching_card.html.twig', {relation: relation, me: u}) }}
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+
     {# ============================ STATS GÉNÉRALES ========================== #}
     <section class="kd-section">
         <div class="kd-pagehead kd-pagehead--sub">

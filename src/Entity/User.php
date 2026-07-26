@@ -161,6 +161,22 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: Goal::class, mappedBy: 'owner')]
     private Collection $goals;
 
+    /**
+     * Relations où cet utilisateur entraîne quelqu'un.
+     *
+     * @var Collection<int, Coaching>
+     */
+    #[ORM\OneToMany(targetEntity: Coaching::class, mappedBy: 'coach')]
+    private Collection $coachingAsCoach;
+
+    /**
+     * Relations où cet utilisateur est entraîné.
+     *
+     * @var Collection<int, Coaching>
+     */
+    #[ORM\OneToMany(targetEntity: Coaching::class, mappedBy: 'athlete')]
+    private Collection $coachingAsAthlete;
+
     public function __construct()
     {
         $this->exercises = new ArrayCollection();
@@ -168,6 +184,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->planTemplates = new ArrayCollection();
         $this->scheduledWorkouts = new ArrayCollection();
         $this->goals = new ArrayCollection();
+        $this->coachingAsCoach = new ArrayCollection();
+        $this->coachingAsAthlete = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -753,6 +771,73 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         if ($this->goals->removeElement($goal)) {
             if ($goal->getOwner() === $this) {
                 $goal->setOwner(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Rôle coach (accordé par `app:user:promote-coach`). Ne remplace pas
+     * ROLE_USER : un coach reste un athlète et garde son propre contenu.
+     */
+    public function isCoach(): bool
+    {
+        return \in_array('ROLE_COACH', $this->getRoles(), true);
+    }
+
+    /**
+     * @return Collection<int, Coaching>
+     */
+    public function getCoachingAsCoach(): Collection
+    {
+        return $this->coachingAsCoach;
+    }
+
+    public function addCoachingAsCoach(Coaching $coaching): static
+    {
+        if (!$this->coachingAsCoach->contains($coaching)) {
+            $this->coachingAsCoach->add($coaching);
+            $coaching->setCoach($this);
+        }
+
+        return $this;
+    }
+
+    public function removeCoachingAsCoach(Coaching $coaching): static
+    {
+        if ($this->coachingAsCoach->removeElement($coaching)) {
+            if ($coaching->getCoach() === $this) {
+                $coaching->setCoach(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Coaching>
+     */
+    public function getCoachingAsAthlete(): Collection
+    {
+        return $this->coachingAsAthlete;
+    }
+
+    public function addCoachingAsAthlete(Coaching $coaching): static
+    {
+        if (!$this->coachingAsAthlete->contains($coaching)) {
+            $this->coachingAsAthlete->add($coaching);
+            $coaching->setAthlete($this);
+        }
+
+        return $this;
+    }
+
+    public function removeCoachingAsAthlete(Coaching $coaching): static
+    {
+        if ($this->coachingAsAthlete->removeElement($coaching)) {
+            if ($coaching->getAthlete() === $this) {
+                $coaching->setAthlete(null);
             }
         }
 
