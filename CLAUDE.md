@@ -54,6 +54,13 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   différé, alternatives dérivées des `targetAreas`. Détail dans `ROADMAP.md §2.3`.
 - **Les paramètres vivent sur `PrescribedExercise`** (le lien bloc↔exercice).
   C'est ce qui rend un exercice réutilisable avec des paramètres différents.
+  **Extension (séries détaillées) :** un exercice de force peut, en option, éclater
+  son compteur scalaire `sets`/`reps`/`weightKg` en une collection `PrescribedSet`
+  (une ligne = une série, type `SetType` + valeurs propres). Le scalaire reste le
+  défaut (mode simple) ; dès qu'il y a des `PrescribedSet`, ils **priment** (helpers
+  dérivés `getWorkingSetCount`/`getTonnageKg`/`getTopWeightKg` sur `PrescribedExercise`,
+  consommés par tous les services de calcul). L'échauffement (`SetType::WARMUP`) est
+  exclu du volume de travail. Muscu uniquement (`SETS_REPS`/`SETS_TIME`).
 - **Modèle d'exercice unique et flexible**, piloté par l'enum `PrescriptionType`
   (champs de valeurs nullable, seul le sous-ensemble pertinent est rempli). Pas
   d'héritage par activité.
@@ -849,6 +856,60 @@ navigateur (non automatisable ici).
   Icône importée : `trending-down` (`trending-up` déjà locale). **Lot B
   (progression RÉALISÉE) NON fait : décision requise** (options 1/2/3 du §3 de la
   spec, à trancher avec l'utilisateur avant de coder).
+  **Séries détaillées + superset visible (hors-roadmap) — AVEC migration.** Un
+  exercice de force pouvait seulement prescrire N séries identiques (`4×6 @ 100`).
+  On ajoute la prescription **hétérogène** : échauffement montant, séries de travail,
+  dégressive, à l'échec, drop set. **Modèle** : enum `SetType` (5 cas, `getLabel`/
+  `shortLabel`/`countsAsWorking` — l'échauffement ne compte pas comme volume de
+  travail) + nouvelle entité **`PrescribedSet`** (position, type, reps, charge, durée),
+  collection `PrescribedExercise::detailedSets` (cascade+orphanRemoval, FK `ON DELETE
+  CASCADE`). **Opt-in par exercice, muscu uniquement** (`SETS_REPS`/`SETS_TIME`, choix
+  utilisateur) : tant que la collection est vide, le compteur scalaire reste le défaut ;
+  dès qu'elle est peuplée, elle **prime** via trois helpers dérivés sur
+  `PrescribedExercise` (`getWorkingSetCount` hors échauffement, `getTonnageKg` par ligne,
+  `getTopWeightKg`). Ces helpers rendent les services **détaillé-aware sans dupliquer la
+  logique** : `WorkoutMetrics::volume` (séries/tonnage), `WorkoutEstimator` (durée sommée
+  par série), `ProgressionAggregator` (top set + décompte). `PlanFlattener` gagne un
+  résumé par série (groupes de séries consécutives identiques fusionnés, ex. « Échauf
+  10 reps @ 40 kg · 2× 8 reps @ 100 kg · Drop 6 reps @ 80 kg ») + une clé `sets`
+  structurée ; l'export Excel, le flux ICS et l'aperçu au survol en héritent
+  automatiquement (ils consomment le `summary`). `WorkoutCloner` clone la collection
+  (fork à la pose/duplication) — correction au passage : `rpe`/`elevationGainMeters`
+  n'étaient pas copiés. **Compositeur** : `PrescribedSetType` (champ de valeur selon le
+  type parent), 5 endpoints minces sur `WorkoutController` (`set_add` — éclate le
+  scalaire en N lignes la 1re fois, sinon recopie la dernière ; `set_clear` — retour au
+  mode simple, réversible ; `set_edit` — auto-save au `change`, stream **ligne seule**
+  pour garder le focus ; `set_delete`/`set_move`). Les mutations structurelles re-rendent
+  tout le panneau de paramètres `#prescribed-params-{id}` (form prescrit + éditeur de
+  séries) via un stream ciblé — le conteneur `.kd-cexo__params` (et son `hidden`) survit,
+  le panneau reste ouvert (même piège d'id que `#workout-blocks`). `_prescribed_form`
+  masque les champs scalaires (séries/reps/charge/durée) dès qu'il y a des séries
+  détaillées (transverses repos/RPE/notes conservés). Panneau extrait en
+  `_prescribed_params.html.twig` (réutilisé par `_block` et le stream). Repli sans JS :
+  redirection. **Superset rendu visible** (décision : nommer l'existant, zéro modèle) :
+  un bloc à ≥ 2 exercices affiche un badge « Superset » (2) / « Circuit » (3+) en lecture
+  ET dans le compositeur — la mécanique bloc+`rounds` l'exprimait déjà. Rendu lecture
+  (`_workout_read`) : liste par série (`.kd-setlist`) + badge superset. **Couleur neutre**
+  pour type de série et superset (ni activité ni statut). Migration
+  `Version20260726120000` (table `prescribed_set`). Tests : `WorkoutMetricsTest`
+  (décompte hors échauffement + tonnage par ligne), `PlanFlattenerTest` (regroupement du
+  résumé). Icônes importées : `list-ordered`, `list-plus`, `rotate-ccw`. **Limite connue** :
+  basculer un exercice détaillé vers un type non-force (ex. distance) ne vide pas ses
+  séries et l'éditeur reste affiché jusqu'au rechargement (cas absurde, non géré).
+  **Lot design séries (lisibilité + badges + WYSIWYG).** Le résumé détaillé s'affichait en
+  une longue ligne mono `nowrap` qui débordait de la ligne repliée du compositeur. Corrigé :
+  (1) **Badges de type de série** — nouveau composant macro `templates/components/_set_type.html.twig`
+  (`badge(type)`), **monochrome** (le type n'est ni activité ni statut, pas de teinte) : icône
+  Lucide par type (`SetType::icon()`) + emphase (contour pour échauffement, plein ink pour « à
+  l'échec », chip clair sinon). NORMAL n'affiche pas de badge. Classes `.kd-setbadge(--warmup/
+  --to_failure)`. (2) **Ligne repliée lisible** — pour un exercice détaillé, la pastille mono est
+  remplacée par un résumé qui passe à la ligne (compteur « N séries » + badges des types présents),
+  rendu dans `.kd-cexo__body` (`.kd-cexo__sets`) ; le détail complet reste dans le panneau et la
+  vue séance. (3) **Éditeur WYSIWYG** — `_sets_editor` calqué sur la vue séance : chip de type +
+  valeurs + unités inline (`8 reps @ 100 kg`), accent gauche neutre par type (`.kd-set--{type}`).
+  (4) **Vue séance** (`_workout_read`) : la liste `.kd-setlist` utilise les badges (badge aligné à
+  droite de chaque ligne). `SetType::shortLabel()` étoffé (« Dégressive », « À l'échec », « Drop
+  set »). Icônes importées : `zap`, `chevrons-down`. Pas de migration.
 
 ---
 

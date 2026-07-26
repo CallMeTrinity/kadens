@@ -5,12 +5,14 @@ namespace App\Controller;
 use App\Entity\Block;
 use App\Entity\Exercise;
 use App\Entity\PrescribedExercise;
+use App\Entity\PrescribedSet;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
 use App\Form\BlockType;
 use App\Form\PrescribedExerciseType;
+use App\Form\PrescribedSetType;
 use App\Form\WorkoutType;
 use App\Repository\ExerciseRepository;
 use App\Repository\WorkoutRepository;
@@ -377,6 +379,132 @@ final class WorkoutController extends AbstractController
         return $this->redirectToRoute('app_workout_edit', ['id' => $workout->getId()]);
     }
 
+    // ---- Séries détaillées (mode force : SETS_REPS / SETS_TIME) -------------
+
+    /**
+     * Passe un exercice en « séries détaillées » (première fois : éclate le compteur
+     * scalaire en N lignes explicites) ou ajoute une série (recopiée de la dernière).
+     * Chaque série peut ensuite porter son propre type (échauffement, dégressive,
+     * drop set…) et ses valeurs — ce que le compteur `sets`/`reps` ne permet pas.
+     */
+    #[Route('/{id}/exercises/{prescribedId}/sets', name: 'app_workout_set_add', methods: ['POST'], requirements: ['id' => '\d+', 'prescribedId' => '\d+'])]
+    public function addSet(Request $request, Workout $workout, int $prescribedId): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
+        $prescribed = $this->findPrescribed($workout, $prescribedId);
+
+        if ($this->isCsrfTokenValid('set_add'.$prescribedId, $request->getPayload()->getString('_token'))) {
+            if (!$prescribed->hasDetailedSets()) {
+                // Éclatement du mode scalaire : autant de lignes que le compteur,
+                // chacune reprenant reps/durée/charge existants (point de départ à ajuster).
+                $count = max(1, $prescribed->getSets() ?? 1);
+                for ($i = 0; $i < $count; ++$i) {
+                    $prescribed->addDetailedSet($this->newSetFrom($prescribed, $i));
+                }
+            } else {
+                // Ajout d'une série recopiée de la dernière (on duplique puis on ajuste).
+                $last = $prescribed->getDetailedSets()->last() ?: null;
+                $set = (new PrescribedSet())
+                    ->setPosition($this->nextPosition($prescribed->getDetailedSets()->toArray()))
+                    ->setReps($last?->getReps())
+                    ->setWeightKg($last?->getWeightKg())
+                    ->setDurationSeconds($last?->getDurationSeconds());
+                $prescribed->addDetailedSet($set);
+            }
+            foreach ($prescribed->getDetailedSets() as $set) {
+                $this->entityManager->persist($set);
+            }
+        }
+
+        return $this->setsResponse($request, $workout, $prescribed);
+    }
+
+    /**
+     * Revient au mode simple : retire toutes les séries détaillées. Le compteur
+     * scalaire (jamais effacé) reprend la main. Geste réversible.
+     */
+    #[Route('/{id}/exercises/{prescribedId}/sets/clear', name: 'app_workout_set_clear', methods: ['POST'], requirements: ['id' => '\d+', 'prescribedId' => '\d+'])]
+    public function clearSets(Request $request, Workout $workout, int $prescribedId): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
+        $prescribed = $this->findPrescribed($workout, $prescribedId);
+
+        if ($this->isCsrfTokenValid('set_clear'.$prescribedId, $request->getPayload()->getString('_token'))) {
+            foreach ($prescribed->getDetailedSets()->toArray() as $set) {
+                $prescribed->removeDetailedSet($set);
+            }
+        }
+
+        return $this->setsResponse($request, $workout, $prescribed);
+    }
+
+    /**
+     * Enregistre une série (type + valeurs). Comme editPrescribed : on ne re-rend
+     * QUE la ligne de résumé (pastille), pas la liste des séries — le champ en cours
+     * de saisie n'est pas re-rendu, le focus reste. Repli sans JS : redirection.
+     */
+    #[Route('/{id}/sets/{setId}', name: 'app_workout_set_edit', methods: ['POST'], requirements: ['id' => '\d+', 'setId' => '\d+'])]
+    public function editSet(Request $request, Workout $workout, int $setId): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
+        $set = $this->findSet($workout, $setId);
+        $prescribed = $set->getPrescribedExercise();
+
+        $form = $this->createSetForm($set);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $workout->setEstimatedDurationMinutes($this->estimator->estimateMinutes($workout));
+            $this->entityManager->flush();
+        }
+
+        if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
+            $request->setRequestFormat(TurboBundle::STREAM_FORMAT);
+
+            return $this->render('workout/stream/prescribed_row.stream.html.twig', [
+                'workout' => $workout,
+                'prescribed' => $prescribed,
+                'summary' => $this->prescribedSummaries($workout)[$prescribed->getId()] ?? '',
+            ]);
+        }
+
+        return $this->redirectToRoute('app_workout_edit', ['id' => $workout->getId()]);
+    }
+
+    #[Route('/{id}/sets/{setId}/delete', name: 'app_workout_set_delete', methods: ['POST'], requirements: ['id' => '\d+', 'setId' => '\d+'])]
+    public function deleteSet(Request $request, Workout $workout, int $setId): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
+        $set = $this->findSet($workout, $setId);
+        $prescribed = $set->getPrescribedExercise();
+
+        if ($this->isCsrfTokenValid('set_delete'.$setId, $request->getPayload()->getString('_token'))) {
+            $prescribed->removeDetailedSet($set);
+            // Renumérotation dense des positions restantes (0..n).
+            $remaining = $prescribed->getDetailedSets()->toArray();
+            usort($remaining, static fn (PrescribedSet $a, PrescribedSet $b) => $a->getPosition() <=> $b->getPosition());
+            foreach ($remaining as $index => $remainingSet) {
+                $remainingSet->setPosition($index);
+            }
+        }
+
+        return $this->setsResponse($request, $workout, $prescribed);
+    }
+
+    #[Route('/{id}/sets/{setId}/move/{direction}', name: 'app_workout_set_move', methods: ['POST'], requirements: ['id' => '\d+', 'setId' => '\d+', 'direction' => 'up|down'])]
+    public function moveSet(Request $request, Workout $workout, int $setId, string $direction): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
+        $set = $this->findSet($workout, $setId);
+        $prescribed = $set->getPrescribedExercise();
+
+        if ($this->isCsrfTokenValid('set_move'.$setId, $request->getPayload()->getString('_token'))) {
+            $this->swapPosition($prescribed->getDetailedSets()->toArray(), $set, $direction);
+        }
+
+        return $this->setsResponse($request, $workout, $prescribed);
+    }
+
     // ---- Édition rapide (mini-modale de l'éditeur de plan) ------------------
 
     /**
@@ -480,6 +608,34 @@ final class WorkoutController extends AbstractController
         }
 
         throw $this->createNotFoundException('Exercice prescrit introuvable dans cette séance.');
+    }
+
+    private function findSet(Workout $workout, int $setId): PrescribedSet
+    {
+        foreach ($workout->getBlocks() as $block) {
+            foreach ($block->getPrescribedExercises() as $prescribed) {
+                foreach ($prescribed->getDetailedSets() as $set) {
+                    if ($set->getId() === $setId) {
+                        return $set;
+                    }
+                }
+            }
+        }
+
+        throw $this->createNotFoundException('Série introuvable dans cette séance.');
+    }
+
+    /**
+     * Nouvelle série reprenant reps/durée/charge scalaires de l'exercice (point de
+     * départ à l'éclatement du mode simple). Type NORMAL par défaut.
+     */
+    private function newSetFrom(PrescribedExercise $prescribed, int $position): PrescribedSet
+    {
+        return (new PrescribedSet())
+            ->setPosition($position)
+            ->setReps($prescribed->getReps())
+            ->setWeightKg($prescribed->getWeightKg())
+            ->setDurationSeconds($prescribed->getDurationSeconds());
     }
 
     /**
@@ -639,6 +795,72 @@ final class WorkoutController extends AbstractController
         ]);
     }
 
+    private function createSetForm(PrescribedSet $set): FormInterface
+    {
+        $prescribed = $set->getPrescribedExercise();
+
+        return $this->formFactory->createNamed('set_'.$set->getId(), PrescribedSetType::class, $set, [
+            'parent_type' => $prescribed->getPrescriptionType() ?? PrescriptionType::SETS_REPS,
+            'action' => $this->generateUrl('app_workout_set_edit', [
+                'id' => $prescribed->getBlock()->getWorkout()->getId(),
+                'setId' => $set->getId(),
+            ]),
+        ]);
+    }
+
+    /**
+     * Vues des formulaires de série d'un exercice, indexées par id de série.
+     *
+     * @return array<int, \Symfony\Component\Form\FormView>
+     */
+    private function setFormsFor(PrescribedExercise $prescribed): array
+    {
+        $forms = [];
+        foreach ($prescribed->getDetailedSets() as $set) {
+            $forms[$set->getId()] = $this->createSetForm($set)->createView();
+        }
+
+        return $forms;
+    }
+
+    /**
+     * Contexte de re-rendu ciblé de la zone des séries d'un exercice (stream).
+     *
+     * @return array<string, mixed>
+     */
+    private function setsEditorContext(Workout $workout, PrescribedExercise $prescribed): array
+    {
+        return [
+            'workout' => $workout,
+            'prescribed' => $prescribed,
+            'summary' => $this->prescribedSummaries($workout)[$prescribed->getId()] ?? '',
+            // Vue du formulaire prescrit : le stream re-rend TOUT le panneau de
+            // paramètres (form + séries), pour que la visibilité des champs scalaires
+            // suive le passage simple <-> détaillé.
+            'prescribedForm' => $this->createPrescribedForm($prescribed)->createView(),
+            'setForms' => $this->setFormsFor($prescribed),
+        ];
+    }
+
+    /**
+     * Réponse d'une mutation structurelle des séries (ajout/retrait/déplacement) :
+     * recalcule la durée estimée, puis re-rend la zone des séries + la pastille de
+     * résumé (stream ciblé). Sans JS : redirection vers l'éditeur.
+     */
+    private function setsResponse(Request $request, Workout $workout, PrescribedExercise $prescribed): Response
+    {
+        $workout->setEstimatedDurationMinutes($this->estimator->estimateMinutes($workout));
+        $this->entityManager->flush();
+
+        if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
+            $request->setRequestFormat(TurboBundle::STREAM_FORMAT);
+
+            return $this->render('workout/stream/sets_editor.stream.html.twig', $this->setsEditorContext($workout, $prescribed));
+        }
+
+        return $this->redirectToRoute('app_workout_edit', ['id' => $workout->getId()]);
+    }
+
     /**
      * Contexte de rendu du panneau d'édition rapide : les formulaires prescrits
      * (postant vers la route quick-edit) et les résumés lisibles par exercice.
@@ -673,12 +895,17 @@ final class WorkoutController extends AbstractController
     {
         $blockForms = [];
         $prescribedForms = [];
+        $setForms = [];
 
         foreach ($workout->getBlocks() as $block) {
             $blockForms[$block->getId()] = $this->createBlockForm($block)->createView();
 
             foreach ($block->getPrescribedExercises() as $prescribed) {
                 $prescribedForms[$prescribed->getId()] = $this->createPrescribedForm($prescribed)->createView();
+
+                foreach ($prescribed->getDetailedSets() as $set) {
+                    $setForms[$set->getId()] = $this->createSetForm($set)->createView();
+                }
             }
         }
 
@@ -687,6 +914,7 @@ final class WorkoutController extends AbstractController
             'addBlockForm' => $this->createAddBlockForm($workout, (new Block())->setRole(BlockRole::MAIN))->createView(),
             'blockForms' => $blockForms,
             'prescribedForms' => $prescribedForms,
+            'setForms' => $setForms,
             'summaries' => $this->prescribedSummaries($workout),
         ];
     }

@@ -65,18 +65,40 @@ final class WorkoutEstimator
 
     private function setsReps(PrescribedExercise $pe): int
     {
+        $rest = $pe->getRestSeconds() ?? self::DEFAULT_REST_SECONDS;
+
+        // Mode détaillé : chaque série a ses propres reps (l'échauffement compte
+        // aussi dans la durée vécue, contrairement au volume de travail).
+        if ($pe->hasDetailedSets()) {
+            $total = 0;
+            foreach ($pe->getDetailedSets() as $set) {
+                $total += ($set->getReps() ?? 10) * self::SECONDS_PER_REP + $rest;
+            }
+
+            return $total;
+        }
+
         $sets = max(1, $pe->getSets() ?? 1);
         $reps = $pe->getReps() ?? 10;
-        $rest = $pe->getRestSeconds() ?? self::DEFAULT_REST_SECONDS;
 
         return $sets * ($reps * self::SECONDS_PER_REP + $rest);
     }
 
     private function setsTime(PrescribedExercise $pe): int
     {
+        $rest = $pe->getRestSeconds() ?? self::DEFAULT_REST_SECONDS;
+
+        if ($pe->hasDetailedSets()) {
+            $total = 0;
+            foreach ($pe->getDetailedSets() as $set) {
+                $total += ($set->getDurationSeconds() ?? 0) + $rest;
+            }
+
+            return $total;
+        }
+
         $sets = max(1, $pe->getSets() ?? 1);
         $duration = $pe->getDurationSeconds() ?? 0;
-        $rest = $pe->getRestSeconds() ?? self::DEFAULT_REST_SECONDS;
 
         return $sets * ($duration + $rest);
     }

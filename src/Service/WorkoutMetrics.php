@@ -6,7 +6,6 @@ namespace App\Service;
 
 use App\Entity\Workout;
 use App\Enum\ActivityType;
-use App\Enum\PrescriptionType;
 
 /**
  * Repères dérivés du contenu d'une séance (aucun stockage) : activités
@@ -88,7 +87,10 @@ final class WorkoutMetrics
                 }
 
                 if (ActivityType::GYM === $activity) {
-                    $sets = ($pe->getSets() ?? 0) * $rounds;
+                    // Séries de travail (hors échauffement) et tonnage sont dérivés
+                    // par PrescribedExercise : identiques au compteur scalaire en
+                    // mode simple, ventilés par ligne en mode « séries détaillées ».
+                    $sets = $pe->getWorkingSetCount() * $rounds;
                     if ($sets > 0) {
                         $gymTotalSets += $sets;
                         foreach ($exercise->getTargetAreas() ?? [] as $area) {
@@ -96,10 +98,7 @@ final class WorkoutMetrics
                         }
                     }
 
-                    if (PrescriptionType::SETS_REPS === $pe->getPrescriptionType()
-                        && null !== $pe->getWeightKg() && null !== $pe->getReps()) {
-                        $gymTonnage += $sets * $pe->getReps() * $pe->getWeightKg();
-                    }
+                    $gymTonnage += $pe->getTonnageKg() * $rounds;
 
                     continue;
                 }

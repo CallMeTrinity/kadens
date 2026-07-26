@@ -11,7 +11,12 @@
    est fourni, le bouton d'enregistrement disparaît (tout est automatique). #}
 {% import 'components/_activity.html.twig' as activity %}
 {% set auto = auto_action|default(null) %}
-{% set exercise = form.vars.data.exercise %}
+{% set pe = form.vars.data %}
+{% set exercise = pe.exercise %}
+{# En mode « séries détaillées », les valeurs scalaires (séries/reps/charge/durée)
+   sont pilotées série par série : on masque leurs champs pour éviter la double
+   saisie contradictoire. Les champs transverses (repos/RPE/notes) restent. #}
+{% set scalar_overridden = pe.hasDetailedSets ? ['sets', 'reps', 'weightKg', 'durationSeconds'] : [] %}
 <div data-controller="prescription-fields"
      data-prescription-fields-map-value="{{ prescription_type_fields_map()|json_encode|e('html_attr') }}">
     {{ form_start(form, { attr: { class: 'kd-form' } }) }}
@@ -28,9 +33,11 @@
 
         <div class="kd-fieldrow">
             {% for field in ['sets', 'reps', 'weightKg', 'durationSeconds', 'distanceMeters', 'paceSecondsPerKm', 'intensityZone', 'elevationGainMeters', 'targetReps', 'capSeconds'] %}
-                <div data-prescription-fields-target="field" data-field="{{ field }}" style="flex:1 1 140px;">
-                    {{ form_row(attribute(form, field), auto ? { attr: { 'data-action': auto } } : {}) }}
-                </div>
+                {% if field not in scalar_overridden %}
+                    <div data-prescription-fields-target="field" data-field="{{ field }}" style="flex:1 1 140px;">
+                        {{ form_row(attribute(form, field), auto ? { attr: { 'data-action': auto } } : {}) }}
+                    </div>
+                {% endif %}
             {% endfor %}
         </div>
 

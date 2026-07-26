@@ -174,11 +174,13 @@ final class ProgressionAggregator
         foreach ($weeks as $occurrences) {
             foreach ($occurrences as $occurrence) {
                 $pe = $occurrence['pe'];
-                $has['weight'] = $has['weight'] || null !== $pe->getWeightKg();
+                // Charge/séries détaillé-aware : top set et décompte dérivent des
+                // lignes en mode détaillé, du scalaire sinon.
+                $has['weight'] = $has['weight'] || null !== $pe->getTopWeightKg();
                 $has['pace'] = $has['pace'] || null !== $pe->getPaceSecondsPerKm();
                 $has['distance'] = $has['distance'] || null !== $pe->getDistanceMeters();
                 $has['duration'] = $has['duration'] || null !== $pe->getDurationSeconds();
-                $has['sets'] = $has['sets'] || null !== $pe->getSets();
+                $has['sets'] = $has['sets'] || $pe->getWorkingSetCount() > 0;
             }
         }
 
@@ -286,8 +288,8 @@ final class ProgressionAggregator
             $rounds = $occurrence['rounds'];
             switch ($metric) {
                 case 'weight':
-                    if (null !== $pe->getWeightKg()) {
-                        $result = null === $result ? $pe->getWeightKg() : max($result, $pe->getWeightKg());
+                    if (null !== $pe->getTopWeightKg()) {
+                        $result = null === $result ? $pe->getTopWeightKg() : max($result, $pe->getTopWeightKg());
                     }
                     break;
                 case 'pace':
@@ -307,8 +309,8 @@ final class ProgressionAggregator
                     }
                     break;
                 case 'sets':
-                    if (null !== $pe->getSets()) {
-                        $result = ($result ?? 0.0) + $pe->getSets() * $rounds;
+                    if ($pe->getWorkingSetCount() > 0) {
+                        $result = ($result ?? 0.0) + $pe->getWorkingSetCount() * $rounds;
                     }
                     break;
             }

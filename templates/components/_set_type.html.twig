@@ -1,0 +1,15 @@
+{# Badge de type de série (mode « séries détaillées »). Monochrome par choix : le
+   type de série n'est ni une activité ni un statut, il ne code donc pas de teinte
+   (règle « la couleur porte du sens »). La distinction passe par l'icône et
+   l'emphase (contour / plein / atténué). NORMAL n'affiche pas de badge.
+
+   Usage : {% import 'components/_set_type.html.twig' as settype %}
+           {{ settype.badge(set.setType) }} #}
+{% macro badge(type) %}
+    {%- if type.value != 'normal' -%}
+        <span class="kd-setbadge kd-setbadge--{{ type.value }}">
+            {%- if type.icon %}{{ ux_icon(type.icon) }}{% endif -%}
+            <span class="kd-setbadge__txt">{{ type.shortLabel }}</span>
+        </span>
+    {%- endif -%}
+{% endmacro %}

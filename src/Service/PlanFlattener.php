@@ -6,6 +6,7 @@ use App\Entity\Block;
 use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
 use App\Entity\PrescribedExercise;
+use App\Entity\PrescribedSet;
 use App\Entity\Workout;
 use App\Enum\IntensityZone;
 use App\Enum\PaceUnit;
@@ -21,7 +22,8 @@ use App\Enum\PrescriptionType;
  * Les valeurs numériques brutes (kg / mètres / secondes) sont conservées telles
  * quelles pour l'export ; un champ `summary` lisible est ajouté pour l'affichage.
  *
- * @phpstan-type FlatPrescribed array{prescribed: PrescribedExercise, exercise: \App\Entity\Exercise|null, type: PrescriptionType|null, summary: string, rest: ?int, notes: ?string}
+ * @phpstan-type FlatSetGroup array{type: \App\Enum\SetType, typeLabel: string|null, count: int, detail: string}
+ * @phpstan-type FlatPrescribed array{prescribed: PrescribedExercise, exercise: \App\Entity\Exercise|null, type: PrescriptionType|null, summary: string, sets: list<FlatSetGroup>|null, rest: ?int, notes: ?string}
  * @phpstan-type FlatBlock array{block: Block, exercises: list<FlatPrescribed>}
  * @phpstan-type FlatWorkout array{workout: Workout, blocks: list<FlatBlock>, activities: list<\App\Enum\ActivityType>, exerciseCount: int}
  * @phpstan-type FlatItem array{item: PlanItem, workout: FlatWorkout}
@@ -129,6 +131,8 @@ final class PlanFlattener
             'exercise' => $prescribed->getExercise(),
             'type' => $prescribed->getPrescriptionType(),
             'summary' => $this->summarize($prescribed),
+            // Groupes de séries détaillées (mode force détaillé), null en mode simple.
+            'sets' => $prescribed->hasDetailedSets() ? $this->detailedSetGroups($prescribed) : null,
             'rest' => $prescribed->getRestSeconds(),
             'notes' => $prescribed->getNotes(),
         ];
@@ -172,6 +176,10 @@ final class PlanFlattener
 
     private function summarizeSetsReps(PrescribedExercise $pe): string
     {
+        if ($pe->hasDetailedSets()) {
+            return $this->summarizeDetailedSets($pe);
+        }
+
         $summary = trim(sprintf('%s × %s', $pe->getSets() ?? '?', $pe->getReps() ?? '?'));
 
         if (null !== $pe->getWeightKg()) {
@@ -183,6 +191,10 @@ final class PlanFlattener
 
     private function summarizeSetsTime(PrescribedExercise $pe): string
     {
+        if ($pe->hasDetailedSets()) {
+            return $this->summarizeDetailedSets($pe);
+        }
+
         $summary = sprintf('%s × %s', $pe->getSets() ?? '?', $this->units->duration($pe->getDurationSeconds()));
 
         if (null !== $pe->getWeightKg()) {
@@ -190,6 +202,89 @@ final class PlanFlattener
         }
 
         return $summary;
+    }
+
+    /**
+     * Résumé compact d'une prescription en « séries détaillées » : chaque groupe
+     * de séries consécutives identiques devient un jeton « [N×] [Type] détail »,
+     * joints par « · ». Ex. « Échauf 10 reps @ 40 kg · 3× 8 reps @ 100 kg · Drop 6 reps @ 80 kg ».
+     */
+    private function summarizeDetailedSets(PrescribedExercise $pe): string
+    {
+        $parts = [];
+        foreach ($this->detailedSetGroups($pe) as $group) {
+            $token = '';
+            if ($group['count'] > 1) {
+                $token .= $group['count'].'× ';
+            }
+            if (null !== $group['typeLabel']) {
+                $token .= $group['typeLabel'].' ';
+            }
+            $parts[] = trim($token.$group['detail']);
+        }
+
+        return implode(' · ', $parts);
+    }
+
+    /**
+     * Regroupe les séries détaillées consécutives identiques (même type et mêmes
+     * valeurs) pour une lecture dense. Source unique consommée par le résumé
+     * compact ET le rendu détaillé en lecture.
+     *
+     * @return list<FlatSetGroup>
+     */
+    private function detailedSetGroups(PrescribedExercise $pe): array
+    {
+        $groups = [];
+        foreach ($pe->getDetailedSets() as $set) {
+            $detail = $this->detailedSetDetail($pe, $set);
+            $key = $set->getSetType()->value.'|'.$detail;
+
+            $lastIndex = array_key_last($groups);
+            if (null !== $lastIndex && $groups[$lastIndex]['key'] === $key) {
+                ++$groups[$lastIndex]['count'];
+                continue;
+            }
+
+            $short = $set->getSetType()->shortLabel();
+            $groups[] = [
+                'key' => $key,
+                'type' => $set->getSetType(),
+                'typeLabel' => '' !== $short ? $short : null,
+                'count' => 1,
+                'detail' => $detail,
+            ];
+        }
+
+        // On retire la clé technique de regroupement.
+        return array_map(
+            static fn (array $g): array => [
+                'type' => $g['type'],
+                'typeLabel' => $g['typeLabel'],
+                'count' => $g['count'],
+                'detail' => $g['detail'],
+            ],
+            $groups,
+        );
+    }
+
+    /**
+     * Détail lisible d'une série selon le type de force parent (reps pour
+     * SETS_REPS, durée pour SETS_TIME) + charge éventuelle.
+     */
+    private function detailedSetDetail(PrescribedExercise $pe, PrescribedSet $set): string
+    {
+        if (PrescriptionType::SETS_TIME === $pe->getPrescriptionType()) {
+            $detail = $this->units->duration($set->getDurationSeconds());
+        } else {
+            $detail = sprintf('%s reps', $set->getReps() ?? '?');
+        }
+
+        if (null !== $set->getWeightKg()) {
+            $detail .= ' @ '.$this->units->weight($set->getWeightKg());
+        }
+
+        return $detail;
     }
 
     private function summarizeAmrap(PrescribedExercise $pe): string

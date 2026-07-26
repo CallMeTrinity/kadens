@@ -4,6 +4,7 @@ namespace App\Service;
 
 use App\Entity\Block;
 use App\Entity\PrescribedExercise;
+use App\Entity\PrescribedSet;
 use App\Entity\User;
 use App\Entity\Workout;
 use Doctrine\ORM\EntityManagerInterface;
@@ -73,7 +74,7 @@ final class WorkoutCloner
      */
     private function clonePrescribed(PrescribedExercise $source): PrescribedExercise
     {
-        return (new PrescribedExercise())
+        $copy = (new PrescribedExercise())
             ->setExercise($source->getExercise())
             ->setPrescriptionType($source->getPrescriptionType())
             ->setPosition($source->getPosition())
@@ -86,7 +87,24 @@ final class WorkoutCloner
             ->setTargetReps($source->getTargetReps())
             ->setCapSeconds($source->getCapSeconds())
             ->setIntensityZone($source->getIntensityZone())
+            ->setElevationGainMeters($source->getElevationGainMeters())
+            ->setRpe($source->getRpe())
             ->setRestSeconds($source->getRestSeconds())
             ->setNotes($source->getNotes());
+
+        // Séries détaillées : copie profonde (addDetailedSet maintient les deux
+        // côtés, la cascade persist de PrescribedExercise::detailedSets suit).
+        foreach ($source->getDetailedSets() as $set) {
+            $copy->addDetailedSet(
+                (new PrescribedSet())
+                    ->setPosition($set->getPosition() ?? 0)
+                    ->setSetType($set->getSetType())
+                    ->setReps($set->getReps())
+                    ->setWeightKg($set->getWeightKg())
+                    ->setDurationSeconds($set->getDurationSeconds())
+            );
+        }
+
+        return $copy;
     }
 }

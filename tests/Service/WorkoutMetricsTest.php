@@ -5,10 +5,12 @@ namespace App\Tests\Service;
 use App\Entity\Block;
 use App\Entity\Exercise;
 use App\Entity\PrescribedExercise;
+use App\Entity\PrescribedSet;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
+use App\Enum\SetType;
 use App\Enum\TargetArea;
 use App\Service\WorkoutMetrics;
 use PHPUnit\Framework\TestCase;
@@ -72,6 +74,27 @@ final class WorkoutMetricsTest extends TestCase
         // Pas de salle : aucun groupe musculaire.
         self::assertSame([], $vol['gym']['setsByArea']);
         self::assertSame(0.0, $vol['gym']['tonnageKg']);
+    }
+
+    public function testDetailedSetsCountWorkingSetsAndTonnagePerRow(): void
+    {
+        // Séries hétérogènes : 1 échauffement 10 @ 40, 2 travail 8 @ 100, 1 drop 6 @ 80.
+        // L'échauffement ne compte NI dans les séries de travail NI dans le tonnage.
+        $pe = $this->prescribed(ActivityType::GYM, PrescriptionType::SETS_REPS, [TargetArea::CHEST]);
+        $pe->setSets(4)->setReps(8)->setWeightKg(100.0); // scalaire ignoré une fois détaillé
+        $pe->addDetailedSet((new PrescribedSet())->setPosition(0)->setSetType(SetType::WARMUP)->setReps(10)->setWeightKg(40.0));
+        $pe->addDetailedSet((new PrescribedSet())->setPosition(1)->setSetType(SetType::NORMAL)->setReps(8)->setWeightKg(100.0));
+        $pe->addDetailedSet((new PrescribedSet())->setPosition(2)->setSetType(SetType::NORMAL)->setReps(8)->setWeightKg(100.0));
+        $pe->addDetailedSet((new PrescribedSet())->setPosition(3)->setSetType(SetType::DROP_SET)->setReps(6)->setWeightKg(80.0));
+
+        $workout = $this->workout([$this->block(BlockRole::MAIN, 2, [$pe])]);
+        $vol = $this->metrics->volume($workout);
+
+        // 3 séries de travail (hors échauffement) × 2 tours = 6.
+        self::assertSame(6, $vol['gym']['totalSets']);
+        self::assertSame(6, $vol['gym']['setsByArea']['chest']);
+        // Tonnage hors échauffement : (8×100 + 8×100 + 6×80) = 2080, × 2 tours = 4160.
+        self::assertSame(4160.0, $vol['gym']['tonnageKg']);
     }
 
     /**

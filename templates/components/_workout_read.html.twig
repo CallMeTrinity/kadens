@@ -4,6 +4,7 @@
    du cache offline (Phase 9). Attend une variable `flat` (sortie de
    PlanFlattener::flattenWorkout). #}
 {% import 'components/_activity.html.twig' as activity %}
+{% import 'components/_set_type.html.twig' as settype %}
 {% set workout = flat.workout %}
 
 {# Icône par rôle de bloc — la couleur reste neutre (règle « la couleur porte
@@ -56,6 +57,13 @@
                         {{ ux_icon(role_icon[block.role.value] ?? 'lucide:activity') }} {{ block.role.label }}
                     </span>
                     {% if block.label %}<span class="kd-block__label">{{ block.label }}</span>{% endif %}
+                    {# Un bloc à plusieurs exercices enchaînés EST un superset (2 exos) /
+                       circuit (3+) : la mécanique bloc+tours l'exprime déjà, on la nomme. #}
+                    {% if entry.exercises|length > 1 %}
+                        <span class="kd-block__superset">
+                            {{ ux_icon('lucide:repeat') }} {{ entry.exercises|length == 2 ? 'Superset' : 'Circuit' }}
+                        </span>
+                    {% endif %}
                     {% if block.rounds > 1 %}<span class="kd-block__rounds">× {{ block.rounds }} tours</span>{% endif %}
                 </div>
 
@@ -67,7 +75,27 @@
                             <li class="kd-exrow">
                                 <div class="kd-exrow__body">
                                     <span class="kd-exrow__name">{{ ex.exercise ? ex.exercise.name : '—' }}</span>
-                                    {% if ex.summary or ex.rest %}
+                                    {% if ex.sets %}
+                                        {# Mode « séries détaillées » : une ligne par groupe de séries. #}
+                                        <ul class="kd-setlist">
+                                            {% for g in ex.sets %}
+                                                <li class="kd-setline kd-setline--{{ g.type.value }}">
+                                                    <span class="kd-setline__count">{% if g.count > 1 %}{{ g.count }}×{% endif %}</span>
+                                                    <span class="kd-setline__detail">{{ g.detail }}</span>
+                                                    {{ settype.badge(g.type) }}
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                        {% if ex.prescribed.rpe or ex.rest %}
+                                            <span class="kd-exrow__params">
+                                                {% if ex.prescribed.rpe %}RPE {{ ex.prescribed.rpe }}{% endif %}
+                                                {% if ex.rest %}
+                                                    {% if ex.prescribed.rpe %}<span class="kd-dot">·</span>{% endif %}
+                                                    <span class="kd-exrow__rest">repos {{ ex.rest }} s</span>
+                                                {% endif %}
+                                            </span>
+                                        {% endif %}
+                                    {% elseif ex.summary or ex.rest %}
                                         <span class="kd-exrow__params">
                                             {% if ex.summary %}{{ ex.summary }}{% endif %}
                                             {% if ex.rest %}

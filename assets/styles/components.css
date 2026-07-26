@@ -1044,6 +1044,22 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
   padding: 4px var(--kd-space-4);
   white-space: nowrap;
 }
+/* Tag superset/circuit : neutre (structure, pas activité ni statut). */
+.kd-block__superset {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-secondary);
+  background: var(--color-fill);
+  border-radius: var(--kd-radius-pill);
+  padding: 3px var(--kd-space-3);
+  white-space: nowrap;
+}
+.kd-block__superset svg { width: 12px; height: 12px; }
+.kd-block__superset + .kd-block__rounds { margin-left: var(--kd-space-2); }
 
 /* Liste d'exercices d'un bloc — numérotée (counter mono) */
 .kd-exlist {
@@ -1093,6 +1109,64 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
 }
 .kd-exrow__params .kd-dot { color: var(--color-text-placeholder); }
 .kd-exrow__rest { color: var(--color-text-faint); }
+
+/* ---- Badge de type de série (partagé lecture + compositeur) ----
+   Monochrome : le type de série n'est ni une activité ni un statut. La
+   distinction passe par l'icône et l'emphase (contour / plein / atténué),
+   jamais par la teinte. */
+.kd-setbadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  line-height: 1.4;
+  padding: 2px 7px;
+  border-radius: var(--kd-radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+.kd-setbadge svg { width: 11px; height: 11px; }
+.kd-setbadge--warmup {
+  background: transparent;
+  border-style: dashed;
+  color: var(--color-text-faint);
+}
+.kd-setbadge--to_failure {
+  background: var(--color-text-strong);
+  border-color: var(--color-text-strong);
+  color: var(--color-surface);
+}
+
+/* Séries détaillées en lecture : une ligne par groupe (compteur · détail · badge). */
+.kd-setlist {
+  list-style: none;
+  margin: var(--kd-space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.kd-setline {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.kd-setline__count {
+  flex: 0 0 2.2em;
+  text-align: right;
+  color: var(--color-text-faint);
+}
+.kd-setline__detail { color: var(--color-text-strong); }
+.kd-setline .kd-setbadge { margin-left: auto; }
+.kd-setline--warmup .kd-setline__detail { color: var(--color-text-secondary); }
 .kd-exrow__notes {
   font-size: 13px;
   line-height: 1.5;
@@ -2605,6 +2679,142 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
 .kd-cexo__params .kd-form { gap: var(--kd-space-5); }
 .kd-cexo__reorder { display: flex; gap: var(--kd-space-2); margin-top: var(--kd-space-4); }
 .kd-cexo__reorder form { display: inline-flex; margin: 0; }
+
+/* ---- Résumé compact des séries détaillées sur la ligne repliée ---- */
+.kd-cexo__sets {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-top: 4px;
+}
+.kd-cexo__setcount {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-secondary);
+  background: var(--color-fill);
+  padding: 2px 7px;
+  border-radius: var(--kd-radius-sm);
+}
+
+/* ---- Éditeur de séries détaillées (mode force) ----
+   Mise en page WYSIWYG : proche de la vue séance (chip de type + valeurs +
+   unités inline). Couleur neutre (le type de série n'est ni activité ni statut) :
+   l'accent gauche et l'emphase du chip suffisent à distinguer les types. */
+.kd-sets {
+  margin-top: var(--kd-space-5);
+  padding-top: var(--kd-space-4);
+  border-top: 1px dashed var(--color-divider);
+}
+.kd-sets--collapsed {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kd-space-3) var(--kd-space-4);
+}
+.kd-sets--collapsed form { margin: 0; }
+.kd-sets__hint { font-size: 11px; color: var(--color-text-faint); }
+.kd-sets__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kd-space-4);
+  margin-bottom: var(--kd-space-3);
+}
+.kd-sets__head form { margin: 0; }
+.kd-sets__title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 12px;
+  color: var(--color-text-strong);
+}
+.kd-sets__title svg { width: 14px; height: 14px; color: var(--color-text-faint); }
+
+.kd-sets__detail,
+.kd-sets__add,
+.kd-sets__revert {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  padding: var(--kd-space-2) var(--kd-space-4);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--kd-radius-sm);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: var(--kd-weight-medium);
+  cursor: pointer;
+}
+.kd-sets__detail:hover,
+.kd-sets__add:hover,
+.kd-sets__revert:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.kd-sets__detail svg,
+.kd-sets__add svg,
+.kd-sets__revert svg { width: 14px; height: 14px; }
+.kd-sets__revert { font-size: 11px; padding: 3px var(--kd-space-3); }
+.kd-sets__add { margin-top: var(--kd-space-3); }
+
+.kd-sets__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--kd-space-2); }
+.kd-set {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  padding: var(--kd-space-3);
+  border: 1px solid var(--color-divider-soft);
+  border-left: 3px solid var(--color-divider);
+  border-radius: var(--kd-radius-sm);
+  background: var(--color-surface-raised);
+}
+/* Accent gauche par type (neutre, en niveaux de gris). */
+.kd-set--warmup { border-left-color: var(--color-text-placeholder); }
+.kd-set--to_failure { border-left-color: var(--color-text-strong); }
+.kd-set--degressive,
+.kd-set--drop_set { border-left-color: var(--color-text-faint); }
+.kd-set__num {
+  flex: none;
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+  background: var(--color-fill);
+  border-radius: var(--kd-radius-full);
+}
+.kd-set__form {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.kd-set__type {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 116px;
+  font-size: 11px;
+  font-weight: var(--kd-weight-medium);
+}
+.kd-set__vals { display: inline-flex; align-items: center; gap: var(--kd-space-2); }
+.kd-set__val { width: 58px; text-align: center; }
+.kd-set__val--time { width: 72px; }
+.kd-set__unit { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-faint); }
+.kd-set__at { color: var(--color-text-faint); font-size: 13px; }
+.kd-set__form select,
+.kd-set__form input { padding: var(--kd-space-2) var(--kd-space-3); font-size: 12px; }
+.kd-set__actions { flex: none; display: flex; gap: var(--kd-space-1); margin-left: auto; }
+.kd-set__actions form { margin: 0; display: inline-flex; }
+
+@media (max-width: 560px) {
+  .kd-set { flex-wrap: wrap; }
+  .kd-set__form { width: 100%; }
+  .kd-set__actions { margin-left: 0; }
+}
 
 /* ---- Responsive : les deux volets s'empilent ---- */
 @media (max-width: 900px) {
