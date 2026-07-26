@@ -6,6 +6,11 @@
 
 ---
 
+> **État (2026-07-26)** : **Lot A livré** (`ProgressionAggregator`, bloc
+> « Progression prévue » sur `plan_template/show`, contrôleur Stimulus
+> `progression`, `ProgressionAggregatorTest`). **Lot B non fait** — décision
+> requise (§3 / §6) avant de coder.
+
 ## 0. Résumé et recommandation
 
 **Le manque** : l'app est un excellent *éditeur* de plans mais un mauvais *miroir*.

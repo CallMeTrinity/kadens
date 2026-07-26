@@ -817,9 +817,38 @@ navigateur (non automatisable ici).
   **Migration** `Version20260726090000` : table `goal` (FK owner `ON DELETE
   CASCADE`). Tests : `GoalControllerTest` (CRUD, voter 403, ancrage de plan =
   dernière semaine calée sur la semaine de l'échéance). Icône importée : `flag`
-  (le reste déjà local). **Suite : la « vue progression / évolution » est
-  spécifiée dans [`docs/feature-progression.md`](./docs/feature-progression.md),
-  à implémenter dans une session dédiée.**
+  (le reste déjà local).
+  **Progression prévue — lot A de [`docs/feature-progression.md`](./docs/feature-progression.md)
+  (hors-roadmap, SANS migration).** L'app était un bon éditeur mais un mauvais
+  miroir : rien ne visualisait la rampe de charge/allure qu'un plan fait monter
+  semaine après semaine. Le lot A trace la progression **PRÉVUE** (100 % lecture
+  agrégée, aucune donnée de réalisé, zéro entorse à la règle « pas de tracking » —
+  on lit la rampe que le *fork à la pose* a déjà matérialisée dans les copies
+  locales des cases). Nouveau service **`ProgressionAggregator`** (autowiring,
+  consomme `WorkoutMetrics` + `UnitFormatter`, jamais de mise à plat
+  réimplémentée) : `weeklyVolume` (charge par semaine ventilée en séries traçables
+  — temps estimé, tonnage, séries, distances par activité ; ne garde que les
+  séries non vides) et `exerciseTrajectories` (par exercice récurrent — présent
+  sur ≥ 2 semaines —, la métrique primaire déduite des paramètres réellement
+  prescrits : charge top-set, allure, distance, durée ou séries, agrégée par
+  semaine). Les **hauteurs de barres** (`heightPct`) et le **sens** (`direction`
+  up/down/flat ; allure = `lowerIsBetter` donc barre inversée : plus haut = plus
+  rapide) sont précalculés dans le service pour garder le Twig « bête ». Anti-N+1 :
+  nouvelle méthode `PlanTemplateRepository::findWithContent` (fetch-join
+  cases→séance→blocs→prescrits→exercice en une requête), appelée dans
+  `PlanTemplateController::show` (même instance managée réutilisée par le flattener
+  ET l'agrégat). **Rendu 100 % serveur** (aucune lib de charts, cohérent
+  AssetMapper) : fragment `templates/components/_progression.html.twig` (barres
+  proportionnelles façon `.kd-obar`/`.kd-actbar`, couleur réservée aux activités,
+  barre neutre par défaut) branché sur `plan_template/show` — pas d'onglet dédié
+  (le lot A se greffe sur les pages existantes). Sélecteur de trajectoire : charts
+  pré-rendus, bascule 100 % client (contrôleur Stimulus `progression`) ; sans JS,
+  tous les charts restent visibles (auto-suffisant, cachable offline). Couche CSS
+  `.kd-prog*` (tokenisée). Tests : `ProgressionAggregatorTest` (rampe de charge,
+  allure `lowerIsBetter`, exercice non récurrent exclu, séries de volume filtrées).
+  Icône importée : `trending-down` (`trending-up` déjà locale). **Lot B
+  (progression RÉALISÉE) NON fait : décision requise** (options 1/2/3 du §3 de la
+  spec, à trancher avec l'utilisateur avant de coder).
 
 ---
 

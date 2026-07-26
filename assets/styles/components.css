@@ -3715,3 +3715,137 @@ textarea.kd-inlineedit__input { min-height: 3.2em; resize: vertical; }
 .kd-calgoal span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kd-calgoal--week { font-size: 12px; padding: var(--kd-space-2) var(--kd-space-3); margin-bottom: var(--kd-space-3); }
 .kd-calday--goal .kd-calday__num { color: var(--color-primary); font-weight: var(--kd-weight-bold); }
+
+/* ============================================================================
+   Progression prévue (plan_template/show) — barres proportionnelles par semaine.
+   Rendu 100 % serveur (aucune lib de charts). La couleur reste réservée aux
+   activités ; barre neutre par défaut. Voir components/_progression.html.twig.
+   ========================================================================== */
+.kd-prog { margin-top: var(--kd-space-11); }
+.kd-prog__lead {
+  margin: 0 0 var(--kd-space-8);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.kd-prog__part + .kd-prog__part {
+  margin-top: var(--kd-space-11);
+  padding-top: var(--kd-space-9);
+  border-top: 1px solid var(--color-divider);
+}
+.kd-prog__subtitle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin: 0 0 var(--kd-space-7);
+}
+
+/* Séries de charge : une ligne par métrique (temps, tonnage, distance…) */
+.kd-prog__series { display: flex; flex-direction: column; gap: var(--kd-space-9); }
+.kd-prog__rowhead {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-strong);
+  margin-bottom: var(--kd-space-4);
+}
+.kd-prog__dot {
+  width: 9px; height: 9px;
+  border-radius: var(--kd-radius-full);
+  background: var(--color-border-strong);
+  flex: 0 0 auto;
+}
+.kd-prog__dot--run { background: var(--color-activity-run); }
+.kd-prog__dot--gym { background: var(--color-activity-gym); }
+
+/* Grille de colonnes : une par semaine, barre alignée en bas */
+.kd-prog__bars {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(28px, 1fr);
+  gap: var(--kd-space-3);
+  align-items: end;
+  overflow-x: auto;
+}
+.kd-prog__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--kd-space-2);
+  min-width: 28px;
+}
+.kd-prog__track {
+  width: 100%;
+  height: 96px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--color-surface-subtle);
+  border-radius: var(--kd-radius-sm);
+}
+.kd-prog__bar {
+  display: block;
+  width: 100%;
+  min-height: 3px;
+  border-radius: var(--kd-radius-sm);
+  background: var(--color-border-strong);
+}
+.kd-prog__bar--run { background: var(--color-activity-run); }
+.kd-prog__bar--gym { background: var(--color-activity-gym); }
+.kd-prog__col.is-empty .kd-prog__track { opacity: .5; }
+.kd-prog__val {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  line-height: 1.2;
+  min-height: 1.2em;
+}
+.kd-prog__wk {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-faint);
+}
+
+/* Trajectoire d'un exercice : sélecteur + charts empilés (un visible) */
+.kd-prog__trajhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kd-space-6);
+  flex-wrap: wrap;
+  margin-bottom: var(--kd-space-7);
+}
+.kd-prog__trajhead .kd-prog__subtitle { margin: 0; }
+.kd-prog__chart + .kd-prog__chart { margin-top: var(--kd-space-9); }
+.kd-prog__caption {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kd-space-3) var(--kd-space-4);
+  margin-bottom: var(--kd-space-6);
+}
+.kd-prog__exname { font-family: var(--font-body); font-weight: var(--kd-weight-semibold); color: var(--color-text-strong); }
+.kd-prog__metric { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-faint); }
+.kd-prog__trend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+.kd-prog__trend svg { width: 14px; height: 14px; }
+.kd-prog__trend--up svg { color: var(--color-status-done); }
+.kd-prog__trend--down svg { color: var(--color-status-missed); }
+.kd-prog__hint {
+  margin: var(--kd-space-4) 0 0;
+  font-size: 11px;
+  color: var(--color-text-faint);
+}

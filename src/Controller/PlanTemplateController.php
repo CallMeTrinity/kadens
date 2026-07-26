@@ -15,6 +15,7 @@ use App\Security\Voter\PlanTemplateVoter;
 use App\Service\PlanFlattener;
 use App\Service\PlanScheduler;
 use App\Service\PlanVolumeAggregator;
+use App\Service\ProgressionAggregator;
 use App\Service\SlugGenerator;
 use App\Service\WorkoutCloner;
 use App\Service\WorkoutMetrics;
@@ -104,13 +105,21 @@ final class PlanTemplateController extends AbstractController
     }
 
     #[Route('/{id}', name: 'app_plan_template_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(PlanTemplate $template, SlugGenerator $slugGenerator): Response
+    public function show(PlanTemplate $template, SlugGenerator $slugGenerator, PlanTemplateRepository $planTemplateRepository, ProgressionAggregator $progression): Response
     {
         $this->denyAccessUnlessGranted(PlanTemplateVoter::VIEW, $template);
         $this->ensureSlug($template, $slugGenerator);
 
+        // Précharge tout le contenu en une requête : la mise à plat ET les agrégats
+        // de progression parcourent chaque case (anti-N+1). Même instance managée.
+        $loaded = $planTemplateRepository->findWithContent($template->getId()) ?? $template;
+
         return $this->render('plan_template/show.html.twig', [
-            'flat' => $this->planFlattener->flattenPlanTemplate($template),
+            'flat' => $this->planFlattener->flattenPlanTemplate($loaded),
+            'progression' => [
+                'volume' => $progression->weeklyVolume($loaded),
+                'trajectories' => $progression->exerciseTrajectories($loaded),
+            ],
         ]);
     }
 

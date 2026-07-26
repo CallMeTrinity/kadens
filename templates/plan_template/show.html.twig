@@ -49,4 +49,9 @@
     {% endif %}
 
     {{ include('components/_plan_read.html.twig') }}
+
+    {{ include('components/_progression.html.twig', {
+        volume: progression.volume,
+        trajectories: progression.trajectories,
+    }) }}
 {% endblock %}
