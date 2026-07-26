@@ -1171,46 +1171,52 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
 .kd-exrow__params .kd-dot { color: var(--color-text-placeholder); }
 .kd-exrow__rest { color: var(--color-text-faint); }
 
-/* ---- Badge de type de série (partagé lecture + compositeur) ----
-   Monochrome : le type de série n'est ni une activité ni un statut. La
-   distinction passe par l'icône et l'emphase (contour / plein / atténué),
-   jamais par la teinte. */
+/* ---- Pastille de type de série (partagée lecture + survol + compositeur) ----
+   Un sigle cerclé (W / D / F / DS) plutôt qu'un libellé : lisible d'un coup
+   d'œil et de largeur quasi constante, ce qui permet de l'aligner en colonne
+   devant chaque ligne de série. Teintes dédiées `--color-set-*` — elles codent
+   l'intention de la série, distinctes des codes activité et statut. */
 .kd-setbadge {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
   font-family: var(--font-display);
-  font-weight: var(--kd-weight-semibold);
+  font-weight: var(--kd-weight-bold);
   font-size: 10px;
   letter-spacing: 0.02em;
-  line-height: 1.4;
-  padding: 2px 7px;
+  line-height: 1;
   border-radius: var(--kd-radius-pill);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-raised);
-  color: var(--color-text-secondary);
+  /* Teinte pleine : à cette taille, un sigle cerclé sur fond clair se lit mal.
+     La lettre est en papier, la pastille porte la couleur. */
+  background: var(--color-text-secondary);
+  color: var(--color-surface-raised);
   white-space: nowrap;
+  cursor: default;
 }
-.kd-setbadge svg { width: 11px; height: 11px; }
-.kd-setbadge--warmup {
-  background: transparent;
-  border-style: dashed;
-  color: var(--color-text-faint);
-}
-.kd-setbadge--to_failure {
-  background: var(--color-text-strong);
-  border-color: var(--color-text-strong);
-  color: var(--color-surface);
+.kd-setbadge--warmup { background: var(--color-set-warmup); }
+.kd-setbadge--degressive { background: var(--color-set-degressive); }
+.kd-setbadge--to_failure { background: var(--color-set-failure); }
+.kd-setbadge--drop_set { background: var(--color-set-dropset); }
+/* Gouttière de largeur fixe : les lignes sans type (série normale) restent
+   alignées sur celles qui en portent un. */
+.kd-setbadge__slot {
+  flex: 0 0 auto;
+  display: inline-flex;
+  justify-content: center;
+  min-width: 22px;
 }
 
-/* Séries détaillées en lecture : une ligne par groupe (compteur · détail · badge). */
+/* Séries détaillées en lecture : une ligne par groupe (pastille · compteur · détail). */
 .kd-setlist {
   list-style: none;
   margin: var(--kd-space-2) 0 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: var(--kd-space-1);
 }
 .kd-setline {
   display: flex;
@@ -1225,8 +1231,7 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
   text-align: right;
   color: var(--color-text-faint);
 }
-.kd-setline__detail { color: var(--color-text-strong); }
-.kd-setline .kd-setbadge { margin-left: auto; }
+.kd-setline__detail { min-width: 0; color: var(--color-text-strong); }
 .kd-setline--warmup .kd-setline__detail { color: var(--color-text-secondary); }
 .kd-exrow__notes {
   font-size: 13px;
@@ -2831,11 +2836,12 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
   border-radius: var(--kd-radius-sm);
   background: var(--color-surface-raised);
 }
-/* Accent gauche par type (neutre, en niveaux de gris). */
-.kd-set--warmup { border-left-color: var(--color-text-placeholder); }
-.kd-set--to_failure { border-left-color: var(--color-text-strong); }
-.kd-set--degressive,
-.kd-set--drop_set { border-left-color: var(--color-text-faint); }
+/* Accent gauche + fond teinté par type : mêmes couleurs que la pastille en
+   lecture, pour qu'une ligne se reconnaisse au même signal des deux côtés. */
+.kd-set--warmup { border-left-color: var(--color-set-warmup); background: var(--color-set-warmup-tint); }
+.kd-set--degressive { border-left-color: var(--color-set-degressive); background: var(--color-set-degressive-tint); }
+.kd-set--to_failure { border-left-color: var(--color-set-failure); background: var(--color-set-failure-tint); }
+.kd-set--drop_set { border-left-color: var(--color-set-dropset); background: var(--color-set-dropset-tint); }
 .kd-set__num {
   flex: none;
   width: 20px; height: 20px;
@@ -3047,9 +3053,9 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
   position: fixed;
   inset: auto;                 /* neutralise le centrage UA du popover */
   margin: 0;
-  width: min(300px, calc(100vw - 2 * var(--kd-space-6)));
+  width: min(340px, calc(100vw - 2 * var(--kd-space-6)));
   max-height: 60vh;
-  overflow-y: auto;
+  overflow: hidden auto;       /* jamais de débordement latéral, cf. __sum */
   padding: var(--kd-space-5);
   border: 1px solid var(--color-border);
   border-radius: var(--kd-radius-lg);
@@ -3072,17 +3078,49 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
   letter-spacing: var(--kd-tracking-eyebrow-lg);
   color: var(--color-text-faint);
 }
-.kd-planpreview__exos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.kd-planpreview__exos li {
+.kd-planpreview__exos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--kd-space-2); }
+/* Nom à gauche, résumé à droite tant que les deux tiennent sur la ligne. Un
+   résumé long repasse sous le nom au lieu de déborder du panneau.
+   `> li` impératif : sans lui, les lignes de la sous-liste `.kd-setlist--preview`
+   héritent de ce wrap + `space-between` et chaque série éclate sur trois lignes. */
+.kd-planpreview__exos > li {
   display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   justify-content: space-between;
-  gap: var(--kd-space-4);
+  gap: 0 var(--kd-space-4);
   font-family: var(--font-body);
   font-size: 12px;
   color: var(--color-text-secondary);
 }
-.kd-planpreview__exoname { min-width: 0; }
-.kd-planpreview__sum { flex: 0 0 auto; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-faint); }
+.kd-planpreview__exoname { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.kd-planpreview__sum {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  text-align: right;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+/* Exercice en séries détaillées : le nom prend sa ligne, la liste de séries se
+   déploie dessous en pleine largeur (même rendu qu'en vue séance, en plus dense). */
+.kd-planpreview__exo--detailed {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+.kd-setlist--preview {
+  margin: 3px 0 0 2px;
+  padding-left: var(--kd-space-3);
+  border-left: 1px solid var(--color-divider);  /* rattache les séries à leur exercice */
+  gap: 3px;
+}
+.kd-setlist--preview .kd-setline { gap: var(--kd-space-2); font-size: 11px; }
+.kd-setlist--preview .kd-setline__count { flex: 0 0 1.8em; }
+.kd-setlist--preview .kd-setbadge { min-width: 16px; height: 16px; }
+.kd-setlist--preview .kd-setbadge__slot { min-width: 16px; }
 .kd-planpreview__empty { margin: 2px 0 0; font-size: 12px; color: var(--color-text-placeholder); }
 
 /* ----------------------------------------------------------------------------

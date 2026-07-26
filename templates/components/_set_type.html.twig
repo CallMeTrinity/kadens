@@ -1,15 +1,26 @@
-{# Badge de type de série (mode « séries détaillées »). Monochrome par choix : le
-   type de série n'est ni une activité ni un statut, il ne code donc pas de teinte
-   (règle « la couleur porte du sens »). La distinction passe par l'icône et
-   l'emphase (contour / plein / atténué). NORMAL n'affiche pas de badge.
+{# Pastille de type de série (mode « séries détaillées ») : un sigle d'une ou deux
+   lettres (W / D / F / DS) dans une puce cerclée et teintée. Compact, alignable en
+   colonne devant chaque ligne de série, lisible sans lire un libellé. Le libellé
+   complet reste accessible en `title` + `aria-label` (la pastille est un
+   pictogramme, d'où `role="img"` : sans rôle, un `aria-label` sur un `span` n'est
+   pas restitué de façon fiable).
+
+   Teintes dédiées (`--color-set-*`) : elles qualifient l'intention d'une série,
+   sans reprendre les codes activité (terracotta/olive) ni statut. NORMAL n'affiche
+   pas de pastille — une série de travail ordinaire n'a rien à signaler.
 
    Usage : {% import 'components/_set_type.html.twig' as settype %}
-           {{ settype.badge(set.setType) }} #}
+           {{ settype.badge(set.setType) }}   → la pastille (rien si NORMAL)
+           {{ settype.slot(set.setType) }}    → la pastille dans une gouttière de
+                                                largeur fixe, pour aligner des
+                                                lignes avec et sans type #}
 {% macro badge(type) %}
     {%- if type.value != 'normal' -%}
-        <span class="kd-setbadge kd-setbadge--{{ type.value }}">
-            {%- if type.icon %}{{ ux_icon(type.icon) }}{% endif -%}
-            <span class="kd-setbadge__txt">{{ type.shortLabel }}</span>
-        </span>
+        <span class="kd-setbadge kd-setbadge--{{ type.value }}" role="img" title="{{ type.label }}" aria-label="{{ type.label }}">{{ type.letter }}</span>
     {%- endif -%}
+{% endmacro %}
+
+{% macro slot(type) %}
+    {% import _self as settype %}
+    <span class="kd-setbadge__slot">{{ settype.badge(type) }}</span>
 {% endmacro %}

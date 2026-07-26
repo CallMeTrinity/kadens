@@ -66,6 +66,20 @@
   --kd-status-planned: #a99f8d; /* prévu (= ink-faint) */
   --kd-status-missed:  #c0392b; /* manqué */
 
+  /* Types de série (mode « séries détaillées ») — pastille lettre W/D/F/DS.
+     Teintes désaturées, tenues dans la gamme terre du carnet : elles qualifient
+     l'intention d'une série, elles n'entrent pas en concurrence avec les codes
+     activité (terracotta/olive) ni statut. Chaque encre est assez foncée pour
+     rester lisible en 10 px sur son tint. */
+  --kd-set-warm:      #8f6c22; /* échauffement — ambre */
+  --kd-set-warm-tint: #f8f0dd;
+  --kd-set-degr:      #4a646d; /* dégressive — ardoise */
+  --kd-set-degr-tint: #e8eff1;
+  --kd-set-fail:      #a83a2c; /* à l'échec — brique */
+  --kd-set-fail-tint: #fbe9e5;
+  --kd-set-drop:      #6a4570; /* drop set — prune */
+  --kd-set-drop-tint: #f3eaf4;
+
   /* Pistes de graphiques */
   --kd-chart-track: #e8e0d2; /* piste de l'anneau de synthèse */
   --kd-chart-todo:  #e0d7c7; /* barre "à venir" (histogramme) */
@@ -155,6 +169,16 @@
   --color-activity-gym:       var(--kd-olive);       /* muscu / renfo */
   --color-activity-gym-tint:  var(--kd-olive-tint);
   --color-activity-gym-text:  var(--kd-olive-text);
+
+  /* Types de série détaillée (pastille lettre) */
+  --color-set-warmup:          var(--kd-set-warm);
+  --color-set-warmup-tint:     var(--kd-set-warm-tint);
+  --color-set-degressive:      var(--kd-set-degr);
+  --color-set-degressive-tint: var(--kd-set-degr-tint);
+  --color-set-failure:         var(--kd-set-fail);
+  --color-set-failure-tint:    var(--kd-set-fail-tint);
+  --color-set-dropset:         var(--kd-set-drop);
+  --color-set-dropset-tint:    var(--kd-set-drop-tint);
 
   /* Statuts prévu / réalisé */
   --color-status-done:     var(--kd-status-done);

@@ -1007,3 +1007,60 @@ athlète. Le retour depuis la fiche athlète pointe sur l'ancre `#athletes`.
 remplacés par un test de la fiche athlète refusée sans `ROLE_COACH` ;
 `CoachingControllerTest` gagne deux tests de rendu (page complète pour un coach,
 côté coach masqué pour un simple utilisateur).
+
+---
+
+### Lot — Aperçu au survol dense & pastilles de type de série (26/07/2026)
+
+**Point de départ** (deux retours sur la vue plan). L'aperçu au survol d'une case
+se cassait sur les séances riches : `.kd-planpreview__sum` était en `flex: 0 0 auto`,
+donc un résumé de séries détaillées (`12 reps @ 12 kg · 12 reps @ 12 kg · À l'échec`)
+ne pouvait ni rétrécir ni revenir à la ligne — il sortait du panneau et passait
+par-dessus le nom de l'exercice, lui-même écrasé sur une colonne de trois
+caractères. Et même corrigé, la longue chaîne restait illisible dès qu'une
+prescription mélangeait plusieurs types de série.
+
+**Décisions.**
+
+- **Le survol rend les séries comme la vue séance** : une ligne par groupe de
+  séries (`ex.sets` du `PlanFlattener`), plus le résumé compact d'une seule
+  chaîne. Le groupement des séries consécutives identiques (`3× 8 reps @ 100 kg`)
+  est conservé — c'est la même source `detailedSetGroups`, pas de duplication. Le
+  résumé texte (`summarize`) reste tel quel : il sert encore le mode simple et
+  l'export Excel.
+- **Le libellé de type devient une pastille sigle** : `W` / `D` / `F` / `DS` dans
+  une puce cerclée et teintée, à la place de `Échauf` / `Dégressive` / `À l'échec` /
+  `Drop set` et de l'icône Lucide. Motif : largeur quasi constante, donc alignable
+  en **colonne en tête de ligne** (`settype.slot()` réserve une gouttière fixe pour
+  que les séries normales, sans pastille, restent alignées). `D` et `DS` sont
+  distincts à dessein — dégressive et drop set ne sont pas la même intention.
+- **Revirement assumé sur la couleur.** Le lot précédent avait tranché « badge de
+  type monochrome, la teinte est réservée à l'activité et au statut ». Un sigle
+  d'une lettre sans teinte n'est plus discriminant à l'œil, contrairement à une
+  icône. D'où une **famille de tokens dédiée** `--color-set-*` (ambre / ardoise /
+  brique / prune) : la règle « la couleur porte du sens » est tenue, on lui ajoute
+  un troisième code au lieu de recycler terracotta ou olive. Encres choisies
+  assez foncées pour rester lisibles en 10 px sur leur tint.
+
+**Détail technique.** `SetType::icon()` supprimée (plus aucun appelant) au profit
+de `SetType::letter()`. `shortLabel()` reste : le `PlanFlattener` s'en sert pour le
+résumé texte. La macro `_set_type.html.twig` expose `badge(type)` et
+`slot(type)` ; la pastille est un pictogramme, d'où `role="img"` + `aria-label`
+(sans rôle, un `aria-label` sur un `span` n'est pas restitué de façon fiable).
+Côté CSS : `.kd-setbadge` passe en puce **pleine** de 18 px (lettre en papier,
+display bold 10 px) — la première version, sigle coloré cerclé sur tint, se lisait
+mal à cette taille ; le tint sert désormais de fond de ligne dans l'éditeur de
+séries (`.kd-set--{type}`), dont l'accent gauche reprend la même couleur : même
+signal des deux côtés de l'édition. `.kd-setline` reçoit la pastille en tête au
+lieu du badge poussé à droite, et `.kd-setlist--preview` densifie le tout dans le
+popover (filet gauche pour rattacher les séries à leur exercice). Le panneau de
+survol passe à 340 px, `overflow: hidden auto`, et ses lignes autorisent le
+`flex-wrap` — plus aucun débordement latéral possible. Pas de migration.
+
+**Piège coûteux.** La règle de wrap du survol était écrite `.kd-planpreview__exos li`
+et non `> li` : les lignes de la sous-liste de séries héritaient donc de
+`flex-wrap: wrap` + `justify-content: space-between`, et chaque série éclatait en
+trois lignes (pastille, compteur centré, détail). Réflexe à garder dès qu'une liste
+en accueille une autre : cibler l'enfant direct.
+
+**Tests** : 121 au vert, `lint:twig` OK. Aucun test ne portait sur `SetType::icon()`.

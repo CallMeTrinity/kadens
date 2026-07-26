@@ -80,9 +80,9 @@
                                         <ul class="kd-setlist">
                                             {% for g in ex.sets %}
                                                 <li class="kd-setline kd-setline--{{ g.type.value }}">
+                                                    {{ settype.slot(g.type) }}
                                                     <span class="kd-setline__count">{% if g.count > 1 %}{{ g.count }}×{% endif %}</span>
                                                     <span class="kd-setline__detail">{{ g.detail }}</span>
-                                                    {{ settype.badge(g.type) }}
                                                 </li>
                                             {% endfor %}
                                         </ul>

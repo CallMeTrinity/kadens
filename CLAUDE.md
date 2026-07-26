@@ -175,7 +175,9 @@ Règles non négociables :
 1. **Jamais de couleur ou de police en dur** dans un template/composant. Toujours
    un token sémantique.
 2. **La couleur porte du sens** : terracotta = actions primaires + course/trail ;
-   olive = muscu/renfo ; statuts fait/prévu/manqué ont leurs tokens dédiés.
+   olive = muscu/renfo ; statuts fait/prévu/manqué ont leurs tokens dédiés ; les
+   types de série détaillée ont leur propre famille `--color-set-*` (pastille
+   sigle W/D/F/DS), qui ne recycle ni l'activité ni le statut.
 3. Nouvelle valeur → primitive `--kd-*` d'abord, puis token sémantique.
 4. Polices (Space Grotesk / Instrument Sans / JetBrains Mono) à charger dans
    `base.html.twig` — voir `docs/design-system.md §3`. À self-héberger le moment
@@ -199,12 +201,18 @@ deux sens, fiche de travail par athlète sous `/coach`, `ROLE_COACH`) — cf. §
 la règle de propriété — et **paramètres de compte** (`/profile/settings` :
 changement de mot de passe, création de compte par `app:user:create`).
 
-Dernier lot (fusion Coaching / Mes athlètes) : le tableau de bord coach disparaît,
+Dernier lot (aperçu au survol & pastilles de série) : le survol d'une case de plan
+rend désormais **une ligne par groupe de séries** comme la vue séance (fini le
+résumé d'une seule chaîne qui débordait du panneau), et le type de série s'affiche
+en **pastille sigle colorée** (`W`/`D`/`F`/`DS`, tokens `--color-set-*`) alignée en
+tête de ligne, en lecture comme au survol.
+
+Lot précédent (fusion Coaching / Mes athlètes) : le tableau de bord coach disparaît,
 `/coaching` porte les deux sens de la relation (demandes mutualisées, sections
 ordonnées selon le rôle, formulaire d'invitation réservé aux coachs), et `/coach`
 ne garde que la fiche athlète.
 
-Lot précédent (fluidité d'édition & navigation) : création en un clic, éditeurs sans
+Lot antérieur (fluidité d'édition & navigation) : création en un clic, éditeurs sans
 formulaire de métadonnées, semaines ajoutées une par une ou par paquet, compteur de
 séries synchronisé dans les deux sens, **nav réduite à 4 entrées + menu de compte**
 sur l'avatar, profil complet de l'athlète visible par son coach, et **relation

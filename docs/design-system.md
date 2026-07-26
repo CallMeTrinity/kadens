@@ -74,6 +74,24 @@ maquettes (matrice de plan, calendrier, synthèse). À câbler sur le champ
 > accent/tint quand elles seront designées — les ajouter alors comme primitives
 > `--kd-*` puis tokens `--color-activity-*`, jamais en dur.
 
+### Types de série détaillée
+Alignés sur l'enum `SetType`. Rendus par la macro `components/_set_type.html.twig`
+sous forme de **pastille sigle cerclée** (1–2 lettres) : `W` échauffement,
+`D` dégressive, `F` à l'échec, `DS` drop set. `NORMAL` n'affiche rien.
+
+Ces teintes qualifient l'intention d'une série ; elles sont **volontairement
+distinctes** de terracotta/olive (activité) et des statuts, pour ne pas brouiller
+ces deux codes. La pastille est **pleine** (lettre en papier) : à 18 px, un sigle
+coloré cerclé sur fond clair ne se lit pas. Le tint sert de fond de ligne dans
+l'éditeur de séries (`.kd-set--{type}`), dont l'accent gauche reprend l'encre.
+
+| Type | Sigle | Encre (pastille, accent) | Tint (fond de ligne) |
+|---|---|---|---|
+| `WARMUP` | `W` | `--color-set-warmup` `#8f6c22` | `--color-set-warmup-tint` `#f8f0dd` |
+| `DEGRESSIVE` | `D` | `--color-set-degressive` `#4a646d` | `--color-set-degressive-tint` `#e8eff1` |
+| `TO_FAILURE` | `F` | `--color-set-failure` `#a83a2c` | `--color-set-failure-tint` `#fbe9e5` |
+| `DROP_SET` | `DS` | `--color-set-dropset` `#6a4570` | `--color-set-dropset-tint` `#f3eaf4` |
+
 ### Statuts prévu / réalisé
 Alignés sur l'enum `ScheduledStatus`.
 
