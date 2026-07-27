@@ -47,8 +47,18 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   activité, zones, média). Jamais de séries/reps/charge/distance ici.
 - **Bibliothèque globale vs perso** : `Exercise` sans `owner` (null) = biblio
   globale de l'app, visible par tous en lecture, éditable/supprimable uniquement
-  par un `ROLE_ADMIN` (sinon alimentée par l'import console). Avec `owner` =
-  perso, réservé à son propriétaire. Voir `ROADMAP.md §1.3`.
+  par un `ROLE_ADMIN`. Elle s'alimente par l'import console **et** par
+  `/exercise/new` : un `ROLE_ADMIN` qui crée un exercice le crée **global**
+  (`owner = null`), jamais en perso — c'est ce qui donne son sens au rôle. Avec
+  `owner` = perso, réservé à son propriétaire. Voir `ROADMAP.md §1.3`.
+  **Exception coaching, en lecture seule** : `ExerciseVoter::VIEW` traverse une
+  relation acceptée **dans les deux sens** (le coach lit les exercices perso de
+  son athlète, l'athlète ceux de son coach). C'est la seule règle symétrique du
+  projet, et elle existe parce que le compositeur croise les deux bibliothèques
+  (`WorkoutController::libraryOwners()` = propriétaire de la séance + utilisateur
+  courant) : ce qu'on pose dans une séance doit rester ouvrable par l'autre.
+  `EDIT`/`DELETE` restent au propriétaire, et l'index `/exercise` reste scopé sur
+  soi + la globale — lire n'est pas s'approprier.
 - **Variantes = entrées distinctes, pas de champ `equipment`** : l'équipement,
   la prise, la posture sont dans le nom de l'exercice. Regroupement `family`
   différé, alternatives dérivées des `targetAreas`. Détail dans `ROADMAP.md §2.3`.
@@ -134,13 +144,22 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   ouvrables. Corollaire : toute vue accessible au coach doit se scoper sur
   **`$entity->getOwner()`**, jamais sur `$this->getUser()` (`GoalController::show`
   et les rattachements objectif↔plan suivent cette règle).
+  **L'éditeur de trame ne fait pas exception** : sa palette, la garde de pose,
+  l'owner des copies locales forkées, la duplication et l'owner passé à
+  `PlanScheduler::rescheduleItem()` dérivent tous de `PlanTemplateController::ownerOf()`
+  (= `$template->getOwner()`). Un coach y compose donc avec la bibliothèque de
+  **l'athlète**, et tout ce qu'il crée reste à l'athlète. Même logique pour
+  `WorkoutController::duplicate` : la copie appartient au propriétaire de la
+  source. Une copie qui atterrirait chez le coach serait inerte — ni posable au
+  calendrier de l'athlète ni dans son plan, qui n'acceptent que son contenu.
   **Portée des index (`CoachedLibrary`)** : les bibliothèques `/workout` et
   `/plan-template` listent **soi + ses athlètes en relation acceptée**, pour qu'un
   coach retrouve ce qu'il a composé (le contenu appartenant à l'athlète en
   sortait). La relation reste dirigée — les bibliothèques de mes coachs ne me
   regardent pas — et c'est une portée **de consultation seulement** : les
-  sélecteurs qui posent une séance sur son propre calendrier ou dans sa propre
-  trame gardent `findLibraryForOwnerWithContent` (un seul propriétaire). Pas de
+  sélecteurs de pose gardent `findLibraryForOwnerWithContent` (un seul
+  propriétaire), celui de l'entité qu'on garnit — soi pour son calendrier,
+  `$template->getOwner()` pour une trame. Pas de
   champ « créé par » : le coach voit/édite déjà tout le contenu de son athlète.
   À l'écran, une facette `owner` avec **« Moi » actif par défaut** et un badge de
   propriétaire sur les cartes des autres.

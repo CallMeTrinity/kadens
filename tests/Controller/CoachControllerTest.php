@@ -10,6 +10,7 @@ use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
+use App\Enum\ActivityType;
 use App\Enum\CoachingStatus;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -321,6 +322,64 @@ final class CoachControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
     }
 
+    /**
+     * L'éditeur de trame se scope sur le PROPRIÉTAIRE DU PLAN, pas sur
+     * l'utilisateur courant : sans ça, le coach composant le plan de son athlète
+     * n'avait dans la palette que sa propre bibliothèque — donc ni les séances de
+     * l'athlète, ni celles qu'il avait lui-même créées pour lui (elles appartiennent
+     * à l'athlète).
+     */
+    public function testPlanEditorPaletteScopesToPlanOwner(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+        $this->createWorkout($athlete, 'Fractionné athlète');
+        $this->createWorkout($coach, 'Ma séance perso');
+        $plan = $this->createPlanTemplate($athlete, 'Prépa athlète', 4);
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/plan-template/'.$plan->getId().'/edit');
+
+        self::assertResponseIsSuccessful();
+        $palette = $crawler->filter('.kd-palette')->html();
+        self::assertStringContainsString('Fractionné athlète', $palette);
+        self::assertStringNotContainsString('Ma séance perso', $palette);
+    }
+
+    /**
+     * Corollaire de la palette : la pose accepte une séance de l'athlète, et la
+     * copie locale forkée lui appartient (sinon la séance datée du calendrier
+     * pointerait un contenu du coach, invisible chez l'athlète).
+     */
+    public function testCoachPlacesAthleteWorkoutAndForkStaysWithAthlete(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+        $workout = $this->createWorkout($athlete, 'Sortie longue');
+        $plan = $this->createPlanTemplate($athlete, 'Prépa athlète', 4);
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/plan-template/'.$plan->getId().'/edit');
+        $token = $crawler->filter('.kd-palette')->attr('data-place-token');
+
+        $this->client->request('POST', '/plan-template/'.$plan->getId().'/place', [
+            '_token' => $token,
+            'workoutId' => (string) $workout->getId(),
+            'week' => '1',
+            'day' => '3',
+        ]);
+
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(PlanTemplate::class)->find($plan->getId());
+        self::assertCount(1, $reloaded->getPlanItems());
+
+        $fork = $reloaded->getPlanItems()->first()->getWorkout();
+        self::assertTrue($fork->isPlanLocal());
+        self::assertSame($athlete->getId(), $fork->getOwner()->getId());
+    }
+
     /** La relation est dirigée : l'athlète n'hérite pas des droits sur son coach. */
     public function testAthleteHasNoAccessToCoachContent(): void
     {
@@ -331,6 +390,75 @@ final class CoachControllerTest extends WebTestCase
 
         $this->client->loginUser($athlete);
         $this->client->request('GET', '/workout/'.$coachWorkout->getId());
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    // ------------------------------------------- bibliothèque d'exercices
+
+    /**
+     * Le compositeur croise deux bibliothèques d'exercices quand un coach compose
+     * la séance d'un athlète : la sienne et celle de l'athlète. Avant, il n'avait
+     * que la sienne — donc pas les variantes que l'athlète s'était créées.
+     */
+    public function testComposerCrossesCoachAndAthleteExerciseLibraries(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+        $this->createExercise($coach, 'Squat bulgare barre');
+        $this->createExercise($athlete, 'Tirage horizontal poulie');
+        $this->createExercise(null, 'Développé couché');
+        $this->createExercise($this->createUser('stranger@example.com'), 'Exo dun tiers');
+        $workout = $this->createWorkout($athlete, 'Séance suivie');
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId().'/edit');
+
+        self::assertResponseIsSuccessful();
+        $html = $crawler->html();
+        self::assertStringContainsString('Squat bulgare barre', $html);
+        self::assertStringContainsString('Tirage horizontal poulie', $html);
+        self::assertStringContainsString('Développé couché', $html);
+        self::assertStringNotContainsString('Exo dun tiers', $html);
+    }
+
+    /**
+     * VIEW traverse la relation dans les deux sens : le coach pose son propre
+     * exercice dans la séance de l'athlète, qui doit pouvoir en ouvrir la fiche.
+     * L'édition, elle, reste au propriétaire, et l'exercice n'entre pas dans la
+     * bibliothèque de l'athlète.
+     */
+    public function testAthleteReadsCoachExerciseButCannotEditIt(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+        $exercise = $this->createExercise($coach, 'Squat bulgare barre');
+
+        $this->client->loginUser($athlete);
+
+        $this->client->request('GET', '/exercise/'.$exercise->getId());
+        self::assertResponseIsSuccessful();
+
+        $this->client->request('GET', '/exercise/'.$exercise->getId().'/edit');
+        self::assertResponseStatusCodeSame(403);
+
+        // Lecture par lien, pas appropriation : sa bibliothèque reste la sienne.
+        $crawler = $this->client->request('GET', '/exercise');
+        self::assertStringNotContainsString('Squat bulgare barre', $crawler->html());
+    }
+
+    /** Sans relation acceptée, l'exercice perso d'un tiers reste fermé. */
+    public function testExerciseStaysPrivateWithoutAcceptedRelation(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::PENDING);
+        $exercise = $this->createExercise($athlete, 'Gainage latéral');
+
+        $this->client->loginUser($coach);
+        $this->client->request('GET', '/exercise/'.$exercise->getId());
 
         self::assertResponseStatusCodeSame(403);
     }
@@ -459,6 +587,20 @@ final class CoachControllerTest extends WebTestCase
         $this->em->flush();
 
         return $workout;
+    }
+
+    /** @param User|null $owner null = bibliothèque globale de l'app */
+    private function createExercise(?User $owner, string $name): Exercise
+    {
+        $exercise = (new Exercise())
+            ->setOwner($owner)
+            ->setName($name)
+            ->setActivity(ActivityType::GYM);
+
+        $this->em->persist($exercise);
+        $this->em->flush();
+
+        return $exercise;
     }
 
     private function createPlanTemplate(User $owner, string $title, int $weeks): PlanTemplate

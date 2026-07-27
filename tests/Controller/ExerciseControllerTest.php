@@ -93,10 +93,40 @@ final class ExerciseControllerTest extends WebTestCase
         self::assertSame($user->getId(), $created->getOwner()?->getId());
     }
 
-    private function createUser(string $email): User
+    /**
+     * Un admin alimente la bibliothèque GLOBALE : l'exercice naît sans owner, donc
+     * visible par tout le monde. Avant, il partait en perso comme n'importe quel
+     * membre — invisible pour les autres, ce qui vidait le rôle de son sens.
+     */
+    public function testAdminCreatesGlobalExercise(): void
+    {
+        $admin = $this->createUser('admin@example.com', ['ROLE_ADMIN']);
+        $this->client->loginUser($admin);
+
+        $this->client->request('GET', '/exercise/new');
+        $this->client->submitForm('Créer', [
+            'exercise[name]' => 'Soulevé de terre',
+            'exercise[activity]' => ActivityType::GYM->value,
+        ]);
+
+        $created = $this->em->getRepository(Exercise::class)->findOneBy(['name' => 'Soulevé de terre']);
+        self::assertNotNull($created);
+        self::assertNull($created->getOwner());
+
+        // Un membre lambda le voit dans sa bibliothèque et peut ouvrir sa fiche.
+        $this->client->loginUser($this->createUser('member@example.com'));
+        $crawler = $this->client->request('GET', '/exercise');
+        self::assertStringContainsString('Soulevé de terre', $crawler->html());
+
+        $this->client->request('GET', '/exercise/'.$created->getId());
+        self::assertResponseIsSuccessful();
+    }
+
+    /** @param list<string> $roles */
+    private function createUser(string $email, array $roles = []): User
     {
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
-        $user = (new User())->setEmail($email);
+        $user = (new User())->setEmail($email)->setRoles($roles);
         $user->setPassword($hasher->hashPassword($user, 'password'));
 
         $this->em->persist($user);
