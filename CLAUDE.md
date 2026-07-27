@@ -430,6 +430,87 @@ ne porte que ce qu'elle est et un menu ; le reste se déduit du geste.*
   `--kd-navbar-h` n'existe que sous 560px, l'utiliser au-dessus demande un repli.
 
 Lot précédent (une ligne par série) : sur la page de consultation d'une séance,
+Dernier lot (pointage d'une séance en cours) : nouvelle page
+**`GET /schedule/{id}/execute`**, la séance qu'on tient en main *pendant* qu'on la
+fait — distincte de `/schedule/{id}`, qui la donne à lire. On y valide série par
+série, avec les valeurs **réelles** (reps / charge / durée) pré-remplies par le
+prévu. La règle de propriété est en §3 et ne se rediscute pas : **le réalisé
+(`LoggedSet`) n'écrit jamais dans la prescription**.
+
+Forme de la page, calquée sur les apps de salle : **un exercice à la fois**, rail
+de navigation à gauche, minuteur de repos en barre basse. À ne pas casser :
+
+- **`SessionSheet.stops`** = liste **plate** des exercices dans l'ordre où on fait
+  la séance, chaque étape emportant son contexte de bloc. La page d'exécution
+  consomme cette suite, pas l'arbre `blocks`.
+- **Tous les panneaux sont rendus côté serveur**, le contrôleur n'en montre qu'un.
+  C'est la condition du hors ligne : on ne va pas chercher l'exercice suivant sur
+  le réseau au milieu d'une séance. Sans JS, tout s'affiche à la suite et le rail
+  devient une liste d'ancres. Après un Turbo Stream, le contrôleur **réapplique**
+  la sélection (le panneau remplacé revient visible par défaut).
+- **Pas de vignettes d'exercice dans le rail.** `Exercise.mediaUrl` est distant,
+  le service worker ne l'intercepte pas (cross-origin) : ce serait un carré vide
+  hors ligne. Numéro + icône d'activité.
+- **Le chrono de séance dérive du `completedAt` de la première série loggée**, pas
+  d'une colonne `startedAt` : ouvrir la page ne veut rien dire (on l'ouvre parfois
+  la veille), et la valeur reste juste après un rechargement ou sur un autre
+  appareil.
+- **Le minuteur de repos est purement client** et disparaît sans JS — c'est le
+  seul élément de la page dans ce cas, le pointage lui reste entier. Il se lance
+  tout seul à la validation d'une série.
+- **Une seule ligne de série = badge, effort, charge, coche.** Un seul badge : le
+  type quand la série en a un (pastilles W/D/F/DS existantes), le rang sinon.
+
+Sur la fiche datée `/schedule/{id}`, **le réalisé remplace le prévu** une fois la
+séance pointée, sans que la prescription bouge : `_workout_read` accepte une carte
+`logs` optionnelle qu'il fait descendre jusqu'à `_workout_sets_table`. Le prévu ne
+subsiste qu'en repère **là où il diffère**. La page de bibliothèque et la page
+publique ne passent rien et affichent la prescription — elles décrivent une séance
+sans date, donc sans réalisé.
+
+À ne pas casser non plus :
+
+- **Une ligne = un `<form>`**, bouton de validation = vrai submit portant
+  `name="op"`. Sans JS, taper la coche poste la ligne avec ses valeurs. Tout
+  le socle est testé sans JavaScript (`ScheduledWorkoutExecutionTest`).
+  **`op` et jamais `action`** : un contrôle nommé `action` masque la propriété
+  `action` du `<form>`, donc `form.action` renvoie le bouton (ou un
+  `RadioNodeList` quand la ligne en a deux) au lieu de l'URL. Tous les POST
+  partaient sur `/schedule/114/[object HTMLButtonElement]`. Un test garantit
+  qu'aucun contrôle de la page ne porte ce nom.
+- **La file distingue « pas de réseau » de « le serveur refuse ».** Une exception
+  `fetch` met en file et retentera ; une réponse non-2xx s'affiche et n'est PAS
+  mise en file — sinon un bug serveur gonfle la file en silence derrière un
+  message rassurant. Au rejeu, une entrée refusée est **abandonnée** : sans ça
+  un seul geste invalide bloque définitivement tout ce qui le suit.
+  La clé de file est **versionnée** (`kd-execlog-v2-{id}`), à incrémenter quand
+  la forme d'un geste change : c'est le seul moyen d'abandonner une file déjà
+  écrite dans `localStorage`.
+- **Rien ne bouge sous le doigt** : valider ne change ni la hauteur de la ligne
+  ni l'ordre, seulement des couleurs. Les deux icônes (cercle / coche) sont dans
+  le DOM, le CSS choisit selon `.is-done` — c'est ce qui permet à l'affichage
+  optimiste de basculer en changeant **une seule classe**, sans manipuler de SVG,
+  et garde le rendu serveur et le rendu optimiste identiques.
+- **L'écart ne s'affiche que s'il existe.** Sur 16 séries, une légende
+  systématique coûte un écran.
+- **Hors ligne, une seule exception dans `sw.js`** : `/schedule/<id>/execute`
+  reste **network-first** (la règle « en ligne, le réseau gagne toujours pour du
+  HTML » tient), seul son repli change — sa propre copie en cache, jamais
+  `offline.html`. La branche est placée **avant** le test
+  `request.mode === 'navigate'` : arriver par un lien de l'app est une visite
+  Turbo Drive, donc un `fetch()` dont le mode n'est pas `navigate`.
+- **La file d'écriture vit dans le contrôleur `execlog`, pas dans le SW** (qui ne
+  touche à aucun POST) : un service worker qui rejouerait des mutations en
+  arrière-plan serait invisible le jour où il se tromperait. `localStorage`, pas
+  IndexedDB — quelques dizaines de champs par séance. Les gestes visant la même
+  série s'écrasent dans la file : ce qui compte à la reconnexion est l'état final.
+  Le conteneur porte `data-turbo="false"`, sinon Turbo posterait les validations
+  en court-circuitant la file.
+- **Hors périmètre assumé** : ajouter un exercice **imprévu** pendant la séance.
+  Ça demanderait un réalisé autonome (non indexé sur la prescription). Logger
+  plus ou moins de séries que prévu, en revanche, est couvert.
+
+Lot précédent (une ligne par série) : sur la page de consultation d'une séance,
 **une ligne = une série, quel que soit le mode de saisie**. « 3 × 15 @ 130 kg »
 s'affiche en trois lignes identiques, comme trois lignes saisies à la main. Les
 séries sont donc exposées par `PlanFlattener` sous **deux formes complémentaires**,

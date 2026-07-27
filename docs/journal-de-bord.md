@@ -2213,3 +2213,302 @@ de défilement. Verrouillé par `testMoveItemFromTheRowMenuWithoutJs`.
   tentant (le compositeur le fait), mais ici les formulaires de la trame sont déjà
   soumis par Turbo, qui répond en stream *et* fait remonter les réponses en erreur.
   Un `fetch` maison les aurait avalées en silence.
+
+---
+
+## Lot — Pointage d'une séance en cours, prévu vs réalisé (27/07/2026)
+
+Demande initiale : pouvoir valider les séries une par une pendant la séance, et
+qu'un « marquer comme fait » sur un pointage incomplet propose de tout cocher ou
+d'**effacer les séries vides** (en supprimant l'exercice s'il ne lui restait
+rien). Plus, dans un second temps, modifier poids / nombre de séries / ajouter
+ou retirer un exercice depuis cette vue.
+
+### Le problème que la demande ne voyait pas
+
+`ScheduledWorkout.workout` est une **référence vivante**, et une séance posée par
+`/schedule/place` pointe **directement la séance de bibliothèque**. Effacer des
+séries depuis la page d'une date aurait donc réécrit la séance de biblio et
+toutes les autres dates qui la référencent. La règle « fork à la pose » ne
+couvre que les plans : une séance posée seule n'a pas de copie privée.
+
+Trois issues étaient possibles : forker à l'exécution (copie privée par date),
+muter en place (rejeté, destructeur), ou **séparer le réalisé de la
+prescription**. C'est la troisième qui a été retenue, et elle a une conséquence
+qui remonte jusqu'à l'énoncé de départ.
+
+### Ce qui change dans la demande, et pourquoi
+
+**« Effacer les séries vides » n'existe pas.** Avec un réalisé séparé, une série
+non validée n'a rien à effacer : elle est simplement absente du réalisé. Et la
+prescription doit rester intacte, sinon on perd la référence en face de laquelle
+l'écart se lit — « 2 séries sur 4 » n'a de sens que si les 4 sont encore là.
+
+Le choix à la clôture devient donc :
+
+- **Tout valider comme prévu** — les séries manquantes sont loggées avec les
+  valeurs prescrites (les séries déjà corrigées à la main ne sont **pas**
+  réécrites) ;
+- **Terminer tel quel** — le manque reste enregistré comme écart.
+
+De même, « modifier le poids / le nombre de séries » ne modifie plus la séance :
+on saisit des **valeurs réelles**, et on peut logger plus ou moins de séries que
+prévu. « Ajouter un exercice imprévu » reste **hors périmètre** : ça demanderait
+un réalisé autonome (non indexé sur la prescription), écarté à l'arbitrage.
+
+### Modèle
+
+`LoggedSet` : `(scheduledWorkout, prescribedExercise, setIndex)` unique, plus
+`reps` / `weightKg` / `durationSeconds` réels et `completedAt`.
+
+Le point non évident est le **pointage par index** plutôt que par lien vers un
+`PrescribedSet`. En mode scalaire (`sets`/`reps`/`weightKg`), **aucune** ligne
+`PrescribedSet` n'existe en base alors que la vue en déroule N
+(`PlanFlattener::setLines`). Un lien vers `PrescribedSet` aurait obligé à
+matérialiser le détail au premier clic — donc à écrire dans la prescription pour
+pouvoir enregistrer du réalisé, exactement ce qu'on cherchait à éviter. L'index
+couvre les deux modes sans rien matérialiser.
+
+Deux corollaires acceptés : un `setIndex` au-delà du prescrit est une série faite
+**en plus** (le modèle l'accepte sans rien changer, et elle ne gonfle pas le
+total pour que la progression ne dépasse pas 100 %) ; et si la prescription est
+réduite après coup, le log excédentaire subsiste, ignoré en lecture, jamais
+supprimé en silence.
+
+### Services
+
+- **`SessionSheet`** — modèle de lecture : fusionne `PlanFlattener` et le log en
+  une structure unique. Seule autorité sur la définition d'une **ligne
+  validable** : une par série pour les types de force, **une seule** (index 1,
+  « l'exercice est fait ») pour tous les autres. Sans cette seconde règle, une
+  séance de course n'aurait aucun geste possible sur la page.
+- **`WorkoutLogger`** — seule autorité sur les mutations du réalisé.
+  `log` est **idempotent** : la file hors ligne rejoue des gestes après une
+  reconnexion, elle ne doit pas créer de doublons (la contrainte d'unicité
+  lèverait sinon une erreur).
+
+`PlanFlattener::setLines` expose désormais aussi les valeurs **brutes**
+(`reps`, `durationSeconds`) à côté de l'effort formaté : pré-remplir un champ
+demande un nombre, pas « 15 reps ».
+
+### Page `/schedule/{id}/execute`
+
+Distincte de `/schedule/{id}`, qui donne la séance **à lire** : celle-ci sert à
+**pointer**. Mobile d'abord, parce que c'est la seule page de l'app qu'on utilise
+debout, une main occupée.
+
+**Une ligne = un `<form>`**, et le bouton de validation est un vrai submit
+portant `name="action"`. Sans JS, taper la coche poste la ligne avec les valeurs
+réelles affichées. Tout le socle est testé sans JavaScript.
+
+Trois partis pris d'ergonomie qui expliquent le CSS :
+
+- la coche est la plus grosse cible de la ligne (44px) et elle est **à gauche** ;
+- **rien ne bouge sous le doigt** : valider ne change ni la hauteur de la ligne
+  ni l'ordre, seulement des couleurs. Une ligne qui se réordonne au moment où on
+  la tape est intapotable ;
+- l'écart ne s'affiche **que s'il existe**. Sur 16 séries, une ligne de légende
+  systématique coûte un écran entier.
+
+Les deux icônes (cercle / coche) sont rendues dans le DOM, le CSS choisit selon
+`.is-done`. C'est ce qui permet à l'affichage optimiste de basculer en changeant
+**une seule classe**, sans manipuler de SVG en JS — et le rendu serveur et le
+rendu optimiste restent strictement identiques.
+
+### Hors ligne
+
+Deux morceaux, volontairement séparés.
+
+**`public/sw.js`** — une exception, une seule : `/schedule/<id>/execute` reste
+**network-first** (la règle « en ligne, le réseau gagne toujours pour du HTML »
+tient), mais son repli est **sa propre copie en cache**, jamais `offline.html`.
+Une salle en sous-sol est le cas normal, pas l'incident.
+
+Piège évité : la branche est placée **avant** le test `request.mode === 'navigate'`,
+parce qu'arriver sur la page par un lien de l'app est une visite Turbo Drive,
+donc un `fetch()` dont le mode n'est *pas* `navigate`. Sans ça, le mode hors
+ligne aurait dépendu du chemin emprunté pour arriver sur la page.
+
+**Contrôleur `execlog`** — la file d'écriture, en `localStorage`. Elle ne vit
+délibérément **pas** dans le service worker : celui-ci ne touche à aucun POST, et
+un SW qui rejouerait des mutations en arrière-plan serait invisible le jour où il
+se tromperait. Les gestes visant la même série s'écrasent dans la file : ce qui
+compte à la reconnexion est l'état final, pas l'historique des hésitations.
+
+`localStorage` et non IndexedDB : la charge utile est une poignée de champs par
+série, quelques dizaines par séance. IndexedDB apporterait de l'asynchrone et une
+centaine de lignes de plomberie pour stocker moins d'un kilo-octet.
+
+Le conteneur porte `data-turbo="false"` (même choix que le compositeur) : sans
+lui, Turbo posterait les validations en court-circuitant la file hors ligne.
+
+### Tests
+
+`WorkoutLoggerTest` (10 cas) et `ScheduledWorkoutExecutionTest` (9 cas). Le test
+central est `testLoggingNeverTouchesThePrescription` : c'est la garantie qui
+justifie tout le reste de l'architecture.
+
+### Correctif — `name="action"` masque `form.action` (27/07/2026)
+
+Symptôme : la page affichait « Synchronisation de 65 gestes… » et rien ne se
+validait. Les logs disaient tout :
+
+```
+No route found for "POST /schedule/114/[object HTMLButtonElement]"
+No route found for "POST /schedule/114/[object Object]"
+```
+
+**Cause.** Les contrôles nommés d'un `<form>` deviennent des propriétés de
+l'élément et **masquent les siennes**. Le bouton de validation portait
+`name="action"` : `form.action` ne renvoyait donc plus l'URL mais le bouton
+lui-même — et un `RadioNodeList` (`[object Object]`) sur les lignes déjà
+validées, qui en ont deux (valider + enregistrer). Chaque POST partait sur une
+URL inexistante et tombait en 404.
+
+**Correctif principal :** le champ s'appelle `op`. C'est la cause, pas le
+symptôme : renommer supprime la collision au lieu de la contourner. `actionOf()`
+lit malgré tout l'attribut (`getAttribute('action')`), pour que la prochaine
+personne qui ajoute un champ ici n'ait pas à connaître le piège.
+
+**Deux défauts que l'incident a révélés, et qui étaient plus graves que lui :**
+
+1. **La file confondait « pas de réseau » et « le serveur refuse ».** `send()`
+   mettait en file sur *n'importe quel* échec. Un 404 permanent était donc traité
+   comme une coupure réseau : la file gonflait à l'infini, en silence, avec un
+   message rassurant (« synchronisation… ») alors que rien ne pouvait aboutir.
+   Désormais une exception `fetch` (réseau absent) met en file, une réponse
+   non-2xx (le serveur a répondu et refusé) s'affiche à l'écran et n'est pas mise
+   en file.
+2. **Une entrée invalide bloquait la file pour toujours.** `flush()` s'arrêtait
+   au premier échec, sans distinguer les deux cas : un seul geste définitivement
+   refusé coinçait tout ce qui le suivait. Le rejeu abandonne maintenant les
+   entrées refusées par le serveur, et ne s'interrompt que sur une panne réseau.
+
+**Clé de file versionnée** (`kd-execlog-v2-{id}`) : les gestes empoisonnés déjà
+présents dans `localStorage` ne se seraient jamais rejoués. Changer la clé les
+abandonne d'un coup. À incrémenter quand la forme d'un geste change.
+
+**Test de régression** (`testNoFormControlIsNamedActionOnTheExecutePage`). Le bug
+est côté client, donc hors de portée de PHPUnit — mais l'invariant qui le rend
+impossible se lit dans le HTML rendu : aucun contrôle de la page ne doit
+s'appeler `action`. Le test valide d'abord une série, pour couvrir la ligne à
+deux boutons qui produisait le `RadioNodeList`.
+
+---
+
+## Lot — Refonte du déroulé de séance, sur le modèle des apps de salle (27/07/2026)
+
+Retour d'usage après le premier jet : la page d'exécution était une longue liste
+de tous les exercices. Entre deux séries, retrouver la bonne ligne dans un
+déroulé de six exercices est ingérable. Référence donnée : les apps de salle
+(un exercice à la fois, rail de navigation, minuteur de repos).
+
+### Un exercice à la fois
+
+`SessionSheet` expose désormais `stops` : la liste **plate** des exercices dans
+l'ordre où on fait la séance, chaque étape emportant son contexte de bloc au lieu
+d'y être imbriquée. La page consomme cette suite, pas l'arbre.
+
+**Tous les panneaux sont rendus côté serveur**, le contrôleur n'en montre qu'un.
+C'est la condition du hors ligne : au milieu d'une séance, on ne va pas
+rechercher l'exercice suivant sur le réseau. Sans JS, ils s'affichent tous à la
+suite et le rail devient une liste d'ancres — la page marche, elle défile au lieu
+de basculer.
+
+Le contrôleur ouvre sur le **premier exercice non terminé**, pas sur le premier :
+reprendre au milieu est le cas courant (on repose le téléphone, l'écran se
+verrouille, on revient).
+
+### Le rail
+
+Pas de vignettes d'exercice, contrairement à la maquette de référence.
+`Exercise.mediaUrl` pointe vers une ressource **distante**, que le service worker
+n'intercepte pas (cross-origin) : ce serait un carré vide hors ligne, c'est à
+dire précisément là où on en a besoin. Numéro + icône d'activité disent la même
+chose et survivent au sous-sol.
+
+L'état se code par le filet gauche, avec les tokens de statut existants — les
+statuts gardent leurs couleurs dédiées, c'est l'exception prévue par la règle
+« une seule couleur ». Vert = pointé, rouge (l'accent) = en cours, gris = à
+faire.
+
+Sous 900px le nom disparaît (numéro + icône), sous 560px le rail tombe à 3,5rem.
+Le nom reste lisible dans le titre du panneau juste à côté.
+
+### La ligne de série
+
+Quatre zones fixes : badge, effort, charge, coche. **Un seul badge** — le type
+quand la série en a un (les pastilles W/D/F/DS existaient déjà pour la lecture),
+le rang sinon. Afficher les deux doublait la gouttière pour une information que
+le type porte déjà.
+
+Les champs sont des pastilles centrées, pré-remplies par le prévu : le geste par
+défaut, taper la coche sans rien toucher, enregistre « fait comme prévu ».
+
+### Minuteurs
+
+**Chrono de séance** dérivé du `completedAt` de la première série validée. Pas de
+colonne `startedAt` à tenir, pas de question « quand commence une séance ? »
+(ouvrir la page ne veut rien dire, on l'ouvre parfois la veille), et la valeur
+est juste après un rechargement comme sur un autre appareil.
+
+**Minuteur de repos** en barre basse, purement client : un repos n'est pas une
+donnée de séance. Préréglages 30 s / 1 / 1,5 / 2 min, plus le repos **prescrit**
+de l'exercice affiché, réécrit à chaque bascule de panneau. Valider une série le
+lance automatiquement — le repos est la suite logique de la série, le déclencher
+à la main serait un geste de plus au moment précis où on n'en veut aucun. Le
+compteur passe en négatif au lieu de s'arrêter : savoir qu'on traîne depuis 40
+secondes vaut mieux qu'un zéro figé.
+
+C'est le seul élément de la page qui assume de disparaître sans JS, parce que le
+pointage, lui, reste entier.
+
+### Le réalisé remplace le prévu sur la fiche datée
+
+Deuxième demande : « une fois la séance validée, les nouvelles valeurs doivent
+remplacer la séance pour qu'on puisse le voir quelque part ».
+
+Fait **sans toucher la prescription** : c'est le rendu qui préfère le log.
+`_workout_read` accepte une carte `logs` optionnelle, qu'il fait descendre
+jusqu'à `_workout_sets_table`. Quand elle est fournie, le tableau affiche les
+valeurs réelles et ne garde le prévu qu'en repère **là où il diffère** — afficher
+les deux systématiquement doublerait la hauteur de chaque ligne pour une
+information qui, neuf fois sur dix, est « c'était conforme ».
+
+Trois états lisibles d'un coup d'œil : série faite (valeurs réelles), série
+prévue non faite (éteinte, rang barré, « non faite »), série faite en plus
+(ajoutée après les lignes prescrites, marquée « en plus »).
+
+Seule la fiche **datée** fournit cette carte. La page de bibliothèque et la page
+publique décrivent une prescription, qui n'a pas de date donc pas de réalisé :
+elles ne passent rien et ne changent pas d'un caractère. Deux tests verrouillent
+les deux côtés.
+
+### Correctif — La grille d'exécution débordait sur mobile (27/07/2026)
+
+Symptôme : sur téléphone, le rail réduit à une bande de quelques pixels avec des
+glyphes tronqués, le panneau d'exercice par-dessus, et une barre du haut vide.
+
+**Cause unique pour les trois.** `.kd-execstage` n'avait **aucune règle CSS** :
+c'était un enfant de grille avec `min-width: auto` par défaut, qui refuse donc de
+descendre sous la largeur minimale de son contenu. Le panneau contient un tableau
+de séries à colonnes fixes (44px pour la coche, 2,25rem pour le badge) : la piste
+`1fr` a dépassé sa part, la grille a débordé son conteneur, le rail a été écrasé.
+La barre du haut, grille à quatre pistes `auto`, poussait son contenu hors champ
+pour la même raison.
+
+Corrections :
+
+1. `min-width: 0` sur `.kd-execstage` et `.kd-execrail`, plus `.kd-execrail__name`
+   et `.kd-execline__done` (mêmes enfants de grille, contenu textuel).
+2. **La barre du haut passe en `flex-wrap`.** Une grille à pistes `auto` ne se
+   replie pas, elle déborde. Une barre d'en-tête doit se réorganiser quand la
+   largeur manque : le titre s'ellipse (`flex: 1 1 6rem` + `min-width: 0`), les
+   minuteurs et le bouton de clôture gardent leur taille, et sous 560px le chrono
+   part sur sa propre ligne par `order` + `flex-basis: 100%`.
+3. Flèches natives des `input[type=number]` supprimées : elles mangeaient une
+   vingtaine de pixels par champ sur la largeur qui manquait déjà, et juraient
+   avec l'identité « Presse ».
+
+Règle ajoutée dans `docs/design-system.md §5` : tout enfant de grille ou de flex
+qui contient du texte, un champ ou une sous-grille porte `min-width: 0`.
