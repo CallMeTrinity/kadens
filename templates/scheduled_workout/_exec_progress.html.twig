@@ -1,0 +1,23 @@
+{# Jauge de pointage. Fragment isolé parce qu'il est cible d'un Turbo Stream :
+   chaque série validée le re-rend, sans recharger la page.
+
+   Attendus : progress (SessionSheet, clé `progress`). #}
+<div id="session-progress" class="kd-execprog{{ progress.complete ? ' is-complete' }}">
+    <p class="kd-execprog__count">
+        <strong>{{ progress.done }}</strong> / {{ progress.total }} série{{ progress.total > 1 ? 's' }}
+        {% if progress.complete %}
+            <span class="kd-execprog__flag">{{ ux_icon('lucide:circle-check') }} tout est pointé</span>
+        {% elseif progress.done > 0 %}
+            <span class="kd-execprog__flag">{{ progress.remaining }} restante{{ progress.remaining > 1 ? 's' }}</span>
+        {% endif %}
+    </p>
+
+    {# La largeur est une donnée, pas une décision de style : elle ne peut pas
+       vivre dans la feuille. Le rôle progressbar porte la valeur pour les
+       lecteurs d'écran, qui ne voient pas la barre. #}
+    <div class="kd-execprog__track" role="progressbar"
+         aria-valuenow="{{ progress.done }}" aria-valuemin="0" aria-valuemax="{{ progress.total }}"
+         aria-label="Séries pointées">
+        <span class="kd-execprog__fill" style="width: {{ progress.percent }}%"></span>
+    </div>
+</div>

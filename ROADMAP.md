@@ -53,9 +53,11 @@ Ces choix conditionnent tout le reste. Ils ne se rediscutent pas en cours de rou
 - `ScheduledWorkout` = instance **datée** posée sur le calendrier, née d'un template ou d'une séance isolée.
 - Instancier un plan = boucler sur le template et créer N `ScheduledWorkout`. Le template reste intact.
 
-### 1.5 Prévu vs réalisé (pas de tracking)
+### 1.5 Prévu vs réalisé
 - `ScheduledWorkout` porte un `status` (prévu/fait/manqué) et un champ de notes/écart léger.
-- **Aucun log détaillé de séries réalisées.** Strava fait le suivi. Ici on boucle sur la prévision : a-t-on tenu le plan ?
+- **Ajusté après le ROADMAP initial.** La règle était « aucun log détaillé de séries réalisées, Strava fait le suivi ». Elle tenait tant que la boucle se résumait à « a-t-on tenu le plan ? ». Pointer une séance série par série pendant qu'on la fait est un besoin distinct du tracking de performance : ce n'est pas un historique, c'est le déroulé d'aujourd'hui.
+- `LoggedSet` porte donc le réalisé, **strictement séparé de la prescription** (voir §2.3). Ce n'est pas une extension de `PrescribedSet` : c'est son vis-à-vis. La prescription reste partagée entre toutes les dates d'une séance, le réalisé appartient à UNE date.
+- Ce qui reste hors périmètre : l'historique de performance dans le temps, les courbes, les records. Strava fait toujours ce suivi-là.
 
 ### 1.6 IA hors application
 - Aucune IA intégrée à l'app. Aucune dépendance API en prod, aucun coût token.
@@ -82,6 +84,11 @@ PlanItem (N) >── (1) Workout
 
 ScheduledWorkout (N) >── (1) Workout  la séance planifiée (référence vivante)
 ScheduledWorkout (N) >── (0..1) PlanTemplate  d'où vient l'instanciation (nullable)
+ScheduledWorkout (1) ──< (N) LoggedSet    le RÉALISÉ de cette date
+LoggedSet (N) >── (1) PrescribedExercise  ce qu'il valide, + un setIndex (base 1)
+                                          PAS de lien vers PrescribedSet : en mode
+                                          scalaire aucune ligne n'existe en base
+                                          alors que la vue en déroule N.
 
 User (1) ──< (N) Goal                échéance datée (hors ROADMAP initial)
 PlanTemplate (N) >──< (N) Goal       « ce plan prépare cette échéance »
@@ -221,6 +228,19 @@ PlanTemplate (N) >──< (N) Goal       « ce plan prépare cette échéance »
 - `createdAt`, `updatedAt`
 
 > **Décision figée : référence vivante.** `ScheduledWorkout.workout` pointe vers le `Workout` vivant ; toute modification ultérieure de la séance se répercute sur les instances planifiées. Simplicité maximale. Si un besoin d'historique fidèle (garder la séance telle qu'elle était le jour prévu) apparaît plus tard, on ajoutera un mécanisme de snapshot à ce moment-là, pas avant.
+
+**`LoggedSet`** (une série RÉALISÉE, à une date — ajouté après le ROADMAP initial)
+- `id`
+- `scheduledWorkout` → ScheduledWorkout (non nullable, `ON DELETE CASCADE`)
+- `prescribedExercise` → PrescribedExercise (non nullable, `ON DELETE CASCADE`)
+- `setIndex` (entier, base 1 — rang de la série dans l'exercice)
+- `reps`, `weightKg`, `durationSeconds` (nullables — les valeurs **réelles**)
+- `completedAt`
+- Unicité sur `(scheduledWorkout, prescribedExercise, setIndex)`
+
+> **Décision figée : le réalisé ne s'écrit jamais dans la prescription.** C'est le pendant direct de la référence vivante ci-dessus : puisque `ScheduledWorkout.workout` est partagé (bibliothèque + N dates), pointer une série ne peut pas modifier la séance sans corrompre toutes les autres dates. `PrescribedSet` dit ce qu'il faut faire, `LoggedSet` dit ce qui a été fait.
+>
+> **Pointage par `(prescribedExercise, setIndex)` et non par lien vers `PrescribedSet`.** En mode scalaire (`sets`/`reps`/`weightKg`), aucune ligne `PrescribedSet` n'existe en base alors que la vue en déroule N. Un lien direct aurait obligé à matérialiser le détail au premier clic — donc à écrire dans la prescription pour pouvoir enregistrer du réalisé, exactement ce qu'on cherche à éviter. Deux corollaires acceptés : un `setIndex` au-delà du prescrit est une série faite **en plus** (acceptée, mais hors du total pour que la progression ne dépasse pas 100 %) ; un log excédentaire après réduction de la prescription est ignoré en lecture, jamais supprimé en silence.
 
 ---
 

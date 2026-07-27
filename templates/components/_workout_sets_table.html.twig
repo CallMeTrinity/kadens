@@ -11,50 +11,110 @@
    quel que soit le mode de saisie — la vue condensée (groupes) reste celle des
    contextes compacts, résumé et aperçu au survol.
 
-   Attendus : lines (list<FlatSetLine>), topWeightKg (?float), type (?PrescriptionType). #}
+   RÉALISÉ (`logs`, optionnel, indexé par rang) : quand la séance a été pointée,
+   ce sont les valeurs RÉELLES qui s'affichent, et le prévu ne reste qu'en repère
+   sous la valeur, uniquement là où il diffère. C'est ce que veut dire « voir sa
+   séance après coup » : ce qu'on a fait, pas ce qu'on avait prévu de faire. La
+   prescription elle-même n'est jamais modifiée (cf. LoggedSet) — c'est le rendu
+   qui préfère le log, et seule la fiche DATÉE en fournit un.
+
+   Attendus : lines (list<FlatSetLine>), topWeightKg (?float),
+   type (?PrescriptionType), logs (map rang -> LoggedSet, optionnel). #}
 {% import 'components/_set_type.html.twig' as settype %}
+
+{% set logs = logs|default({}) %}
+{% set logged = logs is not empty %}
+{% set isTime = type is not null and type.value == 'sets_time' %}
 
 {# Deux colonnes ne s'affichent que si elles ont quelque chose à dire — une
    colonne vide coûte de la largeur, et la largeur est ce qui manque au
    téléphone. Le « % du max » n'aurait que des 100 % à charge constante, et la
    colonne « Type » que des cases vides si aucune série n'est qualifiée (mode
    simple : toutes les séries sont ordinaires). #}
-{% set show_percent = topWeightKg is not null and topWeightKg > 0
+{% set show_percent = not logged and topWeightKg is not null and topWeightKg > 0
     and lines|filter(l => l.weightKg is null or l.weightKg != topWeightKg)|length > 0 %}
 {% set show_type = lines|filter(l => l.type.value != 'normal')|length > 0 %}
 
 <div class="kd-settable__wrap">
-    <table class="kd-settable">
+    <table class="kd-settable{{ logged ? ' kd-settable--logged' }}">
         <thead>
             <tr>
                 {% if show_type %}<th scope="col" class="kd-settable__c-type">Type</th>{% endif %}
                 <th scope="col" class="kd-settable__c-num">Série</th>
-                <th scope="col">{{ type is not null and type.value == 'sets_time' ? 'Durée' : 'Reps' }}</th>
+                <th scope="col">{{ isTime ? 'Durée' : 'Reps' }}</th>
                 <th scope="col" class="kd-settable__c-num">Charge</th>
                 {% if show_percent %}<th scope="col" class="kd-settable__c-num">% du max</th>{% endif %}
             </tr>
         </thead>
         <tbody>
             {% for l in lines %}
+                {% set log = logs[l.index]|default(null) %}
+                {% set missed = logged and log is null %}
+
+                {# Valeurs affichées : le réel dès qu'il existe, le prévu sinon. #}
+                {% set realEffort = log
+                    ? (isTime ? (log.durationSeconds is not null ? log.durationSeconds ~ ' s' : '—')
+                              : (log.reps is not null ? log.reps ~ ' reps' : '—'))
+                    : l.effort %}
+                {% set realWeight = log ? log.weightKg : l.weightKg %}
+
+                {% set effortGap = log and (isTime
+                    ? log.durationSeconds != l.durationSeconds
+                    : log.reps != l.reps) %}
+                {% set weightGap = log and log.weightKg != l.weightKg %}
+
                 {# Une série de travail ordinaire est la référence : on la marque
                    d'un filet et d'un fond, le reste s'efface autour. #}
-                <tr class="kd-setrow kd-setrow--{{ l.type.value }}">
+                <tr class="kd-setrow kd-setrow--{{ l.type.value }}{{ missed ? ' is-missed' }}">
                     {% if show_type %}<td class="kd-settable__c-type">{{ settype.slot(l.type) }}</td>{% endif %}
                     <td class="kd-settable__c-num kd-setrow__rank">{{ '%02d'|format(l.index) }}</td>
-                    {# `effort` seul : la charge a sa propre colonne. #}
+
                     <td class="kd-setrow__detail">
-                        {{ l.effort }}
+                        {{ realEffort }}
                         {% if l.typeLabel %}<span class="kd-setrow__tag">· {{ l.typeLabel|lower }}</span>{% endif %}
+                        {% if effortGap %}
+                            <span class="kd-setrow__planned">prévu {{ l.effort }}</span>
+                        {% endif %}
+                        {% if missed %}<span class="kd-setrow__tag">· non faite</span>{% endif %}
                     </td>
+
                     <td class="kd-settable__c-num">
-                        {{- l.weightKg is not null ? l.weightKg|number_format(l.weightKg == l.weightKg|round ? 0 : 1, ',', ' ') ~ ' kg' : '—' -}}
+                        {{- realWeight is not null ? realWeight|number_format(realWeight == realWeight|round ? 0 : 1, ',', ' ') ~ ' kg' : '—' -}}
+                        {% if weightGap and l.weightKg is not null %}
+                            <span class="kd-setrow__planned">
+                                prévu {{ l.weightKg|number_format(l.weightKg == l.weightKg|round ? 0 : 1, ',', ' ') }} kg
+                            </span>
+                        {% endif %}
                     </td>
+
                     {% if show_percent %}
                         <td class="kd-settable__c-num kd-setrow__pct">
                             {{- l.weightKg is not null ? (l.weightKg / topWeightKg * 100)|round ~ ' %' : '—' -}}
                         </td>
                     {% endif %}
                 </tr>
+            {% endfor %}
+
+            {# Séries faites EN PLUS du prévu : elles n'ont pas de ligne prescrite
+               en face, elles se posent donc après. Sans elles, une séance où on a
+               ajouté une série s'afficherait amputée de ce qu'on a réellement fait. #}
+            {% for index, log in logs %}
+                {% if index > lines|length %}
+                    <tr class="kd-setrow kd-setrow--normal is-extra">
+                        {% if show_type %}<td class="kd-settable__c-type"></td>{% endif %}
+                        <td class="kd-settable__c-num kd-setrow__rank">{{ '%02d'|format(index) }}</td>
+                        <td class="kd-setrow__detail">
+                            {{- isTime
+                                ? (log.durationSeconds is not null ? log.durationSeconds ~ ' s' : '—')
+                                : (log.reps is not null ? log.reps ~ ' reps' : '—') -}}
+                            <span class="kd-setrow__tag">· en plus</span>
+                        </td>
+                        <td class="kd-settable__c-num">
+                            {{- log.weightKg is not null ? log.weightKg|number_format(log.weightKg == log.weightKg|round ? 0 : 1, ',', ' ') ~ ' kg' : '—' -}}
+                        </td>
+                        {% if show_percent %}<td class="kd-settable__c-num"></td>{% endif %}
+                    </tr>
+                {% endif %}
             {% endfor %}
         </tbody>
     </table>

@@ -1,0 +1,119 @@
+{# Une série : le geste unitaire de la page d'exécution.
+
+   Quatre zones, toujours dans le même ordre — badge, effort, charge, coche :
+   la ligne se lit de gauche à droite comme on l'exécute, et la coche est en
+   bout de course, là où le pouce arrive.
+
+   C'est un vrai <form> à part entière, et le bouton de validation est un vrai
+   submit portant `name="op"` : sans JS, taper la coche poste la ligne AVEC
+   les valeurs réelles saisies. Le contrôleur `execlog` n'ajoute que le confort
+   (enregistrement au changement, état optimiste, file hors ligne).
+
+   `name="op"` et surtout PAS `name="action"` : un contrôle nommé `action` MASQUE
+   la propriété `action` du <form> en JS (`form.action` renvoie alors le bouton,
+   ou un RadioNodeList s'il y en a deux). Les POST partaient sur
+   « /schedule/114/[object HTMLButtonElement] ».
+
+   Les champs sont pré-remplis par le prévu : le geste par défaut, taper la
+   coche sans rien toucher, enregistre « fait comme prévu ». Corriger une valeur
+   avant de valider est l'exception, pas le passage obligé.
+
+   Attendus : ex, line (SheetLine), scheduled, token, isTime (bool),
+   bare (bool — vrai pour un exercice sans séries : coche seule, pas de champs). #}
+{% import 'components/_set_type.html.twig' as settype %}
+
+{% set realReps = line.log ? line.log.reps : line.plannedReps %}
+{% set realWeight = line.log ? line.log.weightKg : line.plannedWeightKg %}
+{% set realDuration = line.log ? line.log.durationSeconds : line.plannedDurationSeconds %}
+
+{# L'écart ne s'affiche que s'il existe : une ligne conforme n'a rien à dire de
+   plus, et sur 16 séries chaque ligne de légende en trop coûte un écran. #}
+{% set gap = line.done and not line.extra and (
+    (isTime and realDuration != line.plannedDurationSeconds)
+    or (not isTime and realReps != line.plannedReps)
+    or realWeight != line.plannedWeightKg
+) %}
+
+<li class="kd-execline{{ line.done ? ' is-done' }}{{ line.extra ? ' is-extra' }}">
+    <form method="post" action="{{ path('app_scheduled_workout_log', {id: scheduled.id}) }}"
+          class="kd-execline__form" data-execlog-target="form">
+        <input type="hidden" name="_token" value="{{ token }}">
+        <input type="hidden" name="prescribedId" value="{{ ex.prescribed.id }}">
+        <input type="hidden" name="setIndex" value="{{ line.index }}">
+
+        {# Un seul badge : le TYPE quand la série en a un (W/D/F/DS, pastilles
+           déjà définies pour la lecture), le rang sinon. Afficher les deux
+           doublerait la gouttière pour une information que le type porte déjà —
+           une série qualifiée se repère à son sigle, pas à son numéro. #}
+        <span class="kd-execline__badge">
+            {%- if line.typeLabel -%}
+                {{ settype.badge(line.type) }}
+            {%- else -%}
+                <span class="kd-execline__rank">{{ line.extra ? '+' : line.index }}</span>
+            {%- endif -%}
+        </span>
+
+        {% if bare %}
+            {# Pas de séries à décrire : la coche vaut « exercice fait ». #}
+            <span class="kd-execline__done">{{ line.done ? 'Fait' : 'À faire' }}</span>
+        {% else %}
+            <label class="kd-execline__field">
+                <span class="kd-sr-only">
+                    {{ isTime ? 'Durée réelle' : 'Répétitions réelles' }}, série {{ line.index }}
+                </span>
+                {% if isTime %}
+                    <input type="number" name="durationSeconds" inputmode="numeric" min="0" step="1"
+                           value="{{ realDuration }}" placeholder="{{ line.plannedDurationSeconds }}"
+                           class="kd-execline__input" data-execlog-target="value">
+                {% else %}
+                    <input type="number" name="reps" inputmode="numeric" min="0" step="1"
+                           value="{{ realReps }}" placeholder="{{ line.plannedReps }}"
+                           class="kd-execline__input" data-execlog-target="value">
+                {% endif %}
+            </label>
+
+            <label class="kd-execline__field">
+                <span class="kd-sr-only">Charge réelle, série {{ line.index }} (kg)</span>
+                {# `inputmode="decimal"` : le clavier des demi-plaques (2,5 kg).
+                   La virgule est normalisée côté serveur. #}
+                <input type="text" name="weightKg" inputmode="decimal"
+                       value="{{ realWeight is not null ? realWeight|number_format(realWeight == realWeight|round ? 0 : 1, ',', '') }}"
+                       placeholder="{{ line.plannedWeightKg is not null ? line.plannedWeightKg|number_format(line.plannedWeightKg == line.plannedWeightKg|round ? 0 : 1, ',', '') }}"
+                       class="kd-execline__input" data-execlog-target="value">
+            </label>
+        {% endif %}
+
+        {# 44px minimum, c'est la cible tactile du socle (base.css). C'est le
+           bouton qu'on tape en sueur, entre deux séries : il est le plus gros
+           élément de la ligne.
+
+           Les DEUX icônes sont rendues, c'est le CSS qui choisit selon `.is-done`
+           portée par le <li>. Ça permet à l'affichage optimiste de basculer en
+           changeant une seule classe, sans que le JS ait à remplacer du SVG —
+           et le rendu serveur et le rendu optimiste restent identiques. #}
+        <button type="submit" name="op" value="{{ line.done ? 'unlog' : 'log' }}"
+                class="kd-execline__check" data-execlog-target="check"
+                aria-pressed="{{ line.done ? 'true' : 'false' }}"
+                aria-label="Valider ou dévalider la série {{ line.index }}">
+            <span class="kd-execline__ico kd-execline__ico--off">{{ ux_icon('lucide:circle') }}</span>
+            <span class="kd-execline__ico kd-execline__ico--on">{{ ux_icon('lucide:check') }}</span>
+        </button>
+
+        {# Repli sans JS pour corriger une valeur d'une série DÉJÀ validée :
+           sans lui, le seul submit de la ligne serait la coche, qui la
+           dévaliderait. Masqué dès que `execlog` est branché (il enregistre
+           au changement). #}
+        {% if line.done and not bare %}
+            <button type="submit" name="op" value="log" class="kd-execline__save">
+                {{ ux_icon('lucide:save') }}<span class="kd-sr-only">Enregistrer les valeurs</span>
+            </button>
+        {% endif %}
+    </form>
+
+    {% if gap %}
+        <p class="kd-execline__gap">
+            prévu {{ isTime ? line.plannedDurationSeconds ~ ' s' : (line.plannedReps ?? '?') ~ ' reps' }}
+            {%- if line.plannedWeightKg is not null %} @ {{ line.plannedWeightKg|number_format(line.plannedWeightKg == line.plannedWeightKg|round ? 0 : 1, ',', ' ') }} kg{% endif %}
+        </p>
+    {% endif %}
+</li>

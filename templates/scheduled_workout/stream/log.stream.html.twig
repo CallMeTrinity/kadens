@@ -1,0 +1,46 @@
+{# Réponse à la validation d'une série : on ne re-rend que ce qui a bougé.
+
+   Quatre cibles, toutes présentes sur la page d'exécution (seule page d'où
+   l'endpoint est posté) : un stream visant un id absent échoue en silence, la
+   cible se choisit donc par page appelante.
+
+   Le panneau de l'exercice seul, et non la liste : remplacer la liste ferait
+   perdre le focus du champ en cours de saisie sur une ligne voisine, et
+   ramènerait l'affichage sur le premier exercice.
+
+   Attendus : stop (SheetStop ciblée), sheet, scheduled. #}
+{% set token = csrf_token('log' ~ scheduled.id) %}
+
+{% if stop %}
+    <turbo-stream action="replace" target="exlog-{{ stop.exercise.prescribed.id }}">
+        <template>
+            {% include 'scheduled_workout/_exec_exercise.html.twig' with {
+                stop: stop, scheduled: scheduled, token: token
+            } only %}
+        </template>
+    </turbo-stream>
+
+    {# La pastille du rail porte l'état de l'exercice (filet, compteur) : elle
+       doit suivre, sinon le fil conducteur ment. #}
+    <turbo-stream action="replace" target="railitem-{{ stop.exercise.prescribed.id }}">
+        <template>
+            {% include 'scheduled_workout/_exec_railitem.html.twig' with {stop: stop} only %}
+        </template>
+    </turbo-stream>
+{% endif %}
+
+<turbo-stream action="replace" target="session-progress">
+    <template>
+        {{ include('scheduled_workout/_exec_progress.html.twig', {progress: sheet.progress}) }}
+    </template>
+</turbo-stream>
+
+{# Le libellé du bouton de clôture porte le nombre de séries restantes, et la
+   modale son décompte : les deux suivent chaque validation. #}
+<turbo-stream action="replace" target="session-finish">
+    <template>
+        {{ include('scheduled_workout/_exec_finish.html.twig', {
+            scheduled: scheduled, progress: sheet.progress, prompt: false
+        }) }}
+    </template>
+</turbo-stream>

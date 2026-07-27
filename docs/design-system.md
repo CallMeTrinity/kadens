@@ -259,6 +259,20 @@ sont dans `assets/fonts/` (subsets latin + latin-ext), les `@font-face` dans
   `.kd-page` s'en sert pour dégager sa fin de page — la barre est `fixed`, elle
   ne pousse rien. La variable compte l'`env(safe-area-inset-bottom)` que la barre
   prend en padding : c'est la **place occupée**, pas la hauteur du dessin.
+- **Piège `min-width: auto` sur les enfants de grille et de flex.** Un enfant de
+  `grid` ou de `flex` vaut `min-width: auto` par défaut : il **refuse de
+  descendre sous la largeur minimale de son contenu**. Une piste `1fr` ne le
+  contraint donc pas — c'est le contenu qui gagne, la grille déborde son
+  conteneur, et les voisins sont écrasés. Sur la page d'exécution, `.kd-execstage`
+  n'avait aucune règle : son panneau contient un tableau de séries à colonnes
+  fixes (44px pour la coche), il a poussé la piste `1fr` au-delà de sa part, le
+  rail de navigation est tombé à quelques pixels et le panneau lui est passé
+  dessus. La barre du haut, autre grille à pistes `auto`, poussait son contenu
+  hors champ pour la même raison.
+  **Règle : tout enfant de grille ou de flex qui contient du texte, un champ ou
+  une sous-grille porte `min-width: 0`.** Et une barre d'en-tête se fait en
+  `flex-wrap` plutôt qu'en pistes `auto` : elle doit se replier quand la largeur
+  manque, pas déborder.
 - **Rien d'important ne dépend d'un survol.** Le survol ne fait qu'accélérer un
   chemin qui existe au clic. Les contrôles révélés au survol restent visibles en
   retrait sous `@media (hover: none)`, et un aperçu en `popover="manual"` doit se

@@ -19,6 +19,18 @@
  *   - navigations      → network-first, repli sur la copie en cache puis sur
  *     (mode 'navigate')  /offline.html.
  *
+ * EXCEPTION ASSUMÉE, et une seule : /schedule/<id>/execute, la page qu'on tient
+ * en main pendant la séance. Elle reste **network-first** — la règle ci-dessus
+ * n'est donc pas cassée, en ligne on sert bien la page fraîche — mais son repli
+ * hors ligne est SA PROPRE copie en cache, jamais /offline.html : une salle en
+ * sous-sol est le cas normal, pas l'incident. C'est la seule page de l'app dont
+ * la version en cache vaut mieux que rien.
+ *
+ * Ce que ça ne fait PAS : mettre en file les validations. Le service worker ne
+ * touche à aucun POST, la file vit dans le contrôleur Stimulus `execlog` où elle
+ * est lisible et débogable (localStorage). Un SW qui rejouerait des mutations
+ * en arrière-plan serait invisible le jour où il se tromperait.
+ *
  * Ce qui n'est JAMAIS intercepté (on sort du handler, le navigateur fait son
  * travail normal) :
  *   - les requêtes non-GET (toutes les mutations) ;
@@ -31,7 +43,10 @@
  * Le nom de cache est versionné : l'incrémenter purge tout à l'activation.
  */
 
-const CACHE = 'kadens-v3';
+const CACHE = 'kadens-v4';
+
+/** La page d'exécution d'une séance datée : /schedule/<id>/execute. */
+const EXECUTE_PATH = /^\/schedule\/\d+\/execute\/?$/;
 
 // Coquille minimale, précachée à l'installation. Les assets digestés ne sont pas
 // listés (leurs URL changent à chaque déploiement) : ils se peuplent au runtime.
@@ -73,8 +88,16 @@ async function cacheFirst(request) {
     return response;
 }
 
-/** Network-first : le réseau fait foi, le cache n'est qu'un filet hors ligne. */
-async function networkFirst(request) {
+/**
+ * Network-first : le réseau fait foi, le cache n'est qu'un filet hors ligne.
+ *
+ * `fallbackToOffline` distingue les deux usages. Pour une navigation ordinaire,
+ * servir une copie en cache d'une page quelconque est ce qu'on ne veut pas
+ * (pages périmées, illusion qu'il faut recharger) : on préfère /offline.html.
+ * Pour la page d'exécution, c'est l'inverse — sa copie de tout à l'heure est
+ * exactement ce dont on a besoin en salle.
+ */
+async function networkFirst(request, fallbackToOffline = true) {
     const cache = await caches.open(CACHE);
 
     try {
@@ -86,8 +109,11 @@ async function networkFirst(request) {
         return response;
     } catch {
         const cached = await cache.match(request);
+        if (cached) {
+            return cached;
+        }
 
-        return cached || cache.match('/offline.html');
+        return fallbackToOffline ? cache.match('/offline.html') : Response.error();
     }
 }
 
@@ -105,6 +131,23 @@ self.addEventListener('fetch', (event) => {
 
     if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/pwa/')) {
         event.respondWith(cacheFirst(request));
+
+        return;
+    }
+
+    /*
+     * La page d'exécution, avant le test de navigation : elle doit être traitée
+     * QUEL QUE SOIT le mode de la requête. Arriver dessus par un lien de l'app
+     * est une visite Turbo Drive, donc un `fetch()` dont le mode n'est pas
+     * 'navigate' — sans cette branche, la page ne serait mise en cache que si on
+     * y atterrissait par une navigation complète, et le mode hors ligne
+     * dépendrait du chemin emprunté pour y arriver.
+     *
+     * Reste network-first : en ligne, c'est bien la page fraîche qui est servie.
+     * Seul le repli change (sa propre copie, pas /offline.html).
+     */
+    if (EXECUTE_PATH.test(url.pathname)) {
+        event.respondWith(networkFirst(request, false));
 
         return;
     }

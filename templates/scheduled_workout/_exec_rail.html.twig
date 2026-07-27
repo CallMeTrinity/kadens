@@ -1,0 +1,24 @@
+{# Rail de navigation : une pastille par exercice, dans l'ordre où on fait la
+   séance. C'est le fil conducteur de la page — on voit d'un coup d'œil où on en
+   est et ce qui reste, sans dérouler.
+
+   Pas de vignettes d'exercice, contrairement à ce que font les apps de salle :
+   `Exercise.mediaUrl` pointe vers une ressource distante, que le service worker
+   n'intercepte pas (cross-origin) et qui serait donc un carré vide hors ligne.
+   Numéro + icône d'activité disent la même chose et survivent au sous-sol.
+
+   L'état se code par la couleur du filet gauche, avec les tokens de statut
+   existants (les statuts gardent leurs couleurs dédiées, cf. design system) :
+   vert = pointé, rouge = en cours, gris = à faire.
+
+   Sans JS, ce sont des ancres vers les panneaux (qui sont tous affichés) : la
+   navigation marche, elle défile au lieu de basculer.
+
+   Attendus : stops (sheet.stops). #}
+<nav class="kd-execrail" aria-label="Exercices de la séance">
+    <ol class="kd-execrail__list">
+        {% for stop in stops %}
+            {% include 'scheduled_workout/_exec_railitem.html.twig' with {stop: stop} only %}
+        {% endfor %}
+    </ol>
+</nav>

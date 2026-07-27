@@ -1,0 +1,80 @@
+{# Clôture de la séance : le bouton de la barre du haut, et la question posée
+   quand le pointage est incomplet.
+
+   Le bouton vit en tête et non en bas : il est là du début à la fin, on doit
+   pouvoir terminer à tout moment sans faire défiler jusqu'au dernier exercice.
+   Rien de collant qui masque du contenu (règle du projet).
+
+   Deux chemins, même endpoint :
+   - avec JS, le contrôleur `execlog` ouvre la modale AVANT de poster, dès qu'il
+     reste des séries à pointer ;
+   - sans JS, le bouton poste sans `mode`, le serveur renvoie ici avec
+     `prompt=1` et la modale est rendue ouverte.
+
+   Le conteneur porte un id : le libellé et le décompte de la modale dépendent du
+   pointage, ils suivent chaque validation (cible du même Turbo Stream que le
+   panneau d'exercice).
+
+   Attendus : scheduled, progress, prompt (bool). #}
+{% set complete = progress.complete %}
+
+<div id="session-finish" class="kd-execfinish">
+    <form method="post" action="{{ path('app_scheduled_workout_finish', {id: scheduled.id}) }}"
+          data-action="execlog#finish" data-execlog-target="bar">
+        <input type="hidden" name="_token" value="{{ csrf_token('finish' ~ scheduled.id) }}">
+        {# Le libellé est isolé dans un span : le contrôleur le réécrit après une
+           validation optimiste, sans toucher à l'icône. #}
+        <button type="submit" class="kd-btn kd-btn--primary kd-execfinish__btn">
+            <span class="kd-execbar__label">
+                {{- complete ? 'Terminer' : 'Terminer · ' ~ progress.remaining -}}
+            </span>
+        </button>
+    </form>
+
+{# Rendu ouvert côté serveur quand on arrive avec `prompt=1` : sans JS, la
+   question doit être visible sans qu'aucun script ne l'ouvre.
+
+   DANS #session-finish : le stream remplace ce conteneur à chaque validation,
+   une modale laissée dehors s'accumulerait dans le DOM à chaque geste. #}
+<dialog class="kd-execdialog" data-execlog-target="dialog"{{ prompt ? ' open' : '' }}>
+    <div class="kd-execdialog__card">
+        <h2 class="kd-execdialog__title">Séance incomplète</h2>
+        <p class="kd-execdialog__body">
+            Il reste <strong>{{ progress.remaining }}</strong> série{{ progress.remaining > 1 ? 's' }}
+            non pointée{{ progress.remaining > 1 ? 's' }} sur {{ progress.total }}.
+            Qu'est-ce qu'on en fait ?
+        </p>
+
+        <div class="kd-execdialog__actions">
+            <form method="post" action="{{ path('app_scheduled_workout_finish', {id: scheduled.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('finish' ~ scheduled.id) }}">
+                <input type="hidden" name="mode" value="all">
+                <button type="submit" class="kd-btn kd-btn--primary kd-btn--block">
+                    {{ ux_icon('lucide:check-check') }} Tout valider comme prévu
+                </button>
+            </form>
+
+            <form method="post" action="{{ path('app_scheduled_workout_finish', {id: scheduled.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('finish' ~ scheduled.id) }}">
+                <input type="hidden" name="mode" value="asis">
+                <button type="submit" class="kd-btn kd-btn--secondary kd-btn--block">
+                    {{ ux_icon('lucide:flag') }} Terminer tel quel
+                </button>
+            </form>
+
+            {# `method="dialog"` ferme nativement, sans JS. #}
+            <form method="dialog">
+                <button type="submit" class="kd-btn kd-btn--ghost kd-btn--block"
+                        data-action="execlog#closeDialog">
+                    Continuer la séance
+                </button>
+            </form>
+        </div>
+
+        <p class="kd-execdialog__hint">
+            « Tel quel » garde le manque : la prescription reste intacte, l'écart
+            est ce qu'on relira plus tard.
+        </p>
+    </div>
+</dialog>
+</div>

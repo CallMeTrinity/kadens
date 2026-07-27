@@ -4,7 +4,9 @@
    gratuitement le clavier, l'état sans JS et l'ouverture forcée à l'impression.
 
    Attendus : blocks (flat.blocks), statsByIndex (WorkoutMetrics::blockBreakdown
-   indexé par position, optionnel). #}
+   indexé par position, optionnel), logs (réalisé indexé par exercice puis rang,
+   optionnel — seule la fiche datée en fournit). #}
+{% set logs = logs|default({}) %}
 {% import 'components/_set_type.html.twig' as settype %}
 
 {% set role_icon = {'warmup': 'lucide:flame', 'main': 'lucide:activity', 'cooldown': 'lucide:wind'} %}
@@ -56,13 +58,17 @@
                                     </p>
                                     <ol class="kd-exlist kd-exlist--nested">
                                         {% for ex in segment.exercises %}
-                                            {% include 'components/_workout_exrow.html.twig' with { ex: ex } only %}
+                                            {% include 'components/_workout_exrow.html.twig' with {
+                                                ex: ex, logs: logs
+                                            } only %}
                                         {% endfor %}
                                     </ol>
                                 </li>
                             {% else %}
                                 {% for ex in segment.exercises %}
-                                    {% include 'components/_workout_exrow.html.twig' with { ex: ex } only %}
+                                    {% include 'components/_workout_exrow.html.twig' with {
+                                        ex: ex, logs: logs
+                                    } only %}
                                 {% endfor %}
                             {% endif %}
                         {% endfor %}

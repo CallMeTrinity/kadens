@@ -1,0 +1,120 @@
+{% extends 'base.html.twig' %}
+
+{% set workout = sheet.workout %}
+{% set progress = sheet.progress %}
+
+{% block title %}Séance en cours — {{ workout.title }}{% endblock %}
+
+{# La page prend toute la largeur : le rail et le panneau forment une mise en
+   page à deux colonnes qui n'a rien à faire dans la gouttière d'un article. #}
+{% block main_class %}kd-page kd-page--wide{% endblock %}
+
+{% block body %}
+    {# La séance PENDANT qu'on la fait. `app_scheduled_workout_show` la donne à
+       lire, celle-ci sert à pointer : un exercice à la fois, une ligne par
+       série, la coche en bout de ligne.
+
+       Rien de ce qui est saisi ici n'écrit dans la séance : le réalisé vit dans
+       `LoggedSet`, daté. La séance de bibliothèque et toutes ses autres dates
+       restent intactes (voir WorkoutLogger).
+
+       Toute la page est un seul contrôleur `execlog` : il enregistre au
+       changement, garde l'affichage en avance sur le réseau, met les gestes en
+       file quand la salle n'a pas de signal, et navigue d'un exercice à l'autre.
+       Sans lui, chaque ligne reste un formulaire postable et tous les panneaux
+       s'affichent à la suite.
+
+       `data-turbo="false"` : Turbo n'intercepte AUCUN formulaire d'ici. C'est le
+       contrôleur qui poste et applique lui-même le flux renvoyé — même choix que
+       le compositeur, et ici c'est indispensable : sans lui, Turbo posterait les
+       validations sans passer par la file hors ligne.
+
+       La clé de file est VERSIONNÉE. Une file écrite par une version antérieure
+       peut contenir des gestes qui n'ont jamais pu aboutir (le bug des URL
+       « [object HTMLButtonElement] » en avait empilé des dizaines) : changer la
+       clé les abandonne d'un coup. À incrémenter quand la forme d'un geste
+       change. #}
+    {% set token = csrf_token('log' ~ scheduled.id) %}
+
+    <div class="kd-exec" data-turbo="false"
+         data-controller="execlog"
+         data-execlog-queue-key-value="kd-execlog-v2-{{ scheduled.id }}"
+         data-execlog-started-at-value="{{ progress.startedAt ? progress.startedAt|date('c') }}"
+         data-execlog-target-minutes-value="{{ workout.estimatedDurationMinutes ?? 0 }}">
+
+        {% for message in app.flashes('success') %}
+            <div class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }}{{ message }}</div>
+        {% endfor %}
+        {% for message in app.flashes('error') %}
+            <div class="kd-flash kd-flash--error" role="alert">{{ ux_icon('lucide:circle-x') }}{{ message }}</div>
+        {% endfor %}
+
+        {# ------------------------------------------------------ Barre du haut
+           Chrono à gauche, clôture à droite. Le chrono ne démarre pas à
+           l'ouverture de la page mais à la PREMIÈRE série validée (dérivé côté
+           serveur) : on ouvre parfois la séance la veille. #}
+        <header class="kd-exectop">
+            <a href="{{ path('app_scheduled_workout_show', {id: scheduled.id}) }}" class="kd-exectop__back">
+                {{ ux_icon('lucide:arrow-left') }}<span class="kd-sr-only">Retour à la fiche</span>
+            </a>
+
+            <p class="kd-exectop__clock">
+                <span class="kd-exectop__elapsed" data-execlog-target="clock">--:--</span>
+                {% if workout.estimatedDurationMinutes %}
+                    <span class="kd-exectop__target">/ {{ workout.estimatedDurationMinutes }} min</span>
+                {% endif %}
+            </p>
+
+            <div class="kd-exectop__titles">
+                <h1 class="kd-exectop__title">{{ workout.title }}</h1>
+                <p class="kd-exectop__date">{{ scheduled.scheduledDate|date('d/m/Y') }}</p>
+            </div>
+
+            {{ include('scheduled_workout/_exec_finish.html.twig', {
+                scheduled: scheduled, progress: progress, prompt: prompt
+            }) }}
+        </header>
+
+        {{ include('scheduled_workout/_exec_progress.html.twig', {progress: progress}) }}
+
+        {# État de la connexion. Masqué tant que tout va bien : une pastille
+           permanente ne dit rien, c'est la perte du réseau ou un refus du
+           serveur qui sont des informations. #}
+        <p class="kd-exec__net" data-execlog-target="net" hidden role="status"></p>
+
+        {% if sheet.stops is empty %}
+            <div class="kd-card kd-empty">
+                {{ ux_icon('lucide:clipboard-list') }}
+                <div>Cette séance est vide : rien à pointer.</div>
+            </div>
+        {% else %}
+            <div class="kd-exec__body">
+                {{ include('scheduled_workout/_exec_rail.html.twig', {
+                    stops: sheet.stops, scheduled: scheduled
+                }) }}
+
+                {# Tous les panneaux sont rendus, le contrôleur n'en montre qu'un.
+                   C'est la condition du hors ligne : la page doit être complète
+                   une fois en cache. #}
+                <div class="kd-execstage">
+                    {% for stop in sheet.stops %}
+                        {% include 'scheduled_workout/_exec_exercise.html.twig' with {
+                            stop: stop, scheduled: scheduled, token: token
+                        } only %}
+                    {% endfor %}
+                </div>
+            </div>
+
+            {{ include('scheduled_workout/_exec_rest.html.twig') }}
+
+            <form method="post" action="{{ path('app_scheduled_workout_log_reset', {id: scheduled.id}) }}"
+                  class="kd-exec__reset"
+                  onsubmit="return confirm('Effacer tout le pointage de cette séance ?');">
+                <input type="hidden" name="_token" value="{{ csrf_token('log_reset' ~ scheduled.id) }}">
+                <button type="submit" class="kd-btn kd-btn--ghost kd-btn--danger kd-btn--sm">
+                    {{ ux_icon('lucide:rotate-ccw') }} Remettre le pointage à zéro
+                </button>
+            </form>
+        {% endif %}
+    </div>
+{% endblock %}
