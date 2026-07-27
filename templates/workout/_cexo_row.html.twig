@@ -1,10 +1,22 @@
-{# Ligne de résumé d'un exercice prescrit dans le compositeur (code, nom, type,
-   résumé, bouton paramètres, retrait). Adressable par id : une édition de
-   paramètres ne re-rend QUE cette ligne (stream ciblé), pas tout #workout-blocks,
-   pour ne pas refermer le panneau de params ni perdre le focus.
+{# Ligne de résumé d'un exercice prescrit dans le compositeur. Adressable par id :
+   une édition de paramètres ne re-rend QUE cette ligne (stream ciblé), pas tout
+   #workout-blocks, pour ne pas refermer le panneau de params ni perdre le focus.
    Paramètres : workout, prescribed, summary (chaîne, défaut '').
    Superset : groupLabel (« A1 », null si isolé), groupKind, canLink (un voisin
-   existe au-dessus dans le bloc). #}
+   existe au-dessus dans le bloc).
+
+   Deux zones seulement, et c'est la règle de la ligne :
+   1. `.kd-cexo__main` — TOUTE la ligne est un bouton qui déplie les paramètres.
+      C'est aussi la prise du glisser-déposer (appui long au doigt, voir le
+      contrôleur `composer`) : plus de poignée-cible ni de bouton « paramètres »
+      qui volaient de la largeur au nom de l'exercice.
+   2. `.kd-kebab` — tout le reste (enchaîner, déplacer, retirer) en toutes lettres.
+      Un menu, pas une rangée d'icônes : au doigt, quatre carrés de 26 px côte à
+      côte se chevauchaient et n'étaient pas atteignables.
+
+   L'état déplié est porté par `.kd-cexo--open` sur le PARENT (qui survit au stream
+   ciblé), pas par un attribut de cette ligne : `aria-expanded` ci-dessous est
+   resynchronisé par le contrôleur après chaque re-render. #}
 {% import 'components/_activity.html.twig' as activity %}
 {% import 'components/_set_type.html.twig' as settype %}
 {% set ex = prescribed.exercise %}
@@ -15,65 +27,95 @@
 {% set groupKind = groupKind|default('single') %}
 {% set canLink = canLink|default(false) %}
 <div class="kd-cexo__row" id="cexo-row-{{ prescribed.id }}">
-    <span class="kd-cexo__handle" title="Glisser pour réordonner">{{ ux_icon('lucide:grip-vertical') }}</span>
-    {% if groupLabel %}
-        <span class="kd-cexo__rank" title="{{ groupKind == 'circuit' ? 'Circuit' : 'Superset' }} — enchaîné sans repos">{{ groupLabel }}</span>
-    {% endif %}
-    <span class="kd-cexo__code{{ mod ? ' kd-cexo__code--' ~ mod }}">{{ ex ? ex.name|slice(0, 2)|upper : '??' }}</span>
-    <div class="kd-cexo__body">
-        <div class="kd-cexo__name">{{ ex ? ex.name : 'Exercice supprimé' }}</div>
-        <div class="kd-cexo__type">{{ prescribed.prescriptionType ? prescribed.prescriptionType.label }}</div>
-
-        {% if detailed %}
-            {# Résumé compact des séries détaillées : compteur + badges des types
-               présents. Passe à la ligne (fini la longue pastille mono qui débordait) ;
-               le détail complet est dans le panneau de paramètres et la vue séance. #}
-            {% set seen = [] %}
-            {% set distinctTypes = [] %}
-            {% for s in prescribed.detailedSets %}
-                {% if s.setType.value != 'normal' and s.setType.value not in seen %}
-                    {% set seen = seen|merge([s.setType.value]) %}
-                    {% set distinctTypes = distinctTypes|merge([s.setType]) %}
-                {% endif %}
-            {% endfor %}
-            <div class="kd-cexo__sets">
-                <span class="kd-cexo__setcount">{{ prescribed.detailedSets|length }} série{{ prescribed.detailedSets|length > 1 ? 's' }}</span>
-                {% for t in distinctTypes %}{{ settype.badge(t) }}{% endfor %}
-            </div>
+    <button type="button" class="kd-cexo__main"
+            data-action="composer#toggleParams"
+            aria-expanded="false"
+            aria-controls="cexo-params-{{ prescribed.id }}">
+        <span class="kd-cexo__handle" aria-hidden="true">{{ ux_icon('lucide:grip-vertical') }}</span>
+        {% if groupLabel %}
+            <span class="kd-cexo__rank" title="{{ groupKind == 'circuit' ? 'Circuit' : 'Superset' }} — enchaîné sans repos">{{ groupLabel }}</span>
         {% endif %}
-    </div>
+        <span class="kd-cexo__code{{ mod ? ' kd-cexo__code--' ~ mod }}">{{ ex ? ex.name|slice(0, 2)|upper : '??' }}</span>
+        <span class="kd-cexo__body">
+            <span class="kd-cexo__name">{{ ex ? ex.name : 'Exercice supprimé' }}</span>
 
-    {% if not detailed and summary is not empty %}
-        <span class="kd-cexo__pill">{{ summary }}</span>
-    {% endif %}
-
-    {# Liaison de superset : une seule bascule par ligne. Liée -> on détache,
-       sinon -> on s'enchaîne à la ligne du dessus. Rien à afficher en tête de
-       bloc : il n'y a personne au-dessus à qui se lier. #}
-    {% if groupLabel %}
-        {{ include('workout/_action_form.html.twig', {
-            action: path('app_workout_prescribed_unlink', {id: workout.id, prescribedId: prescribed.id}),
-            token: csrf_token('prescribed_unlink' ~ prescribed.id),
-            icon: 'lucide:unlink',
-            label: 'Détacher de l\'enchaînement'
-        }) }}
-    {% elseif canLink %}
-        {{ include('workout/_action_form.html.twig', {
-            action: path('app_workout_prescribed_link', {id: workout.id, prescribedId: prescribed.id}),
-            token: csrf_token('prescribed_link' ~ prescribed.id),
-            icon: 'lucide:link',
-            label: 'Enchaîner avec l\'exercice précédent'
-        }) }}
-    {% endif %}
-
-    <button type="button" class="kd-cexo__btn" data-action="composer#toggleParams" title="Paramètres" aria-label="Paramètres">
-        {{ ux_icon('lucide:sliders-horizontal') }}
+            {% if detailed %}
+                {# Résumé compact des séries détaillées : compteur + badges des types
+                   présents. Le détail complet est dans le panneau de paramètres. #}
+                {% set seen = [] %}
+                {% set distinctTypes = [] %}
+                {% for s in prescribed.detailedSets %}
+                    {% if s.setType.value != 'normal' and s.setType.value not in seen %}
+                        {% set seen = seen|merge([s.setType.value]) %}
+                        {% set distinctTypes = distinctTypes|merge([s.setType]) %}
+                    {% endif %}
+                {% endfor %}
+                <span class="kd-cexo__meta">
+                    <span class="kd-cexo__setcount">{{ prescribed.detailedSets|length }} série{{ prescribed.detailedSets|length > 1 ? 's' }}</span>
+                    {% for t in distinctTypes %}{{ settype.badge(t) }}{% endfor %}
+                </span>
+            {% elseif summary is not empty %}
+                {# Le résumé passe SOUS le nom, jamais à côté : en colonne étroite, la
+                   pastille mono poussait le nom hors de la ligne. #}
+                <span class="kd-cexo__meta">
+                    <span class="kd-cexo__pill">{{ summary }}</span>
+                </span>
+            {% else %}
+                {# Rien à résumer (exercice pas encore paramétré) : le type d'effort
+                   est alors la seule information utile. #}
+                <span class="kd-cexo__meta">
+                    <span class="kd-cexo__type">{{ prescribed.prescriptionType ? prescribed.prescriptionType.label }}</span>
+                </span>
+            {% endif %}
+        </span>
+        <span class="kd-cexo__chev" aria-hidden="true">{{ ux_icon('lucide:chevron-down') }}</span>
     </button>
-    {{ include('workout/_action_form.html.twig', {
-        action: path('app_workout_prescribed_delete', {id: workout.id, prescribedId: prescribed.id}),
-        token: csrf_token('prescribed_delete' ~ prescribed.id),
-        icon: 'lucide:x',
-        variant: 'danger',
-        label: 'Retirer l\'exercice'
-    }) }}
+
+    <details class="kd-kebab kd-kebab--row" data-controller="dismiss">
+        <summary class="kd-kebab__trigger kd-kebab__trigger--plain" aria-label="Actions sur {{ ex ? ex.name : 'l\'exercice' }}">
+            {{ ux_icon('lucide:ellipsis') }}
+        </summary>
+        <div class="kd-kebab__panel">
+            {# Liaison de superset : une seule bascule. Liée -> on détache, sinon ->
+               on s'enchaîne à la ligne du dessus. Rien en tête de bloc : il n'y a
+               personne au-dessus à qui se lier. #}
+            {% if groupLabel %}
+                {{ include('workout/_menu_form.html.twig', {
+                    action: path('app_workout_prescribed_unlink', {id: workout.id, prescribedId: prescribed.id}),
+                    token: csrf_token('prescribed_unlink' ~ prescribed.id),
+                    icon: 'lucide:unlink',
+                    label: 'Détacher de l\'enchaînement'
+                }) }}
+            {% elseif canLink %}
+                {{ include('workout/_menu_form.html.twig', {
+                    action: path('app_workout_prescribed_link', {id: workout.id, prescribedId: prescribed.id}),
+                    token: csrf_token('prescribed_link' ~ prescribed.id),
+                    icon: 'lucide:link',
+                    label: 'Enchaîner avec le précédent'
+                }) }}
+            {% endif %}
+
+            {# Repli du glisser-déposer : indispensable au clavier, et plus sûr que
+               l'appui long quand la liste est longue. #}
+            {{ include('workout/_menu_form.html.twig', {
+                action: path('app_workout_prescribed_move', {id: workout.id, prescribedId: prescribed.id, direction: 'up'}),
+                token: csrf_token('prescribed_move' ~ prescribed.id),
+                icon: 'lucide:chevron-up',
+                label: 'Monter l\'exercice'
+            }) }}
+            {{ include('workout/_menu_form.html.twig', {
+                action: path('app_workout_prescribed_move', {id: workout.id, prescribedId: prescribed.id, direction: 'down'}),
+                token: csrf_token('prescribed_move' ~ prescribed.id),
+                icon: 'lucide:chevron-down',
+                label: 'Descendre l\'exercice'
+            }) }}
+            {{ include('workout/_menu_form.html.twig', {
+                action: path('app_workout_prescribed_delete', {id: workout.id, prescribedId: prescribed.id}),
+                token: csrf_token('prescribed_delete' ~ prescribed.id),
+                icon: 'lucide:x',
+                variant: 'danger',
+                label: 'Retirer l\'exercice'
+            }) }}
+        </div>
+    </details>
 </div>

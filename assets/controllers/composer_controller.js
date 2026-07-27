@@ -24,15 +24,33 @@ import Sortable from 'sortablejs';
  * « kd-exercises » : la bibliothèque est source en clone (pull:'clone', put:false),
  * les blocs sont sources ET cibles.
  *
- *   - bloc actif : cible du « + » de la bibliothèque
- *   - glisser une carte de bibliothèque -> l'ajouter dans un bloc (quick-add)
+ * PRISE DU DRAG : il n'y a plus de poignée. La carte entière est saisissable, et
+ * les deux gestes se départagent par le TEMPS (`delay` + `delayOnTouchOnly`) :
+ * un tap déplie les paramètres, un appui long soulève la carte. C'est ce qui rend
+ * une poignée de 15px inutile — au doigt elle était intenable, et elle volait de
+ * la largeur au nom de l'exercice. Au pointeur fin, `delayOnTouchOnly` remet le
+ * délai à zéro : la souris garde le drag immédiat, l'icône de préhension n'est
+ * plus qu'une affordance. `filter` protège ce qui doit rester cliquable/saisissable
+ * dans la carte (le menu, le panneau de paramètres ouvert).
+ *
+ *   - bloc actif : cible de l'ajout depuis la bibliothèque
+ *   - taper une carte de bibliothèque -> l'ajouter au bloc actif (quick-add)
+ *   - glisser une carte de bibliothèque -> l'ajouter dans un bloc au point de dépôt
  *   - glisser une ligne d'exercice -> la réordonner / changer de bloc (reorder)
  *   - stepper de tours, dépliage des paramètres, filtre de bibliothèque (client)
+ *   - sous 900px la bibliothèque est une feuille : `openLib` / `closeLib`
  */
 export default class extends Controller {
     static targets = ['block', 'items', 'library', 'libcard', 'search', 'quickAddForm', 'reorderForm'];
 
     static SORTABLE_GROUP = 'kd-exercises';
+
+    // Appui long avant de soulever une carte, au doigt uniquement. Assez court pour
+    // ne pas se faire attendre, assez long pour qu'un tap reste un tap. Le seuil de
+    // mouvement laisse le scroll partir en premier : bouger avant la fin du délai
+    // annule le drag, on défile normalement.
+    static TOUCH_DRAG_DELAY = 320;
+    static TOUCH_DRAG_THRESHOLD = 8;
 
     // initialize() tourne AVANT les callbacks xTargetConnected (eux-mêmes avant
     // connect()). L'état lu par ces callbacks doit donc être posé ici, sinon
@@ -46,12 +64,35 @@ export default class extends Controller {
 
     connect() {
         this.onSubmit = this.onSubmit.bind(this);
+        this.onKey = (event) => {
+            if (event.key === 'Escape') this.closeLib();
+        };
+        // Fermeture au clic extérieur. Écoutée sur le DOCUMENT et non sur le voile :
+        // le voile ne recouvre que ce qui est sous la feuille dans l'ordre de
+        // peinture, un clic sur un calque au-dessus (menu, en-tête) ne le traversait
+        // pas. Ici, une seule autorité : est-on hors du panneau, oui ou non.
+        this.onOutside = (event) => {
+            if (!this.element.classList.contains('kd-composer--libopen')) return;
+            // Le clic d'OUVERTURE remonte jusqu'ici dans la même phase de bouillonnement,
+            // la classe étant déjà posée : sans cette garde, la feuille se refermerait
+            // aussitôt ouverte.
+            if (event.target.closest('[data-action*="composer#openLib"]')) return;
+            if (event.target.closest('.kd-composer__lib')) return;
+            this.closeLib();
+        };
         this.element.addEventListener('submit', this.onSubmit);
+        document.addEventListener('keydown', this.onKey);
+        document.addEventListener('click', this.onOutside);
         this.applyLibFilter();
     }
 
     disconnect() {
         this.element.removeEventListener('submit', this.onSubmit);
+        document.removeEventListener('keydown', this.onKey);
+        document.removeEventListener('click', this.onOutside);
+        // Une navigation Turbo pendant que la feuille est ouverte laisserait la page
+        // suivante figée : l'état vit sur <body>, il ne part pas avec le contrôleur.
+        document.body.classList.remove('kd-noscroll');
     }
 
     // ---- Soumission dynamique (fetch + Turbo Stream appliqué à la main) -----
@@ -91,6 +132,10 @@ export default class extends Controller {
                 credentials: 'same-origin',
             });
             renderStreamMessage(await response.text());
+            // Le flux réécrit des lignes dont le serveur ignore l'état déplié. rAF :
+            // `renderStreamMessage` rend de façon asynchrone, le DOM n'est pas encore
+            // à jour au retour de l'appel (même raison que dans restoreFocus).
+            requestAnimationFrame(() => this.syncExpanded());
             if (!isParamSave) this.restoreFocus(activeName, caret);
         } catch (error) {
             console.error('Composer submit failed:', error);
@@ -112,11 +157,8 @@ export default class extends Controller {
             const el = this.element.querySelector(`[name="${CSS.escape(name)}"]`);
             if (!el) return;
 
-            const params = el.closest('.kd-cexo__params');
-            if (params) {
-                params.hidden = false;
-                params.closest('.kd-cexo')?.classList.add('kd-cexo--open');
-            }
+            const row = el.closest('.kd-cexo__params')?.closest('.kd-cexo');
+            if (row) this.setParamsOpen(row, true);
 
             el.focus();
             if (caret !== null && typeof el.setSelectionRange === 'function') {
@@ -156,11 +198,14 @@ export default class extends Controller {
             || null;
     }
 
-    // ---- Ajout depuis la bibliothèque (bouton +) --------------------------
+    // ---- Ajout depuis la bibliothèque (tap sur une carte) ------------------
 
+    /** La carte entière est le déclencheur : l'exercice part dans le bloc actif, et
+     *  la feuille se referme (sur écran large, la classe n'était pas posée). */
     quickAdd(event) {
         const block = this.activeBlock();
         if (!block) return;
+        this.closeLib();
         this.submitQuickAdd(event.currentTarget.dataset.exerciseId, block.dataset.blockId);
     }
 
@@ -194,8 +239,9 @@ export default class extends Controller {
             group: { name: this.constructor.SORTABLE_GROUP, pull: 'clone', put: false },
             sort: false,
             draggable: '.kd-libx',
-            filter: '.kd-libx__add',   // ne pas démarrer un drag depuis le bouton +
-            preventOnFilter: false,    // ... mais laisser le clic passer
+            delay: this.constructor.TOUCH_DRAG_DELAY,
+            delayOnTouchOnly: true,
+            touchStartThreshold: this.constructor.TOUCH_DRAG_THRESHOLD,
             animation: 150,
             ghostClass: 'kd-drag-ghost',
             chosenClass: 'kd-drag-chosen',
@@ -213,8 +259,15 @@ export default class extends Controller {
     itemsTargetConnected(el) {
         this.sortables.set(el, Sortable.create(el, {
             group: { name: this.constructor.SORTABLE_GROUP, pull: true, put: true },
-            handle: '.kd-cexo__handle',
             draggable: '.kd-cexo',
+            // Pas de `handle` : toute la carte est la prise (cf. en-tête de fichier).
+            // `filter` exclut ce qui ne doit jamais soulever la carte — le menu, et
+            // le panneau de paramètres déplié, où l'on saisit du texte.
+            filter: '.kd-kebab, .kd-cexo__params',
+            preventOnFilter: false,
+            delay: this.constructor.TOUCH_DRAG_DELAY,
+            delayOnTouchOnly: true,
+            touchStartThreshold: this.constructor.TOUCH_DRAG_THRESHOLD,
             animation: 150,
             ghostClass: 'kd-drag-ghost',
             chosenClass: 'kd-drag-chosen',
@@ -306,12 +359,65 @@ export default class extends Controller {
         event.target.closest('form').requestSubmit();
     }
 
+    /** Taper une carte d'exercice la déplie (il n'y a plus de bouton dédié). */
     toggleParams(event) {
         const row = event.currentTarget.closest('.kd-cexo');
+        if (!row) return;
         const params = row.querySelector('.kd-cexo__params');
         if (!params) return;
-        params.hidden = !params.hidden;
-        row.classList.toggle('kd-cexo--open', !params.hidden);
+        this.setParamsOpen(row, params.hidden);
+    }
+
+    /**
+     * Source unique de l'état déplié. Il est porté par `.kd-cexo--open` sur la CARTE
+     * (qui survit au stream ciblé remplaçant la seule ligne de résumé) ; le bouton,
+     * lui, est re-rendu à `aria-expanded="false"` par le serveur, d'où la resynchro
+     * après chaque flux (voir syncExpanded).
+     */
+    setParamsOpen(row, open) {
+        const params = row.querySelector('.kd-cexo__params');
+        if (!params) return;
+        params.hidden = !open;
+        row.classList.toggle('kd-cexo--open', open);
+        row.querySelector('.kd-cexo__main')?.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    /** Réaligne `aria-expanded` sur la classe après un re-render (le serveur ne sait
+     *  pas quelles cartes étaient dépliées). */
+    syncExpanded() {
+        this.element.querySelectorAll('.kd-cexo').forEach((row) => {
+            row.querySelector('.kd-cexo__main')
+                ?.setAttribute('aria-expanded', row.classList.contains('kd-cexo--open') ? 'true' : 'false');
+        });
+    }
+
+    // ---- Bibliothèque en feuille (sous 900px) ------------------------------
+
+    /**
+     * Ouvre la bibliothèque sur un bloc donné. Un seul geste pour les deux formes :
+     * sur écran large la classe n'a aucun effet (les règles de feuille sont dans une
+     * `@media`), et c'est le focus donné à la recherche qui amène l'utilisateur à la
+     * colonne de gauche.
+     */
+    openLib(event) {
+        const blockId = event.currentTarget.dataset.blockId;
+        if (blockId) {
+            this.activeBlockId = blockId;
+            this.refreshActive();
+        }
+        this.element.classList.add('kd-composer--libopen');
+        // Fige la page derrière la feuille. La classe est posée dans les deux cas :
+        // c'est le CSS qui la neutralise au-dessus de 900px, où il n'y a pas de
+        // feuille et où bloquer le défilement serait un bug.
+        document.body.classList.add('kd-noscroll');
+        if (this.hasSearchTarget) {
+            this.searchTarget.focus({ preventScroll: false });
+        }
+    }
+
+    closeLib() {
+        this.element.classList.remove('kd-composer--libopen');
+        document.body.classList.remove('kd-noscroll');
     }
 
     // ---- Filtre de bibliothèque (client, offline-safe) --------------------

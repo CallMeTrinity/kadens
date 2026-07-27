@@ -1,8 +1,12 @@
 {# Contenu du panneau de paramètres d'un exercice dans le compositeur : le
-   formulaire prescrit (valeurs), l'éditeur de séries détaillées (types de force),
-   et le réordonnancement de l'exercice. Extrait pour être re-rendu d'un bloc
-   (mutation structurelle des séries -> stream ciblant #prescribed-params-{id}).
-   Paramètres : workout, prescribed, prescribedForm (FormView), setForms (par id). #}
+   formulaire prescrit (valeurs) et l'éditeur de séries détaillées (types de force).
+   Extrait pour être re-rendu d'un bloc (mutation structurelle des séries -> stream
+   ciblant #prescribed-params-{id}).
+   Paramètres : workout, prescribed, prescribedForm (FormView), setForms (par id).
+
+   Le réordonnancement de l'exercice n'est plus ici : il a rejoint le menu de la
+   ligne, avec les autres actions. Un panneau de paramètres ne contient que des
+   paramètres. #}
 {{ include('workout/_prescribed_form.html.twig', {
     form: prescribedForm,
     auto_action: 'change->composer#submitForm'
@@ -12,18 +16,3 @@
     prescribed: prescribed,
     setForms: setForms|default({})
 }) }}
-
-<div class="kd-cexo__reorder">
-    {{ include('workout/_action_form.html.twig', {
-        action: path('app_workout_prescribed_move', {id: workout.id, prescribedId: prescribed.id, direction: 'up'}),
-        token: csrf_token('prescribed_move' ~ prescribed.id),
-        icon: 'lucide:chevron-up',
-        label: 'Monter l\'exercice'
-    }) }}
-    {{ include('workout/_action_form.html.twig', {
-        action: path('app_workout_prescribed_move', {id: workout.id, prescribedId: prescribed.id, direction: 'down'}),
-        token: csrf_token('prescribed_move' ~ prescribed.id),
-        icon: 'lucide:chevron-down',
-        label: 'Descendre l\'exercice'
-    }) }}
-</div>

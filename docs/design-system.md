@@ -46,6 +46,7 @@ La hiérarchie de profondeur va à l'envers de l'habitude : plus une surface est
 | `--color-surface-hover` | `#fafaf8` | survol de ligne |
 | `--color-fill` | `#f3f3f1` | tags / badges neutres |
 | `--color-track` | `#ecece8` | pistes de barres, séparateurs |
+| `--color-scrim` | encre à 42 % | voile sous un calque : modale, feuille mobile |
 
 ### Aplat encre
 Le hero de séance, les en-têtes de tableau et l'onglet actif s'inversent. Une

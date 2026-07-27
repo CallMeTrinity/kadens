@@ -1726,3 +1726,103 @@ Trois corrections, dans cet ordre d'efficacité :
    12px, gouttières à `--kd-space-2/3`, gouttière de pastille à 2,5rem, tracking
    d'en-tête réduit. L'`overflow-x: auto` reste, mais comme filet de sécurité
    (écrans très étroits), plus comme mode de lecture normal.
+
+---
+
+## Lot — Le compositeur de séance au téléphone (27/07/2026)
+
+**Le constat.** L'éditeur était la page la moins utilisable au doigt, pour deux
+raisons distinctes.
+
+D'abord l'ordre : sous 900px, les deux volets s'empilaient, la bibliothèque
+au-dessus des blocs. On traversait donc un panneau de recherche, de filtres et de
+cartes — dont on n'a besoin qu'au moment précis d'ajouter un exercice — avant
+d'atteindre ce qu'on est venu voir. À chaque défilement.
+
+Ensuite la ligne d'exercice. Elle alignait sur une seule rangée sans retour à la
+ligne : poignée, rang, code, nom, type, pastille de résumé, bascule de superset,
+bouton paramètres, croix de suppression. Neuf éléments. En colonne étroite, la
+pastille mono poussait le nom hors de la ligne, et les boutons de 26px se
+chevauchaient en débordant du cadre — ce que montrait la capture d'écran : trois
+carrés empilés sur un « tou(rs) » tronqué.
+
+**Le principe retenu.** Une ligne ne porte que deux choses : ce qu'elle est, et
+un menu. Tout le reste se déduit du geste.
+
+- **Taper la carte la déplie.** Le bouton « paramètres » n'existe plus ; c'est la
+  carte entière qui est le bouton (`.kd-cexo__main`), et un chevron dit son état.
+- **L'appui long la soulève.** Plus de poignée-cible : SortableJS départage les
+  deux gestes par le **temps** (`delay: 320` + `delayOnTouchOnly: true`), avec un
+  `touchStartThreshold` qui laisse le défilement partir en premier. Au pointeur
+  fin le délai retombe à zéro — la souris garde son glisser immédiat, et l'icône
+  de préhension n'est plus qu'une affordance.
+- **Le reste passe dans un menu.** Enchaîner/détacher, monter, descendre, retirer :
+  quatre entrées en toutes lettres derrière trois points, au lieu de quatre icônes
+  nues côte à côte. Un `title` ne se survole pas au doigt. Même traitement pour
+  l'en-tête de bloc, dont les trois carrés passaient par-dessus le champ
+  d'intitulé.
+- **Le résumé passe sous le nom.** Posé à côté, il l'écrasait ; dessous, les deux
+  se lisent.
+
+**La bibliothèque devient une feuille.** Sous 900px, `.kd-composer--sheet` la sort
+du flux : elle monte du bas par-dessus un voile, ouverte depuis un « + Ajouter un
+exercice » attaché à chaque bloc — qui désigne du même geste le bloc de
+destination. Taper une carte l'ajoute et referme. Sur écran large, rien ne change :
+la classe n'a d'effet que dans la `@media`, et le même bouton donne simplement le
+focus à la recherche de la colonne de gauche. La carte de bibliothèque est
+devenue un vrai `<button>` (sélecteur `button.kd-libx`, pour ne pas toucher la
+palette de trame ni la barre d'ajout du calendrier, qui restent des zones à
+glisser) : le « + » de 26px était la seule cible d'ajout, et elle était trop petite.
+
+**Les champs de paramètres ne sont plus des boîtes.** Onze champs encadrés côte à
+côte, c'était onze contenants pour une poignée de chiffres. Dans
+`.kd-cexo__params`, le champ n'est qu'une valeur posée sur un filet, et ne
+redevient une boîte qu'au focus — le seul moment où le contour informe. La portée
+est volontairement limitée au compositeur : le même formulaire sert au panneau
+rapide du calendrier, qui garde des champs pleins. Effet de bord utile : les
+`style="flex:1 1 140px"` inline du formulaire prescrit sont devenus une classe
+`.kd-fieldrow__cell`, donc surchargeable — la base tombe à 88px dans le panneau,
+où les valeurs tiennent en trois caractères.
+
+**Pièges rencontrés, à ne pas réintroduire.**
+
+- **`overflow: hidden` sur `.kd-cblock` et `.kd-composer`.** Il ne servait qu'à
+  empêcher un fond de sortir des coins arrondis, mais il clippait les menus, qui
+  sont des calques absolus dépassant par le bas. Remplacé par un rayon porté
+  directement par l'en-tête de bloc et par la bibliothèque. `.kd-composer` garde
+  le sien : c'est la variante `--sheet` qui l'ouvre, parce que `.kd-composer__lib`
+  et `__main` servent aussi à l'éditeur de trame.
+- **L'état déplié ne peut pas vivre sur la ligne.** Le stream ciblé qui réécrit
+  `#cexo-row-{id}` après une sauvegarde de paramètre la rendrait à
+  `aria-expanded="false"` alors que le panneau, frère de la ligne, est resté
+  ouvert. L'état est donc porté par `.kd-cexo--open` sur la **carte** (qui
+  survit), et `aria-expanded` est resynchronisé après chaque flux — dans un
+  `requestAnimationFrame`, `renderStreamMessage` rendant de façon asynchrone.
+- **Le bouton d'ajout est sorti du conteneur trié.** SortableJS calcule ses index
+  sur les enfants directs de `[data-composer-target="items"]` : un bouton parmi
+  eux décalait le point de dépôt.
+- **`--kd-navbar-h` n'existe que sous 560px.** L'utiliser dans la `@media` 900px
+  demande un repli (`var(--kd-navbar-h, 0px)`), sans quoi la déclaration est
+  simplement invalide entre les deux.
+- **Une hauteur défilable se contraint sur toute la chaîne.** La feuille ne
+  défilait pas : `overflow-y: auto` était bien sur la liste, mais deux maillons
+  au-dessus étaient libres — le conteneur en `display: flex` sans
+  `flex-direction: column` (en `row`, l'item est étiré à la hauteur de la ligne,
+  qui suit son contenu, donc il déborde du `max-height` au lieu de s'y contraindre)
+  et le panneau sans `flex: 1` (son `height: 100%` ne résout pas quand le parent
+  n'a qu'un `max-height`). Un seul maillon libre annule le défilement, et le
+  symptôme se lit sur l'élément le plus bas alors que le défaut est au-dessus.
+- **La fermeture au clic extérieur n'appartient pas au voile.** Un voile ne
+  recouvre que ce qui est sous lui dans l'ordre de peinture : un clic sur un calque
+  au-dessus ne le traverse pas. Elle est portée par un écouteur `click` sur le
+  **document**, avec deux gardes — le clic d'ouverture remonte dans la même phase
+  de bouillonnement, la classe étant déjà posée, et il faut ignorer l'intérieur du
+  panneau. Le voile ne garde que son rôle visuel (assombrir, absorber les clics
+  destinés au contenu derrière).
+- **Les surcharges responsive sont écrites en fin de section**, après les
+  composants qu'elles surchargent (cf. `docs/design-system.md` §5).
+
+Nouveau token sémantique `--color-scrim` (le voile de `.kd-modal::backdrop`, qui
+était une valeur en dur, le consomme désormais aussi) et nouveau fragment
+`workout/_menu_form.html.twig` — la variante « item de menu » de `_action_form`,
+qui rend un bouton icône seul.

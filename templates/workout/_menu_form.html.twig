@@ -1,0 +1,12 @@
+{# Formulaire POST autonome rendu comme un ITEM de menu kebab (icône + libellé en
+   toutes lettres). Variante de `_action_form.html.twig`, qui rend un bouton icône
+   seul : dans un menu déroulant, une icône nue n'est pas lisible, et le `title`
+   n'existe pas au doigt.
+   Paramètres : action (URL), token (CSRF), label, icon, variant ('' | 'danger'),
+   confirm (optionnel). #}
+<form method="post" action="{{ action }}"{% if confirm is defined %} onsubmit="return confirm('{{ confirm }}');"{% endif %}>
+    <input type="hidden" name="_token" value="{{ token }}">
+    <button type="submit" class="kd-kebab__item{{ variant|default('') == 'danger' ? ' kd-kebab__item--danger' }}">
+        {{ ux_icon(icon) }} {{ label }}
+    </button>
+</form>

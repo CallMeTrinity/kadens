@@ -1955,6 +1955,54 @@ a.kd-scope--link:hover {
     color: var(--color-text-faint);
 }
 
+.kd-kebab__item--danger,
+.kd-kebab__item--danger svg {
+    color: var(--color-primary);
+}
+
+.kd-kebab__item--danger:hover {
+    background: var(--color-primary-tint);
+    color: var(--color-primary-on-tint);
+}
+
+/* Variante papier du déclencheur : le kebab d'origine vit sur l'aplat encre du
+   hero de séance, celui-ci sur les surfaces claires (compositeur). */
+.kd-kebab__trigger--plain {
+    width: 34px;
+    height: 34px;
+    border-color: transparent;
+    border-radius: var(--kd-radius-sm);
+    color: var(--color-text-placeholder);
+}
+
+.kd-kebab__trigger--plain:hover {
+    border-color: var(--color-border-strong);
+    color: var(--color-text-strong);
+}
+
+.kd-kebab__trigger--plain svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Menu ouvert depuis une LIGNE de liste : compact, et ancré à droite comme le
+   déclencheur. Il sort du bloc par le bas — d'où l'absence d'`overflow: hidden`
+   sur .kd-cblock, à ne pas réintroduire. */
+.kd-kebab--row {
+    flex: none;
+}
+
+.kd-kebab--row .kd-kebab__panel {
+    min-width: 216px;
+    border-radius: var(--kd-radius-md);
+    box-shadow: var(--shadow-card);
+}
+
+.kd-kebab--row .kd-kebab__item {
+    padding: var(--kd-space-3) var(--kd-space-5);
+    font-size: 13px;
+}
+
 /* ---- Bandeau de KPI ---- */
 .kd-wk__kpis {
     display: grid;
@@ -2962,6 +3010,14 @@ a.kd-scope--link:hover {
 
 .kd-fieldrow .kd-field {
     margin: 0;
+}
+
+/* Cellule d'une rangée de champs. Existe pour que la largeur des champs soit
+   surchargeable (variante compacte du compositeur) : elle était en `style=""`
+   inline, donc intouchable depuis la feuille. */
+.kd-fieldrow__cell {
+    flex: 1 1 140px;
+    min-width: 0;
 }
 
 .kd-fieldrow--tight .kd-field:nth-child(2) {
@@ -4052,7 +4108,7 @@ a.kd-planday__item:hover svg {
 }
 
 .kd-modal::backdrop {
-    background: color-mix(in srgb, var(--kd-ink-900) 42%, transparent);
+    background: var(--color-scrim);
 }
 
 .kd-modal__card {
@@ -4423,6 +4479,19 @@ a.kd-summplan__title:hover {
     overflow: hidden;
 }
 
+/* Variante du compositeur de séance : les menus kebab de ses lignes sont des
+   calques absolus qui dépassent la section par le bas, on ne peut donc pas la
+   clipper. Le masquage ne servait qu'à empêcher le fond de la bibliothèque de
+   sortir des coins arrondis — c'est elle qui porte désormais son rayon.
+   Scopé, parce que .kd-composer__lib / __main servent aussi à l'éditeur de trame. */
+.kd-composer--sheet {
+    overflow: visible;
+}
+
+.kd-composer--sheet .kd-composer__lib {
+    border-radius: var(--kd-radius-xl) 0 0 var(--kd-radius-xl);
+}
+
 /* ---- En-tête (méta sous le titre inline de l'en-tête de page) ---- */
 .kd-eyebrow--accent {
     color: var(--color-primary);
@@ -4456,6 +4525,12 @@ a.kd-summplan__title:hover {
     padding: var(--kd-space-8) var(--kd-space-8) var(--kd-space-9);
 }
 
+/* Voile de la bibliothèque en feuille. Inexistant tant qu'on n'est pas sous 900px
+   ET la feuille ouverte (cf. la @media en fin de section). */
+.kd-composer__scrim {
+    display: none;
+}
+
 /* ============================================================================
    Bibliothèque (volet gauche)
    ============================================================================ */
@@ -4484,6 +4559,23 @@ a.kd-summplan__title:hover {
 
 .kd-libpanel__count {
     color: var(--color-text-placeholder);
+}
+
+/* N'a de sens qu'en feuille : sur écran large la bibliothèque est une colonne, il
+   n'y a rien à fermer. */
+.kd-libpanel__close {
+    display: none;
+    margin-left: auto;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
+.kd-libpanel__close svg {
+    width: 20px;
+    height: 20px;
 }
 
 .kd-libsearch {
@@ -4595,6 +4687,22 @@ a.kd-summplan__title:hover {
     cursor: grabbing;
 }
 
+/* La carte de la bibliothèque du compositeur est un vrai <button> : la taper
+   l'ajoute au bloc actif. Le glisser reste possible, mais ce n'est plus le seul
+   chemin — au doigt il ne l'a jamais vraiment été. Sélecteur d'élément : les
+   autres usages de .kd-libx (palette de trame, barre d'ajout du calendrier)
+   restent des zones à glisser et ne doivent pas bouger. */
+button.kd-libx {
+    width: 100%;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+button.kd-libx:active {
+    cursor: pointer;
+}
+
 .kd-libx--run {
     border-left-color: var(--color-activity-run);
 }
@@ -4628,9 +4736,14 @@ a.kd-summplan__title:hover {
     color: var(--color-activity-gym);
 }
 
+/* `display: flex` et non un bloc implicite : le corps de carte est fait de <span>
+   (elle est un <button> ici, qui n'accepte que du contenu de phrase), et un span
+   sans blocification laisserait nom, activité et tags s'aligner sur une ligne. */
 .kd-libx__body {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 .kd-libx__name {
@@ -4674,7 +4787,8 @@ a.kd-summplan__title:hover {
     cursor: pointer;
 }
 
-.kd-libx__add:hover {
+/* Devenu un pictogramme dans une carte-bouton : il ne se survole plus lui-même. */
+.kd-libx:hover .kd-libx__add {
     border-color: var(--color-primary);
     background: var(--color-primary-tint);
 }
@@ -4886,11 +5000,14 @@ a.kd-summplan__title:hover {
     height: 15px;
 }
 
+/* Pas d'`overflow: hidden` ici, et c'est structurant : les menus kebab de la carte
+   et de ses exercices sont des calques absolus qui sortent du bloc par le bas. Le
+   masquage ne servait qu'à arrondir le fond de l'en-tête contre les coins — c'est
+   l'en-tête qui porte désormais son propre rayon. */
 .kd-cblock {
     border: 1px solid var(--color-border);
     border-radius: var(--kd-radius-lg);
     background: var(--color-surface-raised);
-    overflow: hidden;
     transition: border-color .12s, box-shadow .12s;
 }
 
@@ -4905,13 +5022,15 @@ a.kd-summplan__title:hover {
     gap: var(--kd-space-4);
     padding: var(--kd-space-4) var(--kd-space-5);
     border-bottom: 1px solid var(--color-divider);
+    border-radius: var(--kd-radius-lg) var(--kd-radius-lg) 0 0;
     background: var(--color-surface);
 }
 
 .kd-cblock__form {
     display: flex;
     align-items: center;
-    gap: var(--kd-space-4);
+    flex-wrap: wrap;
+    gap: var(--kd-space-3) var(--kd-space-4);
     flex: 1;
     min-width: 0;
     margin: 0;
@@ -5025,16 +5144,8 @@ a.kd-summplan__title:hover {
     font-weight: var(--kd-weight-semibold);
 }
 
-.kd-cblock__actions {
+.kd-cblock__menu {
     flex: none;
-    display: flex;
-    align-items: center;
-    gap: var(--kd-space-1);
-}
-
-.kd-cblock__actions form {
-    display: inline-flex;
-    margin: 0;
 }
 
 .kd-cblock__items {
@@ -5053,6 +5164,36 @@ a.kd-summplan__title:hover {
     font-family: var(--font-body);
     font-size: 12px;
     color: var(--color-text-placeholder);
+}
+
+/* Ajout d'un exercice attaché au bloc : discret tant qu'on ne le cherche pas,
+   mais toujours présent en fin de liste. C'est le chemin d'ajout au doigt. */
+.kd-cblock__addexo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--kd-space-2);
+    width: calc(100% - var(--kd-space-8));
+    margin: 0 var(--kd-space-4) var(--kd-space-4);
+    padding: var(--kd-space-3);
+    border: 1px dashed var(--color-border-strong);
+    border-radius: var(--kd-radius-md);
+    background: transparent;
+    font-family: var(--font-body);
+    font-size: 12.5px;
+    font-weight: var(--kd-weight-medium);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
+.kd-cblock__addexo:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.kd-cblock__addexo svg {
+    width: 15px;
+    height: 15px;
 }
 
 /* ---- Ligne d'exercice ---- */
@@ -5138,27 +5279,62 @@ a.kd-summplan__title:hover {
     opacity: .96;
 }
 
-.kd-cexo__handle:active {
-    cursor: grabbing;
-}
 
+/* La ligne n'a plus que deux enfants : la carte-bouton (qui prend toute la place
+   disponible) et le menu. C'est ce qui a fait disparaître l'empilement de carrés
+   de 26px qui se chevauchaient en colonne étroite. */
 .kd-cexo__row {
     display: flex;
+    align-items: flex-start;
+    gap: var(--kd-space-1);
+    padding: var(--kd-space-2) var(--kd-space-2) var(--kd-space-2) var(--kd-space-3);
+}
+
+/* Toute la carte est le bouton de dépliage — et la prise du glisser-déposer. */
+.kd-cexo__main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
     align-items: center;
-    gap: var(--kd-space-4);
-    padding: var(--kd-space-3) var(--kd-space-4);
+    gap: var(--kd-space-3);
+    padding: var(--kd-space-2) var(--kd-space-1);
+    border: 0;
+    background: transparent;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
 }
 
 .kd-cexo__handle {
     flex: none;
     display: flex;
     color: var(--color-text-placeholder);
-    cursor: grab;
 }
 
 .kd-cexo__handle svg {
     width: 15px;
     height: 15px;
+}
+
+/* Chevron d'état : il dit ce que fait un tap sur la carte. Il pivote sur la classe
+   du parent, jamais sur `aria-expanded` — le stream ciblé qui réécrit la ligne le
+   remettrait à « replié » alors que le panneau, lui, est resté ouvert. */
+.kd-cexo__chev {
+    flex: none;
+    display: flex;
+    color: var(--color-text-placeholder);
+    transition: transform .12s ease;
+}
+
+.kd-cexo__chev svg {
+    width: 16px;
+    height: 16px;
+}
+
+.kd-cexo--open .kd-cexo__chev {
+    transform: rotate(180deg);
+    color: var(--color-text-secondary);
 }
 
 .kd-cexo__code {
@@ -5189,65 +5365,50 @@ a.kd-summplan__title:hover {
 .kd-cexo__body {
     flex: 1;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 }
 
 .kd-cexo__name {
     font-family: var(--font-body);
     font-weight: var(--kd-weight-semibold);
     font-size: 13.5px;
-    line-height: 1.2;
+    line-height: 1.25;
     color: var(--color-text-strong);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
+/* Le résumé vit SOUS le nom : posé à côté, il écrasait le nom dès que la colonne
+   se resserrait (c'était le défaut le plus visible au téléphone). */
+.kd-cexo__meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    min-width: 0;
+}
+
 .kd-cexo__type {
     font-family: var(--font-mono);
     font-size: 10px;
     color: var(--color-text-faint);
-    margin-top: 2px;
 }
 
 .kd-cexo__pill {
-    flex: none;
+    max-width: 100%;
     font-family: var(--font-mono);
     font-size: 11px;
     font-weight: var(--kd-weight-semibold);
-    color: var(--color-text-strong);
-    background: var(--color-fill);
-    padding: var(--kd-space-2) var(--kd-space-4);
-    border-radius: var(--kd-radius-sm);
-    white-space: nowrap;
-}
-
-.kd-cexo__btn {
-    flex: none;
-    width: 26px;
-    height: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--color-divider);
-    border-radius: var(--kd-radius-sm);
-    background: var(--color-surface-raised);
     color: var(--color-text-secondary);
-    cursor: pointer;
-}
-
-.kd-cexo__btn:hover {
-    border-color: var(--color-primary);
-    color: var(--color-primary);
-}
-
-.kd-cexo__btn svg {
-    width: 15px;
-    height: 15px;
-}
-
-.kd-cexo__row .kd-microactions,
-.kd-cexo__row form {
-    margin: 0;
+    background: var(--color-fill);
+    padding: 2px var(--kd-space-3);
+    border-radius: var(--kd-radius-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .kd-cexo__params {
@@ -5260,26 +5421,76 @@ a.kd-summplan__title:hover {
     gap: var(--kd-space-5);
 }
 
-.kd-cexo__reorder {
-    display: flex;
-    gap: var(--kd-space-2);
-    margin-top: var(--kd-space-4);
+/* ---- Champs « à peine là » du panneau de paramètres ----
+   Onze champs encadrés côte à côte, c'était onze boîtes pour une poignée de
+   chiffres : la valeur se perdait dans son contenant. Ici le champ n'est qu'une
+   valeur posée sur un filet, et il ne devient une boîte qu'au moment où on le
+   modifie. Purement visuel : la mécanique (auto-save au `change`, masquage par
+   type d'effort) est inchangée.
+
+   Portée volontairement limitée au compositeur : le même formulaire sert au
+   panneau rapide du calendrier, qui garde des champs pleins. */
+.kd-cexo__params .kd-field {
+    gap: 2px;
 }
 
-.kd-cexo__reorder form {
-    display: inline-flex;
-    margin: 0;
+.kd-cexo__params .kd-label {
+    font-size: 9.5px;
+    letter-spacing: var(--kd-tracking-eyebrow-lg);
+    color: var(--color-text-placeholder);
+}
+
+.kd-cexo__params .kd-input {
+    padding: var(--kd-space-2) var(--kd-space-1);
+    border-color: transparent;
+    border-bottom-color: var(--color-divider);
+    border-radius: 0;
+    background: transparent;
+    font-size: 13.5px;
+    font-weight: var(--kd-weight-medium);
+}
+
+.kd-cexo__params .kd-input:hover {
+    border-bottom-color: var(--color-border-strong);
+}
+
+/* Au focus le champ redevient une boîte : c'est le seul moment où le contour
+   informe (on est en train de saisir), et l'anneau de `base.css` reste par-dessus. */
+.kd-cexo__params .kd-input:focus {
+    padding: var(--kd-space-2) var(--kd-space-3);
+    border-color: var(--color-text);
+    border-radius: var(--kd-radius-sm);
+    background: var(--color-surface-raised);
+}
+
+.kd-cexo__params .kd-select {
+    padding-right: var(--kd-space-9);
+    background-position: right var(--kd-space-1) center;
+}
+
+.kd-cexo__params .kd-select:focus {
+    background-position: right var(--kd-space-3) center;
+}
+
+.kd-cexo__params .kd-input--area {
+    min-height: 48px;
+}
+
+/* Les valeurs numériques tiennent en 3 caractères : leur donner 140px de base
+   étalait quatre champs sur toute la largeur pour trois chiffres chacun. */
+.kd-cexo__params .kd-fieldrow {
+    gap: var(--kd-space-3) var(--kd-space-5);
+}
+
+.kd-cexo__params .kd-fieldrow__cell {
+    flex: 1 1 88px;
+}
+
+.kd-cexo__params .kd-help {
+    font-size: 10.5px;
 }
 
 /* ---- Résumé compact des séries détaillées sur la ligne repliée ---- */
-.kd-cexo__sets {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 4px 6px;
-    margin-top: 4px;
-}
-
 .kd-cexo__setcount {
     font-family: var(--font-mono);
     font-size: 11px;
@@ -5515,7 +5726,18 @@ a.kd-summplan__title:hover {
     }
 }
 
-/* ---- Responsive : les deux volets s'empilent ---- */
+/* ----------------------------------------------------------------------------
+   Responsive du compositeur
+   PLACÉ EN FIN DE SECTION, APRÈS les composants qu'il surcharge : une `@media`
+   n'ajoute aucune spécificité, une surcharge écrite plus haut serait écrasée par
+   la règle de base (cf. docs/design-system.md §5).
+
+   Sous 900px, la bibliothèque cesse d'être un volet empilé au-DESSUS des blocs :
+   c'était la première chose que l'on traversait à chaque défilement, pour un
+   panneau dont on n'a besoin qu'au moment d'ajouter. Elle devient une feuille qui
+   monte du bas, ouverte depuis le « + Ajouter un exercice » d'un bloc. L'éditeur
+   de trame partage .kd-composer__lib : d'où la portée `--sheet`.
+   ---------------------------------------------------------------------------- */
 @media (max-width: 900px) {
     .kd-composer__body {
         flex-direction: column;
@@ -5529,6 +5751,148 @@ a.kd-summplan__title:hover {
 
     .kd-libpanel__list {
         max-height: 360px;
+    }
+
+    /* ---- La bibliothèque en feuille ---- */
+    .kd-composer--sheet .kd-composer__lib {
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 60;
+        max-height: 78vh;
+        /* `column` et non la valeur par défaut : en `row`, le panneau est étiré à la
+           hauteur de la LIGNE flex, qui suit son contenu — il déborde des 78vh au
+           lieu de s'y contraindre, et plus rien en dessous ne peut défiler. */
+        display: flex;
+        flex-direction: column;
+        border: 1px solid var(--color-text);
+        border-radius: var(--kd-radius-xl) var(--kd-radius-xl) 0 0;
+        background: var(--color-surface);
+        /* Repliée hors écran plutôt que `display: none` : le panneau garde ses
+           dimensions, donc la liste reste défilable dès l'ouverture. */
+        transform: translateY(101%);
+        visibility: hidden;
+        transition: transform .18s ease, visibility .18s;
+    }
+
+    .kd-composer--libopen .kd-composer__lib {
+        transform: translateY(0);
+        visibility: visible;
+    }
+
+    /* Le maillon manquant : sans `flex: 1` + `min-height: 0` ici, le panneau prend
+       la hauteur de son contenu (son `height: 100%` ne résout pas, le parent n'ayant
+       qu'un `max-height`), la liste hérite d'une hauteur infinie et le
+       `overflow-y: auto` ne s'active jamais. Une hauteur défilable se contraint sur
+       TOUTE la chaîne, un seul maillon libre suffit à l'annuler. */
+    .kd-composer--sheet .kd-libpanel {
+        flex: 1;
+        min-height: 0;
+        height: auto;
+    }
+
+    .kd-composer--sheet .kd-libpanel__head {
+        flex: none;
+    }
+
+    .kd-composer--sheet .kd-libpanel__list {
+        flex: 1;
+        min-height: 0;
+        max-height: none;
+        overflow-y: auto;
+        /* Arrivé en bout de liste, le geste ne repart pas sur la page derrière. */
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+        /* La barre gestuelle iOS est comptée dans --kd-navbar-h : sans ce dégagement,
+           la dernière carte passe sous la nav basse. Posé sur la liste et non sur le
+           panneau, pour qu'il défile avec le contenu au lieu d'amputer la feuille en
+           permanence. La variable n'existe que sous 560px (là où la nav descend),
+           d'où le repli — sans lui, la déclaration serait invalide entre 560 et 900px. */
+        padding-bottom: calc(var(--kd-space-5) + var(--kd-navbar-h, 0px));
+    }
+
+    .kd-composer--sheet .kd-libpanel__close {
+        display: flex;
+    }
+
+    .kd-composer--sheet .kd-libpanel__hint {
+        display: none;
+    }
+
+    /* Posée sur <body> par le contrôleur quand une feuille est ouverte. Neutre
+       au-dessus de 900px, où il n'y a pas de feuille (cf. openLib). */
+    .kd-noscroll {
+        overflow: hidden;
+    }
+
+    .kd-composer--libopen .kd-composer__scrim {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 55;
+        background: var(--color-scrim);
+    }
+
+    /* Déposer suppose une bibliothèque visible à côté : au doigt, il n'y en a pas. */
+    .kd-composer--sheet .kd-cblock__drop {
+        display: none;
+    }
+}
+
+@media (max-width: 560px) {
+    .kd-composer__main {
+        padding: var(--kd-space-5) var(--kd-space-3) var(--kd-space-7);
+    }
+
+    /* L'en-tête de bloc passe sur deux lignes plutôt que d'écraser l'intitulé :
+       rôle + tours, puis l'intitulé libre en pleine largeur. */
+    .kd-cblock__head {
+        align-items: flex-start;
+        padding: var(--kd-space-3) var(--kd-space-3) var(--kd-space-3) var(--kd-space-4);
+    }
+
+    .kd-cblock__label {
+        flex: 1 0 100%;
+        order: 3;
+    }
+
+    .kd-cblock__items {
+        padding: var(--kd-space-2) var(--kd-space-2);
+    }
+
+    .kd-cblock__addexo {
+        width: calc(100% - var(--kd-space-4));
+        margin: 0 var(--kd-space-2) var(--kd-space-3);
+        /* Cible tactile pleine hauteur (44px, cf. base.css). */
+        padding: var(--kd-space-4);
+    }
+
+    .kd-cexo__params {
+        padding: var(--kd-space-4) var(--kd-space-3);
+    }
+
+    /* Le rail de groupe mange de la largeur utile : il suffit qu'il se voie. */
+    .kd-cexo--linked {
+        margin-left: var(--kd-space-3);
+    }
+
+    /* Ancré au bord droit de l'écran plutôt qu'au déclencheur : sur une ligne
+       étroite, un panneau de 216px calé à droite du kebab débordait du viewport. */
+    .kd-kebab--row .kd-kebab__panel {
+        position: fixed;
+        top: auto;
+        left: var(--kd-space-4);
+        right: var(--kd-space-4);
+        bottom: calc(var(--kd-navbar-h) + var(--kd-space-4));
+        min-width: 0;
+        z-index: 70;
+        border-color: var(--color-text);
+    }
+
+    .kd-kebab--row .kd-kebab__item {
+        padding: var(--kd-space-4) var(--kd-space-6);
+        font-size: 14px;
     }
 }
 

@@ -261,7 +261,39 @@ deux sens, fiche de travail par athlète sous `/coach`, `ROLE_COACH`) — cf. §
 la règle de propriété — et **paramètres de compte** (`/profile/settings` :
 changement de mot de passe, création de compte par `app:user:create`).
 
-Dernier lot (une ligne par série) : sur la page de consultation d'une séance,
+Dernier lot (compositeur au téléphone) : l'éditeur de séance passe d'une rangée de
+neuf éléments par ligne à **deux zones et un geste**. Ce qui tient tout : *une ligne
+ne porte que ce qu'elle est et un menu ; le reste se déduit du geste.*
+
+- **Toute la carte d'exercice est le bouton de dépliage** (`.kd-cexo__main`), et
+  c'est aussi la prise du glisser-déposer. Les deux gestes se départagent par le
+  **temps** (SortableJS `delay: 320` + `delayOnTouchOnly: true`) : tap = déplier,
+  appui long = soulever. Il n'y a donc plus ni poignée ni bouton « paramètres ».
+  Au pointeur fin le délai retombe à zéro, la souris garde son drag immédiat.
+- **Tout le reste passe en menu kebab** (`.kd-kebab--row`, `<details>` + `dismiss`) :
+  enchaîner/détacher, monter, descendre, retirer — en toutes lettres, via le nouveau
+  `workout/_menu_form.html.twig`. Même chose pour l'en-tête de bloc. Conséquence à
+  ne pas casser : **plus d'`overflow: hidden` sur `.kd-cblock`** (il clippait ces
+  calques), le rayon est porté par l'en-tête.
+- **L'état déplié vit sur `.kd-cexo--open` (la carte), jamais sur la ligne.** Le
+  stream ciblé qui réécrit `#cexo-row-{id}` la rendrait « repliée » alors que le
+  panneau, son frère, est resté ouvert. `aria-expanded` est resynchronisé après
+  chaque flux, dans un `requestAnimationFrame`.
+- **Sous 900px la bibliothèque est une feuille**, pas un volet empilé au-dessus des
+  blocs (on la traversait à chaque défilement). Ouverte par un « + Ajouter un
+  exercice » attaché à chaque bloc — qui désigne du même geste la destination. La
+  carte est un vrai `<button>` (`button.kd-libx`, pour ne pas toucher la palette de
+  trame ni la barre du calendrier) : taper ajoute, le « + » n'est plus qu'un
+  pictogramme. Portée `.kd-composer--sheet`, parce que `.kd-composer__lib` /
+  `__main` servent aussi à l'éditeur de trame.
+- **Dans `.kd-cexo__params`, un champ n'est qu'une valeur sur un filet** et ne
+  redevient une boîte qu'au focus. Scopé au compositeur : le même formulaire sert au
+  panneau rapide du calendrier, qui garde des champs pleins. Les largeurs inline du
+  formulaire prescrit sont devenues `.kd-fieldrow__cell`, donc surchargeables.
+- Nouveau token `--color-scrim` (repris par `.kd-modal::backdrop`). Rappel :
+  `--kd-navbar-h` n'existe que sous 560px, l'utiliser au-dessus demande un repli.
+
+Lot précédent (une ligne par série) : sur la page de consultation d'une séance,
 **une ligne = une série, quel que soit le mode de saisie**. « 3 × 15 @ 130 kg »
 s'affiche en trois lignes identiques, comme trois lignes saisies à la main. Les
 séries sont donc exposées par `PlanFlattener` sous **deux formes complémentaires**,
