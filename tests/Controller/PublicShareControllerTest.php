@@ -58,11 +58,13 @@ final class PublicShareControllerTest extends WebTestCase
         $this->em->flush();
 
         // Aucune authentification : la page publique doit répondre en 200.
-        $this->client->request('GET', '/s/'.$workout->getSlug());
+        $crawler = $this->client->request('GET', '/s/'.$workout->getSlug());
 
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('body', 'Squat');
-        self::assertSelectorTextContains('body', '4 × 8 @ 60 kg');
+        // Même rendu que la page privée : une ligne par série.
+        self::assertSelectorTextContains('.kd-exrow__flag', '4 séries');
+        self::assertCount(4, $crawler->filter('.kd-settable tbody tr'));
         // Aucune action d'édition sur la page publique.
         self::assertSelectorNotExists('a[href$="/edit"]');
     }

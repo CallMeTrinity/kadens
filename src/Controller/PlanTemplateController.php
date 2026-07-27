@@ -347,6 +347,25 @@ final class PlanTemplateController extends AbstractController
     // ---- Édition de la trame (placement des séances) -----------------------
 
     /**
+     * Re-rend la trame seule, sans muter quoi que ce soit. Sert au rafraîchissement
+     * de la grille après une édition rapide (mini-modale) : la durée estimée et les
+     * volumes de semaine dérivent du contenu des séances, mais leur enregistrement
+     * passe par WorkoutController, qui ne connaît pas le plan. Plutôt que recharger
+     * la page (et perdre la position de défilement), le contrôleur `plangrid`
+     * redemande ce stream à la fermeture de la modale.
+     *
+     * Sans JS, cette route n'est jamais appelée : le repli reste la redirection
+     * vers l'éditeur (gridResponse).
+     */
+    #[Route('/{id}/grid', name: 'app_plan_template_grid', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function grid(Request $request, PlanTemplate $template): Response
+    {
+        $this->denyAccessUnlessGranted(PlanTemplateVoter::EDIT, $template);
+
+        return $this->gridResponse($request, $template);
+    }
+
+    /**
      * Pose une séance dans une case (palette : mode tampon / glisser-déposer).
      * Corps : workoutId + week + day. Clone la séance choisie (fork à la pose) et
      * la pose dans la case, puis resync si le plan est déjà au calendrier.

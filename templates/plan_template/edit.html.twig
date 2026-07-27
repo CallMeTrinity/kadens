@@ -61,15 +61,24 @@
        glisser-déposer inter-cases et la mini-modale d'édition rapide. Il enveloppe
        la grille ET la modale : les mutations de trame ne touchent que le CONTENU de
        #plan-grid (action="update"), la modale et le contrôleur survivent. #}
-    <section class="kd-editsection" data-controller="plangrid">
+    <section class="kd-editsection" data-controller="plangrid"
+             data-plangrid-grid-url-value="{{ path('app_plan_template_grid', {id: template.id}) }}">
         <p class="kd-editsection__title">Trame</p>
         <p class="kd-editsection__hint">
-            Arme une séance dans la palette puis clique les cases pour la poser (ou
-            glisse-la). Déplace une case d'un jour à l'autre par sa poignée. Clique une
-            séance posée pour ajuster ses valeurs (sa progression est propre à cette
-            case, les autres ne bougent pas).
+            Le « + » d'un jour ouvre la palette sur cette case : taper une séance la
+            pose. À la souris, on peut aussi armer une séance puis tamponner les cases,
+            ou la glisser directement. Une séance posée s'ouvre en édition rapide (sa
+            progression est propre à cette case, les autres ne bougent pas), et son
+            menu porte le reste : déplacer, retirer.
         </p>
-        <div class="kd-planeditor">
+        {# `kd-libsheet` : sous 900px la palette n'est plus un volet empilé au-dessus
+           de la trame mais une feuille qui monte du bas, ouverte sur une case précise
+           (même mécanique que la bibliothèque du compositeur, cf. components.css). #}
+        <div class="kd-planeditor kd-libsheet" data-plangrid-target="sheet">
+            {# Voile de la feuille : inerte tant que `kd-libsheet--open` n'est pas
+               posée. Purement visuel, la fermeture au clic extérieur est portée par
+               le contrôleur, sur le document. #}
+            <div class="kd-composer__scrim"></div>
             <div class="kd-composer__lib">
                 {{ include('plan_template/_palette.html.twig') }}
             </div>

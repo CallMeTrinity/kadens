@@ -43,7 +43,7 @@
                     {% if field == 'sets' and pe.hasDetailedSets %}
                         {% set opts = opts|merge({ help: 'Séries de travail — l\'échauffement n\'est pas compté.' }) %}
                     {% endif %}
-                    <div data-prescription-fields-target="field" data-field="{{ field }}" style="flex:1 1 140px;">
+                    <div class="kd-fieldrow__cell" data-prescription-fields-target="field" data-field="{{ field }}">
                         {{ form_row(attribute(form, field), opts) }}
                     </div>
                 {% endif %}
@@ -51,8 +51,8 @@
         </div>
 
         <div class="kd-fieldrow">
-            <div style="flex:0 0 140px;">{{ form_row(form.restSeconds, auto ? { attr: { 'data-action': auto } } : {}) }}</div>
-            <div style="flex:0 0 140px;">{{ form_row(form.rpe, auto ? { attr: { 'data-action': auto } } : {}) }}</div>
+            <div class="kd-fieldrow__cell">{{ form_row(form.restSeconds, auto ? { attr: { 'data-action': auto } } : {}) }}</div>
+            <div class="kd-fieldrow__cell">{{ form_row(form.rpe, auto ? { attr: { 'data-action': auto } } : {}) }}</div>
         </div>
         {{ form_row(form.notes, auto ? { attr: { 'data-action': auto } } : {}) }}
 

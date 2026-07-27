@@ -215,6 +215,39 @@ final class CalendarControllerTest extends WebTestCase
         self::assertSame(ScheduledStatus::PLANNED, $this->em->getRepository(ScheduledWorkout::class)->find($id)->getStatus());
     }
 
+    /**
+     * Avec JS, Turbo poste en demandant un stream. La réponse doit viser les
+     * fragments **de cette page** : viser `#cal-event-{id}` (la pastille de
+     * calendrier, absente ici) ne remplace rien, et le statut ne bougeait à
+     * l'écran qu'après un rechargement manuel.
+     */
+    public function testDoneButtonAnswersWithAStreamTargetingThisPage(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $workout = $this->createWorkout($user, 'Sortie longue');
+        $scheduled = $this->createScheduled($user, $workout, new \DateTimeImmutable('2026-03-15'));
+        $id = $scheduled->getId();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/schedule/'.$id);
+
+        $this->client->request('POST', '/schedule/'.$id.'/status', [
+            '_token' => $crawler->filter('.kd-done__form input[name="_token"]')->attr('value'),
+            'return' => 'schedule',
+            'status' => 'done',
+            'completionNotes' => '',
+        ], [], ['HTTP_ACCEPT' => 'text/vnd.turbo-stream.html, text/html']);
+
+        self::assertResponseIsSuccessful();
+        $html = $this->client->getResponse()->getContent();
+
+        self::assertStringContainsString('target="schedule-badge"', $html);
+        self::assertStringContainsString('target="schedule-done"', $html);
+        self::assertStringNotContainsString('cal-event-'.$id, $html);
+        // Le fragment renvoyé porte bien le nouvel état, pas l'ancien.
+        self::assertStringContainsString('Annuler', $html);
+    }
+
     public function testCalendarEventLinksToTheDatedPage(): void
     {
         $user = $this->createUser('owner@example.com');

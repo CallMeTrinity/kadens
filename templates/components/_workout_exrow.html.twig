@@ -6,9 +6,12 @@
         {% if ex.groupLabel %}<span class="kd-exrow__rank">{{ ex.groupLabel }}</span>{% endif %}
         <span class="kd-exrow__name">{{ ex.exercise ? ex.exercise.name : '—' }}</span>
 
-        {# `values` et non `summary` : le RPE a sa propre colonne juste à droite. #}
-        {% if ex.sets %}
-            <span class="kd-exrow__flag">{{ ex.sets|reduce((c, g) => c + g.count, 0) }} séries détaillées</span>
+        {# Dès qu'il y a un tableau de séries dessous, l'en-tête n'en donne que le
+           compte : répéter « 3 × 15 @ 130 kg » juste au-dessus des trois lignes
+           qui le disent serait redondant. Sinon (course, vélo, AMRAP…), `values`
+           et non `summary` : le RPE a sa propre colonne juste à droite. #}
+        {% if ex.setLines %}
+            <span class="kd-exrow__flag">{{ ex.setLines|length }} série{{ ex.setLines|length > 1 ? 's' }}</span>
         {% elseif ex.values %}
             <span class="kd-exrow__val">{{ ex.values }}</span>
         {% endif %}
@@ -21,9 +24,9 @@
         {% endif %}
     </div>
 
-    {% if ex.sets %}
+    {% if ex.setLines %}
         {% include 'components/_workout_sets_table.html.twig' with {
-            groups: ex.sets, topWeightKg: ex.topWeightKg, type: ex.type
+            lines: ex.setLines, topWeightKg: ex.topWeightKg, type: ex.type
         } only %}
     {% endif %}
 

@@ -1604,3 +1604,313 @@ inscrire. Elle affiche `/pwa/icon-192.png`, précaché.
 **Non vérifiable ici** : installation réelle, rendu de l'écran de démarrage iOS et
 audit Lighthouse demandent un navigateur sur `kadens.antoninpamart.fr` (HTTPS
 requis pour le service worker).
+
+---
+
+## Correctif — Le bouton « fait » qui ne se rafraîchissait pas (27/07/2026)
+
+Sur `/schedule/{id}`, marquer une séance comme faite enregistrait bien le statut
+mais ne changeait rien à l'écran : il fallait recharger la page pour voir la
+pastille basculer.
+
+### Cause
+
+Le formulaire poste vers `app_scheduled_workout_status`. Turbo envoie
+`Accept: text/vnd.turbo-stream.html`, donc `getPreferredFormat()` vaut
+`turbo_stream` — et le contrôleur testait ce format **avant** de regarder
+`return=schedule`. Il répondait donc avec le stream du calendrier, qui remplace
+`#cal-event-{id}`. Cet élément n'existe pas sur la page de la séance datée.
+
+**La règle à retenir : un `<turbo-stream>` dont la cible est absente du DOM
+n'échoue pas, il ne fait rien.** Pas d'erreur console, pas de 500 — le réseau
+répond 200, le statut part en base, et l'écran ment jusqu'au rechargement. Un
+endpoint servi par deux pages doit donc choisir son fragment en fonction de
+l'appelant, pas seulement en fonction du format demandé.
+
+### Correction
+
+Le même `return=schedule` qui pilotait déjà la redirection de repli pilote
+maintenant aussi le choix du stream (`streamScheduleStatus()` vs
+`streamCalEvent()`). Deux cibles, parce que le statut se lit à deux endroits sur
+cette page :
+
+- `#schedule-badge` — la pastille du hero, extraite dans
+  `components/_scheduled_badge.html.twig` ;
+- `#schedule-done` — la section « Réalisé » entière, extraite dans
+  `components/_scheduled_done.html.twig` (le libellé du bouton, le statut posté
+  et la note d'écart en dépendent tous).
+
+L'extraction en composants n'est pas cosmétique : elle est ce qui permet au
+stream de re-rendre exactement le même markup que le rendu initial, id compris.
+Le repli sans JS (redirection vers `app_scheduled_workout_show`) est inchangé.
+
+Couvert par `CalendarControllerTest::testDoneButtonAnswersWithAStreamTargetingThisPage`,
+qui poste avec l'en-tête `Accept` de Turbo et vérifie que la réponse vise bien
+les fragments de cette page — et jamais `cal-event-{id}`.
+
+---
+
+## Lot — Une ligne par série, quel que soit le mode de saisie (27/07/2026)
+
+**Le constat.** La page d'une séance affichait deux langages selon la façon dont
+l'exercice avait été saisi. Séries détaillées : un tableau, une ligne par groupe,
+type, rang, charge, % du max. Mode simple : une seule chaîne compacte, « 3 × 15
+@ 130 kg », posée dans l'en-tête de la ligne d'exercice. Même contenu prescrit,
+deux lectures — et il fallait décoder la chaîne pour comparer deux exercices
+voisins.
+
+**La règle posée.** Sur la page de consultation, **une ligne = une série**,
+toujours. Trois séries scalaires valent trois lignes identiques ; dix séries
+valent dix lignes. La répétition n'est pas du bruit, c'est ce qui rend la lecture
+uniforme et ce qui permet de compter des yeux.
+
+**Deux vues, pas deux vérités.** `PlanFlattener` expose désormais les séries sous
+deux formes, sur le modèle de `summary`/`values` et `exercises`/`segments` :
+
+- `sets` — la vue **condensée** (`detailedSetGroups`), inchangée : les séries
+  consécutives identiques fusionnent, chaque groupe garde son rang réel. Elle
+  reste réservée au mode détaillé et alimente les contextes compacts (résumé
+  `summarizeDetailedSets`, aperçu au survol, export, pastille de calendrier).
+- `setLines` — la vue **déroulée**, nouvelle : une entrée par série
+  (`type`, `typeLabel`, `index`, `effort`, `weightKg`), dérivée de la collection
+  détaillée si elle existe, **synthétisée depuis le scalaire** sinon (toutes les
+  lignes en `SetType::NORMAL`, mêmes valeurs). C'est ce que consomme la page.
+
+Le déroulé est réservé à `SETS_REPS` / `SETS_TIME`. Le `sets` d'un
+`DISTANCE_PACE` compte des **intervalles**, pas des séries : « 8 × 400 m » reste
+une ligne de résumé, et un exercice sans compteur (ajout express, `sets` null)
+garde son repli sur `values` — pas de tableau de « ? reps » pour un exercice
+qu'on n'a pas encore paramétré.
+
+**Conséquences à l'écran.**
+
+- `_workout_sets_table` prend `lines` au lieu de `groups` : plus de colonne
+  multiplicateur (`.kd-setrow__mult`, supprimé du CSS), plus de plage « 02 — 03 »,
+  un rang simple par ligne.
+- Le « % du max » ne s'affiche plus que si les charges **varient** : à charge
+  constante — le cas de toute prescription scalaire — la colonne n'aurait aligné
+  que des 100 %.
+- L'en-tête de la ligne d'exercice n'affiche plus qu'un compte (« 4 séries ») dès
+  qu'un tableau le suit : répéter « 4 × 8 @ 60 kg » juste au-dessus des quatre
+  lignes qui le disent était redondant. Le libellé « séries détaillées » disparaît
+  avec ça — en lecture, la distinction n'existe plus.
+
+**Ce qui n'a pas bougé.** L'aperçu au survol garde sa vue condensée (un panneau de
+survol doit tenir à l'écran), l'export Excel et le flux ICS gardent `summary`, et
+l'éditeur garde ses deux modes de saisie : c'est une refonte de **lecture**, pas
+du modèle.
+
+Couvert par `PlanFlattenerTest` (déroulé scalaire, déroulé détaillé sans fusion,
+intervalles non déroulés) et les tests de contrôleur `WorkoutControllerTest` /
+`PublicShareControllerTest`, qui comptent désormais les `<tr>` du tableau.
+
+### Suite — La largeur du tableau
+
+Dérouler les séries a rendu visible un défaut que la vue condensée masquait : le
+tableau prenait toute la largeur disponible. Sur un grand écran, « 6 reps » et
+« 80 kg » se retrouvaient séparés de plusieurs centaines de pixels — on ne lit
+plus une ligne, on traverse un vide — et sous 560px il défilait horizontalement
+dans son propre cadre, geste sans repère visuel dans une page qui, elle, ne
+défile pas : on rate des colonnes sans savoir qu'elles existent.
+
+Trois corrections, dans cet ordre d'efficacité :
+
+1. **Deux colonnes conditionnelles.** « % du max » ne s'affiche que si les
+   charges varient, « Type » que si une série est qualifiée. Une prescription
+   scalaire tombe donc à trois colonnes — c'est la moitié de la largeur gagnée
+   avant même de toucher au CSS, et une colonne vide en moins à l'écran.
+2. **Cadre plafonné à `34rem`** (`.kd-settable__wrap`), au lieu de suivre la
+   largeur de la page. Cinq colonnes courtes n'ont pas besoin de plus ; le
+   `min-width` du tableau descend de 30rem à 26rem.
+3. **Compression sous 560px** plutôt que défilement : `min-width: 0`, corps à
+   12px, gouttières à `--kd-space-2/3`, gouttière de pastille à 2,5rem, tracking
+   d'en-tête réduit. L'`overflow-x: auto` reste, mais comme filet de sécurité
+   (écrans très étroits), plus comme mode de lecture normal.
+
+---
+
+## Lot — Le compositeur de séance au téléphone (27/07/2026)
+
+**Le constat.** L'éditeur était la page la moins utilisable au doigt, pour deux
+raisons distinctes.
+
+D'abord l'ordre : sous 900px, les deux volets s'empilaient, la bibliothèque
+au-dessus des blocs. On traversait donc un panneau de recherche, de filtres et de
+cartes — dont on n'a besoin qu'au moment précis d'ajouter un exercice — avant
+d'atteindre ce qu'on est venu voir. À chaque défilement.
+
+Ensuite la ligne d'exercice. Elle alignait sur une seule rangée sans retour à la
+ligne : poignée, rang, code, nom, type, pastille de résumé, bascule de superset,
+bouton paramètres, croix de suppression. Neuf éléments. En colonne étroite, la
+pastille mono poussait le nom hors de la ligne, et les boutons de 26px se
+chevauchaient en débordant du cadre — ce que montrait la capture d'écran : trois
+carrés empilés sur un « tou(rs) » tronqué.
+
+**Le principe retenu.** Une ligne ne porte que deux choses : ce qu'elle est, et
+un menu. Tout le reste se déduit du geste.
+
+- **Taper la carte la déplie.** Le bouton « paramètres » n'existe plus ; c'est la
+  carte entière qui est le bouton (`.kd-cexo__main`), et un chevron dit son état.
+- **L'appui long la soulève.** Plus de poignée-cible : SortableJS départage les
+  deux gestes par le **temps** (`delay: 320` + `delayOnTouchOnly: true`), avec un
+  `touchStartThreshold` qui laisse le défilement partir en premier. Au pointeur
+  fin le délai retombe à zéro — la souris garde son glisser immédiat, et l'icône
+  de préhension n'est plus qu'une affordance.
+- **Le reste passe dans un menu.** Enchaîner/détacher, monter, descendre, retirer :
+  quatre entrées en toutes lettres derrière trois points, au lieu de quatre icônes
+  nues côte à côte. Un `title` ne se survole pas au doigt. Même traitement pour
+  l'en-tête de bloc, dont les trois carrés passaient par-dessus le champ
+  d'intitulé.
+- **Le résumé passe sous le nom.** Posé à côté, il l'écrasait ; dessous, les deux
+  se lisent.
+
+**La bibliothèque devient une feuille.** Sous 900px, `.kd-composer--sheet` la sort
+du flux : elle monte du bas par-dessus un voile, ouverte depuis un « + Ajouter un
+exercice » attaché à chaque bloc — qui désigne du même geste le bloc de
+destination. Taper une carte l'ajoute et referme. Sur écran large, rien ne change :
+la classe n'a d'effet que dans la `@media`, et le même bouton donne simplement le
+focus à la recherche de la colonne de gauche. La carte de bibliothèque est
+devenue un vrai `<button>` (sélecteur `button.kd-libx`, pour ne pas toucher la
+palette de trame ni la barre d'ajout du calendrier, qui restent des zones à
+glisser) : le « + » de 26px était la seule cible d'ajout, et elle était trop petite.
+
+**Les champs de paramètres ne sont plus des boîtes.** Onze champs encadrés côte à
+côte, c'était onze contenants pour une poignée de chiffres. Dans
+`.kd-cexo__params`, le champ n'est qu'une valeur posée sur un filet, et ne
+redevient une boîte qu'au focus — le seul moment où le contour informe. La portée
+est volontairement limitée au compositeur : le même formulaire sert au panneau
+rapide du calendrier, qui garde des champs pleins. Effet de bord utile : les
+`style="flex:1 1 140px"` inline du formulaire prescrit sont devenus une classe
+`.kd-fieldrow__cell`, donc surchargeable — la base tombe à 88px dans le panneau,
+où les valeurs tiennent en trois caractères.
+
+**Pièges rencontrés, à ne pas réintroduire.**
+
+- **`overflow: hidden` sur `.kd-cblock` et `.kd-composer`.** Il ne servait qu'à
+  empêcher un fond de sortir des coins arrondis, mais il clippait les menus, qui
+  sont des calques absolus dépassant par le bas. Remplacé par un rayon porté
+  directement par l'en-tête de bloc et par la bibliothèque. `.kd-composer` garde
+  le sien : c'est la variante `--sheet` qui l'ouvre, parce que `.kd-composer__lib`
+  et `__main` servent aussi à l'éditeur de trame.
+- **L'état déplié ne peut pas vivre sur la ligne.** Le stream ciblé qui réécrit
+  `#cexo-row-{id}` après une sauvegarde de paramètre la rendrait à
+  `aria-expanded="false"` alors que le panneau, frère de la ligne, est resté
+  ouvert. L'état est donc porté par `.kd-cexo--open` sur la **carte** (qui
+  survit), et `aria-expanded` est resynchronisé après chaque flux — dans un
+  `requestAnimationFrame`, `renderStreamMessage` rendant de façon asynchrone.
+- **Le bouton d'ajout est sorti du conteneur trié.** SortableJS calcule ses index
+  sur les enfants directs de `[data-composer-target="items"]` : un bouton parmi
+  eux décalait le point de dépôt.
+- **`--kd-navbar-h` n'existe que sous 560px.** L'utiliser dans la `@media` 900px
+  demande un repli (`var(--kd-navbar-h, 0px)`), sans quoi la déclaration est
+  simplement invalide entre les deux.
+- **Une hauteur défilable se contraint sur toute la chaîne.** La feuille ne
+  défilait pas : `overflow-y: auto` était bien sur la liste, mais deux maillons
+  au-dessus étaient libres — le conteneur en `display: flex` sans
+  `flex-direction: column` (en `row`, l'item est étiré à la hauteur de la ligne,
+  qui suit son contenu, donc il déborde du `max-height` au lieu de s'y contraindre)
+  et le panneau sans `flex: 1` (son `height: 100%` ne résout pas quand le parent
+  n'a qu'un `max-height`). Un seul maillon libre annule le défilement, et le
+  symptôme se lit sur l'élément le plus bas alors que le défaut est au-dessus.
+- **La fermeture au clic extérieur n'appartient pas au voile.** Un voile ne
+  recouvre que ce qui est sous lui dans l'ordre de peinture : un clic sur un calque
+  au-dessus ne le traverse pas. Elle est portée par un écouteur `click` sur le
+  **document**, avec deux gardes — le clic d'ouverture remonte dans la même phase
+  de bouillonnement, la classe étant déjà posée, et il faut ignorer l'intérieur du
+  panneau. Le voile ne garde que son rôle visuel (assombrir, absorber les clics
+  destinés au contenu derrière).
+- **Les surcharges responsive sont écrites en fin de section**, après les
+  composants qu'elles surchargent (cf. `docs/design-system.md` §5).
+
+Nouveau token sémantique `--color-scrim` (le voile de `.kd-modal::backdrop`, qui
+était une valeur en dur, le consomme désormais aussi) et nouveau fragment
+`_menu_form.html.twig` — la variante « item de menu » de `_action_form`, qui rend
+un bouton icône seul. (Il vit dans `templates/components/` depuis que l'éditeur de
+trame le consomme lui aussi.)
+
+---
+
+## Lot — L'éditeur de plan au téléphone (28/07/2026)
+
+**Le constat.** Le lot précédent avait traité le compositeur de séance ; l'éditeur
+de trame était resté avec exactement les mêmes défauts, un cran plus loin même,
+parce qu'il empile deux niveaux (semaine, puis jour).
+
+- La palette s'empilait **au-dessus** de la trame sous 1200px : on la traversait à
+  chaque défilement, pour un panneau dont on n'a besoin qu'au moment de poser.
+- Poser une séance demandait le mode **tampon** — armer une carte, puis retrouver
+  la case et la taper. Deux gestes séparés par un défilement, et un état invisible
+  entre les deux.
+- Une case posée n'offrait qu'une **croix de 22px** et une **poignée de 13px**.
+  Le déplacement n'avait aucun repli : ni clavier, ni sans JS.
+- L'en-tête de semaine alignait un `<select>` de destination et deux boutons, qui
+  passaient à la ligne et doublaient la hauteur de chaque en-tête.
+
+**Le principe retenu, repris tel quel du compositeur.** *Une ligne ne porte que ce
+qu'elle est et un menu ; le reste se déduit du geste.*
+
+### La palette devient une feuille, et le mécanisme est mutualisé
+
+Les règles de feuille ne sont plus scopées `kd-composer--sheet` mais
+**`kd-libsheet`** : le conteneur des deux volets la porte (compositeur *et*
+`.kd-planeditor`), son contrôleur y pose `kd-libsheet--open`. Le voile
+`.kd-composer__scrim`, `.kd-noscroll` sur `<body>`, le bouton de fermeture, la
+chaîne de hauteurs défilables : une seule définition pour les deux écrans. Ce qui
+reste propre à un éditeur garde sa portée à lui (`kd-composer--sheet` pour le
+débordement et le rayon du compositeur, `.kd-planeditor` pour les siens).
+
+### Le « + » d'un jour désigne la case
+
+C'est le pendant du « + Ajouter un exercice » attaché à un bloc : il ouvre la
+palette **sur** cette case (mémorisée dans le contrôleur), et taper une carte y
+pose directement la séance. Le mode tampon reste, mais il n'est plus le seul
+chemin — et il est explicitement désarmé quand une case est visée, deux intentions
+de pose concurrentes rendant le prochain clic imprévisible. Un rappel
+`Poser dans S2 · mercredi` s'affiche en tête de palette : en feuille, la trame est
+masquée, sans lui on ne sait plus où l'on pose.
+
+Le bouton vit **hors** de `[data-plangrid-target="cell"]` (SortableJS calcule ses
+index sur les enfants directs) et suit le motif du « + » du calendrier : révélé au
+survol à la souris, visible en retrait sous `@media (hover: none)` — c'est le seul
+chemin d'ajout au doigt, il ne peut pas dépendre d'un survol.
+
+### La carte entière est la prise, le reste passe en menu
+
+Même départage par le temps que dans le compositeur (`delay: 320` +
+`delayOnTouchOnly`, `filter` sur le menu et la note en édition en ligne) : tap =
+édition rapide, appui long = soulever. La poignée disparaît.
+
+Le menu kebab de la case porte **Édition complète**, **Déplacer vers** et
+**Retirer de la trame**. Celui de la semaine porte **Copier vers** et **Retirer la
+semaine**. Deux d'entre eux ne sont pas de simples boutons : ils demandent un
+choix avant d'agir, d'où `.kd-kebab__form` (libellé, puis une ligne de `<select>`
+et un bouton). « Déplacer vers » est au passage le **premier repli** du
+glisser-déposer de trame : il n'y en avait aucun, ni au clavier ni sans JS, et
+c'est aussi le seul geste praticable quand la case d'arrivée est à trois semaines
+de défilement. Verrouillé par `testMoveItemFromTheRowMenuWithoutJs`.
+
+### Pièges rencontrés
+
+- **`.kd-planeditor` ne peut plus clipper.** Il portait `overflow: clip` (choisi
+  pour ne pas casser la palette `sticky`) ; les panneaux de menu, calques absolus,
+  en sortent par le bas. Même piège que `overflow: hidden` sur `.kd-cblock`. Le
+  rayon passe sur la palette, qui est l'enfant de bord.
+- **`.kd-planitem form { display: inline-flex }`**, hérité du bouton de retrait,
+  est plus spécifique que `.kd-kebab__form` : il remettait les formulaires du menu
+  en ligne. Supprimé — et signalé sur place, parce que c'est le genre de règle
+  qu'on réintroduit sans y penser.
+- **Une feuille qui monte du bas doit remettre `top: auto`.** La palette de trame
+  est `sticky` avec un `top` sur écran large ; la règle de feuille passait bien en
+  `position: fixed` avec `bottom: 0`, mais le `top` hérité restait — le panneau se
+  retrouvait ancré des **deux** côtés et s'étirait depuis le haut de l'écran au
+  lieu de monter du bas. Le compositeur ne l'avait jamais montré : sa colonne n'a
+  pas de `top`. Mutualiser une règle, c'est hériter des `position` des deux écrans.
+- **`base.css` est importé avant `components.css`.** Sa règle jumelle
+  `@media (pointer: coarse) { .kd-planday__add { opacity: .55 } }` est écrasée par
+  l'`opacity: 0` du composant : la révélation au survol doit être neutralisée dans
+  `components.css`, après la définition (même famille de piège que les `@media`
+  sans spécificité).
+- **On n'a PAS étendu l'interception des soumissions à toute la section.** C'était
+  tentant (le compositeur le fait), mais ici les formulaires de la trame sont déjà
+  soumis par Turbo, qui répond en stream *et* fait remonter les réponses en erreur.
+  Un `fetch` maison les aurait avalées en silence.

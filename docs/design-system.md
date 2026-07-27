@@ -46,6 +46,7 @@ La hiérarchie de profondeur va à l'envers de l'habitude : plus une surface est
 | `--color-surface-hover` | `#fafaf8` | survol de ligne |
 | `--color-fill` | `#f3f3f1` | tags / badges neutres |
 | `--color-track` | `#ecece8` | pistes de barres, séparateurs |
+| `--color-scrim` | encre à 42 % | voile sous un calque : modale, feuille mobile |
 
 ### Aplat encre
 Le hero de séance, les en-têtes de tableau et l'onglet actif s'inversent. Une
@@ -216,7 +217,7 @@ sont dans `assets/fonts/` (subsets latin + latin-ext), les `@font-face` dans
 | Palier | Cible | Ce qui bascule |
 |---|---|---|
 | `560px` | téléphone | une colonne, nav en barre basse, calendrier en agenda vertical, filtres d'index repliés |
-| `900px` | tablette | éditeurs à deux volets empilés, nav condensée, repères de hero sous le titre |
+| `900px` | tablette | bibliothèque/palette des éditeurs en **feuille** (`kd-libsheet`), nav condensée, repères de hero sous le titre |
 | `1200px` | petit portable | palette de l'éditeur de trame sous la grille |
 
 > **Ils ne peuvent pas être tokenisés.** `@media` n'accepte pas `var()`, et le
@@ -264,6 +265,17 @@ sont dans `assets/fonts/` (subsets latin + latin-ext), les `@font-face` dans
   retrait sous `@media (hover: none)`, et un aperçu en `popover="manual"` doit se
   garder derrière `(hover: hover) and (pointer: fine)` : un tap émet un
   `mouseenter` synthétique sans `mouseleave`, le panneau resterait collé.
+- **La feuille des éditeurs est un mécanisme unique : `kd-libsheet`.** Le
+  compositeur de séance et l'éditeur de trame partagent `.kd-composer__lib` ; sous
+  900px, le conteneur des deux volets porte `kd-libsheet` et son contrôleur y pose
+  `kd-libsheet--open` (voile `.kd-composer__scrim`, `.kd-noscroll` sur `<body>`).
+  Ne pas reporter ces règles sur une portée par écran : c'est le même geste, il
+  n'a qu'une définition. Ce qui reste propre à un éditeur (rayon de la colonne,
+  zone de dépôt) garde sa portée à lui (`kd-composer--sheet`, `.kd-planeditor`).
+- **Un conteneur d'éditeur ne clippe jamais son débordement.** Les menus kebab de
+  lignes sont des calques absolus qui sortent par le bas : `overflow: hidden` ou
+  `clip` sur `.kd-cblock` ou `.kd-planeditor` les ampute, et aucun `z-index` ne
+  rattrape ça. Le rayon se porte alors sur les enfants de bord.
 
 ---
 
@@ -326,11 +338,17 @@ décomposé en `_workout_program`, `_workout_sets_table`, `_workout_analysis`.
 - **Onglets** (`.kd-wk__tab`) : filet bas sur l'onglet actif.
 - **Bloc en accordéon** (`.kd-block`) : `<details open>`, numéro en gris clair,
   rôle en condensé capitales, résumé mono poussé à droite.
-- **Tableau de séries** (`.kd-settable`) : en-tête en aplat encre, groupe de
-  séries de travail marqué d'un filet gauche et d'un fond. Les séries
-  consécutives identiques sont fusionnées par `PlanFlattener` mais gardent leur
-  rang réel (« 03 — 06 ») : condenser l'affichage ne doit pas faire perdre la
-  numérotation.
+- **Tableau de séries** (`.kd-settable`) : en-tête en aplat encre, série de
+  travail ordinaire marquée d'un filet gauche et d'un fond. **Une ligne = une
+  série**, y compris quand la saisie est scalaire (`PlanFlattener::setLines`
+  déroule « 3 × 15 » en trois lignes) : la répétition est le prix d'une lecture
+  identique quel que soit le mode de saisie. Deux colonnes ne s'affichent que si
+  elles ont quelque chose à dire : « % du max » seulement si les charges varient,
+  « Type » seulement si une série est qualifiée. **Largeur plafonnée à 34rem** —
+  étiré sur un grand écran, le tableau éloignait les reps de la charge de
+  plusieurs centaines de pixels. Sous 560px il se comprime au lieu de défiler :
+  un défilement horizontal imbriqué dans une page qui ne défile pas n'a aucun
+  repère visuel, on rate des colonnes sans savoir qu'elles existent.
 - **Analyse** (`.kd-analysis`) : barre empilée + légende, barres horizontales,
   timeline de durée. Rendu 100 % serveur, aucune bibliothèque de graphiques.
 

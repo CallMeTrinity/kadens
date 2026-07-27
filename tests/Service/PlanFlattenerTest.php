@@ -80,6 +80,96 @@ final class PlanFlattenerTest extends TestCase
     }
 
     /**
+     * La vue déroulée (`setLines`) rend une entrée par série dans les deux modes :
+     * un compteur scalaire « 3 × 15 @ 130 kg » vaut trois lignes identiques,
+     * exactement comme trois lignes saisies à la main. C'est ce qui fait qu'une
+     * séance se lit de la même façon quel que soit le mode de saisie.
+     */
+    public function testScalarSetsAreUnrolledOneLinePerSet(): void
+    {
+        $exercise = (new Exercise())->setName('Squat')->setActivity(ActivityType::GYM);
+        $prescribed = (new PrescribedExercise())
+            ->setPrescriptionType(PrescriptionType::SETS_REPS)
+            ->setExercise($exercise)
+            ->setPosition(0)
+            ->setSets(3)->setReps(15)->setWeightKg(130.0);
+
+        $block = (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(0);
+        $block->addPrescribedExercise($prescribed);
+        $workout = (new Workout())->setTitle('Séance')->setSlug('seance-scalaire');
+        $workout->addBlock($block);
+
+        $flat = $this->flattener->flattenWorkout($workout)['blocks'][0]['exercises'][0];
+
+        // La vue condensée reste réservée au mode détaillé (aperçu, résumé).
+        self::assertNull($flat['sets']);
+        self::assertSame('3 × 15 @ 130 kg', $flat['summary']);
+
+        self::assertCount(3, $flat['setLines']);
+        self::assertSame([1, 2, 3], array_column($flat['setLines'], 'index'));
+        foreach ($flat['setLines'] as $line) {
+            self::assertSame(SetType::NORMAL, $line['type']);
+            self::assertSame('15 reps', $line['effort']);
+            self::assertSame(130.0, $line['weightKg']);
+        }
+    }
+
+    /**
+     * Le déroulé suit la saisie détaillée série par série, échauffement compris,
+     * sans fusionner les lignes identiques comme le fait la vue condensée.
+     */
+    public function testDetailedSetsAreUnrolledWithoutMerging(): void
+    {
+        $exercise = (new Exercise())->setName('Développé couché')->setActivity(ActivityType::GYM);
+        $prescribed = (new PrescribedExercise())
+            ->setPrescriptionType(PrescriptionType::SETS_REPS)
+            ->setExercise($exercise)
+            ->setPosition(0);
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(0)->setSetType(SetType::WARMUP)->setReps(10)->setWeightKg(40.0));
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(1)->setSetType(SetType::NORMAL)->setReps(8)->setWeightKg(100.0));
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(2)->setSetType(SetType::NORMAL)->setReps(8)->setWeightKg(100.0));
+
+        $block = (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(0);
+        $block->addPrescribedExercise($prescribed);
+        $workout = (new Workout())->setTitle('Séance')->setSlug('seance-detaillee');
+        $workout->addBlock($block);
+
+        $flat = $this->flattener->flattenWorkout($workout)['blocks'][0]['exercises'][0];
+
+        // Deux groupes condensés, mais trois lignes déroulées.
+        self::assertCount(2, $flat['sets']);
+        self::assertCount(3, $flat['setLines']);
+        self::assertSame([SetType::WARMUP, SetType::NORMAL, SetType::NORMAL], array_column($flat['setLines'], 'type'));
+        self::assertSame('Échauf', $flat['setLines'][0]['typeLabel']);
+        self::assertNull($flat['setLines'][1]['typeLabel']);
+    }
+
+    /**
+     * Le `sets` d'un DISTANCE_PACE compte des intervalles, pas des séries : il ne
+     * se déroule pas en tableau (« 8 × 400 m » reste une ligne de résumé).
+     */
+    public function testIntervalsAreNotUnrolled(): void
+    {
+        $exercise = (new Exercise())->setName('Fractionné')->setActivity(ActivityType::RUNNING);
+        $prescribed = (new PrescribedExercise())
+            ->setPrescriptionType(PrescriptionType::DISTANCE_PACE)
+            ->setExercise($exercise)
+            ->setPosition(0)
+            ->setSets(8)
+            ->setDistanceMeters(400);
+
+        $block = (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(0);
+        $block->addPrescribedExercise($prescribed);
+        $workout = (new Workout())->setTitle('Piste')->setSlug('piste');
+        $workout->addBlock($block);
+
+        $flat = $this->flattener->flattenWorkout($workout)['blocks'][0]['exercises'][0];
+
+        self::assertNull($flat['setLines']);
+        self::assertSame('8 × 400 m', $flat['summary']);
+    }
+
+    /**
      * Un bloc est livré à la fois à plat (`exercises`, ordre de lecture) et
      * découpé (`segments`). Les deux décrivent le même contenu dans le même
      * ordre : c'est ce qui autorise l'export à ignorer les liaisons pendant que

@@ -2,14 +2,20 @@
    (poser/retirer/déplacer/dupliquer) met à jour le CONTENU de ce conteneur via
    Turbo Stream (action="update", l'id survit). Contexte attendu (fourni par
    gridContext) : template, flat (sortie de PlanFlattener::flattenPlanTemplate).
-   Le placement se fait par la palette (armer + tamponner, ou glisser-déposer) :
-   pas de formulaire d'ajout par case.
 
    Chaque case porte sa PROPRE copie de séance (fork à la pose) : l'éditer via la
-   modale ne touche ni la séance de bibliothèque ni les autres cases. Le lien de
-   la carte ouvre le compositeur de cette copie (édition rapide). #}
+   modale ne touche ni la séance de bibliothèque ni les autres cases.
+
+   Deux zones et un geste, comme le compositeur de séance :
+   1. la carte de séance entière ouvre l'édition rapide, et c'est aussi la prise du
+      glisser-déposer (appui long au doigt, cf. le contrôleur `plangrid`) — il n'y
+      a plus de poignée de 13px, intenable au doigt ;
+   2. tout le reste (édition complète, déplacer, retirer) vit dans un menu kebab, en
+      toutes lettres. Même chose pour l'en-tête de semaine.
+   L'ajout se fait par le « + » du jour, qui désigne du même geste la case visée. #}
 {% import 'components/_activity.html.twig' as activity %}
 {% set dayNames = {1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Jeu', 5: 'Ven', 6: 'Sam', 7: 'Dim'} %}
+{% set dayFull = {1: 'lundi', 2: 'mardi', 3: 'mercredi', 4: 'jeudi', 5: 'vendredi', 6: 'samedi', 7: 'dimanche'} %}
 
 <div class="kd-planweeks">
     {% for week in flat.weeks %}
@@ -17,31 +23,42 @@
             <div class="kd-planweek__head">
                 <span class="kd-planweek__num">Semaine {{ week.weekNumber }}</span>
                 {% if template.durationWeeks > 1 %}
-                    <div class="kd-planweek__tools">
-                        {# Copier cette semaine vers une cible libre (remplace la cible). #}
-                        <form method="post" class="kd-planweek__copy"
-                              action="{{ path('app_plan_template_week_copy', {id: template.id, week: week.weekNumber}) }}"
-                              onsubmit="return confirm('Copier la semaine {{ week.weekNumber }} vers la semaine choisie ? Son contenu actuel sera remplacé.');">
-                            <input type="hidden" name="_token" value="{{ csrf_token('week_copy' ~ week.weekNumber) }}">
-                            <select name="target" class="kd-planweek__select" aria-label="Copier la semaine {{ week.weekNumber }} vers">
-                                {% for w in 1..template.durationWeeks %}
-                                    {% if w != week.weekNumber %}<option value="{{ w }}">S{{ w }}</option>{% endif %}
-                                {% endfor %}
-                            </select>
-                            <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm" title="Copier cette semaine vers la semaine choisie">
-                                {{ ux_icon('lucide:copy') }} Copier vers
-                            </button>
-                        </form>
-                        {# Retirer cette semaine. #}
-                        <form method="post"
-                              action="{{ path('app_plan_template_week_remove', {id: template.id, week: week.weekNumber}) }}"
-                              onsubmit="return confirm('Retirer la semaine {{ week.weekNumber }} ? Les séances encore prévues au calendrier seront retirées (le réalisé est conservé).');">
-                            <input type="hidden" name="_token" value="{{ csrf_token('week_remove' ~ week.weekNumber) }}">
-                            <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm" title="Retirer la semaine {{ week.weekNumber }}">
-                                {{ ux_icon('lucide:trash-2') }}
-                            </button>
-                        </form>
-                    </div>
+                    {# Actions de semaine en menu, pas en rangée : le select « copier
+                       vers » et deux boutons ne tiennent pas sur une ligne de téléphone. #}
+                    <details class="kd-kebab kd-kebab--row kd-planweek__menu" data-controller="dismiss">
+                        <summary class="kd-kebab__trigger kd-kebab__trigger--plain" aria-label="Actions sur la semaine {{ week.weekNumber }}">
+                            {{ ux_icon('lucide:ellipsis') }}
+                        </summary>
+                        <div class="kd-kebab__panel">
+                            {# Copier cette semaine vers une cible libre (remplace la cible). #}
+                            <form method="post" class="kd-kebab__form"
+                                  action="{{ path('app_plan_template_week_copy', {id: template.id, week: week.weekNumber}) }}"
+                                  onsubmit="return confirm('Copier la semaine {{ week.weekNumber }} vers la semaine choisie ? Son contenu actuel sera remplacé.');">
+                                <input type="hidden" name="_token" value="{{ csrf_token('week_copy' ~ week.weekNumber) }}">
+                                <label class="kd-kebab__formlabel" for="week-copy-{{ week.weekNumber }}">
+                                    {{ ux_icon('lucide:copy') }} Copier vers
+                                </label>
+                                <div class="kd-kebab__formrow">
+                                    <select name="target" id="week-copy-{{ week.weekNumber }}" class="kd-input"
+                                            aria-label="Semaine de destination">
+                                        {% for w in 1..template.durationWeeks %}
+                                            {% if w != week.weekNumber %}<option value="{{ w }}">Semaine {{ w }}</option>{% endif %}
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit" class="kd-btn kd-btn--secondary kd-btn--sm">Copier</button>
+                                </div>
+                            </form>
+
+                            {{ include('components/_menu_form.html.twig', {
+                                action: path('app_plan_template_week_remove', {id: template.id, week: week.weekNumber}),
+                                token: csrf_token('week_remove' ~ week.weekNumber),
+                                icon: 'lucide:trash-2',
+                                variant: 'danger',
+                                label: 'Retirer la semaine',
+                                confirm: 'Retirer la semaine ' ~ week.weekNumber ~ ' ? Les séances encore prévues au calendrier seront retirées (le réalisé est conservé).'
+                            }) }}
+                        </div>
+                    </details>
                 {% endif %}
             </div>
 
@@ -89,7 +106,6 @@
                                          data-move-token="{{ csrf_token('item_move' ~ entry.item.id) }}"
                                          data-action="mouseenter->plangrid#showPreview mouseleave->plangrid#hidePreview">
                                         <div class="kd-planitem">
-                                            <span class="kd-planitem__handle" title="Déplacer" aria-hidden="true">{{ ux_icon('lucide:grip-vertical') }}</span>
                                             <button type="button" class="kd-planitem__link"
                                                     data-action="plangrid#edit"
                                                     data-panel-url="{{ path('app_workout_quick_panel', {id: entry.item.workout.id}) }}"
@@ -109,14 +125,51 @@
                                                     </span>
                                                 {% endif %}
                                             </button>
-                                            <form method="post" class="kd-planitem__delform"
-                                                  action="{{ path('app_plan_template_item_delete', {id: template.id, itemId: entry.item.id}) }}"
-                                                  onsubmit="return confirm('Retirer cette séance de la trame ?');">
-                                                <input type="hidden" name="_token" value="{{ csrf_token('item_delete' ~ entry.item.id) }}">
-                                                <button type="submit" class="kd-planitem__del" title="Retirer" aria-label="Retirer">
-                                                    {{ ux_icon('lucide:x') }}
-                                                </button>
-                                            </form>
+
+                                            <details class="kd-kebab kd-kebab--row" data-controller="dismiss">
+                                                <summary class="kd-kebab__trigger kd-kebab__trigger--plain"
+                                                         aria-label="Actions sur {{ entry.workout.workout.title }}">
+                                                    {{ ux_icon('lucide:ellipsis') }}
+                                                </summary>
+                                                <div class="kd-kebab__panel">
+                                                    <a class="kd-kebab__item" href="{{ path('app_workout_edit', {id: entry.item.workout.id}) }}">
+                                                        {{ ux_icon('lucide:square-pen') }} Édition complète
+                                                    </a>
+
+                                                    {# Repli du glisser-déposer : indispensable au clavier, et plus
+                                                       sûr que l'appui long quand la trame est longue. Sans JS, ce
+                                                       POST redirige simplement vers l'éditeur. #}
+                                                    <form method="post" class="kd-kebab__form"
+                                                          action="{{ path('app_plan_template_item_move', {id: template.id, itemId: entry.item.id}) }}">
+                                                        <input type="hidden" name="_token" value="{{ csrf_token('item_move' ~ entry.item.id) }}">
+                                                        <span class="kd-kebab__formlabel">
+                                                            {{ ux_icon('lucide:move') }} Déplacer vers
+                                                        </span>
+                                                        <div class="kd-kebab__formrow">
+                                                            <select name="week" class="kd-input" aria-label="Semaine de destination">
+                                                                {% for w in 1..template.durationWeeks %}
+                                                                    <option value="{{ w }}"{{ w == week.weekNumber ? ' selected' }}>S{{ w }}</option>
+                                                                {% endfor %}
+                                                            </select>
+                                                            <select name="day" class="kd-input" aria-label="Jour de destination">
+                                                                {% for d, name in dayNames %}
+                                                                    <option value="{{ d }}"{{ d == day.dayOfWeek ? ' selected' }}>{{ name }}</option>
+                                                                {% endfor %}
+                                                            </select>
+                                                            <button type="submit" class="kd-btn kd-btn--secondary kd-btn--sm">OK</button>
+                                                        </div>
+                                                    </form>
+
+                                                    {{ include('components/_menu_form.html.twig', {
+                                                        action: path('app_plan_template_item_delete', {id: template.id, itemId: entry.item.id}),
+                                                        token: csrf_token('item_delete' ~ entry.item.id),
+                                                        icon: 'lucide:x',
+                                                        variant: 'danger',
+                                                        label: 'Retirer de la trame',
+                                                        confirm: 'Retirer cette séance de la trame ?'
+                                                    }) }}
+                                                </div>
+                                            </details>
                                         </div>
                                         {# Note de case éditable en ligne (clic). Toujours présente : une note
                                            vide devient un discret « + note ». #}
@@ -138,6 +191,19 @@
                                 {% endfor %}
                             </div>
                         </div>
+
+                        {# Chemin d'ajout attaché au jour, HORS du conteneur trié (SortableJS
+                           calcule ses index sur les enfants directs de la cellule). Il ouvre
+                           la palette SUR cette case : sous 900px en feuille, au-dessus en
+                           donnant le focus à la recherche. Le glisser-déposer et le mode
+                           tampon restent des raccourcis de souris, jamais le seul chemin. #}
+                        <button type="button" class="kd-planday__add"
+                                data-action="plangrid#openLib"
+                                data-week="{{ week.weekNumber }}" data-day="{{ day.dayOfWeek }}"
+                                data-cell-label="S{{ week.weekNumber }} · {{ dayFull[day.dayOfWeek] }}"
+                                aria-label="Ajouter une séance — semaine {{ week.weekNumber }}, {{ dayFull[day.dayOfWeek] }}">
+                            {{ ux_icon('lucide:plus') }}
+                        </button>
                     </div>
                 {% endfor %}
             </div>

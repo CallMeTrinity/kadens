@@ -87,7 +87,7 @@
   /* Statuts prévu / réalisé — sémantiques, donc distincts de l'échelle
      catégorielle : fait = encre pleine, prévu = gris, manqué = rouge (le rouge
      signale l'écart au plan, cohérent avec son usage « intensité / échec »). */
-  --kd-status-done:    #0b0b0b; /* fait */
+  --kd-status-done: #006d14; /* fait */
   --kd-status-planned: #8a8a82; /* prévu */
   --kd-status-missed:  #d8261e; /* manqué */
 
@@ -171,6 +171,9 @@
   --color-surface-hover:   var(--kd-paper-hover);
   --color-fill:            var(--kd-paper-150);
   --color-track:           var(--kd-paper-200);
+  /* Voile sous un calque (modale, feuille) : une seule valeur, pour que deux
+     surfaces flottantes n'assombrissent pas la page différemment. */
+  --color-scrim:           color-mix(in srgb, var(--kd-ink-900) 42%, transparent);
 
   /* Aplat encre — hero, en-tête de tableau, ligne mise en avant */
   --color-surface-ink:       var(--kd-ink-surface);

@@ -1,7 +1,16 @@
-{# Palette de séances (volet gauche de l'éditeur de trame). Purement client pour
-   la recherche/filtre (offline-safe, contrôleur `plangrid`). Poser une séance :
-   cliquer la carte pour l'ARMER puis cliquer les cases (mode tampon), ou glisser
-   la carte dans une case. Repli sans JS : le <details> « Séance » par case.
+{# Palette de séances de l'éditeur de trame. Purement client pour la
+   recherche/filtre (offline-safe, contrôleur `plangrid`).
+
+   Deux formes pour un seul markup, comme la bibliothèque du compositeur : colonne
+   gauche sur écran large, feuille qui monte du bas sous 900px (classe
+   `kd-libsheet--open`, cf. components.css).
+
+   Poser une séance, trois chemins, tous portés par la même carte-bouton :
+   - taper le « + » d'un jour ouvre la palette SUR cette case, taper une carte pose ;
+   - à la souris, taper une carte l'ARME, puis on tamponne les cases ;
+   - ou on glisse la carte dans une case.
+   La carte est un vrai <button> : au doigt, il faut une cible pleine, et le mode
+   tampon (deux gestes séparés dans le temps) n'y est pas lisible.
    Contexte : paletteCards (chaque : workout, activities, exerciseCount, filterText),
    paletteCount, paletteActivities, template. #}
 {% import 'components/_activity.html.twig' as activity %}
@@ -14,11 +23,21 @@
         <div class="kd-libpanel__title">
             <span>Séances</span>
             <span class="kd-libpanel__count">{{ paletteCount }}</span>
+            {# Visible uniquement en feuille (sous 900px) : sur écran large, le
+               panneau n'est pas un calque, il n'y a rien à fermer. #}
+            <button type="button" class="kd-libpanel__close" data-action="plangrid#closeLib" aria-label="Fermer la palette">
+                {{ ux_icon('lucide:x') }}
+            </button>
         </div>
+
+        {# Rappelle la case visée quand la palette est ouverte depuis un « + » : sans
+           lui, la feuille masque la trame et on ne sait plus où l'on pose. #}
+        <p class="kd-libpanel__target" data-plangrid-target="targetLabel" hidden></p>
 
         <div class="kd-libsearch">
             {{ ux_icon('lucide:search') }}
             <input type="search" placeholder="Rechercher une séance…"
+                   data-plangrid-target="search"
                    data-action="input->plangrid#filterLib">
         </div>
 
@@ -37,28 +56,28 @@
     <div class="kd-libpanel__list" data-plangrid-target="paletteList">
         {% for card in paletteCards %}
             {% set w = card.workout %}
-            <div class="kd-palettecard"
-                 data-plangrid-target="palettecard"
-                 data-workout-id="{{ w.id }}"
-                 data-activity="{% for a in card.activities %}{{ a.value }}{{ not loop.last ? ' ' }}{% endfor %}"
-                 data-filter-text="{{ card.filterText }}"
-                 data-action="click->plangrid#armWorkout">
+            <button type="button" class="kd-palettecard kd-palettecard--btn"
+                    data-plangrid-target="palettecard"
+                    data-workout-id="{{ w.id }}"
+                    data-activity="{% for a in card.activities %}{{ a.value }}{{ not loop.last ? ' ' }}{% endfor %}"
+                    data-filter-text="{{ card.filterText }}"
+                    data-action="plangrid#armWorkout">
                 <span class="kd-libx__code">{{ w.title|slice(0, 2)|upper }}</span>
-                <div class="kd-libx__body">
-                    <div class="kd-libx__name">{{ w.title }}</div>
-                    <div class="kd-palettecard__meta">
+                <span class="kd-libx__body">
+                    <span class="kd-libx__name">{{ w.title }}</span>
+                    <span class="kd-palettecard__meta">
                         {% if w.estimatedDurationMinutes %}
                             <span>{{ ux_icon('lucide:clock') }} {{ w.estimatedDurationMinutes }} min</span>
                         {% endif %}
                         <span>{{ card.exerciseCount }} exos</span>
-                    </div>
+                    </span>
                     {% if card.activities %}
-                        <div class="kd-cellbadges">
+                        <span class="kd-cellbadges">
                             {% for a in card.activities %}{{ activity.badge(a, false) }}{% endfor %}
-                        </div>
+                        </span>
                     {% endif %}
-                </div>
-            </div>
+                </span>
+            </button>
         {% else %}
             <p class="kd-libpanel__empty">Aucune séance en bibliothèque. Crée-en une d'abord.</p>
         {% endfor %}
@@ -66,6 +85,7 @@
 
     <p class="kd-libpanel__hint">
         Clique une séance pour l'<strong>armer</strong>, puis clique les cases pour la poser.
-        Ou glisse-la dans une case.
+        Ou glisse-la dans une case. Le <strong>+</strong> d'un jour, lui, vise directement
+        sa case.
     </p>
 </div>

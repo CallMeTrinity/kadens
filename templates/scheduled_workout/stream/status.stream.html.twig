@@ -1,0 +1,18 @@
+{# Réponse à un changement de statut posté **depuis la page de la séance datée**
+   (`return=schedule`), par opposition à calendar/stream/cal_event.stream.html.twig
+   qui sert le calendrier. La distinction est nécessaire : un stream ne fait rien
+   si sa cible est absente du DOM, et `#cal-event-{id}` n'existe pas ici — c'est
+   ce qui obligeait à recharger la page pour voir le nouveau statut.
+
+   Deux cibles, parce que le statut se lit à deux endroits : la pastille du hero
+   et la section « Réalisé » (libellé du bouton, statut posté, note d'écart). #}
+<turbo-stream action="replace" target="schedule-badge">
+    <template>
+        {{ include('components/_scheduled_badge.html.twig', {scheduled: scheduled}) }}
+    </template>
+</turbo-stream>
+<turbo-stream action="replace" target="schedule-done">
+    <template>
+        {{ include('components/_scheduled_done.html.twig', {scheduled: scheduled}) }}
+    </template>
+</turbo-stream>

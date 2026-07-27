@@ -1,24 +1,33 @@
-{# Tableau des séries détaillées d'un exercice.
+{# Tableau des séries d'un exercice de force.
 
    Un vrai <table> : ce sont des données tabulaires, et c'est ce qui donne
    gratuitement la navigation par lecteur d'écran (en-têtes annoncés à chaque
    cellule via scope="col").
 
-   Les groupes viennent de PlanFlattener::detailedSetGroups : les séries
-   consécutives identiques sont fusionnées, mais chaque groupe garde son rang
-   réel (firstIndex/lastIndex) — c'est ce qui permet d'écrire « 03 — 06 » sans
-   mentir sur la numérotation.
+   Une ligne = une série, toujours. Les lignes viennent de
+   PlanFlattener::setLines, qui déroule aussi bien une saisie détaillée qu'un
+   compteur scalaire : « 3 × 15 @ 130 kg » s'affiche donc en trois lignes
+   identiques. C'est le prix à payer pour qu'une séance se lise de la même façon
+   quel que soit le mode de saisie — la vue condensée (groupes) reste celle des
+   contextes compacts, résumé et aperçu au survol.
 
-   Attendus : groups (list<FlatSetGroup>), topWeightKg (?float), type (?PrescriptionType). #}
+   Attendus : lines (list<FlatSetLine>), topWeightKg (?float), type (?PrescriptionType). #}
 {% import 'components/_set_type.html.twig' as settype %}
 
-{% set show_percent = topWeightKg is not null and topWeightKg > 0 %}
+{# Deux colonnes ne s'affichent que si elles ont quelque chose à dire — une
+   colonne vide coûte de la largeur, et la largeur est ce qui manque au
+   téléphone. Le « % du max » n'aurait que des 100 % à charge constante, et la
+   colonne « Type » que des cases vides si aucune série n'est qualifiée (mode
+   simple : toutes les séries sont ordinaires). #}
+{% set show_percent = topWeightKg is not null and topWeightKg > 0
+    and lines|filter(l => l.weightKg is null or l.weightKg != topWeightKg)|length > 0 %}
+{% set show_type = lines|filter(l => l.type.value != 'normal')|length > 0 %}
 
 <div class="kd-settable__wrap">
     <table class="kd-settable">
         <thead>
             <tr>
-                <th scope="col" class="kd-settable__c-type">Type</th>
+                {% if show_type %}<th scope="col" class="kd-settable__c-type">Type</th>{% endif %}
                 <th scope="col" class="kd-settable__c-num">Série</th>
                 <th scope="col">{{ type is not null and type.value == 'sets_time' ? 'Durée' : 'Reps' }}</th>
                 <th scope="col" class="kd-settable__c-num">Charge</th>
@@ -26,32 +35,23 @@
             </tr>
         </thead>
         <tbody>
-            {% for g in groups %}
+            {% for l in lines %}
                 {# Une série de travail ordinaire est la référence : on la marque
                    d'un filet et d'un fond, le reste s'efface autour. #}
-                <tr class="kd-setrow kd-setrow--{{ g.type.value }}">
-                    <td class="kd-settable__c-type">
-                        {% if g.count > 1 %}
-                            <span class="kd-setrow__mult">{{ g.count }}×</span>
-                        {% else %}
-                            {{ settype.slot(g.type) }}
-                        {% endif %}
-                    </td>
-                    <td class="kd-settable__c-num kd-setrow__rank">
-                        {{- '%02d'|format(g.firstIndex) -}}
-                        {%- if g.lastIndex > g.firstIndex %} — {{ '%02d'|format(g.lastIndex) }}{% endif -%}
-                    </td>
-                    {# `effort` et non `detail` : la charge a sa propre colonne. #}
+                <tr class="kd-setrow kd-setrow--{{ l.type.value }}">
+                    {% if show_type %}<td class="kd-settable__c-type">{{ settype.slot(l.type) }}</td>{% endif %}
+                    <td class="kd-settable__c-num kd-setrow__rank">{{ '%02d'|format(l.index) }}</td>
+                    {# `effort` seul : la charge a sa propre colonne. #}
                     <td class="kd-setrow__detail">
-                        {{ g.effort }}
-                        {% if g.typeLabel %}<span class="kd-setrow__tag">· {{ g.typeLabel|lower }}</span>{% endif %}
+                        {{ l.effort }}
+                        {% if l.typeLabel %}<span class="kd-setrow__tag">· {{ l.typeLabel|lower }}</span>{% endif %}
                     </td>
                     <td class="kd-settable__c-num">
-                        {{- g.weightKg is not null ? g.weightKg|number_format(g.weightKg == g.weightKg|round ? 0 : 1, ',', ' ') ~ ' kg' : '—' -}}
+                        {{- l.weightKg is not null ? l.weightKg|number_format(l.weightKg == l.weightKg|round ? 0 : 1, ',', ' ') ~ ' kg' : '—' -}}
                     </td>
                     {% if show_percent %}
                         <td class="kd-settable__c-num kd-setrow__pct">
-                            {{- g.weightKg is not null ? (g.weightKg / topWeightKg * 100)|round ~ ' %' : '—' -}}
+                            {{- l.weightKg is not null ? (l.weightKg / topWeightKg * 100)|round ~ ' %' : '—' -}}
                         </td>
                     {% endif %}
                 </tr>
