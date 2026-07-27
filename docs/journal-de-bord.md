@@ -1604,3 +1604,46 @@ inscrire. Elle affiche `/pwa/icon-192.png`, précaché.
 **Non vérifiable ici** : installation réelle, rendu de l'écran de démarrage iOS et
 audit Lighthouse demandent un navigateur sur `kadens.antoninpamart.fr` (HTTPS
 requis pour le service worker).
+
+---
+
+## Correctif — Le bouton « fait » qui ne se rafraîchissait pas (27/07/2026)
+
+Sur `/schedule/{id}`, marquer une séance comme faite enregistrait bien le statut
+mais ne changeait rien à l'écran : il fallait recharger la page pour voir la
+pastille basculer.
+
+### Cause
+
+Le formulaire poste vers `app_scheduled_workout_status`. Turbo envoie
+`Accept: text/vnd.turbo-stream.html`, donc `getPreferredFormat()` vaut
+`turbo_stream` — et le contrôleur testait ce format **avant** de regarder
+`return=schedule`. Il répondait donc avec le stream du calendrier, qui remplace
+`#cal-event-{id}`. Cet élément n'existe pas sur la page de la séance datée.
+
+**La règle à retenir : un `<turbo-stream>` dont la cible est absente du DOM
+n'échoue pas, il ne fait rien.** Pas d'erreur console, pas de 500 — le réseau
+répond 200, le statut part en base, et l'écran ment jusqu'au rechargement. Un
+endpoint servi par deux pages doit donc choisir son fragment en fonction de
+l'appelant, pas seulement en fonction du format demandé.
+
+### Correction
+
+Le même `return=schedule` qui pilotait déjà la redirection de repli pilote
+maintenant aussi le choix du stream (`streamScheduleStatus()` vs
+`streamCalEvent()`). Deux cibles, parce que le statut se lit à deux endroits sur
+cette page :
+
+- `#schedule-badge` — la pastille du hero, extraite dans
+  `components/_scheduled_badge.html.twig` ;
+- `#schedule-done` — la section « Réalisé » entière, extraite dans
+  `components/_scheduled_done.html.twig` (le libellé du bouton, le statut posté
+  et la note d'écart en dépendent tous).
+
+L'extraction en composants n'est pas cosmétique : elle est ce qui permet au
+stream de re-rendre exactement le même markup que le rendu initial, id compris.
+Le repli sans JS (redirection vers `app_scheduled_workout_show`) est inchangé.
+
+Couvert par `CalendarControllerTest::testDoneButtonAnswersWithAStreamTargetingThisPage`,
+qui poste avec l'en-tête `Accept` de Turbo et vérifie que la réponse vise bien
+les fragments de cette page — et jamais `cal-event-{id}`.

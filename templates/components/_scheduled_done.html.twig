@@ -1,0 +1,59 @@
+{# ============================ PRÉVU VS RÉALISÉ ============================
+   En bas de séance, à l'endroit où on arrive après avoir lu le programme.
+   Le bouton bascule entre « prévue » et « faite » ; « manquée » reste au
+   cycle rapide du calendrier, qui boucle sur les trois états.
+
+   Fragment isolé parce qu'il est **cible d'un Turbo Stream** : le contrôleur
+   re-rend cette section (et la pastille du hero) après un changement de statut,
+   sans recharger la page. L'id doit donc survivre au remplacement, et tout ce
+   qui dépend du statut (libellé du bouton, statut posté, note) vit ici. #}
+{% set isDone = scheduled.status.value == 'done' %}
+<section id="schedule-done" class="kd-done" aria-labelledby="done-title">
+    <h2 class="kd-done__title" id="done-title">Réalisé</h2>
+
+    <form method="post" action="{{ path('app_scheduled_workout_status', {id: scheduled.id}) }}" class="kd-done__form">
+        <input type="hidden" name="_token" value="{{ csrf_token('status' ~ scheduled.id) }}">
+        {# Sans ça, l'endpoint renvoie au calendrier : on quitterait la page
+           à chaque bascule. #}
+        <input type="hidden" name="return" value="schedule">
+        <input type="hidden" name="status" value="{{ isDone ? 'planned' : 'done' }}">
+
+        <div class="kd-field">
+            <label class="kd-label" for="completion-notes">Écart / ressenti (optionnel)</label>
+            <textarea id="completion-notes" name="completionNotes" rows="3"
+                      class="kd-input kd-input--area"
+                      placeholder="Charge revue à la baisse, dos raide…">{{ scheduled.completionNotes }}</textarea>
+        </div>
+
+        <button type="submit" class="kd-btn kd-btn--block {{ isDone ? 'kd-btn--secondary' : 'kd-btn--primary' }}">
+            {% if isDone %}
+                {{ ux_icon('lucide:rotate-ccw') }} Annuler « fait »
+            {% else %}
+                {{ ux_icon('lucide:check') }} Marquer fait
+            {% endif %}
+        </button>
+    </form>
+
+    <div class="kd-done__secondary">
+        <form method="post" action="{{ path('app_scheduled_workout_move', {id: scheduled.id}) }}" class="kd-done__move">
+            <input type="hidden" name="_token" value="{{ csrf_token('move' ~ scheduled.id) }}">
+            <input type="hidden" name="return" value="schedule">
+            <label class="kd-label" for="move-date">Déplacer</label>
+            <div class="kd-done__moverow">
+                <input type="date" id="move-date" name="scheduledDate"
+                       value="{{ scheduled.scheduledDate|date('Y-m-d') }}" class="kd-input" required>
+                <button type="submit" class="kd-btn kd-btn--secondary">
+                    {{ ux_icon('lucide:calendar-clock') }} Déplacer
+                </button>
+            </div>
+        </form>
+
+        <form method="post" action="{{ path('app_scheduled_workout_delete', {id: scheduled.id}) }}"
+              onsubmit="return confirm('Retirer cette séance du planning ?');">
+            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ scheduled.id) }}">
+            <button type="submit" class="kd-btn kd-btn--ghost kd-btn--danger">
+                {{ ux_icon('lucide:trash-2') }} Retirer du planning
+            </button>
+        </form>
+    </div>
+</section>

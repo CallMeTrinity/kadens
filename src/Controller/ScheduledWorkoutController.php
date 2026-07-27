@@ -27,8 +27,10 @@ use Symfony\UX\Turbo\TurboBundle;
  * Mutations des séances planifiées (instances datées). Les actions redirigent
  * vers le calendrier concerné (dans la vue mémorisée, cf. preferredCalendarView) ;
  * le rendu du planning reste porté par CalendarController. Exception : le
- * changement de statut répond en Turbo Stream (re-render de la seule pastille,
- * sans rechargement), avec repli redirection sans JS.
+ * changement de statut répond en Turbo Stream (re-render du seul fragment
+ * concerné, sans rechargement), avec repli redirection sans JS. Le fragment
+ * dépend de la page appelante : pastille de calendrier, ou pastille + section
+ * « Réalisé » de la page de séance datée (qui poste `return=schedule`).
  */
 #[Route('/schedule')]
 final class ScheduledWorkoutController extends AbstractController
@@ -190,11 +192,15 @@ final class ScheduledWorkoutController extends AbstractController
 
                 $this->entityManager->flush();
 
-                // Réponse asynchrone : on re-rend juste la pastille, la page (et
-                // donc la vue mois/semaine) n'est pas rechargée. Repli sans JS =
-                // redirection classique.
+                // Réponse asynchrone : on re-rend le seul fragment concerné, la
+                // page n'est pas rechargée. Repli sans JS = redirection classique.
+                // Le fragment dépend de la page d'origine : un stream dont la
+                // cible est absente du DOM ne fait rien, et `#cal-event-{id}`
+                // n'existe pas sur la page de la séance datée.
                 if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
-                    return $this->streamCalEvent($request, $scheduled, $planFlattener);
+                    return 'schedule' === $payload->getString('return')
+                        ? $this->streamScheduleStatus($request, $scheduled)
+                        : $this->streamCalEvent($request, $scheduled, $planFlattener);
                 }
 
                 $this->addFlash('success', 'Statut mis à jour.');
@@ -245,6 +251,20 @@ final class ScheduledWorkoutController extends AbstractController
         }
 
         return $this->redirectToMonth($scheduled->getScheduledDate());
+    }
+
+    /**
+     * Re-rend en Turbo Stream les deux zones de `/schedule/{id}` qui portent le
+     * statut : la pastille du hero et la section « Réalisé ». Pendant de
+     * streamCalEvent() pour l'autre page appelante.
+     */
+    private function streamScheduleStatus(Request $request, ScheduledWorkout $scheduled): Response
+    {
+        $request->setRequestFormat(TurboBundle::STREAM_FORMAT);
+
+        return $this->render('scheduled_workout/stream/status.stream.html.twig', [
+            'scheduled' => $scheduled,
+        ]);
     }
 
     /**

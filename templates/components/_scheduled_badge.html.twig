@@ -1,0 +1,7 @@
+{# Pastille de statut d'une séance datée, dans le hero de /schedule/{id}.
+   Fragment isolé parce qu'il est **cible d'un Turbo Stream** : basculer « fait »
+   depuis le bas de page le re-rend en place (cf. scheduled_workout/stream/
+   status.stream.html.twig). L'id doit donc survivre au remplacement. #}
+<span id="schedule-badge" class="kd-badge kd-badge--{{ scheduled.status.value }}">
+    <span class="kd-badge__dot"></span>{{ scheduled.status.label }}
+</span>
