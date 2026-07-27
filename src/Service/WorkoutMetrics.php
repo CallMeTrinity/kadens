@@ -31,6 +31,7 @@ final class WorkoutMetrics
 {
     public function __construct(
         private readonly WorkoutEstimator $estimator,
+        private readonly SupersetGrouper $supersets,
     ) {
     }
 
@@ -60,14 +61,16 @@ final class WorkoutMetrics
 
         foreach ($workout->getBlocks() as $block) {
             $rounds = max(1, $block->getRounds() ?? 1);
-            $count = $block->getPrescribedExercises()->count();
 
-            // Un bloc enchaîné EST un superset (2 exos) ou un circuit (3+) :
-            // même convention de nommage que le rendu des blocs en lecture.
-            if (2 === $count) {
-                ++$supersets;
-            } elseif ($count >= 3) {
-                ++$circuits;
+            // Les enchaînements se comptent au groupe LIÉ, pas au bloc : un bloc
+            // peut n'en porter aucun, ou plusieurs. Superset = 2 exercices liés,
+            // circuit = 3 et plus. Découpage délégué à SupersetGrouper.
+            foreach ($this->supersets->segments($block) as $segment) {
+                if ('superset' === $segment['kind']) {
+                    ++$supersets;
+                } elseif ('circuit' === $segment['kind']) {
+                    ++$circuits;
+                }
             }
 
             foreach ($block->getPrescribedExercises() as $pe) {

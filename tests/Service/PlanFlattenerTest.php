@@ -14,6 +14,7 @@ use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
 use App\Enum\SetType;
 use App\Service\PlanFlattener;
+use App\Service\SupersetGrouper;
 use App\Service\UnitFormatter;
 use App\Service\WorkoutEstimator;
 use App\Service\WorkoutMetrics;
@@ -26,7 +27,7 @@ final class PlanFlattenerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->flattener = new PlanFlattener(new UnitFormatter(), new WorkoutMetrics(new WorkoutEstimator()));
+        $this->flattener = new PlanFlattener(new UnitFormatter(), new WorkoutMetrics(new WorkoutEstimator(), new SupersetGrouper()), new SupersetGrouper());
     }
 
     #[DataProvider('summaryCases')]
@@ -76,6 +77,43 @@ final class PlanFlattenerTest extends TestCase
         self::assertSame(2, $flat['sets'][1]['count']);
         self::assertNull($flat['sets'][1]['typeLabel']); // NORMAL : pas de libellé
         self::assertSame('Drop set', $flat['sets'][2]['typeLabel']);
+    }
+
+    /**
+     * Un bloc est livré à la fois à plat (`exercises`, ordre de lecture) et
+     * découpé (`segments`). Les deux décrivent le même contenu dans le même
+     * ordre : c'est ce qui autorise l'export à ignorer les liaisons pendant que
+     * la vue les montre.
+     */
+    public function testBlockExposesFlatExercisesAndSupersetSegments(): void
+    {
+        $block = (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(0);
+        foreach ([1, 1, null] as $position => $group) {
+            $exercise = (new Exercise())->setName('Ex'.$position)->setActivity(ActivityType::GYM);
+            $block->addPrescribedExercise(
+                (new PrescribedExercise())
+                    ->setPrescriptionType(PrescriptionType::SETS_REPS)
+                    ->setExercise($exercise)
+                    ->setPosition($position)
+                    ->setSupersetGroup($group)
+                    ->setSets(3)
+                    ->setReps(10)
+            );
+        }
+
+        $workout = (new Workout())->setTitle('Séance')->setSlug('seance');
+        $workout->addBlock($block);
+
+        $flatBlock = $this->flattener->flattenWorkout($workout)['blocks'][0];
+
+        self::assertCount(3, $flatBlock['exercises']);
+        self::assertSame(['A1', 'A2', null], array_column($flatBlock['exercises'], 'groupLabel'));
+
+        self::assertCount(2, $flatBlock['segments']);
+        self::assertSame('superset', $flatBlock['segments'][0]['kind']);
+        self::assertCount(2, $flatBlock['segments'][0]['exercises']);
+        self::assertSame('single', $flatBlock['segments'][1]['kind']);
+        self::assertNull($flatBlock['segments'][1]['label']);
     }
 
     /**

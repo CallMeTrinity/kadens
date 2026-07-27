@@ -42,7 +42,8 @@ Ces choix conditionnent tout le reste. Ils ne se rediscutent pas en cours de rou
 - **Bibliothèque globale vs perso via `owner`.** Un `Exercise` **sans owner (null)** est la bibliothèque globale de l'app : visible par tous en lecture, éditable/supprimable uniquement par un **`ROLE_ADMIN`** (sinon alimentée par l'import console). Un `Exercise` **avec owner** est perso : visible/éditable par son seul propriétaire. La liste d'un utilisateur = ses exos perso + le global. *(Cette règle "global = éditable par l'admin" vaudra aussi pour les futures ressources de bibliothèque : Workout, PlanTemplate.)*
 - **Les paramètres vivent sur le lien séance↔exercice**, porté par l'entité `PrescribedExercise`. C'est ce qui permet de réutiliser le même exercice dans plusieurs séances avec des paramètres différents (même squat, charge différente).
 - **Modèle d'exercice unique et flexible.** Pas d'héritage par activité. Un enum `PrescriptionType` décrit le format d'effort ; les champs de valeurs sont nullable et seul le sous-ensemble pertinent est rempli. Cela absorbe muscu, isométrie, AMRAP, "30 burpees en 1 min", course distance/allure, vélo durée/zone, natation, etc. sans jamais créer de nouvelle classe.
-- **Blocs avec `rounds` et `role`.** Une séance est une liste ordonnée de blocs. Un bloc contient des exercices prescrits ordonnés et a un nombre de tours (`rounds`) et un rôle (`WARMUP`/`MAIN`/`COOLDOWN`). Une seule mécanique couvre séance plate (blocs à 1 exercice, rounds=1), superset (1 bloc, 2 exos, rounds=N), circuit (1 bloc, N exos, rounds=N) et échauffement (bloc de rôle WARMUP).
+- **Blocs avec `rounds` et `role`.** Une séance est une liste ordonnée de blocs. Un bloc contient des exercices prescrits ordonnés et a un nombre de tours (`rounds`) et un rôle (`WARMUP`/`MAIN`/`COOLDOWN`). Le bloc est une **section** de la séance : séance plate (blocs à 1 exercice, rounds=1), tours d'un circuit complet (rounds=N), échauffement (rôle `WARMUP`).
+- **Le superset est une liaison INTRA-bloc, pas un bloc.** Un bloc de deux exercices n'est pas un superset : un superset, ce sont deux exercices *liés* à l'intérieur d'un bloc, qui s'enchaînent en alternance. Un même bloc peut donc contenir des exercices isolés et plusieurs groupes liés. La liaison est portée par `PrescribedExercise.supersetGroup` (nullable) et gérée exclusivement par `SupersetGrouper`, qui tient deux invariants : les membres d'un groupe sont **contigus** en position, et un groupe compte **au moins deux membres**. Le groupe ne porte ni tours ni repos propres — le nombre de tours d'un superset est déjà décrit par le nombre de séries de chacun de ses exercices, et `Block.rounds` reste au bloc. Libellés (A1, A2, B1…) **dérivés** de l'ordre d'apparition, jamais stockés.
 - **Unités normalisées en base.** Charges en **kg**, distances en **mètres**, durées en **secondes**. Jamais de texte mixte type "5km" ou "45s". Toujours numérique + unité implicite figée. Cette discipline rend l'export Excel (Phase 8) trivial ; la violer transforme l'export en enfer de parsing.
 - **Sérialisation découplée du rendu.** Dès qu'on affiche un plan/une séance, on passe par un service qui produit une structure "plate" traversable. Le rendu Twig ET le futur export Excel consomment ce même service. Ne jamais dupliquer la logique de mise à plat.
 - **Pages de consultation auto-suffisantes.** Les pages de lecture d'une séance/d'un plan ne chargent aucun contenu en AJAX après le rendu initial. Tout est dans la réponse HTML. C'est la condition pour que le cache offline (Phase 9) n'ait pas de trous.
@@ -165,7 +166,7 @@ PlanTemplate (N) >──< (N) Goal       « ce plan prépare cette échéance »
 - `role` (enum `BlockRole`)
 - `rounds` (int, défaut 1 — nombre de tours du bloc)
 - `position` (int — ordre dans la séance)
-- `label` (string, nullable — ex : "Superset A")
+- `label` (string, nullable — intitulé libre du bloc, ex : "Push lourd")
 - Relations : `prescribedExercises` (OneToMany, ordonnés par `position`).
 
 **`PrescribedExercise`** (exercice prescrit dans un bloc — porte les paramètres)
@@ -173,6 +174,9 @@ PlanTemplate (N) >──< (N) Goal       « ce plan prépare cette échéance »
 - `block` → Block
 - `exercise` → Exercise (référence vers la bibliothèque)
 - `position` (int — ordre dans le bloc)
+- `supersetGroup` (smallint, nullable — liaison de superset : même bloc + même
+  numéro = exercices enchaînés en alternance ; null = isolé. Numéro purement
+  technique, renuméroté 1..n par `SupersetGrouper`)
 - `prescriptionType` (enum `PrescriptionType`)
 - Champs de valeurs (tous nullable, seul le sous-ensemble pertinent est rempli selon le type) :
   - `sets` (int)

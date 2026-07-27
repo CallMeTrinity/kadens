@@ -26,6 +26,18 @@ class PrescribedExercise
     #[ORM\Column]
     private ?int $position = null;
 
+    /**
+     * Liaison de superset : les exercices d'un MÊME bloc qui partagent ce numéro
+     * s'enchaînent en alternance (A1 → A2 → repos → A1…). null = exercice isolé.
+     *
+     * Le numéro n'a de sens que dans son bloc et n'est qu'une clé de
+     * regroupement : les libellés affichés (A, B, C…) se dérivent de l'ordre
+     * d'apparition. Les membres d'un groupe sont tenus CONTIGUS en position par
+     * SupersetGrouper, seule autorité sur ce champ.
+     */
+    #[ORM\Column(type: Types::SMALLINT, nullable: true)]
+    private ?int $supersetGroup = null;
+
     #[ORM\Column(enumType: PrescriptionType::class)]
     private ?PrescriptionType $prescriptionType = null;
 
@@ -123,6 +135,26 @@ class PrescribedExercise
         $this->position = $position;
 
         return $this;
+    }
+
+    public function getSupersetGroup(): ?int
+    {
+        return $this->supersetGroup;
+    }
+
+    public function setSupersetGroup(?int $supersetGroup): static
+    {
+        $this->supersetGroup = $supersetGroup;
+
+        return $this;
+    }
+
+    /**
+     * L'exercice est-il lié à un ou plusieurs autres dans son bloc ?
+     */
+    public function isSuperset(): bool
+    {
+        return null !== $this->supersetGroup;
     }
 
     public function getPrescriptionType(): ?PrescriptionType

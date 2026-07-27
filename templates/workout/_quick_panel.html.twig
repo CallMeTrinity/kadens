@@ -1,7 +1,8 @@
 {# Contenu de #quick-panel : les exercices d'une séance, groupés par bloc, avec
    leurs paramètres éditables. Injecté dans la mini-modale de l'éditeur de plan
    (fetch) et re-rendu par Turbo Stream à chaque enregistrement (action="update").
-   Contexte (quickPanelContext) : workout, prescribedForms, summaries.
+   Contexte (quickPanelContext) : workout, prescribedForms, summaries,
+   supersetLabels (rang « A1 » par id, seulement pour les exercices enchaînés).
 
    Portée volontairement limitée aux valeurs (reps/séries/repos…) : la structure
    (blocs, ordre, glisser-déposer) reste au compositeur, atteignable par le lien
@@ -30,6 +31,9 @@
                 {% set mod = ex ? activity.modifier(ex.activity) : '' %}
                 <details class="kd-quickexo">
                     <summary class="kd-quickexo__sum">
+                        {% if supersetLabels[prescribed.id]|default(null) %}
+                            <span class="kd-cexo__rank" title="Enchaîné sans repos">{{ supersetLabels[prescribed.id] }}</span>
+                        {% endif %}
                         <span class="kd-cexo__code{{ mod ? ' kd-cexo__code--' ~ mod }}">{{ ex ? ex.name|slice(0, 2)|upper : '??' }}</span>
                         <span class="kd-quickexo__name">{{ ex ? ex.name : 'Exercice supprimé' }}</span>
                         {% if summaries[prescribed.id]|default('') is not empty %}

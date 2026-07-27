@@ -78,6 +78,9 @@ final class WorkoutCloner
             ->setExercise($source->getExercise())
             ->setPrescriptionType($source->getPrescriptionType())
             ->setPosition($source->getPosition())
+            // Les liaisons de superset sont internes au bloc : le numéro reste
+            // valable tel quel dans la copie.
+            ->setSupersetGroup($source->getSupersetGroup())
             ->setSets($source->getSets())
             ->setReps($source->getReps())
             ->setWeightKg($source->getWeightKg())

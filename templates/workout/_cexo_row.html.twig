@@ -2,15 +2,23 @@
    résumé, bouton paramètres, retrait). Adressable par id : une édition de
    paramètres ne re-rend QUE cette ligne (stream ciblé), pas tout #workout-blocks,
    pour ne pas refermer le panneau de params ni perdre le focus.
-   Paramètres : workout, prescribed, summary (chaîne, défaut ''). #}
+   Paramètres : workout, prescribed, summary (chaîne, défaut '').
+   Superset : groupLabel (« A1 », null si isolé), groupKind, canLink (un voisin
+   existe au-dessus dans le bloc). #}
 {% import 'components/_activity.html.twig' as activity %}
 {% import 'components/_set_type.html.twig' as settype %}
 {% set ex = prescribed.exercise %}
 {% set mod = ex ? activity.modifier(ex.activity) : '' %}
 {% set summary = summary|default('') %}
 {% set detailed = prescribed.hasDetailedSets %}
+{% set groupLabel = groupLabel|default(null) %}
+{% set groupKind = groupKind|default('single') %}
+{% set canLink = canLink|default(false) %}
 <div class="kd-cexo__row" id="cexo-row-{{ prescribed.id }}">
     <span class="kd-cexo__handle" title="Glisser pour réordonner">{{ ux_icon('lucide:grip-vertical') }}</span>
+    {% if groupLabel %}
+        <span class="kd-cexo__rank" title="{{ groupKind == 'circuit' ? 'Circuit' : 'Superset' }} — enchaîné sans repos">{{ groupLabel }}</span>
+    {% endif %}
     <span class="kd-cexo__code{{ mod ? ' kd-cexo__code--' ~ mod }}">{{ ex ? ex.name|slice(0, 2)|upper : '??' }}</span>
     <div class="kd-cexo__body">
         <div class="kd-cexo__name">{{ ex ? ex.name : 'Exercice supprimé' }}</div>
@@ -38,6 +46,26 @@
     {% if not detailed and summary is not empty %}
         <span class="kd-cexo__pill">{{ summary }}</span>
     {% endif %}
+
+    {# Liaison de superset : une seule bascule par ligne. Liée -> on détache,
+       sinon -> on s'enchaîne à la ligne du dessus. Rien à afficher en tête de
+       bloc : il n'y a personne au-dessus à qui se lier. #}
+    {% if groupLabel %}
+        {{ include('workout/_action_form.html.twig', {
+            action: path('app_workout_prescribed_unlink', {id: workout.id, prescribedId: prescribed.id}),
+            token: csrf_token('prescribed_unlink' ~ prescribed.id),
+            icon: 'lucide:unlink',
+            label: 'Détacher de l\'enchaînement'
+        }) }}
+    {% elseif canLink %}
+        {{ include('workout/_action_form.html.twig', {
+            action: path('app_workout_prescribed_link', {id: workout.id, prescribedId: prescribed.id}),
+            token: csrf_token('prescribed_link' ~ prescribed.id),
+            icon: 'lucide:link',
+            label: 'Enchaîner avec l\'exercice précédent'
+        }) }}
+    {% endif %}
+
     <button type="button" class="kd-cexo__btn" data-action="composer#toggleParams" title="Paramètres" aria-label="Paramètres">
         {{ ux_icon('lucide:sliders-horizontal') }}
     </button>
