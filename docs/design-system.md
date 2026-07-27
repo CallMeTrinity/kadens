@@ -326,11 +326,17 @@ décomposé en `_workout_program`, `_workout_sets_table`, `_workout_analysis`.
 - **Onglets** (`.kd-wk__tab`) : filet bas sur l'onglet actif.
 - **Bloc en accordéon** (`.kd-block`) : `<details open>`, numéro en gris clair,
   rôle en condensé capitales, résumé mono poussé à droite.
-- **Tableau de séries** (`.kd-settable`) : en-tête en aplat encre, groupe de
-  séries de travail marqué d'un filet gauche et d'un fond. Les séries
-  consécutives identiques sont fusionnées par `PlanFlattener` mais gardent leur
-  rang réel (« 03 — 06 ») : condenser l'affichage ne doit pas faire perdre la
-  numérotation.
+- **Tableau de séries** (`.kd-settable`) : en-tête en aplat encre, série de
+  travail ordinaire marquée d'un filet gauche et d'un fond. **Une ligne = une
+  série**, y compris quand la saisie est scalaire (`PlanFlattener::setLines`
+  déroule « 3 × 15 » en trois lignes) : la répétition est le prix d'une lecture
+  identique quel que soit le mode de saisie. Deux colonnes ne s'affichent que si
+  elles ont quelque chose à dire : « % du max » seulement si les charges varient,
+  « Type » seulement si une série est qualifiée. **Largeur plafonnée à 34rem** —
+  étiré sur un grand écran, le tableau éloignait les reps de la charge de
+  plusieurs centaines de pixels. Sous 560px il se comprime au lieu de défiler :
+  un défilement horizontal imbriqué dans une page qui ne défile pas n'a aucun
+  repère visuel, on rate des colonnes sans savoir qu'elles existent.
 - **Analyse** (`.kd-analysis`) : barre empilée + légende, barres horizontales,
   timeline de durée. Rendu 100 % serveur, aucune bibliothèque de graphiques.
 

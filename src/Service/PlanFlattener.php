@@ -11,6 +11,7 @@ use App\Entity\Workout;
 use App\Enum\IntensityZone;
 use App\Enum\PaceUnit;
 use App\Enum\PrescriptionType;
+use App\Enum\SetType;
 
 /**
  * Source unique de mise à plat d'une séance ET d'un plan complet.
@@ -23,7 +24,8 @@ use App\Enum\PrescriptionType;
  * quelles pour l'export ; un champ `summary` lisible est ajouté pour l'affichage.
  *
  * @phpstan-type FlatSetGroup array{type: \App\Enum\SetType, typeLabel: string|null, count: int, detail: string, effort: string, firstIndex: int, lastIndex: int, weightKg: float|null}
- * @phpstan-type FlatPrescribed array{prescribed: PrescribedExercise, exercise: \App\Entity\Exercise|null, type: PrescriptionType|null, summary: string, values: string, sets: list<FlatSetGroup>|null, rest: ?int, notes: ?string, topWeightKg: ?float, groupLabel: string|null}
+ * @phpstan-type FlatSetLine array{type: \App\Enum\SetType, typeLabel: string|null, index: int, effort: string, weightKg: float|null}
+ * @phpstan-type FlatPrescribed array{prescribed: PrescribedExercise, exercise: \App\Entity\Exercise|null, type: PrescriptionType|null, summary: string, values: string, sets: list<FlatSetGroup>|null, setLines: list<FlatSetLine>|null, rest: ?int, notes: ?string, topWeightKg: ?float, groupLabel: string|null}
  * @phpstan-type FlatSegment array{label: string|null, kind: 'single'|'superset'|'circuit', exercises: list<FlatPrescribed>}
  * @phpstan-type FlatBlock array{block: Block, exercises: list<FlatPrescribed>, segments: list<FlatSegment>}
  * @phpstan-type FlatWorkout array{workout: Workout, blocks: list<FlatBlock>, activities: list<\App\Enum\ActivityType>, exerciseCount: int}
@@ -160,7 +162,11 @@ final class PlanFlattener
             'summary' => $this->summarize($prescribed),
             'values' => $this->summarizeValues($prescribed),
             // Groupes de séries détaillées (mode force détaillé), null en mode simple.
+            // Vue condensée, pour les contextes compacts : aperçu au survol, résumé.
             'sets' => $prescribed->hasDetailedSets() ? $this->detailedSetGroups($prescribed) : null,
+            // Vue déroulée : une entrée par série, quel que soit le mode de saisie.
+            // C'est ce que consomme la page de consultation.
+            'setLines' => $this->setLines($prescribed),
             'rest' => $prescribed->getRestSeconds(),
             'notes' => $prescribed->getNotes(),
             // Référence du « % du max » affiché par le tableau de séries.
@@ -325,6 +331,70 @@ final class PlanFlattener
             ],
             $groups,
         );
+    }
+
+    /**
+     * Vue déroulée des séries d'un exercice de force : **une entrée par série**,
+     * que la prescription soit détaillée ou scalaire. Un « 3 × 15 @ 130 kg » donne
+     * donc trois lignes identiques, exactement comme trois lignes saisies à la
+     * main — c'est ce qui fait qu'une séance se lit de la même façon partout, quel
+     * que soit le mode de saisie.
+     *
+     * Complémentaire de `detailedSetGroups`, jamais concurrente : le regroupement
+     * reste la vue **condensée** (résumé, aperçu au survol, export), celle-ci est
+     * la vue **déroulée** (page de consultation).
+     *
+     * Réservée aux deux types de force, seuls à décrire des séries. Le `sets` d'un
+     * DISTANCE_PACE compte des intervalles, pas des séries : il ne se déroule pas.
+     *
+     * @return list<FlatSetLine>|null null quand il n'y a rien à dérouler
+     */
+    private function setLines(PrescribedExercise $pe): ?array
+    {
+        if (!\in_array($pe->getPrescriptionType(), [PrescriptionType::SETS_REPS, PrescriptionType::SETS_TIME], true)) {
+            return null;
+        }
+
+        if ($pe->hasDetailedSets()) {
+            $lines = [];
+            $index = 0;
+            foreach ($pe->getDetailedSets() as $set) {
+                $short = $set->getSetType()->shortLabel();
+                $lines[] = [
+                    'type' => $set->getSetType(),
+                    'typeLabel' => '' !== $short ? $short : null,
+                    'index' => ++$index,
+                    'effort' => $this->detailedSetEffort($pe, $set),
+                    'weightKg' => $set->getWeightKg(),
+                ];
+            }
+
+            return $lines;
+        }
+
+        $count = $pe->getSets() ?? 0;
+        if ($count < 1) {
+            return null;
+        }
+
+        // Mode simple : toutes les séries sont ordinaires et portent les mêmes
+        // valeurs, c'est tout ce que le scalaire sait dire.
+        $effort = PrescriptionType::SETS_TIME === $pe->getPrescriptionType()
+            ? $this->units->duration($pe->getDurationSeconds())
+            : sprintf('%s reps', $pe->getReps() ?? '?');
+
+        $lines = [];
+        for ($index = 1; $index <= $count; ++$index) {
+            $lines[] = [
+                'type' => SetType::NORMAL,
+                'typeLabel' => null,
+                'index' => $index,
+                'effort' => $effort,
+                'weightKg' => $pe->getWeightKg(),
+            ];
+        }
+
+        return $lines;
     }
 
     /**

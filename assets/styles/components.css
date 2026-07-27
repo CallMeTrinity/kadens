@@ -2355,15 +2355,20 @@ a.kd-scope--link:hover {
 /* ---- Tableau des séries détaillées ---- */
 .kd-settable__wrap {
     margin: var(--kd-space-5) 0 0;
-    /* Le tableau garde ses colonnes plutôt que de s'écraser : il défile dans son
-     propre conteneur, jamais la page. */
+    /* Plafonné : sur un large écran, un tableau étiré sur toute la page éloigne
+     les reps de la charge de plusieurs centaines de pixels — on ne lit plus une
+     ligne, on traverse un vide. Cinq colonnes courtes n'ont pas besoin de plus. */
+    max-width: 34rem;
+    /* Filet de sécurité seulement : le tableau garde ses colonnes plutôt que de
+     s'écraser, et défile dans son propre conteneur, jamais la page. En pratique
+     il ne défile plus — les colonnes se compriment avant (voir téléphone). */
     overflow-x: auto;
     border: 1px solid var(--color-border);
 }
 
 .kd-settable {
     width: 100%;
-    min-width: 30rem;
+    min-width: 26rem;
     border-collapse: collapse;
     font-family: var(--font-mono);
     font-size: 13px;
@@ -2399,7 +2404,7 @@ a.kd-scope--link:hover {
     background: var(--color-surface-raised);
 }
 
-/* Le groupe de séries de travail est la référence de lecture : il porte un
+/* La série de travail ordinaire est la référence de lecture : elle porte un
    filet gauche et un fond, tout le reste s'efface autour. */
 .kd-setrow--normal td {
     background: var(--color-surface-subtle);
@@ -2413,12 +2418,6 @@ a.kd-scope--link:hover {
 
 .kd-setrow--warmup td {
     color: var(--color-text-secondary);
-}
-
-.kd-setrow__mult {
-    font-family: var(--font-display);
-    font-weight: var(--kd-weight-bold);
-    font-size: 17px;
 }
 
 .kd-setrow__rank {
@@ -2730,6 +2729,29 @@ a.kd-scope--link:hover {
     .kd-exrow__rpe {
         padding-left: 0;
         border-left: 0;
+    }
+
+    /* Le tableau de séries rentre dans la largeur du téléphone au lieu de défiler
+     dans son cadre : un défilement horizontal imbriqué dans une page qui, elle,
+     ne défile pas n'a aucun repère visuel — on rate des colonnes sans savoir
+     qu'elles existent. Il rentre en comprimant ce qui peut l'être (gouttières,
+     corps de texte, gouttière de pastille), le contenu ne bouge pas. */
+    .kd-settable {
+        min-width: 0;
+        font-size: 12px;
+    }
+
+    .kd-settable thead th,
+    .kd-settable td {
+        padding: var(--kd-space-2) var(--kd-space-3);
+    }
+
+    .kd-settable thead th {
+        letter-spacing: var(--kd-tracking-eyebrow);
+    }
+
+    .kd-settable__c-type {
+        width: 2.5rem;
     }
 
     .kd-analysis {
@@ -6341,22 +6363,6 @@ textarea.kd-inlineedit__input {
 /* ── Abonnement calendrier (ICS) ─────────────────────────────────────────────
    Modale « S'abonner » : lien(s) de flux à copier + aide + régénération.
    Réutilise .kd-modal*/
-.kd-input
-
-/
-.kd-btn
-
-;
-couleur d
-
-'alerte = terracotta
-(
-convention « action à mener »
-
-)
-. *
-
-/
 .kd-subscribe {
     display: inline-flex;
 }

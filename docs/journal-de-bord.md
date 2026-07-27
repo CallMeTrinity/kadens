@@ -1647,3 +1647,82 @@ Le repli sans JS (redirection vers `app_scheduled_workout_show`) est inchangé.
 Couvert par `CalendarControllerTest::testDoneButtonAnswersWithAStreamTargetingThisPage`,
 qui poste avec l'en-tête `Accept` de Turbo et vérifie que la réponse vise bien
 les fragments de cette page — et jamais `cal-event-{id}`.
+
+---
+
+## Lot — Une ligne par série, quel que soit le mode de saisie (27/07/2026)
+
+**Le constat.** La page d'une séance affichait deux langages selon la façon dont
+l'exercice avait été saisi. Séries détaillées : un tableau, une ligne par groupe,
+type, rang, charge, % du max. Mode simple : une seule chaîne compacte, « 3 × 15
+@ 130 kg », posée dans l'en-tête de la ligne d'exercice. Même contenu prescrit,
+deux lectures — et il fallait décoder la chaîne pour comparer deux exercices
+voisins.
+
+**La règle posée.** Sur la page de consultation, **une ligne = une série**,
+toujours. Trois séries scalaires valent trois lignes identiques ; dix séries
+valent dix lignes. La répétition n'est pas du bruit, c'est ce qui rend la lecture
+uniforme et ce qui permet de compter des yeux.
+
+**Deux vues, pas deux vérités.** `PlanFlattener` expose désormais les séries sous
+deux formes, sur le modèle de `summary`/`values` et `exercises`/`segments` :
+
+- `sets` — la vue **condensée** (`detailedSetGroups`), inchangée : les séries
+  consécutives identiques fusionnent, chaque groupe garde son rang réel. Elle
+  reste réservée au mode détaillé et alimente les contextes compacts (résumé
+  `summarizeDetailedSets`, aperçu au survol, export, pastille de calendrier).
+- `setLines` — la vue **déroulée**, nouvelle : une entrée par série
+  (`type`, `typeLabel`, `index`, `effort`, `weightKg`), dérivée de la collection
+  détaillée si elle existe, **synthétisée depuis le scalaire** sinon (toutes les
+  lignes en `SetType::NORMAL`, mêmes valeurs). C'est ce que consomme la page.
+
+Le déroulé est réservé à `SETS_REPS` / `SETS_TIME`. Le `sets` d'un
+`DISTANCE_PACE` compte des **intervalles**, pas des séries : « 8 × 400 m » reste
+une ligne de résumé, et un exercice sans compteur (ajout express, `sets` null)
+garde son repli sur `values` — pas de tableau de « ? reps » pour un exercice
+qu'on n'a pas encore paramétré.
+
+**Conséquences à l'écran.**
+
+- `_workout_sets_table` prend `lines` au lieu de `groups` : plus de colonne
+  multiplicateur (`.kd-setrow__mult`, supprimé du CSS), plus de plage « 02 — 03 »,
+  un rang simple par ligne.
+- Le « % du max » ne s'affiche plus que si les charges **varient** : à charge
+  constante — le cas de toute prescription scalaire — la colonne n'aurait aligné
+  que des 100 %.
+- L'en-tête de la ligne d'exercice n'affiche plus qu'un compte (« 4 séries ») dès
+  qu'un tableau le suit : répéter « 4 × 8 @ 60 kg » juste au-dessus des quatre
+  lignes qui le disent était redondant. Le libellé « séries détaillées » disparaît
+  avec ça — en lecture, la distinction n'existe plus.
+
+**Ce qui n'a pas bougé.** L'aperçu au survol garde sa vue condensée (un panneau de
+survol doit tenir à l'écran), l'export Excel et le flux ICS gardent `summary`, et
+l'éditeur garde ses deux modes de saisie : c'est une refonte de **lecture**, pas
+du modèle.
+
+Couvert par `PlanFlattenerTest` (déroulé scalaire, déroulé détaillé sans fusion,
+intervalles non déroulés) et les tests de contrôleur `WorkoutControllerTest` /
+`PublicShareControllerTest`, qui comptent désormais les `<tr>` du tableau.
+
+### Suite — La largeur du tableau
+
+Dérouler les séries a rendu visible un défaut que la vue condensée masquait : le
+tableau prenait toute la largeur disponible. Sur un grand écran, « 6 reps » et
+« 80 kg » se retrouvaient séparés de plusieurs centaines de pixels — on ne lit
+plus une ligne, on traverse un vide — et sous 560px il défilait horizontalement
+dans son propre cadre, geste sans repère visuel dans une page qui, elle, ne
+défile pas : on rate des colonnes sans savoir qu'elles existent.
+
+Trois corrections, dans cet ordre d'efficacité :
+
+1. **Deux colonnes conditionnelles.** « % du max » ne s'affiche que si les
+   charges varient, « Type » que si une série est qualifiée. Une prescription
+   scalaire tombe donc à trois colonnes — c'est la moitié de la largeur gagnée
+   avant même de toucher au CSS, et une colonne vide en moins à l'écran.
+2. **Cadre plafonné à `34rem`** (`.kd-settable__wrap`), au lieu de suivre la
+   largeur de la page. Cinq colonnes courtes n'ont pas besoin de plus ; le
+   `min-width` du tableau descend de 30rem à 26rem.
+3. **Compression sous 560px** plutôt que défilement : `min-width: 0`, corps à
+   12px, gouttières à `--kd-space-2/3`, gouttière de pastille à 2,5rem, tracking
+   d'en-tête réduit. L'`overflow-x: auto` reste, mais comme filet de sécurité
+   (écrans très étroits), plus comme mode de lecture normal.

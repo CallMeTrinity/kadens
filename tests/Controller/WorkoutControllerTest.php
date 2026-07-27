@@ -326,11 +326,21 @@ final class WorkoutControllerTest extends WebTestCase
         $this->em->clear();
 
         $this->client->loginUser($user);
-        $this->client->request('GET', '/workout/'.$workout->getId());
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId());
 
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('body', 'Squat');
-        self::assertSelectorTextContains('body', '4 × 8 @ 60 kg');
+        // Une saisie scalaire se déroule comme une saisie détaillée : quatre
+        // lignes de série, pas un « 4 × 8 @ 60 kg » compact.
+        self::assertSelectorTextContains('.kd-exrow__flag', '4 séries');
+        self::assertCount(4, $crawler->filter('.kd-settable tbody tr'));
+        self::assertStringContainsString('8 reps', $crawler->filter('.kd-settable')->text());
+        self::assertStringContainsString('60 kg', $crawler->filter('.kd-settable')->text());
+        // Deux colonnes sans rien à dire disparaissent : le « % du max » n'aurait
+        // que des 100 % à charge constante, et « Type » que des cases vides.
+        self::assertCount(3, $crawler->filter('.kd-settable thead th'));
+        self::assertStringNotContainsString('% du max', $crawler->filter('.kd-settable')->text());
+        self::assertStringNotContainsString('Type', $crawler->filter('.kd-settable')->text());
 
         // Bandeau de synthèse : 4 séries × 8 reps × 60 kg = 1 920 kg.
         self::assertSelectorExists('.kd-wk__kpis');
@@ -341,7 +351,7 @@ final class WorkoutControllerTest extends WebTestCase
         self::assertSelectorExists('[data-tabs-name="analyse"]');
     }
 
-    public function testShowGroupsDetailedSetsIntoARangedTable(): void
+    public function testShowRendersOneRowPerDetailedSet(): void
     {
         $user = $this->createUser('owner@example.com');
         $exercise = $this->createExercise($user, 'Soulevé de terre');
@@ -366,8 +376,11 @@ final class WorkoutControllerTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('.kd-settable');
-        // Groupe fusionné : deux séries de travail rendues sur une ligne « 02 — 03 ».
-        self::assertStringContainsString('02 — 03', $crawler->filter('.kd-settable')->text());
+        // Une ligne par série, y compris les deux séries de travail identiques.
+        self::assertCount(3, $crawler->filter('.kd-settable tbody tr'));
+        // Une série est qualifiée (échauffement) : la colonne « Type » a un sens.
+        self::assertCount(5, $crawler->filter('.kd-settable thead th'));
+        self::assertStringContainsString('03', $crawler->filter('.kd-settable tbody tr:last-child')->text());
         // % de la charge la plus lourde : l'échauffement à 70/140.
         self::assertStringContainsString('50 %', $crawler->filter('.kd-settable')->text());
     }

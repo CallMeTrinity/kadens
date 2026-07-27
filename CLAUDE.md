@@ -261,7 +261,30 @@ deux sens, fiche de travail par athlète sous `/coach`, `ROLE_COACH`) — cf. §
 la règle de propriété — et **paramètres de compte** (`/profile/settings` :
 changement de mot de passe, création de compte par `app:user:create`).
 
-Dernier lot (PWA installable) : la **Phase 9 est réactivée, mais amputée**. Ce
+Dernier lot (une ligne par série) : sur la page de consultation d'une séance,
+**une ligne = une série, quel que soit le mode de saisie**. « 3 × 15 @ 130 kg »
+s'affiche en trois lignes identiques, comme trois lignes saisies à la main. Les
+séries sont donc exposées par `PlanFlattener` sous **deux formes complémentaires**,
+sur le modèle de `summary`/`values` :
+
+- `sets` — vue **condensée** (`detailedSetGroups`), inchangée, réservée au mode
+  détaillé : séries consécutives identiques fusionnées, rang réel conservé. Elle
+  sert les contextes compacts (résumé, aperçu au survol, export, pastille).
+- `setLines` — vue **déroulée**, une entrée par série, dérivée de la collection
+  détaillée ou **synthétisée depuis le scalaire** (tout en `SetType::NORMAL`).
+  C'est ce que consomme `_workout_sets_table`.
+
+À ne pas casser : le déroulé est réservé à `SETS_REPS`/`SETS_TIME` (le `sets` d'un
+`DISTANCE_PACE` compte des **intervalles**, pas des séries) et `sets` scalaire nul
+retombe sur `values` — pas de tableau de « ? reps » pour un exercice pas encore
+paramétré. L'en-tête de la ligne d'exercice se réduit au compte (« 4 séries ») dès
+qu'un tableau le suit. Côté largeur, **deux colonnes sont conditionnelles**
+(« % du max » si les charges varient, « Type » si une série est qualifiée), le
+cadre est plafonné à `34rem` et sous 560px le tableau **se comprime au lieu de
+défiler** — un défilement horizontal imbriqué dans une page qui ne défile pas
+n'a aucun repère visuel.
+
+Lot précédent (PWA installable) : la **Phase 9 est réactivée, mais amputée**. Ce
 qu'on veut, c'est l'installabilité (icône, nom, écran de démarrage, plein écran) ;
 ce qu'on ne veut plus, c'est le mode hors connexion complet, qui servait des pages
 périmées *en ligne* et avait fait suspendre la phase. Règle qui tient tout :
