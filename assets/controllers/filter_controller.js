@@ -45,7 +45,7 @@ export default class extends Controller {
 
     connect() {
         this.query = '';
-        this.facets = {};
+        this.readFacets();
         this.readSort();
         this.apply();
     }
@@ -73,6 +73,20 @@ export default class extends Controller {
     }
 
     // ------------------------------------------------------------------ Logique
+    /*
+     * État initial des facettes, lu dans le HTML rendu : la puce active d'un
+     * groupe porte déjà `kd-libfilter--on` (cf. `_filterbar.html.twig`). Sans
+     * cette lecture, un groupe dont le défaut n'est pas « all » — la portée d'un
+     * coach, qui s'ouvre sur ses propres entrées — s'afficherait actif tout en
+     * laissant passer tous les items.
+     */
+    readFacets() {
+        this.facets = {};
+        this.facetTargets
+            .filter((b) => b.classList.contains('kd-libfilter--on'))
+            .forEach((b) => { this.facets[b.dataset.facetGroup] = b.dataset.facetValue; });
+    }
+
     readSort() {
         if (!this.hasSortTarget) {
             this.sortKey = 'name';

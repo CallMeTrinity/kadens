@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
+use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\ScheduledStatus;
@@ -12,6 +13,7 @@ use App\Repository\PlanTemplateRepository;
 use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\PlanTemplateVoter;
+use App\Service\CoachedLibrary;
 use App\Service\PlanFlattener;
 use App\Service\PlanScheduler;
 use App\Service\PlanVolumeAggregator;
@@ -55,12 +57,20 @@ final class PlanTemplateController extends AbstractController
     }
 
     #[Route('', name: 'app_plan_template_index', methods: ['GET'])]
-    public function index(PlanTemplateRepository $planTemplateRepository): Response
+    public function index(PlanTemplateRepository $planTemplateRepository, CoachedLibrary $coachedLibrary): Response
     {
-        $templates = $planTemplateRepository->findBy(['owner' => $this->getUser()], ['title' => 'ASC']);
+        /** @var User $user */
+        $user = $this->getUser();
+
+        // Même portée que l'index des séances : soi + ses athlètes suivis, pour
+        // qu'un coach retrouve les plans qu'il a bâtis pour eux (ils appartiennent
+        // à l'athlète). Facette « Moi » active par défaut.
+        $athletes = $coachedLibrary->athletesOf($user);
+        $templates = $planTemplateRepository->findForOwnersWithContent([$user, ...$athletes]);
 
         $items = [];
         $counts = [];
+        $ownerCounts = [];
         foreach ($templates as $template) {
             // Activités distinctes de toutes les séances du plan (union), pour les facettes.
             $seen = [];
@@ -78,6 +88,10 @@ final class PlanTemplateController extends AbstractController
             foreach ($activities as $activity) {
                 $counts[$activity->value] = ($counts[$activity->value] ?? 0) + 1;
             }
+            $ownerId = $template->getOwner()?->getId();
+            if (null !== $ownerId) {
+                $ownerCounts[$ownerId] = ($ownerCounts[$ownerId] ?? 0) + 1;
+            }
         }
 
         $facets = [];
@@ -91,6 +105,7 @@ final class PlanTemplateController extends AbstractController
             'items' => $items,
             'total' => \count($items),
             'activityFacets' => $facets,
+            'ownerFacets' => $coachedLibrary->ownerFacets($user, $athletes, $ownerCounts),
         ]);
     }
 

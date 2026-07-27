@@ -9,7 +9,13 @@
      - total       : effectif initial (compteur)
      - countNoun   : nom au singulier ("exercice", "séance", "plan")
      - sortOptions : list de { key, label, dir?('asc'|'desc'), numeric?(bool) }
-     - facetGroups : list de { group, allLabel, facets:[{value,label,count}] }
+     - facetGroups : list de { group, allLabel, facets:[{value,label,count}],
+                               default?(valeur active au chargement, 'all' sinon) }
+
+   `default` sert au groupe « propriétaire » d'un coach : la page s'ouvre sur ses
+   propres entrées, les athlètes sont à une puce. Le contrôleur Stimulus lit cet
+   état initial dans les classes rendues — ne pas activer une puce à la main sans
+   passer par `default`, la logique de filtre ne la verrait pas.
    ============================================================================ #}
 <div class="kd-filterbar">
     <div class="kd-filterbar__row">
@@ -39,12 +45,13 @@
 
     {% for grp in facetGroups|default([]) %}
         {% if grp.facets %}
+            {% set active = grp.default|default('all') %}
             <div class="kd-libfilters">
-                <button type="button" class="kd-libfilter kd-libfilter--on"
+                <button type="button" class="kd-libfilter{{ active == 'all' ? ' kd-libfilter--on' }}"
                         data-filter-target="facet" data-facet-group="{{ grp.group }}" data-facet-value="all"
                         data-action="filter#pickFacet">{{ grp.allLabel }} · {{ total }}</button>
                 {% for f in grp.facets %}
-                    <button type="button" class="kd-libfilter"
+                    <button type="button" class="kd-libfilter{{ active == f.value ? ' kd-libfilter--on' }}"
                             data-filter-target="facet" data-facet-group="{{ grp.group }}" data-facet-value="{{ f.value }}"
                             data-action="filter#pickFacet">{{ f.label }} · {{ f.count }}</button>
                 {% endfor %}

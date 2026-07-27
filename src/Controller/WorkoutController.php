@@ -6,6 +6,7 @@ use App\Entity\Block;
 use App\Entity\Exercise;
 use App\Entity\PrescribedExercise;
 use App\Entity\PrescribedSet;
+use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\BlockRole;
@@ -16,6 +17,7 @@ use App\Form\PrescribedSetType;
 use App\Repository\ExerciseRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\WorkoutVoter;
+use App\Service\CoachedLibrary;
 use App\Service\PlanFlattener;
 use App\Service\SetSynchronizer;
 use App\Service\SlugGenerator;
@@ -63,19 +65,35 @@ final class WorkoutController extends AbstractController
     }
 
     #[Route('', name: 'app_workout_index', methods: ['GET'])]
-    public function index(WorkoutRepository $workoutRepository, WorkoutMetrics $workoutMetrics): Response
-    {
+    public function index(
+        WorkoutRepository $workoutRepository,
+        WorkoutMetrics $workoutMetrics,
+        CoachedLibrary $coachedLibrary,
+    ): Response {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        // Portée : soi + ses athlètes suivis, pour qu'un coach retrouve ici ce
+        // qu'il a composé pour eux (le contenu appartient à l'athlète, il sortait
+        // donc de cet index). La facette « Moi » reste active par défaut.
+        $athletes = $coachedLibrary->athletesOf($user);
+
         // Fetch-join du contenu : les activités distinctes par séance servent aux
         // facettes/filtres de l'index (sans ce join ce serait un N+1).
-        $workouts = $workoutRepository->findLibraryForOwnerWithContent($this->getUser());
+        $workouts = $workoutRepository->findLibraryForOwnersWithContent([$user, ...$athletes]);
 
         $items = [];
         $counts = [];
+        $ownerCounts = [];
         foreach ($workouts as $workout) {
             $activities = $workoutMetrics->distinctActivities($workout);
             $items[] = ['workout' => $workout, 'activities' => $activities];
             foreach ($activities as $activity) {
                 $counts[$activity->value] = ($counts[$activity->value] ?? 0) + 1;
+            }
+            $ownerId = $workout->getOwner()?->getId();
+            if (null !== $ownerId) {
+                $ownerCounts[$ownerId] = ($ownerCounts[$ownerId] ?? 0) + 1;
             }
         }
 
@@ -83,6 +101,7 @@ final class WorkoutController extends AbstractController
             'items' => $items,
             'total' => \count($items),
             'activityFacets' => $this->buildActivityFacets($counts),
+            'ownerFacets' => $coachedLibrary->ownerFacets($user, $athletes, $ownerCounts),
         ]);
     }
 

@@ -335,6 +335,86 @@ final class CoachControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(403);
     }
 
+    // ------------------------------------------- portée des index bibliothèque
+
+    /**
+     * Le contenu composé pour un athlète lui appartient : sans élargissement de
+     * portée, il n'apparaissait nulle part dans les index du coach. Il y figure
+     * désormais, avec le badge de propriétaire et une facette dédiée.
+     */
+    public function testCoachIndexListsAthleteWorkouts(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+        $this->createWorkout($athlete, 'Fractionné athlète');
+        $this->createWorkout($coach, 'Ma séance perso');
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/workout');
+
+        self::assertResponseIsSuccessful();
+        $html = $crawler->html();
+        self::assertStringContainsString('Fractionné athlète', $html);
+        self::assertStringContainsString('Ma séance perso', $html);
+        // Facette de propriétaire, « Moi » active au chargement.
+        self::assertSame(
+            (string) $coach->getId(),
+            $crawler->filter('.kd-libfilter--on[data-facet-group="owner"]')->attr('data-facet-value')
+        );
+        // Badge sur la carte de l'athlète, absent sur la sienne.
+        self::assertCount(1, $crawler->filter('.kd-scope--link'));
+    }
+
+    public function testCoachIndexListsAthletePlans(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+        $this->createPlanTemplate($athlete, 'Prépa athlète', 4);
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/plan-template');
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('Prépa athlète', $crawler->html());
+        self::assertSame(
+            (string) $coach->getId(),
+            $crawler->filter('.kd-libfilter--on[data-facet-group="owner"]')->attr('data-facet-value')
+        );
+    }
+
+    /** Une demande non acceptée n'ouvre aucune portée. */
+    public function testPendingRelationDoesNotWidenIndex(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::PENDING);
+        $this->createWorkout($athlete, 'Séance privée');
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/workout');
+
+        self::assertStringNotContainsString('Séance privée', $crawler->html());
+        // Aucun athlète : le groupe de facette disparaît de la barre de filtres.
+        self::assertCount(0, $crawler->filter('[data-facet-group="owner"]'));
+    }
+
+    /** La relation reste dirigée : l'athlète ne voit pas la bibliothèque du coach. */
+    public function testAthleteIndexDoesNotListCoachWorkouts(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+        $this->createWorkout($coach, 'Séance du coach');
+
+        $this->client->loginUser($athlete);
+        $crawler = $this->client->request('GET', '/workout');
+
+        self::assertStringNotContainsString('Séance du coach', $crawler->html());
+        self::assertCount(0, $crawler->filter('[data-facet-group="owner"]'));
+    }
+
     // ---------------------------------------------------------------- helpers
 
     /** @param list<string> $roles */

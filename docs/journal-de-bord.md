@@ -1265,3 +1265,59 @@ normalisation, liaison, fusion, détachement du milieu, dépôt entrant/sortant)
 un cas de `PlanFlattenerTest` qui vérifie que `exercises` et `segments` décrivent
 le même contenu dans le même ordre. `WorkoutMetricsTest` a été retourné : « deux
 exercices dans un bloc » n'est plus un superset, il faut la liaison.
+
+---
+
+## Lot — Les index Séances / Plans s'ouvrent aux athlètes suivis (27/07/2026)
+
+**Le manque.** Le contenu qu'un coach compose pour un athlète appartient à
+l'athlète (`setOwner($athlete)`, règle de propriété inchangée). Les index
+`/workout` et `/plan-template` se scopaient sur `owner = utilisateur courant` :
+un coach ne retrouvait donc **nulle part** ce qu'il avait bâti, sinon fiche par
+fiche sous `/coach/athlete/{id}`. Avec trois athlètes, retrouver « la prépa semi
+de quelqu'un » demandait de se souvenir de qui.
+
+**La portée.** Nouveau service `CoachedLibrary` : il répond à « quels
+propriétaires cet utilisateur peut-il lister » — soi, puis ses athlètes en
+relation **acceptée**. La relation reste dirigée : les bibliothèques de mes
+coachs ne me regardent pas. Les repositories reçoivent la liste
+(`WorkoutRepository::findLibraryForOwnersWithContent`,
+`PlanTemplateRepository::findForOwnersWithContent`, tous deux fetch-joints — le
+second remplace un `findBy` qui faisait déjà un N+1 par plan pour dériver ses
+activités).
+
+Portée **de consultation uniquement**. Les sélecteurs qui posent une séance sur
+son propre calendrier ou dans sa propre trame gardent la version à un seul
+propriétaire (`findLibraryForOwnerWithContent`) : proposer la séance d'un athlète
+à la pose serait un contresens, et `CoachController::scheduleWorkout` refuse
+déjà l'inverse.
+
+**Pas de champ « créé par ».** Distinguer ce que le coach a écrit de ce que
+l'athlète a écrit demanderait une colonne, sans reprise possible de
+l'historique — et le coach a de toute façon le droit de voir et d'éditer tout le
+contenu de son athlète (branche coach des voters). C'est déjà ce que montre la
+fiche athlète.
+
+**À l'écran.** Un groupe de facette `owner` dans la barre de filtres, avec
+**« Moi » actif par défaut** : la page reste celle d'avant pour un usage perso,
+les athlètes sont à une puce. Chaque carte qui n'est pas la sienne porte un badge
+de propriétaire (`components/_owner_badge.html.twig`, variante cliquable de
+`.kd-scope`) qui renvoie à la fiche de l'athlète. L'identifiant de l'athlète
+entre aussi dans `data-filter-text` : chercher son email remonte ses entrées.
+
+Le groupe **disparaît** quand il n'y a aucun athlète (`_filterbar` saute les
+groupes vides) : sans coaching, rien ne change à l'affichage.
+
+**Deux détails qui n'en sont pas.**
+- `_filterbar` accepte désormais un `default` par groupe de facette. C'est ce qui
+  permet d'ouvrir la page sur autre chose que « tout ».
+- Le contrôleur Stimulus `filter` **lisait** un état initial vide (`this.facets =
+  {}` au `connect`). Une puce pré-active en HTML aurait donc été affichée active
+  tout en laissant passer tous les items. `readFacets()` lit maintenant les
+  classes rendues. Corollaire : ne jamais activer une puce à la main dans un
+  template sans passer par `default`.
+
+**Tests** : 143 au vert, dont quatre cas ajoutés à `CoachControllerTest` — les
+deux index listent le contenu de l'athlète avec la facette « Moi » active, une
+relation `PENDING` n'élargit rien, et l'athlète ne voit pas la bibliothèque de
+son coach.

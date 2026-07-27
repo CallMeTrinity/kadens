@@ -744,6 +744,19 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
   color: var(--color-text-faint);
 }
 .kd-scope svg { width: 12px; height: 12px; }
+/* Variante cliquable : le badge de propriétaire d'une carte renvoie à la fiche
+   de l'athlète. Casse normale — c'est un identifiant saisi, pas un libellé de
+   structure (cf. règle 4 du design system). */
+a.kd-scope--link {
+  max-width: 100%;
+  text-transform: none;
+  letter-spacing: 0;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+a.kd-scope--link:hover { color: var(--color-primary); }
 
 /* ----------------------------------------------------------------------------
    Liste de définitions (page de consultation : activité, zones, description…)

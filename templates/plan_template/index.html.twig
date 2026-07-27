@@ -33,6 +33,7 @@
             ],
             facetGroups: [
                 { group: 'activity', allLabel: 'Toutes activités', facets: activityFacets },
+                { group: 'owner', allLabel: 'Tout le monde', facets: ownerFacets, default: app.user.id },
             ],
         }) }}
 
@@ -52,8 +53,9 @@
                     <article class="kd-libcard"
                              data-filter-target="item"
                              data-filter-name="{{ template.title }}"
-                             data-filter-text="{{ template.title }} {% for a in item.activities %}{{ a.label }} {% endfor %}"
+                             data-filter-text="{{ template.title }} {% for a in item.activities %}{{ a.label }} {% endfor %}{{ template.owner ? template.owner.userIdentifier }}"
                              data-facet-activity="{% for a in item.activities %}{{ a.value }}{{ not loop.last ? ' ' }}{% endfor %}"
+                             data-facet-owner="{{ template.owner ? template.owner.id }}"
                              data-sort-name="{{ template.title|lower }}"
                              data-sort-created="{{ template.createdAt ? template.createdAt|date('U') : 0 }}"
                              data-sort-weeks="{{ template.durationWeeks }}"
@@ -66,6 +68,7 @@
                                     {{ ux_icon('lucide:calendar-range') }} {{ template.durationWeeks }} semaine{{ template.durationWeeks > 1 ? 's' }}
                                     <span class="kd-dot">·</span>{{ ux_icon('lucide:clipboard-list') }} {{ template.planItems|length }} séance{{ template.planItems|length > 1 ? 's' }}
                                 </div>
+                                {{ include('components/_owner_badge.html.twig', {owner: template.owner}) }}
                             </div>
                         </div>
 

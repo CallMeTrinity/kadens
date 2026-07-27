@@ -134,6 +134,16 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   ouvrables. Corollaire : toute vue accessible au coach doit se scoper sur
   **`$entity->getOwner()`**, jamais sur `$this->getUser()` (`GoalController::show`
   et les rattachements objectif↔plan suivent cette règle).
+  **Portée des index (`CoachedLibrary`)** : les bibliothèques `/workout` et
+  `/plan-template` listent **soi + ses athlètes en relation acceptée**, pour qu'un
+  coach retrouve ce qu'il a composé (le contenu appartenant à l'athlète en
+  sortait). La relation reste dirigée — les bibliothèques de mes coachs ne me
+  regardent pas — et c'est une portée **de consultation seulement** : les
+  sélecteurs qui posent une séance sur son propre calendrier ou dans sa propre
+  trame gardent `findLibraryForOwnerWithContent` (un seul propriétaire). Pas de
+  champ « créé par » : le coach voit/édite déjà tout le contenu de son athlète.
+  À l'écran, une facette `owner` avec **« Moi » actif par défaut** et un badge de
+  propriétaire sur les cartes des autres.
 - **Objectif ↔ Plan : relation N:N, libre et réversible.** Table de jointure
   `plan_template_goal`, côté propriétaire sur `PlanTemplate` (`addGoal`/`removeGoal`,
   qui maintiennent **les deux côtés** — sinon un fragment re-rendu par Turbo Stream
@@ -232,7 +242,15 @@ deux sens, fiche de travail par athlète sous `/coach`, `ROLE_COACH`) — cf. §
 la règle de propriété — et **paramètres de compte** (`/profile/settings` :
 changement de mot de passe, création de compte par `app:user:create`).
 
-Dernier lot (superset réel, intra-bloc) : le superset cesse d'être un effet de
+Dernier lot (portée coach des index) : `/workout` et `/plan-template` listent
+aussi le contenu des athlètes suivis (cf. §3), via le service `CoachedLibrary` et
+les variantes multi-propriétaires des repositories. Facette `owner` (« Moi » par
+défaut) et badge de propriétaire sur les cartes des autres. Deux effets de bord
+utiles : `_filterbar` accepte un `default` par groupe de facette, et le
+contrôleur Stimulus `filter` lit désormais l'état initial des puces au lieu de
+repartir d'un filtre vide.
+
+Lot précédent (superset réel, intra-bloc) : le superset cesse d'être un effet de
 bord du nombre d'exercices d'un bloc pour devenir une **liaison stockée entre
 exercices d'un même bloc** (cf. §3).
 
