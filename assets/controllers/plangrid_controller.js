@@ -21,11 +21,14 @@ import Sortable from 'sortablejs';
  *    La modale porte `data-turbo="false"` : Turbo n'intercepte rien, on applique
  *    nous-mêmes les streams (comme le compositeur). Le lien « Édition complète »
  *    renvoie au compositeur pour la structure (blocs, ordre). À la fermeture, si un
- *    enregistrement a eu lieu, on recharge la page pour refléter durée/titre sur les
- *    cases.
+ *    enregistrement a eu lieu, on redemande le stream de la trame (`gridUrl`) pour
+ *    refléter durée/volumes sur les cases : jamais de rechargement de page, qui
+ *    ferait remonter en haut au moindre ajustement.
  */
 export default class extends Controller {
     static targets = ['cell', 'dialog', 'panel', 'fullLink', 'palette', 'paletteList', 'palettecard'];
+
+    static values = { gridUrl: String };
 
     static SORTABLE_GROUP = 'kd-plan-workouts';
 
@@ -123,11 +126,28 @@ export default class extends Controller {
 
     dialogTargetConnected(el) {
         // ESC / bouton / backdrop ferment le <dialog> et déclenchent l'event `close`.
-        // Un enregistrement change la durée estimée (voire le titre) affichée sur les
-        // cases : on recharge alors la page pour la refléter dans la grille.
+        // Un enregistrement change la durée estimée affichée sur la case et les
+        // volumes de la semaine : on re-rend la trame seule, sans toucher au reste
+        // de la page (donc sans perdre la position de défilement).
         el.addEventListener('close', () => {
-            if (this.dirty) window.location.reload();
+            if (this.dirty) this.refreshGrid();
         });
+    }
+
+    /** Redemande le stream de #plan-grid (route GET, aucune mutation). */
+    async refreshGrid() {
+        this.dirty = false;
+        if (!this.hasGridUrlValue) return;
+
+        try {
+            const response = await fetch(this.gridUrlValue, {
+                headers: { Accept: 'text/vnd.turbo-stream.html' },
+                credentials: 'same-origin',
+            });
+            renderStreamMessage(await response.text());
+        } catch (error) {
+            console.error('Plan grid refresh failed:', error);
+        }
     }
 
     async edit(event) {
