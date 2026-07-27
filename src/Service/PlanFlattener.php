@@ -22,8 +22,8 @@ use App\Enum\PrescriptionType;
  * Les valeurs numériques brutes (kg / mètres / secondes) sont conservées telles
  * quelles pour l'export ; un champ `summary` lisible est ajouté pour l'affichage.
  *
- * @phpstan-type FlatSetGroup array{type: \App\Enum\SetType, typeLabel: string|null, count: int, detail: string}
- * @phpstan-type FlatPrescribed array{prescribed: PrescribedExercise, exercise: \App\Entity\Exercise|null, type: PrescriptionType|null, summary: string, sets: list<FlatSetGroup>|null, rest: ?int, notes: ?string}
+ * @phpstan-type FlatSetGroup array{type: \App\Enum\SetType, typeLabel: string|null, count: int, detail: string, effort: string, firstIndex: int, lastIndex: int, weightKg: float|null}
+ * @phpstan-type FlatPrescribed array{prescribed: PrescribedExercise, exercise: \App\Entity\Exercise|null, type: PrescriptionType|null, summary: string, values: string, sets: list<FlatSetGroup>|null, rest: ?int, notes: ?string, topWeightKg: ?float}
  * @phpstan-type FlatBlock array{block: Block, exercises: list<FlatPrescribed>}
  * @phpstan-type FlatWorkout array{workout: Workout, blocks: list<FlatBlock>, activities: list<\App\Enum\ActivityType>, exerciseCount: int}
  * @phpstan-type FlatItem array{item: PlanItem, workout: FlatWorkout}
@@ -130,11 +130,18 @@ final class PlanFlattener
             'prescribed' => $prescribed,
             'exercise' => $prescribed->getExercise(),
             'type' => $prescribed->getPrescriptionType(),
+            // `summary` est auto-suffisant (RPE compris) : c'est la chaîne à
+            // afficher quand elle est seule — export Excel, aperçu au survol,
+            // pastille de calendrier. `values` est la même sans le RPE, pour les
+            // vues qui lui donnent sa propre colonne (page de consultation).
             'summary' => $this->summarize($prescribed),
+            'values' => $this->summarizeValues($prescribed),
             // Groupes de séries détaillées (mode force détaillé), null en mode simple.
             'sets' => $prescribed->hasDetailedSets() ? $this->detailedSetGroups($prescribed) : null,
             'rest' => $prescribed->getRestSeconds(),
             'notes' => $prescribed->getNotes(),
+            // Référence du « % du max » affiché par le tableau de séries.
+            'topWeightKg' => $prescribed->getTopWeightKg(),
         ];
     }
 
@@ -143,7 +150,23 @@ final class PlanFlattener
      */
     private function summarize(PrescribedExercise $pe): string
     {
-        $summary = match ($pe->getPrescriptionType()) {
+        $summary = $this->summarizeValues($pe);
+
+        // RPE : transverse à tous les types, ajouté en suffixe s'il est renseigné.
+        if (null !== $pe->getRpe()) {
+            $summary = trim($summary.sprintf(' · RPE %d', $pe->getRpe()));
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Le corps du résumé, sans le suffixe RPE : ce que l'exercice demande de
+     * faire, indépendamment de l'intensité ressentie.
+     */
+    private function summarizeValues(PrescribedExercise $pe): string
+    {
+        return match ($pe->getPrescriptionType()) {
             PrescriptionType::SETS_REPS => $this->summarizeSetsReps($pe),
             PrescriptionType::SETS_TIME => $this->summarizeSetsTime($pe),
             PrescriptionType::AMRAP => $this->summarizeAmrap($pe),
@@ -152,13 +175,6 @@ final class PlanFlattener
             PrescriptionType::DURATION => $this->summarizeDuration($pe),
             null => '',
         };
-
-        // RPE : transverse à tous les types, ajouté en suffixe s'il est renseigné.
-        if (null !== $pe->getRpe()) {
-            $summary = trim($summary.sprintf(' · RPE %d', $pe->getRpe()));
-        }
-
-        return $summary;
     }
 
     /**
@@ -231,18 +247,28 @@ final class PlanFlattener
      * valeurs) pour une lecture dense. Source unique consommée par le résumé
      * compact ET le rendu détaillé en lecture.
      *
+     * Chaque groupe porte aussi son rang réel dans la série (`firstIndex` /
+     * `lastIndex`, base 1) pour que le tableau de lecture puisse afficher
+     * « 03 — 06 », et sa charge brute (`weightKg`) pour dériver le pourcentage
+     * de la charge la plus lourde de l'exercice. Le regroupement condense
+     * l'affichage, il ne doit pas faire perdre la numérotation.
+     *
      * @return list<FlatSetGroup>
      */
     private function detailedSetGroups(PrescribedExercise $pe): array
     {
         $groups = [];
+        $position = 0;
+
         foreach ($pe->getDetailedSets() as $set) {
+            ++$position;
             $detail = $this->detailedSetDetail($pe, $set);
             $key = $set->getSetType()->value.'|'.$detail;
 
             $lastIndex = array_key_last($groups);
             if (null !== $lastIndex && $groups[$lastIndex]['key'] === $key) {
                 ++$groups[$lastIndex]['count'];
+                $groups[$lastIndex]['lastIndex'] = $position;
                 continue;
             }
 
@@ -253,6 +279,10 @@ final class PlanFlattener
                 'typeLabel' => '' !== $short ? $short : null,
                 'count' => 1,
                 'detail' => $detail,
+                'effort' => $this->detailedSetEffort($pe, $set),
+                'firstIndex' => $position,
+                'lastIndex' => $position,
+                'weightKg' => $set->getWeightKg(),
             ];
         }
 
@@ -263,6 +293,10 @@ final class PlanFlattener
                 'typeLabel' => $g['typeLabel'],
                 'count' => $g['count'],
                 'detail' => $g['detail'],
+                'effort' => $g['effort'],
+                'firstIndex' => $g['firstIndex'],
+                'lastIndex' => $g['lastIndex'],
+                'weightKg' => $g['weightKg'],
             ],
             $groups,
         );
@@ -274,17 +308,27 @@ final class PlanFlattener
      */
     private function detailedSetDetail(PrescribedExercise $pe, PrescribedSet $set): string
     {
-        if (PrescriptionType::SETS_TIME === $pe->getPrescriptionType()) {
-            $detail = $this->units->duration($set->getDurationSeconds());
-        } else {
-            $detail = sprintf('%s reps', $set->getReps() ?? '?');
-        }
+        $detail = $this->detailedSetEffort($pe, $set);
 
         if (null !== $set->getWeightKg()) {
             $detail .= ' @ '.$this->units->weight($set->getWeightKg());
         }
 
         return $detail;
+    }
+
+    /**
+     * L'effort d'une série sans sa charge — reps pour SETS_REPS, durée pour
+     * SETS_TIME. Le tableau de lecture donne à la charge sa propre colonne :
+     * il lui faut la valeur nue, pas la chaîne assemblée de `detail`.
+     */
+    private function detailedSetEffort(PrescribedExercise $pe, PrescribedSet $set): string
+    {
+        if (PrescriptionType::SETS_TIME === $pe->getPrescriptionType()) {
+            return $this->units->duration($set->getDurationSeconds());
+        }
+
+        return sprintf('%s reps', $set->getReps() ?? '?');
     }
 
     private function summarizeAmrap(PrescribedExercise $pe): string

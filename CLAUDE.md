@@ -163,25 +163,39 @@ Arborescence cible complète : `ROADMAP.md §3`.
 
 ## 5. Design system
 
-Identité **« Carnet clair »** : papier & encre, accent terracotta, olive en
-secondaire. Issue de la maquette Claude Design « Kadens — Éditeur de plan ».
+Identité **« Presse »** : papier froid, encre quasi noire, **un seul accent
+rouge**, rayon 0, aucune ombre, titres en condensé capitales. Issue de la
+maquette Claude Design « Séance — Refonte », qui a servi de test avant
+généralisation. Remplace l'ancienne identité « Carnet clair ».
 
 - **Source de vérité des tokens** : [`assets/styles/tokens.css`](./assets/styles/tokens.css)
   (primitives `--kd-*` + tokens sémantiques `--color-*`, `--font-*`).
-- **Guide d'usage + patterns de composants** :
+- **Guide d'usage, responsive, accessibilité, patterns** :
   [`docs/design-system.md`](./docs/design-system.md).
+- **Socle transverse** (a11y, focus, tactile, impression) :
+  [`assets/styles/base.css`](./assets/styles/base.css), importé avant
+  `components.css` — ses règles sont des défauts surchargeables.
 
 Règles non négociables :
 1. **Jamais de couleur ou de police en dur** dans un template/composant. Toujours
    un token sémantique.
-2. **La couleur porte du sens** : terracotta = actions primaires + course/trail ;
-   olive = muscu/renfo ; statuts fait/prévu/manqué ont leurs tokens dédiés ; les
-   types de série détaillée ont leur propre famille `--color-set-*` (pastille
-   sigle W/D/F/DS), qui ne recycle ni l'activité ni le statut.
+2. **La couleur porte du sens, et il n'y a qu'une couleur.** Le rouge est
+   réservé aux actions primaires, à l'intensité et à l'échec. Toute **catégorie**
+   (activité, région musculaire, rôle de bloc) se code par son rang dans
+   l'échelle de gris `--color-cat-1..4`, jamais par une teinte inventée — c'est
+   ce qui permet de couvrir les cinq activités là où l'ancienne palette n'en
+   codait que deux. Les statuts gardent leurs tokens dédiés ; les types de série
+   détaillée se réduisent à deux axes (encre/rouge, plein/contour).
 3. Nouvelle valeur → primitive `--kd-*` d'abord, puis token sémantique.
-4. Polices (Space Grotesk / Instrument Sans / JetBrains Mono) à charger dans
-   `base.html.twig` — voir `docs/design-system.md §3`. À self-héberger le moment
-   venu pour l'offline (Phase 9).
+4. **Le condensé capitales ne touche pas au contenu saisi.** Titre de page,
+   bouton, onglet, rôle de bloc : Barlow Condensed uppercase. Nom d'exercice, de
+   séance, d'athlète, intitulé d'objectif : Barlow, casse normale.
+5. Polices (Barlow Condensed / Barlow / IBM Plex Mono) **self-hostées**,
+   régénérées par [`tools/fetch-fonts.sh`](./tools/fetch-fonts.sh) —
+   `assets/styles/fonts.css` est généré, ne jamais l'éditer à la main.
+6. **Trois points de rupture, et rien d'autre : 560 / 900 / 1200.** Ils ne
+   peuvent pas être tokenisés (`@media` n'accepte pas `var()`, et il n'y a pas
+   de build CSS) : c'est une convention documentée à tenir à la main.
 
 ---
 
@@ -201,11 +215,36 @@ deux sens, fiche de travail par athlète sous `/coach`, `ROLE_COACH`) — cf. §
 la règle de propriété — et **paramètres de compte** (`/profile/settings` :
 changement de mot de passe, création de compte par `app:user:create`).
 
-Dernier lot (aperçu au survol & pastilles de série) : le survol d'une case de plan
-rend désormais **une ligne par groupe de séries** comme la vue séance (fini le
-résumé d'une seule chaîne qui débordait du panneau), et le type de série s'affiche
-en **pastille sigle colorée** (`W`/`D`/`F`/`DS`, tokens `--color-set-*`) alignée en
-tête de ligne, en lecture comme au survol.
+Dernier lot (refonte graphique « Presse » & page séance) : bascule complète de
+l'identité (cf. §5), refonte de la page de consultation d'une séance sur le
+modèle de la maquette, et première vraie couche mobile/accessibilité.
+
+- **Identité** : `tokens.css` réécrit (primitives seules ; les noms sémantiques
+  n'ont pas bougé, c'est ce qui a repeint les 4 400 lignes de `components.css`
+  sans les toucher). Polices migrées vers Barlow / Barlow Condensed / IBM Plex
+  Mono via le nouveau `tools/fetch-fonts.sh`.
+- **Page séance** : hero encre, bandeau de KPI, onglets Programme / Analyse,
+  blocs en accordéon `<details>`, tableau de séries avec plage de rangs et % du
+  max, menu kebab d'actions. Le composant `_workout_read` est éclaté en
+  `_workout_program` / `_workout_sets_table` / `_workout_analysis`, et expose un
+  bloc Twig `actions` (d'où un `embed` côté `workout/show`) que la page publique
+  laisse vide.
+- **Services** : `WorkoutMetrics::summary()` et `::blockBreakdown()`,
+  `WorkoutEstimator::estimateBlockSeconds()`, nouvel enum `TargetRegion`.
+  `PlanFlattener` expose désormais `values` (le résumé sans le suffixe RPE) et,
+  par groupe de séries, `effort` / `firstIndex` / `lastIndex` / `weightKg` — le
+  regroupement condense l'affichage sans faire perdre la numérotation, et chaque
+  valeur a sa propre colonne au lieu d'une chaîne pré-assemblée.
+- **Mobile / a11y** : `<meta viewport>` rétablie (elle était commentée : aucune
+  media query ne se déclenchait sur téléphone), points de rupture ramenés de neuf
+  valeurs à trois, `base.css` (skip link, `.kd-sr-only`, `:focus-visible` global,
+  `prefers-reduced-motion`, cibles tactiles 44 px, impression), nav en barre
+  basse et calendrier en agenda vertical sous 560 px, contrôleur Stimulus `tabs`
+  en amélioration progressive.
+
+Lot précédent (aperçu au survol & pastilles de série) : le survol d'une case de
+plan rend une ligne par groupe de séries comme la vue séance, et le type de série
+s'affiche en pastille sigle (`W`/`D`/`F`/`DS`, tokens `--color-set-*`).
 
 Lot précédent (fusion Coaching / Mes athlètes) : le tableau de bord coach disparaît,
 `/coaching` porte les deux sens de la relation (demandes mutualisées, sections

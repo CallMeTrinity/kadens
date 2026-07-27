@@ -13,6 +13,7 @@ use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
 use App\Service\ProgressionAggregator;
 use App\Service\UnitFormatter;
+use App\Service\WorkoutEstimator;
 use App\Service\WorkoutMetrics;
 use PHPUnit\Framework\TestCase;
 
@@ -22,7 +23,7 @@ final class ProgressionAggregatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->aggregator = new ProgressionAggregator(new UnitFormatter(), new WorkoutMetrics());
+        $this->aggregator = new ProgressionAggregator(new UnitFormatter(), new WorkoutMetrics(new WorkoutEstimator()));
     }
 
     public function testWeightRampAcrossWeeksIsTraced(): void

@@ -6,39 +6,59 @@
 
 {% block body %}
     {# Vue de consultation auto-suffisante : aucun chargement AJAX post-rendu,
-       condition du cache offline (Phase 9). Consomme la sortie de PlanFlattener. #}
-    <div class="kd-actionbar">
-        <a href="{{ path('app_workout_index') }}" class="kd-backlink">
-            {{ ux_icon('lucide:arrow-left') }} Mes séances
-        </a>
+       condition du cache offline. Consomme PlanFlattener + WorkoutMetrics.
 
-        <div class="kd-actionbar__end"
-             data-controller="clipboard"
-             data-clipboard-url-value="{{ url('app_public_share', {slug: workout.slug}) }}">
-            {% if is_granted('WORKOUT_EDIT', workout) %}
-                <a href="{{ path('app_workout_edit', {id: workout.id}) }}" class="kd-btn kd-btn--secondary kd-btn--sm">
-                    {{ ux_icon('lucide:square-pen') }} Éditer
+       `embed` et non `include` : la barre d'actions se pose dans le hero du
+       composant partagé, que la page publique laisse vide. #}
+    {% embed 'components/_workout_read.html.twig' with {
+        flat: flat, summary: summary, blockStats: blockStats
+    } only %}
+        {% block actions %}
+            <div class="kd-wk__bar"
+                 data-controller="clipboard"
+                 data-clipboard-url-value="{{ url('app_public_share', {slug: flat.workout.slug}) }}">
+                <a href="{{ path('app_workout_index') }}" class="kd-wk__back">
+                    {{ ux_icon('lucide:arrow-left') }} Mes séances
                 </a>
-            {% endif %}
-            <a href="{{ path('app_export_workout', {id: workout.id}) }}" class="kd-btn kd-btn--ghost kd-btn--sm">
-                {{ ux_icon('lucide:file-down') }} Excel
-            </a>
-            <form method="post" action="{{ path('app_workout_duplicate', {id: workout.id}) }}" style="margin:0;">
-                <input type="hidden" name="_token" value="{{ csrf_token('duplicate' ~ workout.id) }}">
-                <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm">
-                    {{ ux_icon('lucide:copy') }} Dupliquer
-                </button>
-            </form>
-            <button type="button" class="kd-btn kd-btn--ghost kd-btn--sm" data-action="clipboard#copy">
-                {{ ux_icon('lucide:link-2') }} Copier le lien
-            </button>
-            <a href="{{ path('app_public_share', {slug: workout.slug}) }}" target="_blank" rel="noopener"
-               class="kd-btn kd-btn--ghost kd-btn--sm">
-                {{ ux_icon('lucide:external-link') }} Page publique
-            </a>
-            <span class="kd-actionbar__feedback" data-clipboard-target="feedback" role="status" aria-live="polite"></span>
-        </div>
-    </div>
 
-    {% include 'components/_workout_read.html.twig' with { flat: flat } only %}
+                <div class="kd-wk__baractions">
+                    {% if is_granted('WORKOUT_EDIT', flat.workout) %}
+                        <a href="{{ path('app_workout_edit', {id: flat.workout.id}) }}"
+                           class="kd-btn kd-btn--sm kd-btn--onink">
+                            {{ ux_icon('lucide:square-pen') }} Éditer
+                        </a>
+                    {% endif %}
+
+                    {# Les actions secondaires vivent dans un <details> natif :
+                       clavier et sans-JS d'office, comme le menu de compte. Le
+                       contrôleur `dismiss` n'ajoute que le confort. #}
+                    <details class="kd-kebab" data-controller="dismiss">
+                        <summary class="kd-kebab__trigger" aria-label="Plus d'actions">
+                            {{ ux_icon('lucide:ellipsis') }}
+                        </summary>
+                        <div class="kd-kebab__panel">
+                            <a href="{{ path('app_export_workout', {id: flat.workout.id}) }}" class="kd-kebab__item">
+                                {{ ux_icon('lucide:file-down') }} Exporter en Excel
+                            </a>
+                            <form method="post" action="{{ path('app_workout_duplicate', {id: flat.workout.id}) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('duplicate' ~ flat.workout.id) }}">
+                                <button type="submit" class="kd-kebab__item">
+                                    {{ ux_icon('lucide:copy') }} Dupliquer la séance
+                                </button>
+                            </form>
+                            <button type="button" class="kd-kebab__item" data-action="clipboard#copy">
+                                {{ ux_icon('lucide:link-2') }} Copier le lien
+                            </button>
+                            <a href="{{ path('app_public_share', {slug: flat.workout.slug}) }}"
+                               target="_blank" rel="noopener" class="kd-kebab__item">
+                                {{ ux_icon('lucide:external-link') }} Ouvrir la page publique
+                            </a>
+                        </div>
+                    </details>
+
+                    <span class="kd-wk__feedback" data-clipboard-target="feedback" role="status" aria-live="polite"></span>
+                </div>
+            </div>
+        {% endblock %}
+    {% endembed %}
 {% endblock %}

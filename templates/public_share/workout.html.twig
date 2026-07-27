@@ -6,6 +6,10 @@
 
 {% block body %}
     {# Page publique en lecture seule : réutilise le composant de rendu, sans
-       aucune action d'édition ni navigation propriétaire. #}
-    {% include 'components/_workout_read.html.twig' with { flat: flat } only %}
+       aucune action d'édition ni navigation propriétaire. Le bloc `actions` du
+       composant reste vide, c'est ce qui garantit qu'aucune commande
+       propriétaire ne peut fuiter ici. #}
+    {% include 'components/_workout_read.html.twig' with {
+        flat: flat, summary: summary, blockStats: blockStats
+    } only %}
 {% endblock %}

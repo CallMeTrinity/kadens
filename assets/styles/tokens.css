@@ -1,6 +1,6 @@
 /* ============================================================================
    Kadens — Design tokens
-   Identité : « Carnet clair » — papier & encre, accent terracotta.
+   Identité : « Presse » — encre, papier froid, un seul accent rouge.
    Source de vérité des couleurs, typo, espacements, rayons et ombres.
 
    Deux couches :
@@ -11,6 +11,11 @@
    Toute évolution visuelle passe par ce fichier, puis se répercute dans
    docs/design-system.md et CLAUDE.md (§ Design). Ne jamais coder une couleur
    en dur dans un template ou un composant.
+
+   Règle de contraste : tout token dont le nom commence par --color-text-* est
+   garanti ≥ 4.5:1 sur --color-surface-raised (WCAG AA texte courant). Les gris
+   plus clairs existent (--kd-cat-*, --kd-chart-*) mais ne portent JAMAIS de
+   texte : ils sont réservés aux filets, segments de barre et aplats.
    ============================================================================ */
 
 :root {
@@ -18,89 +23,112 @@
      1. PRIMITIVES
      ------------------------------------------------------------------------ */
 
-  /* Neutres papier (chauds, du plus foncé "page" au plus clair "surface haute") */
-  --kd-page:        #e9e6df; /* fond de page global */
-  --kd-paper-50:    #f7f5f0; /* fond de carte / conteneur principal */
-  --kd-paper-0:     #fffdf9; /* surface haute : en-têtes, cartes, cellules */
-  --kd-paper-100:   #f2ede3; /* remplissage discret (encart, slug) */
-  --kd-paper-150:   #f0ebe1; /* fond de tag / badge neutre */
-  --kd-paper-200:   #efe8dc; /* piste de barre de progression, séparateurs */
+  /* Neutres papier (froids, du plus foncé "page" au plus clair "surface haute").
+     Profondeur inversée : plus une surface est haute, plus elle est claire. */
+  --kd-page:        #dcdcd7; /* fond de page global */
+  --kd-paper-50:    #f7f7f5; /* fond de carte / conteneur principal */
+  --kd-paper-0:     #ffffff; /* surface haute : en-têtes, cartes, cellules */
+  --kd-paper-100:   #fbfbf9; /* remplissage discret (encart, slug) */
+  --kd-paper-150:   #f3f3f1; /* fond de tag / badge neutre */
+  --kd-paper-200:   #ecece8; /* piste de barre de progression, séparateurs */
+  --kd-paper-hover: #fafaf8; /* survol de ligne */
 
-  /* Encre (texte) — du primaire au plus estompé */
-  --kd-ink-900:     #1a1712; /* texte principal */
-  --kd-ink-800:     #2a2318; /* texte fort sur carte */
-  --kd-ink-800-alt: #2a1c14; /* texte sur tuile accentuée */
-  --kd-ink-700:     #3a3226; /* texte de bouton secondaire */
-  --kd-ink-500:     #5a5346; /* texte de liste inactif */
-  --kd-ink-muted:   #7a7264; /* texte secondaire */
-  --kd-ink-soft:    #8a8272; /* texte tertiaire / descriptions */
-  --kd-ink-faint:   #a99f8d; /* labels, libellés mono, texte estompé */
-  --kd-ink-placeholder: #b0a794; /* placeholders, valeurs très estompées */
-  --kd-ink-weekend: #c0a68f; /* numéros de week-end au calendrier */
-  --kd-ink-outside: #c9bfab; /* jours hors du mois courant */
+  /* Encre (texte) — du primaire au plus estompé.
+     Tous ≥ 4.5:1 sur --kd-paper-0 : la palette porte l'estompage par le
+     contraste relatif à l'encre pleine (#0b0b0b, 19:1), pas par la pâleur. */
+  --kd-ink-900:     #0b0b0b; /* texte principal */
+  --kd-ink-800:     #1a1a1a; /* texte fort sur carte, survol d'aplat encre */
+  --kd-ink-800-alt: #1a1a1a; /* texte sur tuile accentuée */
+  --kd-ink-700:     #2e2e2a; /* texte de bouton secondaire */
+  --kd-ink-500:     #4a4a46; /* texte de liste inactif */
+  --kd-ink-muted:   #5c5c56; /* texte secondaire        — 7.4:1 */
+  --kd-ink-soft:    #6e6e68; /* texte tertiaire         — 5.6:1 */
+  --kd-ink-faint:   #75756e; /* labels, libellés mono   — 5.2:1 */
+  --kd-ink-placeholder: #7a7a73; /* placeholders        — 4.8:1 */
+  --kd-ink-weekend: #6e6e68; /* numéros de week-end au calendrier */
+  --kd-ink-outside: #7a7a73; /* jours hors du mois courant */
 
-  /* Bordures */
-  --kd-border:        #e3ddd1; /* bordure de carte par défaut */
-  --kd-border-strong: #ddd3c2; /* champs, boutons, contours nets */
-  --kd-border-cell:   #e6e0d4; /* cellules de grille (matrice, calendrier) */
-  --kd-border-pill:   #e0d9cb; /* contour de puce/pill */
-  --kd-border-muted:  #d8d1c3; /* bordure de bouton secondaire */
-  --kd-divider:       #efe8dc; /* filet de séparation dans une carte */
-  --kd-divider-soft:  #f2ece1; /* filet très léger entre lignes */
+  /* Bordures — filets 1px, jamais d'ombre */
+  --kd-border:        #e2e2de; /* bordure de carte par défaut */
+  --kd-border-strong: #c9c9c2; /* champs, boutons, contours nets */
+  --kd-border-cell:   #e2e2de; /* cellules de grille (matrice, calendrier) */
+  --kd-border-pill:   #d6d6d0; /* contour de puce/pill */
+  --kd-border-muted:  #d6d6d0; /* bordure de bouton secondaire */
+  --kd-divider:       #e2e2de; /* filet de séparation dans une carte */
+  --kd-divider-soft:  #f0f0ec; /* filet très léger entre lignes */
 
-  /* Terracotta — accent primaire + code activité « course / trail » */
-  --kd-terracotta:        #b7532e; /* accent principal, boutons, liens */
-  --kd-terracotta-dark:   #8f3f22; /* survol / texte fort sur tint */
-  --kd-terracotta-text:   #a2694c; /* méta sur fond tint */
-  --kd-terracotta-tint:   #fbeee7; /* fond teinté terracotta */
+  /* Rouge — accent unique : actions primaires, intensité, échec, alerte.
+     C'est la seule couleur de la palette. Elle ne décore jamais. */
+  --kd-accent:        #d8261e; /* accent principal, boutons, liens  — 5.0:1 */
+  --kd-accent-dark:   #a81a14; /* survol / texte fort sur tint      — 7.4:1 */
+  --kd-accent-bright: #f03127; /* survol d'un aplat rouge plein */
+  --kd-accent-on-ink: #f0544c; /* accent lisible sur fond encre */
+  --kd-accent-tint:   #fbe9e8; /* fond teinté rouge */
+  --kd-accent-track:  #e8c9c7; /* piste de jauge d'intensité */
 
-  /* Olive — accent secondaire + code activité « muscu / renfo » */
-  --kd-olive:       #5c6b3a; /* accent activité gym */
-  --kd-olive-tint:  #eef1e3; /* fond teinté olive */
-  --kd-olive-text:  #6a7541; /* méta sur fond olive */
-  --kd-olive-dark:  #2c3218; /* texte fort sur tint olive */
-  --kd-olive-label: #4c5730; /* label de légende olive */
+  /* Aplat encre — hero, en-tête de tableau, bloc mis en avant */
+  --kd-ink-surface:      #0b0b0b;
+  --kd-ink-surface-hover: #1a1a1a;
+  --kd-on-ink:           #ffffff;
+  --kd-on-ink-muted:     rgba(255, 255, 255, .60);
+  --kd-on-ink-faint:     rgba(255, 255, 255, .45);
+  --kd-border-on-ink:    rgba(255, 255, 255, .18);
+  --kd-border-on-ink-strong: rgba(255, 255, 255, .35);
 
-  /* Statuts prévu / réalisé */
-  --kd-status-done:    #4c7a3a; /* fait */
-  --kd-status-planned: #a99f8d; /* prévu (= ink-faint) */
-  --kd-status-missed:  #c0392b; /* manqué */
+  /* Échelle catégorielle ordonnée — remplace l'ancien code couleur par
+     activité. Elle sert aux SÉRIES d'un graphique et aux aplats de catégorie,
+     jamais à du texte : ordonnée du plus dense au plus clair, elle se lit en
+     niveaux de gris comme une hiérarchie de volume. */
+  --kd-cat-1: #0b0b0b;
+  --kd-cat-2: #4a4a46;
+  --kd-cat-3: #8a8a82;
+  --kd-cat-4: #c9c9c2;
+
+  /* Statuts prévu / réalisé — sémantiques, donc distincts de l'échelle
+     catégorielle : fait = encre pleine, prévu = gris, manqué = rouge (le rouge
+     signale l'écart au plan, cohérent avec son usage « intensité / échec »). */
+  --kd-status-done:    #0b0b0b; /* fait */
+  --kd-status-planned: #8a8a82; /* prévu */
+  --kd-status-missed:  #d8261e; /* manqué */
 
   /* Types de série (mode « séries détaillées ») — pastille lettre W/D/F/DS.
-     Teintes désaturées, tenues dans la gamme terre du carnet : elles qualifient
-     l'intention d'une série, elles n'entrent pas en concurrence avec les codes
-     activité (terracotta/olive) ni statut. Chaque encre est assez foncée pour
-     rester lisible en 10 px sur son tint. */
-  --kd-set-warm:      #8f6c22; /* échauffement — ambre */
-  --kd-set-warm-tint: #f8f0dd;
-  --kd-set-degr:      #4a646d; /* dégressive — ardoise */
-  --kd-set-degr-tint: #e8eff1;
-  --kd-set-fail:      #a83a2c; /* à l'échec — brique */
-  --kd-set-fail-tint: #fbe9e5;
-  --kd-set-drop:      #6a4570; /* drop set — prune */
-  --kd-set-drop-tint: #f3eaf4;
+     Deux axes seulement, comme la maquette : l'encre pour ce qui structure la
+     série (échauffement, dégressive), le rouge pour ce qui la pousse (échec,
+     drop set) ; le plein pour le travail effectif, le contour pour l'approche.
+     C'est volontairement plus pauvre que l'ancienne famille à quatre teintes :
+     à 18 px, une lettre suffit à qualifier, la couleur n'a qu'à trancher. */
+  --kd-set-warm:      #0b0b0b; /* échauffement — contour encre */
+  --kd-set-warm-tint: #ffffff;
+  --kd-set-degr:      #0b0b0b; /* dégressive — encre pleine */
+  --kd-set-degr-tint: #f3f3f1;
+  --kd-set-fail:      #d8261e; /* à l'échec — rouge plein */
+  --kd-set-fail-tint: #fbe9e8;
+  --kd-set-drop:      #d8261e; /* drop set — contour rouge */
+  --kd-set-drop-tint: #ffffff;
 
   /* Pistes de graphiques */
-  --kd-chart-track: #e8e0d2; /* piste de l'anneau de synthèse */
-  --kd-chart-todo:  #e0d7c7; /* barre "à venir" (histogramme) */
+  --kd-chart-track: #efefec; /* piste de l'anneau de synthèse */
+  --kd-chart-todo:  #d6d6d0; /* barre "à venir" (histogramme) */
 
-  /* Ombres */
-  --kd-shadow-card:   0 6px 28px rgba(0, 0, 0, .09);
-  --kd-shadow-accent: 0 2px 8px rgba(183, 83, 46, .35);
+  /* Ombres — l'identité ne repose que sur des filets 1px. Les tokens
+     subsistent pour ne pas casser les consommateurs ; ils ne peignent rien. */
+  --kd-shadow-card:   none;
+  --kd-shadow-accent: none;
 
-  /* Rayons */
-  --kd-radius-xs:   4px;
-  --kd-radius-sm:   6px;
-  --kd-radius-md:   8px;  /* boutons, champs */
-  --kd-radius-lg:   11px; /* cartes */
-  --kd-radius-xl:   12px; /* grandes cartes */
-  --kd-radius-pill: 20px;
-  --kd-radius-full: 50%;
+  /* Rayons — aucun. Toutes les formes sont franches. Les noms subsistent pour
+     que components.css n'ait pas à être réécrit. */
+  --kd-radius-xs:   0;
+  --kd-radius-sm:   0;
+  --kd-radius-md:   0;
+  --kd-radius-lg:   0;
+  --kd-radius-xl:   0;
+  --kd-radius-pill: 0;
+  --kd-radius-full: 0;
 
   /* Familles de polices */
-  --kd-font-display: 'Space Grotesk', system-ui, sans-serif;   /* titres, gros chiffres */
-  --kd-font-sans:    'Instrument Sans', system-ui, sans-serif; /* corps de texte */
-  --kd-font-mono:    'JetBrains Mono', ui-monospace, Menlo, monospace; /* labels, méta, badges */
+  --kd-font-display: 'Barlow Condensed', system-ui, sans-serif;  /* titres, gros chiffres */
+  --kd-font-sans:    'Barlow', system-ui, sans-serif;            /* corps de texte */
+  --kd-font-mono:    'IBM Plex Mono', ui-monospace, Menlo, monospace; /* labels, méta, badges */
 
   /* Échelle d'espacement (base 4px, valeurs réellement utilisées dans les maquettes) */
   --kd-space-1:  4px;
@@ -118,13 +146,16 @@
   --kd-space-13: 30px;
 
   /* Graisses */
-  --kd-weight-regular:  400;
-  --kd-weight-medium:   500;
-  --kd-weight-semibold: 600;
-  --kd-weight-bold:     700;
+  --kd-weight-regular:   400;
+  --kd-weight-medium:    500;
+  --kd-weight-semibold:  600;
+  --kd-weight-bold:      700;
+  --kd-weight-extrabold: 800;
 
-  /* Interlettrage des labels mono en capitales (eyebrows) */
-  --kd-tracking-eyebrow:  .06em;
+  /* Interlettrage */
+  --kd-tracking-display:  -.01em; /* gros titres condensés */
+  --kd-tracking-action:    .1em;  /* boutons, onglets */
+  --kd-tracking-eyebrow:   .06em;
   --kd-tracking-eyebrow-lg: .1em;
   --kd-tracking-eyebrow-xl: .16em;
 
@@ -137,10 +168,20 @@
   --color-surface:         var(--kd-paper-50);
   --color-surface-raised:  var(--kd-paper-0);
   --color-surface-subtle:  var(--kd-paper-100);
+  --color-surface-hover:   var(--kd-paper-hover);
   --color-fill:            var(--kd-paper-150);
   --color-track:           var(--kd-paper-200);
 
-  /* Texte */
+  /* Aplat encre — hero, en-tête de tableau, ligne mise en avant */
+  --color-surface-ink:       var(--kd-ink-surface);
+  --color-surface-ink-hover: var(--kd-ink-surface-hover);
+  --color-on-ink:            var(--kd-on-ink);
+  --color-on-ink-muted:      var(--kd-on-ink-muted);
+  --color-on-ink-faint:      var(--kd-on-ink-faint);
+  --color-border-on-ink:     var(--kd-border-on-ink);
+  --color-border-on-ink-strong: var(--kd-border-on-ink-strong);
+
+  /* Texte — tous garantis ≥ 4.5:1 sur --color-surface-raised */
   --color-text:            var(--kd-ink-900);
   --color-text-strong:     var(--kd-ink-800);
   --color-text-secondary:  var(--kd-ink-muted);
@@ -152,23 +193,39 @@
   --color-border:          var(--kd-border);
   --color-border-strong:   var(--kd-border-strong);
   --color-border-cell:     var(--kd-border-cell);
+  --color-border-pill:     var(--kd-border-pill);
+  --color-border-muted:    var(--kd-border-muted);
   --color-divider:         var(--kd-divider);
   --color-divider-soft:    var(--kd-divider-soft);
 
-  /* Primaire (terracotta) */
-  --color-primary:         var(--kd-terracotta);
-  --color-primary-hover:   var(--kd-terracotta-dark);
-  --color-primary-tint:    var(--kd-terracotta-tint);
-  --color-primary-on-tint: var(--kd-terracotta-dark);
+  /* Primaire (rouge) */
+  --color-primary:         var(--kd-accent);
+  --color-primary-hover:   var(--kd-accent-dark);
+  --color-primary-bright:  var(--kd-accent-bright);
+  --color-primary-on-ink:  var(--kd-accent-on-ink);
+  --color-primary-tint:    var(--kd-accent-tint);
+  --color-primary-track:   var(--kd-accent-track);
+  --color-primary-on-tint: var(--kd-accent-dark);
   --color-on-primary:      #ffffff;
 
-  /* Accents d'activité (code couleur métier) */
-  --color-activity-run:       var(--kd-terracotta); /* course / trail */
-  --color-activity-run-tint:  var(--kd-terracotta-tint);
-  --color-activity-run-text:  var(--kd-terracotta-text);
-  --color-activity-gym:       var(--kd-olive);       /* muscu / renfo */
-  --color-activity-gym-tint:  var(--kd-olive-tint);
-  --color-activity-gym-text:  var(--kd-olive-text);
+  /* Échelle catégorielle (séries de graphique, aplats de catégorie) */
+  --color-cat-1:           var(--kd-cat-1);
+  --color-cat-2:           var(--kd-cat-2);
+  --color-cat-3:           var(--kd-cat-3);
+  --color-cat-4:           var(--kd-cat-4);
+
+  /* Accents d'activité — l'activité est portée par l'ICÔNE, la couleur ne fait
+     que la ranger dans l'échelle catégorielle. Les cinq activités sont
+     couvertes (l'ancienne palette n'en codait que deux). */
+  --color-activity-run:       var(--kd-cat-1); /* course / trail */
+  --color-activity-run-tint:  var(--kd-paper-150);
+  --color-activity-run-text:  var(--kd-ink-muted);
+  --color-activity-gym:       var(--kd-cat-2); /* muscu / renfo */
+  --color-activity-gym-tint:  var(--kd-paper-150);
+  --color-activity-gym-text:  var(--kd-ink-muted);
+  --color-activity-swim:      var(--kd-cat-3); /* natation */
+  --color-activity-bike:      var(--kd-cat-3); /* vélo */
+  --color-activity-mobility:  var(--kd-cat-4); /* mobilité */
 
   /* Types de série détaillée (pastille lettre) */
   --color-set-warmup:          var(--kd-set-warm);
@@ -185,7 +242,7 @@
   --color-status-planned:  var(--kd-status-planned);
   --color-status-missed:   var(--kd-status-missed);
 
-  /* Élévation */
+  /* Élévation — neutralisée : l'identité travaille au filet, pas à l'ombre */
   --shadow-card:           var(--kd-shadow-card);
   --shadow-accent:         var(--kd-shadow-accent);
 

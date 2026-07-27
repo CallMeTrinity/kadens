@@ -12,6 +12,8 @@ use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
 use App\Enum\SetType;
 use App\Enum\TargetArea;
+use App\Enum\TargetRegion;
+use App\Service\WorkoutEstimator;
 use App\Service\WorkoutMetrics;
 use PHPUnit\Framework\TestCase;
 
@@ -21,7 +23,7 @@ final class WorkoutMetricsTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->metrics = new WorkoutMetrics();
+        $this->metrics = new WorkoutMetrics(new WorkoutEstimator());
     }
 
     public function testDistinctActivitiesInOrderOfAppearance(): void
@@ -95,6 +97,104 @@ final class WorkoutMetricsTest extends TestCase
         self::assertSame(6, $vol['gym']['setsByArea']['chest']);
         // Tonnage hors échauffement : (8×100 + 8×100 + 6×80) = 2080, × 2 tours = 4160.
         self::assertSame(4160.0, $vol['gym']['tonnageKg']);
+    }
+
+    public function testSummaryWeightsRpeByWorkingSetsAndKeepsTopLift(): void
+    {
+        // Squat 4×5 @ 120 kg RPE 9 / Curl 2×12 @ 20 kg RPE 6.
+        // Une moyenne simple donnerait 7,5 ; pondérée par les séries : 8.
+        $squat = $this->prescribed(ActivityType::GYM, PrescriptionType::SETS_REPS, [TargetArea::QUADRICEPS]);
+        $squat->setSets(4)->setReps(5)->setWeightKg(120.0)->setRpe(9);
+        $squat->getExercise()->setName('Squat');
+
+        $curl = $this->prescribed(ActivityType::GYM, PrescriptionType::SETS_REPS, [TargetArea::BICEPS]);
+        $curl->setSets(2)->setReps(12)->setWeightKg(20.0)->setRpe(6);
+        $curl->getExercise()->setName('Curl');
+
+        $workout = $this->workout([$this->block(BlockRole::MAIN, 1, [$squat, $curl])]);
+        $summary = $this->metrics->summary($workout);
+
+        self::assertSame(8.0, $summary['averageRpe']);
+        self::assertSame(6, $summary['workingSets']);
+        self::assertSame(2, $summary['exerciseCount']);
+        // Deux exercices enchaînés dans un bloc = un superset.
+        self::assertSame(1, $summary['supersets']);
+        self::assertSame(0, $summary['circuits']);
+        self::assertNotNull($summary['topLift']);
+        self::assertSame('Squat', $summary['topLift']['exercise']);
+        self::assertSame(120.0, $summary['topLift']['weightKg']);
+        // 4×5×120 + 2×12×20 = 2400 + 480.
+        self::assertSame(2880.0, $summary['tonnageKg']);
+    }
+
+    public function testSummaryGroupsVolumeByAnatomicalRegion(): void
+    {
+        // 4 séries jambes (2 zones ciblées → 8 séries attribuées),
+        // 2 séries bras (1 zone → 2 attribuées). Total attribué = 10.
+        $squat = $this->prescribed(ActivityType::GYM, PrescriptionType::SETS_REPS, [TargetArea::QUADRICEPS, TargetArea::GLUTES]);
+        $squat->setSets(4)->setReps(5)->setWeightKg(100.0);
+
+        $curl = $this->prescribed(ActivityType::GYM, PrescriptionType::SETS_REPS, [TargetArea::BICEPS]);
+        $curl->setSets(2)->setReps(12)->setWeightKg(20.0);
+
+        $workout = $this->workout([$this->block(BlockRole::MAIN, 1, [$squat, $curl])]);
+        $regions = $this->metrics->summary($workout)['regions'];
+
+        self::assertCount(2, $regions);
+        // Trié par volume décroissant.
+        self::assertSame(TargetRegion::LOWER_BODY, $regions[0]['region']);
+        self::assertSame(8, $regions[0]['sets']);
+        self::assertSame(80.0, $regions[0]['percent']);
+        self::assertSame(TargetRegion::UPPER_BODY, $regions[1]['region']);
+        self::assertSame(20.0, $regions[1]['percent']);
+    }
+
+    public function testSummaryIsEmptyButValidOnAnEmptyWorkout(): void
+    {
+        $summary = $this->metrics->summary($this->workout([]));
+
+        self::assertSame(0.0, $summary['tonnageKg']);
+        self::assertSame(0, $summary['workingSets']);
+        self::assertSame(0, $summary['blockCount']);
+        self::assertNull($summary['averageRpe']);
+        self::assertNull($summary['topLift']);
+        self::assertSame([], $summary['regions']);
+    }
+
+    public function testBlockBreakdownSumsToTheWorkoutTotals(): void
+    {
+        $bench = $this->prescribed(ActivityType::GYM, PrescriptionType::SETS_REPS, [TargetArea::CHEST]);
+        $bench->setSets(3)->setReps(8)->setWeightKg(80.0)->setRestSeconds(120);
+
+        $row = $this->prescribed(ActivityType::GYM, PrescriptionType::SETS_REPS, [TargetArea::BACK]);
+        $row->setSets(3)->setReps(10)->setWeightKg(60.0)->setRestSeconds(90);
+
+        $workout = $this->workout([
+            $this->block(BlockRole::WARMUP, 1, [$bench]),
+            $this->block(BlockRole::MAIN, 2, [$row]),
+        ]);
+
+        $blocks = $this->metrics->blockBreakdown($workout);
+        $summary = $this->metrics->summary($workout);
+
+        self::assertCount(2, $blocks);
+        self::assertSame(3, $blocks[0]['workingSets']);
+        // Bloc à 2 tours : 3 séries × 2.
+        self::assertSame(6, $blocks[1]['workingSets']);
+
+        self::assertSame(
+            $summary['workingSets'],
+            $blocks[0]['workingSets'] + $blocks[1]['workingSets'],
+        );
+        self::assertSame(
+            $summary['tonnageKg'],
+            $blocks[0]['tonnageKg'] + $blocks[1]['tonnageKg'],
+        );
+        // La durée déléguée à l'estimateur doit retomber sur son total.
+        self::assertSame(
+            (new WorkoutEstimator())->estimateSeconds($workout),
+            $blocks[0]['seconds'] + $blocks[1]['seconds'],
+        );
     }
 
     /**

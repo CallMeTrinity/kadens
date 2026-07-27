@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Entity\Block;
 use App\Entity\PrescribedExercise;
 use App\Entity\Workout;
 use App\Enum\PrescriptionType;
@@ -28,15 +29,25 @@ final class WorkoutEstimator
         $total = 0;
 
         foreach ($workout->getBlocks() as $block) {
-            $blockSeconds = 0;
-            foreach ($block->getPrescribedExercises() as $prescribed) {
-                $blockSeconds += $this->prescribedSeconds($prescribed);
-            }
-
-            $total += $blockSeconds * max(1, $block->getRounds() ?? 1);
+            $total += $this->estimateBlockSeconds($block);
         }
 
         return $total;
+    }
+
+    /**
+     * Durée estimée d'un bloc seul, tours compris. Extrait de estimateSeconds()
+     * pour que la timeline de l'onglet « Analyse » et le résumé d'en-tête
+     * d'accordéon lisent la même valeur que le total de la séance.
+     */
+    public function estimateBlockSeconds(Block $block): int
+    {
+        $seconds = 0;
+        foreach ($block->getPrescribedExercises() as $prescribed) {
+            $seconds += $this->prescribedSeconds($prescribed);
+        }
+
+        return $seconds * max(1, $block->getRounds() ?? 1);
     }
 
     /**

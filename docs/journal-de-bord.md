@@ -158,8 +158,11 @@ navigateur (non automatisable ici).
   éditeur (`_grid.html.twig` : même grille en variante `.kd-plangrid--edit`, séance en
   `.kd-planitem` avec retrait `.kd-planitem__del`, ajout par case en `<details>`
   `.kd-planadd`, sections infos/dupliquer/zone dangereuse en `.kd-editsection`,
-  suppression `.kd-btn--danger`). La grille bascule en agenda vertical (jour en ligne) :
-  à 1024px en édition, 880px en lecture. Couleur neutre (trame multi-activités). Icônes
+  suppression `.kd-btn--danger`). La grille bascule en agenda vertical (jour en ligne)
+  à 900px en lecture ; en édition elle l'est désormais toujours (cf. commentaire de
+  `.kd-plangrid--edit`). Le breakpoint 1024px mentionné ici n'a jamais existé dans le
+  CSS, et les valeurs ont été ramenées aux trois paliers du design system lors de la
+  refonte « Presse ». Couleur neutre (trame multi-activités). Icônes
   importées : `copy`, `calendar-range`.
   **Calendrier stylé** : `calendar/index.html.twig` refait. En-tête `.kd-pagehead`
   (eyebrow « Planning » + mois) avec nav prev/aujourd'hui/suivant + export en
@@ -1064,3 +1067,124 @@ trois lignes (pastille, compteur centré, détail). Réflexe à garder dès qu'u
 en accueille une autre : cibler l'enfant direct.
 
 **Tests** : 121 au vert, `lint:twig` OK. Aucun test ne portait sur `SetType::icon()`.
+
+---
+
+## Lot — Refonte graphique « Presse » & page de consultation d'une séance
+
+**Point de départ.** Une maquette Claude Design (« Séance — Refonte ») prenant la
+page séance comme test d'une nouvelle direction graphique, à généraliser ensuite à
+toute l'application.
+
+**Le constat qui a cadré le lot.** `templates/base.html.twig` avait sa balise
+`<meta name="viewport">` **commentée**. Conséquence : les navigateurs mobiles
+rendaient dans un viewport virtuel de ~980 px puis dézoomaient, et **aucune** des
+16 media queries du projet ne se déclenchait jamais sur téléphone. Tout le travail
+responsive accumulé était inopérant. C'est un fix d'une ligne qui change le
+diagnostic complet — à vérifier en premier sur n'importe quel projet.
+
+**Identité.** Papier froid `#dcdcd7`, encre `#0b0b0b`, un seul accent rouge
+`#d8261e`, rayon 0, aucune ombre, Barlow Condensed / Barlow / IBM Plex Mono.
+
+Le levier a été l'architecture en deux couches de `tokens.css` : seules les
+**primitives** `--kd-*` ont été réécrites, les noms sémantiques `--color-*` n'ont
+pas bougé. Les 4 400 lignes de `components.css` se sont repeintes sans être
+touchées. Ce qui a demandé du travail manuel, c'est la **forme** : Barlow
+Condensed est bien plus étroite que Space Grotesk, un simple échange de famille
+donnait des titres maigres. D'où une passe sur les porteurs de `--font-display`
+(taille, graisse 700/800, `letter-spacing`, `text-transform`).
+
+**Deux règles de design réécrites.**
+1. *Le code couleur par activité disparaît.* La maquette n'emploie que noir, gris
+   et rouge. Les catégories passent sur une échelle de gris ordonnée
+   (`--color-cat-1..4`), le rouge restant aux actions et à l'intensité. Bénéfice
+   collatéral : le trou documenté depuis longtemps (natation, vélo, mobilité sans
+   paire accent/tint) se referme — cinq activités couvertes au lieu de deux.
+2. *Les pastilles de série passent de quatre teintes à deux axes* : encre pour ce
+   qui structure la série, rouge pour ce qui la pousse ; plein pour le travail
+   effectif, contour sinon.
+
+**Contraste.** Les gris clairs de la maquette (`#9a9a93` ≈ 2.8:1, `#8e8e86` ≈
+3.3:1) échouent en AA. Règle posée dans les tokens : un gris sous 4.5:1 ne porte
+**jamais** de texte, seulement des filets et des segments de barre. Les tokens
+`--color-text-*` sont tous ≥ 4.5:1 — c'est un net progrès sur « Carnet clair »,
+dont les eyebrows mono (`--kd-ink-faint` `#a99f8d` ≈ 2.3:1) étaient en échec alors
+qu'ils étaient la signature de l'identité.
+
+**Page séance.** Hero encre pleine largeur, bandeau de 4 KPI (volume,
+enchaînements, RPE moyen avec jauge à 10 crans, charge la plus lourde), onglets
+Programme / Analyse, blocs en accordéon, tableau de séries détaillées avec plage
+de rangs (« 03 — 06 ») et % du max, menu kebab d'actions.
+
+`_workout_read.html.twig` est éclaté en `_workout_program`,
+`_workout_sets_table`, `_workout_analysis`, et expose un **bloc Twig `actions`**
+plutôt qu'une variable : `workout/show` l'`embed` pour y poser la barre du
+propriétaire, `public_share/workout` l'`include` et laisse le bloc vide. C'est
+structurellement ce qui garantit qu'aucune commande d'édition ne peut fuiter sur
+la page publique (un `include` ne porte pas de blocs, d'où le passage à `embed`).
+
+**Services.** `WorkoutMetrics::summary()` (RPE **pondéré par les séries de
+travail** — une moyenne simple donnerait autant de poids à un exercice de 2 séries
+qu'à un de 6) et `::blockBreakdown()`, qui délègue la durée à
+`WorkoutEstimator::estimateBlockSeconds()` pour que la somme des blocs retombe
+exactement sur le total de la séance (un test le vérifie). Nouvel enum
+`TargetRegion` : les 17 `TargetArea` regroupées en 4 régions, qui se mappent une
+pour une sur l'échelle catégorielle — ventiler 17 zones donnait une barre
+illisible. Le regroupement existait déjà en commentaires dans `TargetArea`, il est
+juste rendu exploitable.
+
+**Piège évité de justesse.** Le premier rendu affichait `4 × 6 @ 120 kg · RPE 8`
+**et** une colonne RPE, puis `6 reps @ 70 kg` **et** une colonne Charge. Cause :
+`PlanFlattener` n'exposait que des chaînes **pré-assemblées** (`summary`,
+`detail`), pensées pour être affichées seules. Dès qu'une vue donne sa propre
+colonne à chaque valeur, il lui faut les parties. D'où `values` (le résumé sans le
+suffixe RPE) et `effort` (l'effort d'une série sans sa charge), à côté des chaînes
+complètes qui restent utiles à l'export Excel, à l'aperçu au survol et aux
+pastilles de calendrier. Réflexe à garder : une chaîne assemblée n'est pas une
+donnée, c'est un rendu.
+
+**Mobile et accessibilité, toute l'application.**
+- Points de rupture ramenés de neuf valeurs dispersées (480→1100) à **trois** :
+  560 / 900 / 1200. Ils ne peuvent pas être tokenisés — `@media` n'accepte pas
+  `var()` et il n'y a pas de build CSS (AssetMapper, pas de PostCSS). C'est une
+  convention documentée.
+- Nouveau `assets/styles/base.css` : `.kd-skip`, `.kd-sr-only`, `:focus-visible`
+  global (anneau encre 2 px ; l'ancien halo `--color-primary-tint` ne tenait pas
+  les 3:1 de WCAG 1.4.11), `prefers-reduced-motion`, cibles tactiles 44 px sous
+  `pointer: coarse`, et une feuille d'impression qui force l'ouverture des
+  `<details>` et des panneaux d'onglets masqués.
+- La nav condensée **ne masque plus les libellés** : `display: none` retire
+  l'élément de l'arbre d'accessibilité, les 4 liens perdaient donc leur nom
+  accessible. Sous 560 px elle passe en barre basse fixe (icône + libellé).
+- Calendrier mensuel en **agenda vertical** sous 560 px : le scroll horizontal à
+  `min-width: 720px` avec des cases de 100 px était impraticable au doigt. Chaque
+  case porte désormais son jour de la semaine (`.kd-calday__dow`), masqué tant
+  qu'une colonne le nomme.
+- Contrôleur Stimulus `tabs` en **amélioration progressive** : le serveur rend
+  tous les panneaux avec leurs titres, le contrôleur révèle la barre (rendue
+  `hidden`), masque les titres et pose l'ARIA (roving tabindex, flèches,
+  Home/End). Sans JS, la page reste complète.
+
+**Détail technique.** `tools/fetch-fonts.sh` créé : `docs/design-system.md`
+mentionnait un « script de fetch » qui n'existait pas dans le dépôt. 22 woff2
+(264 Ko contre 380 avant). Quatre tokens sémantiques manquants ont été trouvés au
+passage (`--color-border-pill`, `--color-border-muted`, `--color-ink-outside`,
+`--shadow-raised`) — ils étaient consommés par `components.css` sans avoir jamais
+été déclarés, donc silencieusement inertes.
+
+**Ce qui a été écarté.** Trois éléments de la maquette n'ont aucun support dans le
+modèle : « Démarrer la séance » (contredit la règle « pas de tracking détaillé »,
+CLAUDE.md §3), le champ « Lieu » (inexistant sur `Workout`), et la comparaison
+avec une séance précédente (aucun historique modélisé). Écartés plutôt
+qu'improvisés.
+
+**Découpe de `components.css` abandonnée.** Elle était au plan (4 400 lignes → 6
+fichiers). À l'exécution, aucun découpage contigu ne donnait des fichiers aux noms
+honnêtes : l'ordre source entremêle composants transverses et CSS de vue, et un
+découpage non contigu produisait un diff de 4 400 lignes rendant la refonte
+elle-même illisible en revue. Le fichier reste sectionné par bannières, et la
+couche responsive s'y insère au sein de chaque section. `base.css` a été créé pour
+le socle transverse — du code neuf, pas du code déplacé.
+
+**Tests** : 128 au vert (dont un `SmokeTest` qui balaie les 18 vues et vérifie
+qu'aucune ne casse après la bascule des tokens), `lint:twig` OK.

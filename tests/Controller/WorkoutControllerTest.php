@@ -6,11 +6,13 @@ use App\Entity\Block;
 use App\Entity\Exercise;
 use App\Entity\PlanTemplate;
 use App\Entity\PrescribedExercise;
+use App\Entity\PrescribedSet;
 use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
+use App\Enum\SetType;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -329,6 +331,45 @@ final class WorkoutControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('body', 'Squat');
         self::assertSelectorTextContains('body', '4 × 8 @ 60 kg');
+
+        // Bandeau de synthèse : 4 séries × 8 reps × 60 kg = 1 920 kg.
+        self::assertSelectorExists('.kd-wk__kpis');
+        self::assertSelectorTextContains('.kd-wk__kpis', '1 920');
+        // Les deux panneaux sont rendus côté serveur : sans JS, la page est
+        // complète (le contrôleur `tabs` n'en masque un qu'après coup).
+        self::assertSelectorExists('[data-tabs-name="programme"]');
+        self::assertSelectorExists('[data-tabs-name="analyse"]');
+    }
+
+    public function testShowGroupsDetailedSetsIntoARangedTable(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise($user, 'Soulevé de terre');
+        $workout = $this->createWorkout($user, 'Séance dos');
+
+        $block = (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(0);
+        $prescribed = (new PrescribedExercise())
+            ->setExercise($exercise)
+            ->setPosition(0)
+            ->setPrescriptionType(PrescriptionType::SETS_REPS);
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(0)->setSetType(SetType::WARMUP)->setReps(6)->setWeightKg(70.0));
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(1)->setSetType(SetType::NORMAL)->setReps(6)->setWeightKg(140.0));
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(2)->setSetType(SetType::NORMAL)->setReps(6)->setWeightKg(140.0));
+        $block->addPrescribedExercise($prescribed);
+        $workout->addBlock($block);
+        $this->em->persist($block);
+        $this->em->flush();
+        $this->em->clear();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('.kd-settable');
+        // Groupe fusionné : deux séries de travail rendues sur une ligne « 02 — 03 ».
+        self::assertStringContainsString('02 — 03', $crawler->filter('.kd-settable')->text());
+        // % de la charge la plus lourde : l'échauffement à 70/140.
+        self::assertStringContainsString('50 %', $crawler->filter('.kd-settable')->text());
     }
 
     public function testShowDeniedToNonOwner(): void

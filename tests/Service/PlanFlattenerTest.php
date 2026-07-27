@@ -15,6 +15,7 @@ use App\Enum\PrescriptionType;
 use App\Enum\SetType;
 use App\Service\PlanFlattener;
 use App\Service\UnitFormatter;
+use App\Service\WorkoutEstimator;
 use App\Service\WorkoutMetrics;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -25,7 +26,7 @@ final class PlanFlattenerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->flattener = new PlanFlattener(new UnitFormatter(), new WorkoutMetrics());
+        $this->flattener = new PlanFlattener(new UnitFormatter(), new WorkoutMetrics(new WorkoutEstimator()));
     }
 
     #[DataProvider('summaryCases')]
@@ -75,6 +76,47 @@ final class PlanFlattenerTest extends TestCase
         self::assertSame(2, $flat['sets'][1]['count']);
         self::assertNull($flat['sets'][1]['typeLabel']); // NORMAL : pas de libellé
         self::assertSame('Drop set', $flat['sets'][2]['typeLabel']);
+    }
+
+    /**
+     * Le regroupement condense l'affichage, il ne doit pas faire perdre le rang
+     * réel des séries : le tableau de lecture affiche « 02 — 03 » sur un groupe
+     * de deux, et dérive le « % du max » de la charge brute conservée.
+     */
+    public function testDetailedSetGroupsKeepSetNumberingAndRawWeight(): void
+    {
+        $exercise = (new Exercise())->setName('Soulevé de terre')->setActivity(ActivityType::GYM);
+        $prescribed = (new PrescribedExercise())
+            ->setPrescriptionType(PrescriptionType::SETS_REPS)
+            ->setExercise($exercise)
+            ->setPosition(0);
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(0)->setSetType(SetType::WARMUP)->setReps(6)->setWeightKg(70.0));
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(1)->setSetType(SetType::NORMAL)->setReps(6)->setWeightKg(140.0));
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(2)->setSetType(SetType::NORMAL)->setReps(6)->setWeightKg(140.0));
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(3)->setSetType(SetType::TO_FAILURE)->setReps(6)->setWeightKg(140.0));
+
+        $block = (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(0);
+        $block->addPrescribedExercise($prescribed);
+        $workout = (new Workout())->setTitle('Séance')->setSlug('seance-num');
+        $workout->addBlock($block);
+
+        $flat = $this->flattener->flattenWorkout($workout)['blocks'][0]['exercises'][0];
+        $groups = $flat['sets'];
+
+        self::assertCount(3, $groups);
+        // Groupe isolé : rang unique.
+        self::assertSame(1, $groups[0]['firstIndex']);
+        self::assertSame(1, $groups[0]['lastIndex']);
+        // Groupe fusionné : la plage couvre les deux séries d'origine.
+        self::assertSame(2, $groups[1]['firstIndex']);
+        self::assertSame(3, $groups[1]['lastIndex']);
+        // Le groupe suivant reprend la numérotation là où elle en était.
+        self::assertSame(4, $groups[2]['firstIndex']);
+
+        self::assertSame(70.0, $groups[0]['weightKg']);
+        self::assertSame(140.0, $groups[1]['weightKg']);
+        // Référence du pourcentage : la charge la plus lourde de l'exercice.
+        self::assertSame(140.0, $flat['topWeightKg']);
     }
 
     /**

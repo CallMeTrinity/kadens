@@ -1,105 +1,155 @@
 # Design system — Kadens
 
 Référence visuelle de l'application. Elle décrit l'identité, les tokens et les
-patterns de composants tirés des maquettes. La source de vérité des valeurs est
+patterns de composants. La source de vérité des valeurs est
 [`assets/styles/tokens.css`](../assets/styles/tokens.css) : ce document explique
 comment et quand les utiliser, il ne les redéfinit pas.
 
-Origine : maquette Claude Design « Kadens — Éditeur de plan », variante retenue
-**1a — Carnet clair**. Toutes les autres vues (bibliothèque, séance, calendrier,
-synthèse) en sont des déclinaisons.
+Origine : maquette Claude Design « Séance — Refonte », qui a servi de test à la
+nouvelle direction avant sa généralisation. Elle remplace l'identité « Carnet
+clair » (papier crème, terracotta, olive, Space Grotesk / Instrument Sans /
+JetBrains Mono) sur **toutes** les vues.
 
 ---
 
-## 1. Identité — « Carnet clair »
+## 1. Identité — « Presse »
 
-Papier et encre. Fond chaud légèrement crème, texte encre foncée, un seul accent
-franc (terracotta) et un accent secondaire sobre (olive) qui sert de **code
-couleur métier**, pas de décoration. Densité éditoriale : beaucoup de labels en
-mono capitales façon carnet d'entraînement, des cartes nettes à coins arrondis,
-des filets fins plutôt que des ombres lourdes.
+Registre éditorial sportif. Papier froid, encre quasi noire, **un seul accent**
+rouge. Aucune forme arrondie, aucune ombre : tout se joue au filet `1px` et aux
+aplats. Titres en condensé capitales, valeurs et métadonnées en mono. La densité
+vient du contraste typographique, pas de la couleur.
 
-Principe : **la couleur porte du sens.** Terracotta = course/trail et actions
-primaires. Olive = muscu/renfo. Rien n'est coloré « pour faire joli ».
+Deux principes tiennent tout le reste :
+
+1. **La couleur porte du sens — et il n'y en a qu'une.** Le rouge marque les
+   actions primaires, l'intensité et l'échec. Tout le reste vit en niveaux de
+   gris. Une catégorie (activité, région musculaire, rôle de bloc) se code par
+   sa **place dans l'échelle catégorielle**, pas par une teinte propre.
+2. **Le contraste avant la pâleur.** Un texte estompé l'est parce que l'encre
+   pleine est à 19:1, pas parce qu'il est pâle. Tout token `--color-text-*` tient
+   au moins 4.5:1 sur `--color-surface-raised`.
 
 ---
 
 ## 2. Couleurs
 
 ### Neutres papier
-Du fond de page au plus clair. La hiérarchie de profondeur va à l'envers de
-l'habitude : plus une surface est « haute » (carte, en-tête), plus elle est
-claire (`--color-surface-raised` = `#fffdf9`), posée sur un fond de page plus
-foncé (`--color-bg` = `#e9e6df`).
+La hiérarchie de profondeur va à l'envers de l'habitude : plus une surface est
+« haute », plus elle est claire, posée sur un fond de page plus foncé.
 
 | Token | Valeur | Usage |
 |---|---|---|
-| `--color-bg` | `#e9e6df` | fond de page |
-| `--color-surface` | `#f7f5f0` | fond de carte / conteneur |
-| `--color-surface-raised` | `#fffdf9` | en-têtes, cartes internes, cellules |
-| `--color-surface-subtle` | `#f2ede3` | encarts, champ slug |
-| `--color-fill` | `#f0ebe1` | tags / badges neutres |
-| `--color-track` | `#efe8dc` | pistes de barres, séparateurs |
+| `--color-bg` | `#dcdcd7` | fond de page |
+| `--color-surface` | `#f7f7f5` | fond de carte / conteneur |
+| `--color-surface-raised` | `#ffffff` | en-têtes, cartes internes, cellules |
+| `--color-surface-subtle` | `#fbfbf9` | encarts, ligne de série de travail |
+| `--color-surface-hover` | `#fafaf8` | survol de ligne |
+| `--color-fill` | `#f3f3f1` | tags / badges neutres |
+| `--color-track` | `#ecece8` | pistes de barres, séparateurs |
+
+### Aplat encre
+Le hero de séance, les en-têtes de tableau et l'onglet actif s'inversent. Une
+famille dédiée évite d'écrire des `rgba()` blancs à la main.
+
+| Token | Valeur | Usage |
+|---|---|---|
+| `--color-surface-ink` | `#0b0b0b` | fond des aplats inversés |
+| `--color-on-ink` | `#ffffff` | texte sur aplat encre |
+| `--color-on-ink-muted` | `rgba(255,255,255,.60)` | texte secondaire sur encre |
+| `--color-on-ink-faint` | `rgba(255,255,255,.45)` | labels mono sur encre |
+| `--color-border-on-ink` | `rgba(255,255,255,.18)` | filets sur encre |
+| `--color-primary-on-ink` | `#f0544c` | accent lisible sur encre |
 
 ### Encre (texte)
-| Token | Valeur | Usage |
-|---|---|---|
-| `--color-text` | `#1a1712` | texte principal |
-| `--color-text-strong` | `#2a2318` | intitulés forts sur carte |
-| `--color-text-secondary` | `#7a7264` | texte secondaire |
-| `--color-text-soft` | `#8a8272` | descriptions |
-| `--color-text-faint` | `#a99f8d` | labels mono, texte estompé |
-| `--color-text-placeholder` | `#b0a794` | placeholders, valeurs très pâles |
+Tous ces tokens sont garantis **≥ 4.5:1 sur `--color-surface-raised`**.
 
-### Accent primaire — Terracotta
-| Token | Valeur | Usage |
-|---|---|---|
-| `--color-primary` | `#b7532e` | boutons primaires, liens, accents |
-| `--color-primary-hover` | `#8f3f22` | survol, texte fort sur tint |
-| `--color-primary-tint` | `#fbeee7` | fond teinté (badge actif, tuile course) |
-| `--color-on-primary` | `#ffffff` | texte sur fond terracotta plein |
-
-### Code couleur activité
-Terracotta et olive servent à distinguer les familles d'activité dans les
-maquettes (matrice de plan, calendrier, synthèse). À câbler sur le champ
-`activity` de l'entité `Exercise` / la famille de la séance.
-
-| Famille | Accent | Tint | Texte sur tint |
+| Token | Valeur | Contraste | Usage |
 |---|---|---|---|
-| Course / trail (`run`) | `--color-activity-run` `#b7532e` | `--color-activity-run-tint` `#fbeee7` | `--color-activity-run-text` `#a2694c` |
-| Muscu / renfo (`gym`) | `--color-activity-gym` `#5c6b3a` | `--color-activity-gym-tint` `#eef1e3` | `--color-activity-gym-text` `#6a7541` |
+| `--color-text` | `#0b0b0b` | 19:1 | texte principal |
+| `--color-text-strong` | `#1a1a1a` | 16:1 | intitulés forts sur carte |
+| `--color-text-secondary` | `#5c5c56` | 7.4:1 | texte secondaire |
+| `--color-text-soft` | `#6e6e68` | 5.6:1 | descriptions |
+| `--color-text-faint` | `#75756e` | 5.2:1 | labels mono, texte estompé |
+| `--color-text-placeholder` | `#7a7a73` | 4.8:1 | placeholders |
 
-> Les maquettes ne couvrent que deux familles visuellement. Les autres activités
-> du modèle (natation, vélo, mobilité) devront recevoir leur propre paire
-> accent/tint quand elles seront designées — les ajouter alors comme primitives
-> `--kd-*` puis tokens `--color-activity-*`, jamais en dur.
+### Accent — rouge
+| Token | Valeur | Usage |
+|---|---|---|
+| `--color-primary` | `#d8261e` | boutons primaires, liens, intensité (5.0:1) |
+| `--color-primary-hover` | `#a81a14` | survol d'un **texte** rouge (7.4:1) |
+| `--color-primary-bright` | `#f03127` | survol d'un **aplat** rouge plein |
+| `--color-primary-tint` | `#fbe9e8` | fond teinté |
+| `--color-primary-track` | `#e8c9c7` | piste de jauge d'intensité |
+| `--color-on-primary` | `#ffffff` | texte sur aplat rouge |
+
+> Deux survols distincts, ce n'est pas une redondance : un aplat rouge doit
+> **s'éclaircir** au survol (le foncer le referme), un texte rouge doit
+> **foncer**. Confondre les deux donne un bouton primaire qui s'éteint.
+
+### Échelle catégorielle
+Remplace l'ancien code couleur par activité. Elle sert aux **séries d'un
+graphique** et aux aplats de catégorie, jamais à du texte : ordonnée du plus
+dense au plus clair, elle se lit comme une hiérarchie de volume.
+
+| Token | Valeur | Classe utilitaire |
+|---|---|---|
+| `--color-cat-1` | `#0b0b0b` | `.kd-cat--1` |
+| `--color-cat-2` | `#4a4a46` | `.kd-cat--2` |
+| `--color-cat-3` | `#8a8a82` | `.kd-cat--3` |
+| `--color-cat-4` | `#c9c9c2` | `.kd-cat--4` |
+
+### Code activité
+L'activité est portée par l'**icône** (voir `_activity.html.twig`, source unique
+du couple icône ↔ modificateur). Le rang catégoriel ne fait que la classer. Les
+cinq activités sont couvertes — l'ancienne palette n'en codait que deux, faute
+d'une troisième couleur disponible.
+
+| Famille | Modificateur | Rang |
+|---|---|---|
+| Course / trail | `run` | `--color-activity-run` = cat-1 |
+| Muscu / renfo | `gym` | `--color-activity-gym` = cat-2 |
+| Natation | `swim` | `--color-activity-swim` = cat-3 |
+| Vélo | `bike` | `--color-activity-bike` = cat-3 |
+| Mobilité | `mobility` | `--color-activity-mobility` = cat-4 |
+
+### Régions anatomiques
+`TargetRegion` regroupe les 17 `TargetArea` en quatre grands ensembles, qui se
+mappent un pour un sur l'échelle catégorielle via `TargetRegion::rank()`.
+Ventiler les 17 zones donnerait une barre empilée illisible.
+
+| Région | Rang |
+|---|---|
+| Bas du corps | 1 |
+| Haut du corps | 2 |
+| Tronc | 3 |
+| Corps entier | 4 |
 
 ### Types de série détaillée
-Alignés sur l'enum `SetType`. Rendus par la macro `components/_set_type.html.twig`
-sous forme de **pastille sigle cerclée** (1–2 lettres) : `W` échauffement,
-`D` dégressive, `F` à l'échec, `DS` drop set. `NORMAL` n'affiche rien.
+Alignés sur l'enum `SetType`, rendus par `components/_set_type.html.twig` en
+pastille sigle carrée : `W` échauffement, `D` dégressive, `F` à l'échec, `DS`
+drop set. `NORMAL` n'affiche rien.
 
-Ces teintes qualifient l'intention d'une série ; elles sont **volontairement
-distinctes** de terracotta/olive (activité) et des statuts, pour ne pas brouiller
-ces deux codes. La pastille est **pleine** (lettre en papier) : à 18 px, un sigle
-coloré cerclé sur fond clair ne se lit pas. Le tint sert de fond de ligne dans
-l'éditeur de séries (`.kd-set--{type}`), dont l'accent gauche reprend l'encre.
+Deux axes seulement, contre quatre teintes auparavant : l'**encre** pour ce qui
+structure la série, le **rouge** pour ce qui la pousse ; le **plein** pour le
+travail effectif, le **contour** pour ce qui n'en est pas (échauffement) ou n'en
+est qu'une prolongation (drop set). La lettre identifie, la couleur tranche.
 
-| Type | Sigle | Encre (pastille, accent) | Tint (fond de ligne) |
+| Type | Sigle | Rendu | Token |
 |---|---|---|---|
-| `WARMUP` | `W` | `--color-set-warmup` `#8f6c22` | `--color-set-warmup-tint` `#f8f0dd` |
-| `DEGRESSIVE` | `D` | `--color-set-degressive` `#4a646d` | `--color-set-degressive-tint` `#e8eff1` |
-| `TO_FAILURE` | `F` | `--color-set-failure` `#a83a2c` | `--color-set-failure-tint` `#fbe9e5` |
-| `DROP_SET` | `DS` | `--color-set-dropset` `#6a4570` | `--color-set-dropset-tint` `#f3eaf4` |
+| `WARMUP` | `W` | contour encre | `--color-set-warmup` |
+| `DEGRESSIVE` | `D` | encre plein | `--color-set-degressive` |
+| `TO_FAILURE` | `F` | rouge plein | `--color-set-failure` |
+| `DROP_SET` | `DS` | contour rouge | `--color-set-dropset` |
 
 ### Statuts prévu / réalisé
-Alignés sur l'enum `ScheduledStatus`.
+Alignés sur `ScheduledStatus`. Sémantiques, donc distincts de l'échelle
+catégorielle. Le rouge de `MISSED` est cohérent avec son usage « écart, échec ».
 
 | Token | Valeur | Statut |
 |---|---|---|
-| `--color-status-done` | `#4c7a3a` | `DONE` — fait |
-| `--color-status-planned` | `#a99f8d` | `PLANNED` — prévu |
-| `--color-status-missed` | `#c0392b` | `MISSED` — manqué |
+| `--color-status-done` | `#0b0b0b` | `DONE` — fait |
+| `--color-status-planned` | `#8a8a82` | `PLANNED` — prévu |
+| `--color-status-missed` | `#d8261e` | `MISSED` — manqué |
 
 ---
 
@@ -109,131 +159,162 @@ Trois familles, chacune avec un rôle strict.
 
 | Token | Famille | Rôle |
 |---|---|---|
-| `--font-display` | Space Grotesk | titres (`h1`), gros chiffres de synthèse, titres de tuiles |
-| `--font-body` | Instrument Sans | corps de texte, libellés courants, boutons |
-| `--font-mono` | JetBrains Mono | eyebrows en capitales, méta, badges, valeurs de paramètres |
+| `--font-display` | Barlow Condensed | titres, boutons, onglets, gros chiffres |
+| `--font-body` | Barlow | corps de texte, **noms saisis par l'utilisateur** |
+| `--font-mono` | IBM Plex Mono | eyebrows capitales, méta, badges, valeurs |
 
-Échelle observée dans les maquettes (indicative, pas normative au pixel près) :
+**Règle de casse, non négociable :** le condensé en capitales est réservé aux
+**libellés de structure** (titre de page, titre de carte, rôle de bloc, bouton,
+onglet). Un contenu saisi — nom d'exercice, de séance, de plan, d'athlète,
+intitulé d'objectif — reste en **Barlow, casse normale**. Barlow Condensed en
+capitales sur un nom propre devient illisible.
 
-- Titre de page : `600 24–27px` display
-- Titre de carte : `600 15px` display
-- Gros chiffre (KPI) : `700 26–30px` display
-- Corps : `400 13px` body
-- Corps petit : `400 12px` body
-- Label mono capitale (eyebrow) : `600 10–11px` mono, `letter-spacing` `.06`–`.16em`, `text-transform: uppercase`
-- Méta mono : `500–600 10–12px` mono
+Échelle de référence :
 
-Les eyebrows en mono capitales sont une signature de l'identité : sections de
-filtre, rôles de bloc (`ÉCHAUFFEMENT`, `CORPS DE SÉANCE`), légendes de synthèse.
+- Titre de page : `800`, `clamp(34px, 6vw, 52px)`, `line-height .92`, uppercase
+- Titre de séance (hero) : `800`, `clamp(40px, 8vw, 84px)`, `line-height .88`
+- Titre de carte / section : `700 19px` display, `letter-spacing .04em`, uppercase
+- Rôle de bloc : `700 22px` display, uppercase
+- Valeur de KPI : `800 40px` display, `font-variant-numeric: tabular-nums`
+- Bouton / onglet : `700 15px` display, `letter-spacing .1em`, uppercase
+- Corps : `400–600 14–16px` body
+- Label mono capitale : `600 10–11px` mono, `letter-spacing .06`–`.16em`
+
+Les gros chiffres portent tous `font-variant-numeric: tabular-nums` : sans ça,
+une valeur qui change de largeur fait sauter la mise en page.
 
 ### Chargement des polices
-**Self-hostées depuis la Phase 9** (offline-first, aucune dépendance Google
-Fonts). Les fichiers `woff2` sont dans `assets/fonts/` (subsets latin +
-latin-ext), les `@font-face` dans `assets/styles/fonts.css`, importé par
-`app.css` et donc chargé via AssetMapper (`importmap('app')` émet le `<link>`
-CSS ; les `url()` sont réécrites vers les chemins digestés). Le `base.html.twig`
-ne référence plus aucune police externe.
+**Self-hostées** (offline-first, aucune dépendance Google Fonts). Les `woff2`
+sont dans `assets/fonts/` (subsets latin + latin-ext), les `@font-face` dans
+`assets/styles/fonts.css`, importé par `app.css` et chargé via AssetMapper (les
+`url()` sont réécrites vers les chemins digestés).
 
-> Régénération : les `woff2` et `fonts.css` sont produits par un script de fetch
-> jetable (récupère le CSS Google Fonts en UA Chrome pour obtenir du woff2, filtre
-> latin/latin-ext, télécharge et réécrit les `url()` en local). À relancer si les
-> familles ou graisses déclarées changent. Le service worker les met en cache au
-> runtime (cache-first sur `/assets/*`, immuables car digestés) : pas besoin de les
-> lister dans le précache.
+> Régénération : [`tools/fetch-fonts.sh`](../tools/fetch-fonts.sh). Les familles
+> et graisses vivent dans le tableau `FAMILIES` en tête du script — c'est la
+> seule chose à modifier. `fonts.css` est **généré**, ne jamais l'éditer à la
+> main.
 
 ---
 
-## 4. Rayons, ombres, espacements
+## 4. Formes, espacements
 
-- **Rayons** : `--kd-radius-md` (8px) pour boutons/champs, `--kd-radius-lg`
-  (11px) et `--kd-radius-xl` (12px) pour les cartes, `--kd-radius-pill` (20px)
-  pour les pills/tags, `--kd-radius-full` pour les pastilles.
-- **Ombres** : `--shadow-card` (`0 6px 28px rgba(0,0,0,.09)`) sur les cartes
-  flottantes ; `--shadow-accent` sous les tuiles terracotta pleines (objectif).
-  L'identité privilégie les **filets `1px`** (`--color-border`) à l'ombre.
-- **Espacements** : échelle `--kd-space-*` en base 4px. Padding de carte usuel :
-  22–30px horizontal, 20–26px vertical.
-
----
-
-## 5. Patterns de composants (tirés des maquettes)
-
-Descriptions de référence pour l'implémentation Twig/CSS. Une partie est désormais
-codée dans `assets/styles/components.css` (source des classes `.kd-*` : header,
-`.kd-btn` (dont `--danger`), `.kd-card`, `.kd-badge`, `.kd-navcard`, `.kd-stat`,
-grilles, plus la couche « bibliothèque & formulaires » : `.kd-libcard` (carte
-d'entrée listée, filet gauche à la couleur de l'activité), `.kd-tag` (valeur
-neutre), `.kd-deflist` (consultation), `.kd-toolbar` + `.kd-search` + `.kd-count`
-(barre d'index), `.kd-flash`, `.kd-backlink`, et les classes de formulaire
-`.kd-form` / `.kd-field` / `.kd-label` / `.kd-input` / `.kd-select` /
-`.kd-choicegrid` / `.kd-errors` / `.kd-help` / `.kd-formactions`) et
-`templates/components/_header.html.twig`. Deux composants Twig transverses :
-`templates/components/_activity.html.twig` (macros `badge` / `icon` / `modifier`,
-**source unique** du couple icône Lucide ↔ couleur par `ActivityType`) et le
-**thème de formulaire global** `templates/form/kadens_theme.html.twig` (enregistré
-dans `config/packages/twig.yaml`, applique les classes `.kd-*` à tous les champs du
-site — aucune vue n'a besoin de styler ses champs à la main). Filtrage client des
-index (recherche offline-safe) via le contrôleur Stimulus `filter`. Les composants
-encore décrits mais non codés (tuile de séance, cellule de grille, anneau de
-progression, histogramme) restent des cibles.
-
-- **Carte de bibliothèque** (`.kd-libcard`) : carte à filet gauche `3px` coloré par
-  l'activité (course = terracotta, muscu = olive, autres = neutre), tuile d'icône
-  d'activité, nom + méta (activité, portée biblio/perso), tags de zones, pied
-  d'actions. Sert la bibliothèque d'exercices (écran `2a`) et se réutilise pour
-  d'autres index.
-- **Champs de formulaire** : label mono capitale (`.kd-label`), input/textarea/select
-  à bordure `--color-border-strong` + focus terracotta (`--color-primary-tint` en
-  halo). Les choix multiples « expanded » deviennent des **pastilles
-  sélectionnables** (`.kd-choicegrid`, checkbox masqué, état coché = tint
-  terracotta).
-
-- **Carte** : `--color-surface-raised`, bordure `1px --color-border`, rayon
-  `--kd-radius-lg`, en-tête séparé par un filet `--color-divider`.
-- **Bouton primaire** : fond `--color-primary`, texte `--color-on-primary`,
-  rayon `--kd-radius-md`, `600 12px` body. Bordure de même couleur que le fond.
-- **Bouton secondaire** : fond `--color-surface-raised`, bordure
-  `--color-border-strong`, texte `--color-text-strong`.
-- **Badge / pill** : `--color-fill` + texte `--color-text-secondary` (neutre),
-  ou `--color-primary-tint` + texte `--color-primary-on-tint` (accent). Rayon
-  `--kd-radius-pill`, souvent en `--font-mono`.
-- **Champ de recherche** : bordure `--color-border-strong`, placeholder
-  `--color-text-placeholder`, icône `⌕`.
-- **Menu de compte** (`.kd-usermenu`) : déclencheur = pastille avatar (lettre
-  initiale, fond `--color-primary`) + chevron ; panneau flottant
-  `--color-surface-raised`, filet `--color-border`, rayon `--kd-radius-lg`,
-  `--shadow-card`. Porte ce qui relève du compte (profil, objectifs, coaching,
-  athlètes, paramètres, déconnexion) — la barre principale ne garde que les quatre
-  entrées du travail quotidien. **Implémenté en `<details>`/`<summary>` natif** :
-  clavier et sans-JS, condition du cache offline. Le déclencheur prend `is-active`
-  quand la page courante appartient au menu, pour ne pas perdre le repère.
-- **Objectif rattaché** : pill `--color-primary-tint` / `--color-primary-on-tint`
-  (`.kd-plangoals__pill`, badge `.kd-badge--accent`). L'objectif est un **accent
-  primaire**, jamais une couleur d'activité — cohérent avec la tuile « objectif »
-  terracotta des maquettes.
-- **Tuile de séance** (matrice/calendrier) : filet gauche `3px` à la couleur de
-  l'activité, fond tint correspondant, rayon `0 7px 7px 0`. La tuile
-  « objectif » est terracotta plein avec `--shadow-accent`.
-- **Cellule de grille** (matrice semaines×jours, calendrier) : `min-height` ~82–92px,
-  bordure `--color-border-cell`, technique de bordures collées `margin:-1px 0 0 -1px`.
-- **Bloc de séance** : carte avec en-tête (pastille activité + rôle mono capitale
-  + compteur de tours `↻ N` en pill terracotta), lignes d'exercices séparées par
-  `--color-divider-soft`, paramètre à droite en pill mono `--color-fill`.
-- **Anneau de progression** (synthèse) : `conic-gradient(--color-primary 0 X%,
-  --kd-chart-track X% 100%)`, disque intérieur `--color-surface-raised`.
-- **Histogramme** : barres `--color-primary` (fait) vs `--kd-chart-todo` (à venir).
-
-Écrans de référence dans la maquette : `1a` éditeur de plan (matrice), `2a`
-bibliothèque, `2b` consultation de séance, `2c` calendrier, `2d` synthèse.
+- **Rayons : aucun.** Tous les `--kd-radius-*` valent `0`. Les noms subsistent
+  pour que `components.css` n'ait pas à être réécrit ; ne pas les supprimer.
+- **Ombres : aucune.** `--shadow-card` et `--shadow-accent` valent `none`. Un
+  élément **flottant** (modale, panneau de menu, popover) se détache par un
+  contour `1px solid var(--color-text)`, jamais par une élévation simulée.
+- **Espacements** : échelle `--kd-space-*` en base 4px.
+- **Ordre des feuilles** (`app.css`) : `tokens` → `fonts` → `base` →
+  `components`. `base.css` porte des défauts surchargeables, jamais l'inverse.
 
 ---
 
-## 6. Règles
+## 5. Responsive
+
+### Trois paliers, et rien d'autre
+
+| Palier | Cible | Ce qui bascule |
+|---|---|---|
+| `560px` | téléphone | une colonne, nav en barre basse, calendrier en agenda vertical, barre d'actions de séance collante |
+| `900px` | tablette | éditeurs à deux volets empilés, nav condensée, repères de hero sous le titre |
+| `1200px` | petit portable | palette de l'éditeur de trame sous la grille |
+
+> **Ils ne peuvent pas être tokenisés.** `@media` n'accepte pas `var()`, et le
+> projet n'a pas d'étape de build CSS (AssetMapper, pas de PostCSS). C'est une
+> convention documentée, à tenir à la main. Avant d'ajouter une valeur, vérifier
+> qu'aucun des trois paliers ne fait l'affaire — la dispersion précédente (neuf
+> valeurs entre 480 et 1100) rendait le comportement imprévisible.
+
+### Règles
+- Approche **desktop-first** assumée : uniquement des `max-width`.
+- Préférer une valeur fluide à un point de rupture quand c'est possible :
+  `clamp()` pour la typographie, `min()` pour les gouttières.
+- **Gotcha** : `.kd-page` a des gouttières fluides
+  (`min(var(--kd-space-8), 4vw)`). Tout élément qui mord dessus par marge
+  négative — le hero de séance — doit reprendre **exactement** la même
+  expression, sinon un liseré de fond apparaît sur les côtés.
+- Un contenu large (tableau, grille, diagramme) défile dans **son propre**
+  conteneur `overflow-x: auto`. La page ne défile jamais horizontalement.
+
+---
+
+## 6. Accessibilité
+
+Le socle vit dans [`assets/styles/base.css`](../assets/styles/base.css).
+
+- **`<meta name="viewport">`** dans `base.html.twig`. Elle a été absente
+  longtemps : sans elle, aucune media query ne se déclenche sur téléphone.
+- **Lien d'évitement** `.kd-skip` vers `<main id="main">`, visible au focus.
+- **`.kd-sr-only`** pour le texte réservé aux lecteurs d'écran. Ne jamais
+  masquer un libellé avec `display: none` s'il porte le nom accessible d'un
+  contrôle : `display: none` le retire de l'arbre d'accessibilité.
+- **`:focus-visible` global** : anneau `2px solid var(--color-text)` +
+  `outline-offset: 2px`, inversé sur les aplats encre. Ne jamais poser
+  `outline: none` sans remplacement au moins aussi contrasté (WCAG 1.4.11 exige
+  3:1 — l'ancien halo teinté ne les tenait pas).
+- **`prefers-reduced-motion: reduce`** neutralise transitions et animations.
+- **Cibles tactiles** : sous `@media (pointer: coarse)`, plancher de 44×44 px.
+- **Sémantique native d'abord** : `<details>` pour les accordéons et les menus,
+  `<dialog>` pour les modales, `<table>` pour les données tabulaires. On y gagne
+  gratuitement le clavier, l'échappement et le repli sans JS.
+- **Amélioration progressive** : les onglets rendent **tous** les panneaux côté
+  serveur, chacun précédé de son titre. Le contrôleur `tabs` révèle la barre
+  (rendue `hidden`), masque les titres et pose l'ARIA. Sans JS, la page reste
+  complète et imprimable.
+- **Impression** : `base.css` force l'ouverture des `<details>` et des panneaux
+  d'onglets masqués.
+
+---
+
+## 7. Patterns de composants
+
+Classes `.kd-*` dans `assets/styles/components.css`.
+
+### Transverses
+- **Carte** (`.kd-card`) : `--color-surface-raised`, filet `1px`, en-tête séparé
+  par `--color-divider`.
+- **Boutons** (`.kd-btn`) : display 700 15px, uppercase, `letter-spacing .1em`.
+  `--primary` (aplat rouge), `--secondary` (contour encre, s'inverse au survol),
+  `--ghost`, `--onink` (variante sur aplat encre), `--sm`, `--block`, `--danger`.
+- **Badge** (`.kd-badge`) : mono capitales, contour `1px`, transparent. Le code
+  activité pose un filet gauche `3px` au rang catégoriel.
+- **Menu de compte** (`.kd-usermenu`) et **kebab** (`.kd-kebab`) : `<details>`
+  natif + contrôleur `dismiss` (clic extérieur, Échap) pour le seul confort.
+  Panneau à contour encre.
+- **Modale** : `<dialog>` natif, contour encre.
+
+### Page de consultation d'une séance
+Composant partagé avec la page publique : `components/_workout_read.html.twig`,
+décomposé en `_workout_program`, `_workout_sets_table`, `_workout_analysis`.
+
+- **Hero** (`.kd-wk__hero`) : aplat encre pleine largeur, eyebrow rouge, titre
+  condensé, repères en colonnes séparées par des filets. Le bloc `actions` du
+  composant accueille la barre du propriétaire — la page publique le laisse
+  vide, ce qui garantit qu'aucune commande ne peut y fuiter.
+- **Bandeau de KPI** (`.kd-wk__kpis`) : grille auto-fit, filets verticaux
+  devenant horizontaux sur téléphone. Jauge d'intensité à **10 crans**, à
+  l'échelle du RPE, pour éviter toute conversion mentale.
+- **Onglets** (`.kd-wk__tab`) : filet bas sur l'onglet actif.
+- **Bloc en accordéon** (`.kd-block`) : `<details open>`, numéro en gris clair,
+  rôle en condensé capitales, résumé mono poussé à droite.
+- **Tableau de séries** (`.kd-settable`) : en-tête en aplat encre, groupe de
+  séries de travail marqué d'un filet gauche et d'un fond. Les séries
+  consécutives identiques sont fusionnées par `PlanFlattener` mais gardent leur
+  rang réel (« 03 — 06 ») : condenser l'affichage ne doit pas faire perdre la
+  numérotation.
+- **Analyse** (`.kd-analysis`) : barre empilée + légende, barres horizontales,
+  timeline de durée. Rendu 100 % serveur, aucune bibliothèque de graphiques.
+
+---
+
+## 8. Règles
 
 1. **Jamais de couleur/typo en dur** dans un template ou un composant. Toujours
    via un token sémantique (`--color-*`, `--font-*`).
-2. **La couleur porte du sens.** Ne pas réutiliser terracotta ou olive hors de
-   leur rôle (accent primaire / code activité).
+2. **La couleur porte du sens, et il n'y a qu'une couleur.** Le rouge est
+   réservé aux actions primaires, à l'intensité et à l'échec. Une catégorie se
+   code par son rang dans `--color-cat-*`, pas par une teinte inventée.
 3. **Nouvelle valeur = nouvelle primitive `--kd-*` d'abord**, puis token
    sémantique. On n'expose jamais une primitive directement aux vues.
-4. **Toute évolution se répercute** ici et dans `CLAUDE.md` (§ Design).
+4. **Le condensé capitales ne touche pas au contenu saisi** (cf. §3).
+5. **Toute évolution se répercute** ici et dans `CLAUDE.md` (§5 Design system).

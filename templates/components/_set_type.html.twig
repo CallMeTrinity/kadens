@@ -5,9 +5,10 @@
    pictogramme, d'où `role="img"` : sans rôle, un `aria-label` sur un `span` n'est
    pas restitué de façon fiable).
 
-   Teintes dédiées (`--color-set-*`) : elles qualifient l'intention d'une série,
-   sans reprendre les codes activité (terracotta/olive) ni statut. NORMAL n'affiche
-   pas de pastille — une série de travail ordinaire n'a rien à signaler.
+   Tokens dédiés (`--color-set-*`) : l'encre pour ce qui structure la série
+   (échauffement, dégressive), le rouge pour ce qui la pousse (échec, drop set) ;
+   plein pour le travail effectif, contour sinon. NORMAL n'affiche pas de
+   pastille — une série de travail ordinaire n'a rien à signaler.
 
    Usage : {% import 'components/_set_type.html.twig' as settype %}
            {{ settype.badge(set.setType) }}   → la pastille (rien si NORMAL)

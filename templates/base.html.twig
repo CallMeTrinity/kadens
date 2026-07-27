@@ -2,13 +2,13 @@
 <html lang="fr">
     <head>
         <meta charset="UTF-8">
-{#        <meta name="viewport" content="width=device-width, initial-scale=1">#}
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{% block title %}Kadens{% endblock %}</title>
         <link rel="icon" href="{{ asset('icons/kadens.png') }}" type="image/png">
 
         {# Mode hors connexion / PWA suspendu (voir CLAUDE.md §6). On garde juste
            la teinte de barre navigateur, sans manifest ni service worker. #}
-        <meta name="theme-color" content="#b7532e">
+        <meta name="theme-color" content="#0b0b0b">
 
         {% block stylesheets %}
             {# Polices « Carnet clair » self-hostées : chargées via AssetMapper
@@ -20,10 +20,15 @@
         {% endblock %}
     </head>
     <body>
+        {# Évitement du chrome : le header est collant et porte 4 entrées + un
+           menu, qu'un utilisateur clavier retabulerait à chaque navigation.
+           Visible seulement une fois focalisé (.kd-skip). #}
+        <a class="kd-skip" href="#main">Aller au contenu</a>
+
         {% if app.user %}
             {{ include('components/_header.html.twig') }}
         {% endif %}
-        <main class="{% block main_class %}kd-page{% endblock %}">
+        <main id="main" class="{% block main_class %}kd-page{% endblock %}">
             {% block body %}{% endblock %}
         </main>
     </body>

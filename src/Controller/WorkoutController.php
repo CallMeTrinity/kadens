@@ -129,13 +129,20 @@ final class WorkoutController extends AbstractController
         return $this->redirectToRoute('app_workout_edit', ['id' => $workout->getId(), 'rename' => 1]);
     }
 
+    /**
+     * Consultation d'une séance. En plus de la mise à plat, la page consomme la
+     * synthèse et la ventilation par bloc de WorkoutMetrics : la vue ne calcule
+     * rien, elle affiche. Voir components/_workout_read.html.twig.
+     */
     #[Route('/{id}', name: 'app_workout_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(Workout $workout, PlanFlattener $planFlattener): Response
+    public function show(Workout $workout, PlanFlattener $planFlattener, WorkoutMetrics $metrics): Response
     {
         $this->denyAccessUnlessGranted(WorkoutVoter::VIEW, $workout);
 
         return $this->render('workout/show.html.twig', [
             'flat' => $planFlattener->flattenWorkout($workout),
+            'summary' => $metrics->summary($workout),
+            'blockStats' => $metrics->blockBreakdown($workout),
         ]);
     }
 

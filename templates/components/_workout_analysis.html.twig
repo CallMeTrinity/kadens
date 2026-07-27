@@ -1,0 +1,100 @@
+{# Panneau « Analyse » d'une séance : où part le volume, et comment le temps
+   se répartit entre les blocs. Rendu 100 % serveur, aucune lib de graphiques —
+   des div proportionnelles suffisent et restent imprimables.
+
+   Attendus : summary (WorkoutMetrics::summary), blockStats (::blockBreakdown). #}
+
+{% set maxTonnage = 0 %}
+{% for stat in blockStats %}
+    {% if stat.tonnageKg > maxTonnage %}{% set maxTonnage = stat.tonnageKg %}{% endif %}
+{% endfor %}
+
+{% set totalSeconds = 0 %}
+{% for stat in blockStats %}{% set totalSeconds = totalSeconds + stat.seconds %}{% endfor %}
+
+<div class="kd-analysis">
+
+    {% if summary.regions is not empty %}
+        <section class="kd-analysis__card">
+            <h3 class="kd-analysis__title">Répartition du volume</h3>
+            {# Le total des séries attribuées dépasse le nombre de séries réelles
+               (une série compte pour chaque zone ciblée) : on parle donc bien de
+               part du volume attribué, pas de part des séries. #}
+            <p class="kd-analysis__hint">Part des séries attribuées à chaque région.</p>
+
+            <div class="kd-stack" role="img"
+                 aria-label="{% for r in summary.regions %}{{ r.region.label }} {{ r.percent|number_format(0) }} %{{ not loop.last ? ', ' }}{% endfor %}">
+                {% for r in summary.regions %}
+                    <span class="kd-stack__seg kd-cat--{{ r.region.rank }}" style="width: {{ r.percent }}%"></span>
+                {% endfor %}
+            </div>
+
+            <ul class="kd-legend">
+                {% for r in summary.regions %}
+                    <li class="kd-legend__item">
+                        <span class="kd-legend__key kd-cat--{{ r.region.rank }}" aria-hidden="true"></span>
+                        {{ r.region.label }}
+                        <span class="kd-legend__val">{{ r.percent|number_format(0) }} %</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+
+    {% if maxTonnage > 0 %}
+        <section class="kd-analysis__card">
+            <h3 class="kd-analysis__title">Volume par bloc</h3>
+            <ul class="kd-bars">
+                {% for stat in blockStats %}
+                    <li class="kd-bars__row">
+                        <span class="kd-bars__label">
+                            {{ '%02d'|format(loop.index) }} {{ stat.block.label ?: stat.block.role.label }}
+                        </span>
+                        <span class="kd-bars__val">
+                            {{- stat.tonnageKg > 0 ? stat.tonnageKg|round|number_format(0, ',', ' ') ~ ' kg' : '—' -}}
+                        </span>
+                        <span class="kd-bars__track">
+                            <span class="kd-bars__fill" style="width: {{ (stat.tonnageKg / maxTonnage * 100)|round(1) }}%"></span>
+                        </span>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+
+    {% if totalSeconds > 0 %}
+        <section class="kd-analysis__card kd-analysis__card--wide">
+            <h3 class="kd-analysis__title">Durée estimée</h3>
+            <p class="kd-analysis__hint">
+                {{ (totalSeconds / 60)|round(0, 'ceil') }} min au total, réparties par bloc.
+            </p>
+
+            <div class="kd-timeline">
+                {% for stat in blockStats %}
+                    {% set share = stat.seconds / totalSeconds * 100 %}
+                    {% if share > 0 %}
+                        <span class="kd-timeline__seg kd-timeline__seg--{{ stat.block.role.value }}"
+                              style="width: {{ share|round(1) }}%"
+                              title="{{ stat.block.label ?: stat.block.role.label }} — {{ (stat.seconds / 60)|round(0, 'ceil') }} min">
+                            {# Le libellé ne tient pas sous ~12 % de la largeur :
+                               le title et la légende ci-dessous prennent le relais. #}
+                            {% if share >= 12 %}{{ (stat.seconds / 60)|round(0, 'ceil') }}′{% endif %}
+                        </span>
+                    {% endif %}
+                {% endfor %}
+            </div>
+
+            <ul class="kd-legend">
+                {% for stat in blockStats %}
+                    {% if stat.seconds > 0 %}
+                        <li class="kd-legend__item">
+                            <span class="kd-legend__key kd-timeline__seg--{{ stat.block.role.value }}" aria-hidden="true"></span>
+                            {{ stat.block.label ?: stat.block.role.label }}
+                            <span class="kd-legend__val">{{ (stat.seconds / 60)|round(0, 'ceil') }} min</span>
+                        </li>
+                    {% endif %}
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+</div>
