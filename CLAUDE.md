@@ -261,7 +261,49 @@ deux sens, fiche de travail par athlète sous `/coach`, `ROLE_COACH`) — cf. §
 la règle de propriété — et **paramètres de compte** (`/profile/settings` :
 changement de mot de passe, création de compte par `app:user:create`).
 
-Dernier lot (portée coach des index) : `/workout` et `/plan-template` listent
+Dernier lot (utilisabilité au téléphone) : la couche mobile existait mais était
+annulée par **une déclaration CSS**. `backdrop-filter` sur `.kd-header` en faisait
+le bloc conteneur de ses descendants `position: fixed` : la barre de nav basse se
+calait sur le header (52px) au lieu du viewport — rognée en haut de l'écran, et
+peinte par-dessus l'avatar, ce qui rendait tout le menu de compte inatteignable.
+Neutralisé sous 560px, avec `--kd-navbar-h` comme source unique de la hauteur de
+barre. Conséquences à ne pas casser :
+
+- **Nav à 3 entrées** (Séances / Plans / Calendrier) : c'est le fil de la
+  planification, et sous 560px chaque entrée doit rester tapotable. Les exercices
+  vivent dans le menu de compte.
+- **`GET /schedule/{id}`** : la séance dans son contexte **daté**, distincte de
+  `app_workout_show` (bibliothèque, sans date). C'est la seule page qui porte la
+  boucle prévu vs réalisé — bascule « fait », note d'écart, déplacer, retirer —
+  et la cible du clic sur une pastille de calendrier. Elle réutilise
+  `_workout_read` en `embed` ; attention, `only` **isole** le composant : ce que
+  le bloc `actions` consomme doit passer par le `with`.
+- **Le survol n'est jamais un chemin.** L'aperçu `popover="manual"` n'a pas de
+  light-dismiss : au doigt, un tap émet un `mouseenter` sans `mouseleave` et le
+  panneau reste collé. `preview` et `plangrid` se gardent derrière
+  `(hover: hover) and (pointer: fine)`. La pastille de calendrier est donc un
+  **lien** vers `/schedule/{id}`, intercepté par `dialog#openFine` au pointeur fin
+  seulement (modale sur ordinateur, navigation au doigt), plus un œil à droite qui
+  n'est jamais intercepté.
+- **Rien de collant qui masque du contenu** : la barre « Éditer » revient en tête
+  du hero.
+- **Repli mobile en `<details>` rendu ouvert côté serveur**, refermé par le
+  contrôleur `collapse` (filtres d'index). Sans JS, rien n'est caché.
+- **Vue semaine par défaut au téléphone** : le cookie `kd_calview` est `httpOnly`,
+  c'est le serveur qui expose `viewRemembered` et le contrôleur `calview`
+  n'aiguille que la première visite.
+- **Une surcharge responsive vit APRÈS la définition de son composant.** Une
+  `@media` n'ajoute aucune spécificité : regroupées en tête de feuille avec la
+  nav, trois surcharges étaient purement décoratives, écrasées par la règle de
+  base du composant située plus bas (`.kd-page` par le raccourci `padding` de
+  « Mise en page », `.kd-editform__bar` par son `bottom: 0`, `.kd-calday__add` par
+  son `align-self: stretch`). Le dégagement de fin de page et la barre
+  « Enregistrer » passaient donc sous la nav alors que le CSS semblait les
+  traiter. Détail et règle dans `docs/design-system.md §5`.
+- **`--kd-navbar-h` = place occupée, pas hauteur du dessin** : elle inclut
+  l'`env(safe-area-inset-bottom)` que la barre prend en padding.
+
+Lot précédent (portée coach des index) : `/workout` et `/plan-template` listent
 aussi le contenu des athlètes suivis (cf. §3), via le service `CoachedLibrary` et
 les variantes multi-propriétaires des repositories. Facette `owner` (« Moi » par
 défaut) et badge de propriétaire sur les cartes des autres. Deux effets de bord

@@ -16,8 +16,20 @@
    propres entrées, les athlètes sont à une puce. Le contrôleur Stimulus lit cet
    état initial dans les classes rendues — ne pas activer une puce à la main sans
    passer par `default`, la logique de filtre ne la verrait pas.
+
+   `<details>` natif : sur téléphone, recherche + tri + deux rangées de puces
+   mangeaient un écran entier avant la première carte. Rendu **ouvert** côté
+   serveur (sans JS rien n'est caché), le contrôleur `collapse` le referme sous
+   560px. Au-dessus, le `<summary>` est masqué en CSS et le panneau reste ouvert.
    ============================================================================ #}
-<div class="kd-filterbar">
+<details class="kd-filterbar" open
+         data-controller="collapse" data-collapse-media-value="(max-width: 560px)">
+    <summary class="kd-filterbar__toggle">
+        {{ ux_icon('lucide:sliders-horizontal') }}
+        <span>Filtres et tri</span>
+        {{ ux_icon('lucide:chevron-down') }}
+    </summary>
+
     <div class="kd-filterbar__row">
         <div class="kd-search">
             {{ ux_icon('lucide:search') }}
@@ -58,4 +70,4 @@
             </div>
         {% endif %}
     {% endfor %}
-</div>
+</details>

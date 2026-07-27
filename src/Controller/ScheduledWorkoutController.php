@@ -14,6 +14,7 @@ use App\Security\Voter\ScheduledWorkoutVoter;
 use App\Security\Voter\WorkoutVoter;
 use App\Service\PlanFlattener;
 use App\Service\PlanScheduler;
+use App\Service\WorkoutMetrics;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -117,6 +118,31 @@ final class ScheduledWorkoutController extends AbstractController
     }
 
     /**
+     * Consultation d'une séance dans son contexte daté. Distincte de
+     * `app_workout_show`, qui montre la séance de **bibliothèque** : celle-ci ne
+     * connaît aucune date, donc aucun statut à basculer — une même séance peut
+     * être posée sur dix jours différents. C'est cette page qui porte la boucle
+     * prévu vs réalisé, et c'est la cible du clic sur une pastille du calendrier.
+     *
+     * Contexte de rendu identique à WorkoutController::show (même composant de
+     * lecture, mêmes services) : la vue ne calcule rien.
+     */
+    #[Route('/{id}', name: 'app_scheduled_workout_show', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function show(ScheduledWorkout $scheduled, PlanFlattener $planFlattener, WorkoutMetrics $metrics): Response
+    {
+        $this->denyAccessUnlessGranted(ScheduledWorkoutVoter::VIEW, $scheduled);
+
+        $workout = $scheduled->getWorkout();
+
+        return $this->render('scheduled_workout/show.html.twig', [
+            'scheduled' => $scheduled,
+            'flat' => $planFlattener->flattenWorkout($workout),
+            'summary' => $metrics->summary($workout),
+            'blockStats' => $metrics->blockBreakdown($workout),
+        ]);
+    }
+
+    /**
      * Déplace une séance planifiée sur une autre date (référence vivante : seule
      * la date change, la séance reste la même).
      */
@@ -134,10 +160,10 @@ final class ScheduledWorkoutController extends AbstractController
 
             $this->addFlash('success', 'Séance déplacée.');
 
-            return $this->redirectToMonth($newDate);
+            return $this->redirectAfterMutation($request, $scheduled, $newDate);
         }
 
-        return $this->redirectToMonth($scheduled->getScheduledDate());
+        return $this->redirectAfterMutation($request, $scheduled, $scheduled->getScheduledDate());
     }
 
     /**
@@ -177,7 +203,22 @@ final class ScheduledWorkoutController extends AbstractController
             }
         }
 
-        return $this->redirectToMonth($scheduled->getScheduledDate());
+        return $this->redirectAfterMutation($request, $scheduled, $scheduled->getScheduledDate());
+    }
+
+    /**
+     * Où retomber après une mutation. Par défaut le calendrier, dans la vue
+     * mémorisée. Mais ces endpoints servent aussi la page de la séance datée :
+     * elle poste `return=schedule` pour qu'on y revienne au lieu d'éjecter
+     * l'utilisateur vers le planning à chaque changement de statut.
+     */
+    private function redirectAfterMutation(Request $request, ScheduledWorkout $scheduled, \DateTimeImmutable $date): Response
+    {
+        if ('schedule' === $request->getPayload()->getString('return')) {
+            return $this->redirectToRoute('app_scheduled_workout_show', ['id' => $scheduled->getId()]);
+        }
+
+        return $this->redirectToMonth($date);
     }
 
     /**

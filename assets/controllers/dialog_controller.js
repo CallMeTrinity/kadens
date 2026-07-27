@@ -21,6 +21,23 @@ export default class extends Controller {
         this.dialogTarget.showModal();
     }
 
+    /*
+     * Variante « souris seulement », posée sur un lien : ouvre la modale à la
+     * place de la navigation quand le pointeur est fin, et laisse simplement le
+     * lien suivre son cours au doigt.
+     *
+     * C'est de l'amélioration progressive, pas une bifurcation : le HTML de base
+     * est un vrai lien (clavier, clic du milieu, sans JS), et la modale n'est
+     * qu'un raccourci desktop. Sur téléphone, une modale d'édition dans une case
+     * de calendrier est intenable — on va sur la page.
+     */
+    openFine(event) {
+        if (!matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+
+        event.preventDefault();
+        this.open();
+    }
+
     close() {
         this.dialogTarget.close();
     }

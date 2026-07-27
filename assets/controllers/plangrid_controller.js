@@ -293,6 +293,9 @@ export default class extends Controller {
     showPreview(event) {
         // Pas d'aperçu pendant qu'une séance est armée (les cases sont en mode pose).
         if (this.armedWorkoutId) return;
+        // Souris uniquement : au doigt, un tap émet un `mouseenter` synthétique
+        // qui ouvrirait un popover `manual` que plus rien ne referme.
+        if (!matchMedia('(hover: hover) and (pointer: fine)').matches) return;
         const entry = event.currentTarget;
         const preview = entry.querySelector('.kd-planpreview');
         if (!preview || typeof preview.showPopover !== 'function') return;

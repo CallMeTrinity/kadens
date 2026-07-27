@@ -59,6 +59,7 @@ final class CalendarController extends AbstractController
     public function month(
         int $year,
         int $month,
+        Request $request,
         ScheduledWorkoutRepository $scheduledWorkoutRepository,
         WorkoutRepository $workoutRepository,
         PlanTemplateRepository $planTemplateRepository,
@@ -112,6 +113,12 @@ final class CalendarController extends AbstractController
             'goalsByDate' => $goalsByDate,
             'nextGoal' => $nextGoal,
             'weekPivot' => $weekPivot->format('Y-m-d'),
+            // Le cookie de vue est httpOnly, donc invisible au JS : c'est le
+            // serveur qui dit si l'utilisateur a déjà choisi une vue. Tant qu'il
+            // n'a rien choisi, un petit écran bascule sur la semaine (la grille
+            // de 7 colonnes n'a pas de sens au téléphone). Un choix explicite
+            // prime ensuite définitivement.
+            'viewRemembered' => $request->cookies->has('kd_calview'),
             'prev' => ['year' => (int) $prev->format('Y'), 'month' => (int) $prev->format('n')],
             'next' => ['year' => (int) $next->format('Y'), 'month' => (int) $next->format('n')],
             ...$this->buildAddContext($workoutRepository, $planTemplateRepository, $scheduledWorkoutRepository),
