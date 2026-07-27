@@ -23,8 +23,9 @@ use App\Enum\PrescriptionType;
  * quelles pour l'export ; un champ `summary` lisible est ajouté pour l'affichage.
  *
  * @phpstan-type FlatSetGroup array{type: \App\Enum\SetType, typeLabel: string|null, count: int, detail: string, effort: string, firstIndex: int, lastIndex: int, weightKg: float|null}
- * @phpstan-type FlatPrescribed array{prescribed: PrescribedExercise, exercise: \App\Entity\Exercise|null, type: PrescriptionType|null, summary: string, values: string, sets: list<FlatSetGroup>|null, rest: ?int, notes: ?string, topWeightKg: ?float}
- * @phpstan-type FlatBlock array{block: Block, exercises: list<FlatPrescribed>}
+ * @phpstan-type FlatPrescribed array{prescribed: PrescribedExercise, exercise: \App\Entity\Exercise|null, type: PrescriptionType|null, summary: string, values: string, sets: list<FlatSetGroup>|null, rest: ?int, notes: ?string, topWeightKg: ?float, groupLabel: string|null}
+ * @phpstan-type FlatSegment array{label: string|null, kind: 'single'|'superset'|'circuit', exercises: list<FlatPrescribed>}
+ * @phpstan-type FlatBlock array{block: Block, exercises: list<FlatPrescribed>, segments: list<FlatSegment>}
  * @phpstan-type FlatWorkout array{workout: Workout, blocks: list<FlatBlock>, activities: list<\App\Enum\ActivityType>, exerciseCount: int}
  * @phpstan-type FlatItem array{item: PlanItem, workout: FlatWorkout}
  * @phpstan-type FlatDay array{dayOfWeek: int, items: list<FlatItem>}
@@ -36,6 +37,7 @@ final class PlanFlattener
     public function __construct(
         private readonly UnitFormatter $units,
         private readonly WorkoutMetrics $metrics,
+        private readonly SupersetGrouper $supersets,
     ) {
     }
 
@@ -106,25 +108,46 @@ final class PlanFlattener
     }
 
     /**
+     * Un bloc est livré sous deux formes complémentaires, jamais divergentes :
+     * `exercises` (liste plate, ordre de lecture) pour tout ce qui n'a que faire
+     * des liaisons — export, ICS, aperçu — et `segments` (exercices isolés et
+     * groupes de superset) pour les vues qui doivent montrer l'enchaînement.
+     *
      * @return FlatBlock
      */
     private function flattenBlock(Block $block): array
     {
+        $segments = [];
         $exercises = [];
-        foreach ($block->getPrescribedExercises() as $prescribed) {
-            $exercises[] = $this->flattenPrescribed($prescribed);
+        foreach ($this->supersets->segments($block) as $segment) {
+            $flatExercises = [];
+            foreach ($segment['exercises'] as $index => $prescribed) {
+                // Rang lisible dans le groupe : « A1 », « A2 »… La lettre vient du
+                // segment, le numéro du rang dans le segment.
+                $label = null !== $segment['label'] ? $segment['label'].($index + 1) : null;
+                $flat = $this->flattenPrescribed($prescribed, $label);
+                $flatExercises[] = $flat;
+                $exercises[] = $flat;
+            }
+
+            $segments[] = [
+                'label' => $segment['label'],
+                'kind' => $segment['kind'],
+                'exercises' => $flatExercises,
+            ];
         }
 
         return [
             'block' => $block,
             'exercises' => $exercises,
+            'segments' => $segments,
         ];
     }
 
     /**
      * @return FlatPrescribed
      */
-    private function flattenPrescribed(PrescribedExercise $prescribed): array
+    private function flattenPrescribed(PrescribedExercise $prescribed, ?string $groupLabel = null): array
     {
         return [
             'prescribed' => $prescribed,
@@ -142,6 +165,8 @@ final class PlanFlattener
             'notes' => $prescribed->getNotes(),
             // Référence du « % du max » affiché par le tableau de séries.
             'topWeightKg' => $prescribed->getTopWeightKg(),
+            // Rang dans le superset (« A1 », « A2 »…), null hors liaison.
+            'groupLabel' => $groupLabel,
         ];
     }
 

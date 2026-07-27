@@ -1,0 +1,31 @@
+{# Une ligne d'exercice en lecture (nom, valeurs, RPE, repos, tableau de séries,
+   notes). Extrait de `_workout_program` pour être rendu à l'identique qu'il soit
+   isolé ou membre d'un superset. Attend `ex` = entrée FlatPrescribed. #}
+<li class="kd-exrow">
+    <div class="kd-exrow__head">
+        {% if ex.groupLabel %}<span class="kd-exrow__rank">{{ ex.groupLabel }}</span>{% endif %}
+        <span class="kd-exrow__name">{{ ex.exercise ? ex.exercise.name : '—' }}</span>
+
+        {# `values` et non `summary` : le RPE a sa propre colonne juste à droite. #}
+        {% if ex.sets %}
+            <span class="kd-exrow__flag">{{ ex.sets|reduce((c, g) => c + g.count, 0) }} séries détaillées</span>
+        {% elseif ex.values %}
+            <span class="kd-exrow__val">{{ ex.values }}</span>
+        {% endif %}
+
+        {% if ex.prescribed.rpe %}
+            <span class="kd-exrow__rpe{{ ex.prescribed.rpe >= 9 ? ' is-hard' }}">RPE {{ ex.prescribed.rpe }}</span>
+        {% endif %}
+        {% if ex.rest %}
+            <span class="kd-exrow__rest">repos {{ ex.rest }} s</span>
+        {% endif %}
+    </div>
+
+    {% if ex.sets %}
+        {% include 'components/_workout_sets_table.html.twig' with {
+            groups: ex.sets, topWeightKg: ex.topWeightKg, type: ex.type
+        } only %}
+    {% endif %}
+
+    {% if ex.notes %}<p class="kd-exrow__notes">{{ ex.notes|nl2br }}</p>{% endif %}
+</li>

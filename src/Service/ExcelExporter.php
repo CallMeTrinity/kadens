@@ -197,8 +197,15 @@ final class ExcelExporter
         ++$row;
 
         foreach ($flatBlock['exercises'] as $flat) {
+            $name = $flat['exercise']?->getName() ?? '(exercice supprimé)';
+            // Rang de superset en préfixe (« A1 · Développé couché ») : une colonne
+            // de plus pour un champ presque toujours vide ne vaut pas le coup.
+            if (null !== $flat['groupLabel']) {
+                $name = $flat['groupLabel'].' · '.$name;
+            }
+
             $sheet->fromArray([
-                $flat['exercise']?->getName() ?? '(exercice supprimé)',
+                $name,
                 $flat['summary'],
                 $this->formatDuration($flat['rest']),
                 $flat['notes'] ?? '',

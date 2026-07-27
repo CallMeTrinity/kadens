@@ -75,8 +75,25 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
 - **Modèle d'exercice unique et flexible**, piloté par l'enum `PrescriptionType`
   (champs de valeurs nullable, seul le sous-ensemble pertinent est rempli). Pas
   d'héritage par activité.
-- **Blocs avec `rounds` + `role`** (`BlockRole`: WARMUP/MAIN/COOLDOWN). Une seule
-  mécanique couvre séance plate, superset, circuit, échauffement.
+- **Blocs avec `rounds` + `role`** (`BlockRole`: WARMUP/MAIN/COOLDOWN). Le bloc est
+  une **section** de la séance : séance plate, tours d'un circuit complet,
+  échauffement.
+- **Le superset est une liaison DANS un bloc, pas un bloc.** Un bloc de deux
+  exercices n'est pas un superset ; un superset, ce sont deux exercices **liés**
+  à l'intérieur d'un bloc. Un bloc peut donc mélanger des exercices isolés et
+  plusieurs groupes liés (A1/A2, puis B1/B2/B3). Porté par
+  `PrescribedExercise.supersetGroup` (nullable), dont **`SupersetGrouper` est la
+  seule autorité** : il tient deux invariants — membres **contigus** en position,
+  groupe d'**au moins deux** membres — et les rétablit après chaque mutation
+  (`normalize`, appelé par `linkToPrevious` / `detach` / `settleAfterMove`). Les
+  numéros sont renumérotés 1..n, ils se comparent mais ne s'interprètent pas ; les
+  libellés A1/A2 sont **dérivés** de l'ordre, jamais stockés. Le groupe ne porte
+  **ni tours ni repos propres** (le nombre de tours est déjà dans le `sets` de
+  chaque exercice, `Block.rounds` reste au bloc). Conséquences à ne pas casser :
+  changer de bloc détache (le numéro n'a de sens que dans son bloc) ; déposer un
+  exercice **strictement à l'intérieur** d'un groupe l'y fait entrer ; le DOM du
+  compositeur reste **plat** (SortableJS ne trie que ses enfants directs), le
+  groupe se dessine au rail de gauche, jamais par un conteneur.
 - **Unités normalisées en base** : charges en **kg**, distances en **mètres**,
   durées en **secondes**. Jamais de texte mixte type « 5km ». Rend l'export Excel
   (Phase 8) trivial.
@@ -215,7 +232,25 @@ deux sens, fiche de travail par athlète sous `/coach`, `ROLE_COACH`) — cf. §
 la règle de propriété — et **paramètres de compte** (`/profile/settings` :
 changement de mot de passe, création de compte par `app:user:create`).
 
-Dernier lot (refonte graphique « Presse » & page séance) : bascule complète de
+Dernier lot (superset réel, intra-bloc) : le superset cesse d'être un effet de
+bord du nombre d'exercices d'un bloc pour devenir une **liaison stockée entre
+exercices d'un même bloc** (cf. §3).
+
+- **Modèle** : `PrescribedExercise.supersetGroup` (nullable) + service
+  `SupersetGrouper` (découpage en segments, `linkToPrevious` / `detach` /
+  `settleAfterMove` / `normalize`). Migration `Version20260727120000` : la colonne,
+  puis reprise des données — chaque bloc à 2 exercices ou plus devient un groupe
+  unique, ce qui préserve à l'identique l'affichage de l'ancienne règle.
+- **Compositeur** : une bascule par ligne (lier au précédent / détacher), rail de
+  groupe à gauche, rang A1/A2 et intitulé « Superset A » en tête de groupe. Le
+  glisser-déposer décide de l'appartenance (déposé dans un groupe, on le rejoint).
+- **Lecture** : `PlanFlattener` expose désormais, par bloc, `segments` (isolés et
+  groupes) en plus de `exercises` (liste plate) et un `groupLabel` par exercice.
+  La page séance groupe les enchaînements, `WorkoutMetrics` compte les supersets
+  (2 liés) et circuits (3+) **au groupe** et non plus au bloc. Le rang suit
+  jusque dans l'aperçu au survol, l'export Excel et le flux ICS.
+
+Lot précédent (refonte graphique « Presse » & page séance) : bascule complète de
 l'identité (cf. §5), refonte de la page de consultation d'une séance sur le
 modèle de la maquette, et première vraie couche mobile/accessibilité.
 

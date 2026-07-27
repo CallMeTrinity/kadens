@@ -13,6 +13,7 @@ use App\Enum\PrescriptionType;
 use App\Enum\SetType;
 use App\Enum\TargetArea;
 use App\Enum\TargetRegion;
+use App\Service\SupersetGrouper;
 use App\Service\WorkoutEstimator;
 use App\Service\WorkoutMetrics;
 use PHPUnit\Framework\TestCase;
@@ -23,7 +24,7 @@ final class WorkoutMetricsTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->metrics = new WorkoutMetrics(new WorkoutEstimator());
+        $this->metrics = new WorkoutMetrics(new WorkoutEstimator(), new SupersetGrouper());
     }
 
     public function testDistinctActivitiesInOrderOfAppearance(): void
@@ -117,14 +118,33 @@ final class WorkoutMetricsTest extends TestCase
         self::assertSame(8.0, $summary['averageRpe']);
         self::assertSame(6, $summary['workingSets']);
         self::assertSame(2, $summary['exerciseCount']);
-        // Deux exercices enchaînés dans un bloc = un superset.
-        self::assertSame(1, $summary['supersets']);
+        // Deux exercices dans un même bloc ne sont PAS un superset : il faut
+        // qu'ils soient liés. Sans liaison, la séance est à plat.
+        self::assertSame(0, $summary['supersets']);
         self::assertSame(0, $summary['circuits']);
         self::assertNotNull($summary['topLift']);
         self::assertSame('Squat', $summary['topLift']['exercise']);
         self::assertSame(120.0, $summary['topLift']['weightKg']);
         // 4×5×120 + 2×12×20 = 2400 + 480.
         self::assertSame(2880.0, $summary['tonnageKg']);
+    }
+
+    public function testSummaryCountsLinkedGroupsNotBlocks(): void
+    {
+        // Un bloc de 5 exercices : 2 liés (superset), 3 liés (circuit), 1 isolé.
+        // L'ancienne règle « un bloc de 2 exercices = un superset » aurait vu ici
+        // un unique circuit ; la nouvelle compte les deux enchaînements réels.
+        $exercises = [];
+        foreach ([1, 1, null, 2, 2, 2] as $i => $group) {
+            $pe = $this->prescribed(ActivityType::GYM, PrescriptionType::SETS_REPS, [TargetArea::CHEST]);
+            $pe->setSets(3)->setReps(10)->setWeightKg(40.0)->setSupersetGroup($group);
+            $exercises[] = $pe;
+        }
+
+        $summary = $this->metrics->summary($this->workout([$this->block(BlockRole::MAIN, 1, $exercises)]));
+
+        self::assertSame(1, $summary['supersets']);
+        self::assertSame(1, $summary['circuits']);
     }
 
     public function testSummaryGroupsVolumeByAnatomicalRegion(): void

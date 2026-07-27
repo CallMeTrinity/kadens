@@ -1188,3 +1188,80 @@ le socle transverse — du code neuf, pas du code déplacé.
 
 **Tests** : 128 au vert (dont un `SmokeTest` qui balaie les 18 vues et vérifie
 qu'aucune ne casse après la bascule des tokens), `lint:twig` OK.
+
+---
+
+## Lot — Le superset devient une liaison intra-bloc (27/07/2026)
+
+**Le constat.** Le superset n'était pas stocké du tout : il se *déduisait* du
+nombre d'exercices d'un bloc (« 2 exercices = Superset », « 3+ = Circuit »), à
+trois endroits qui répétaient la même règle — `_workout_program.html.twig`,
+`workout/_block.html.twig` et `WorkoutMetrics::summary()`. Conséquence : un bloc
+de cinq exercices dont deux seulement s'enchaînent était inexprimable, et un bloc
+de deux exercices simplement voisins était annoncé comme un superset. C'est
+l'inverse de la réalité : un superset n'est pas un bloc, c'est un lien **entre
+deux exercices à l'intérieur d'un bloc**.
+
+**Le modèle retenu.** Un champ `PrescribedExercise.supersetGroup` (smallint,
+nullable) : même bloc + même numéro = exercices enchaînés. Écartée, l'entité
+dédiée `SupersetGroup` — elle aurait ajouté une table et une couche à cascader
+partout (clonage, mise à plat, streams Turbo, suppression) pour un gain qui se
+résume à un libellé propre au groupe, alors que les libellés A1/A2 se dérivent
+très bien de l'ordre. Écarté aussi, un `rounds` porté par le groupe : le nombre
+de tours d'un superset est **déjà** décrit par le `sets` de chacun de ses
+exercices, et `Block.rounds` reste au bloc — un troisième multiplicateur aurait
+demandé un arbitrage dans tous les services de calcul.
+
+**`SupersetGrouper`, seule autorité.** Deux invariants tenus là et nulle part
+ailleurs : membres **contigus** en position, groupe d'**au moins deux** membres.
+`normalize()` les rétablit après n'importe quelle mutation en renumérotant les
+suites 1..n et en dissolvant les singletons — les numéros se comparent, ils ne
+s'interprètent pas. Le reste en découle :
+- `linkToPrevious()` ouvre un groupe, l'étend, ou **fusionne** deux groupes qui
+  se touchent (plutôt que d'abandonner les liens de l'un des deux) ;
+- `detach()` sort d'abord l'exercice **après** le dernier membre du groupe :
+  détacher le milieu d'un tri-set laisse les deux autres liés au lieu de tout
+  dissoudre ;
+- `settleAfterMove()` porte la règle de dépôt : déposé **strictement à
+  l'intérieur** d'un groupe, l'exercice le rejoint ; sinon il le quitte s'il ne
+  touche plus aucun de ses membres. Changer de bloc détache toujours (le numéro
+  n'a de sens que dans son bloc, le garder ferait entrer par accident dans un
+  groupe homonyme du bloc d'arrivée).
+
+**Reprise des données (`Version20260727120000`).** La colonne, puis un `UPDATE`
+qui place tous les exercices d'un bloc à 2+ dans un groupe unique. L'affichage
+de l'ancienne règle est donc préservé à l'identique après migration ; ce qui
+n'était pas un vrai enchaînement se délie à la main.
+
+**Mise à plat.** `PlanFlattener` livre désormais chaque bloc sous **deux formes
+complémentaires, jamais divergentes** : `exercises` (liste plate, ordre de
+lecture) pour ce qui n'a que faire des liaisons — export Excel, ICS, aperçu — et
+`segments` (isolés et groupes liés) pour les vues qui montrent l'enchaînement.
+Chaque exercice porte en plus son `groupLabel` (« A1 »), ce qui a permis de faire
+suivre le rang jusque dans l'aperçu au survol, la colonne « Exercice » de
+l'export Excel et la description des événements ICS — trois sorties sans mise en
+forme, où le préfixe est la seule façon de lire l'enchaînement.
+
+**Compositeur.** Une bascule par ligne (`lucide:link` / `lucide:unlink`), le rang
+A1/A2 devant le nom, un intitulé « Superset A » en tête de groupe et un rail
+continu à gauche. Le DOM reste **plat** : SortableJS ne trie que ses enfants
+directs, un conteneur de groupe aurait cassé le glisser-déposer. Le groupe se
+dessine donc en `margin-left` + `border-left` sur les lignes elles-mêmes
+(`.kd-cexo--linked`), pas par un wrapper. La ligne re-rendue seule (stream ciblé
+après un enregistrement de paramètre) reçoit son contexte de superset via
+`supersetRowContext()`, sinon le rang et la bascule disparaissaient jusqu'au
+rechargement.
+
+**Lecture.** La ligne d'exercice est extraite dans
+`components/_workout_exrow.html.twig` pour être rendue à l'identique qu'elle soit
+isolée ou membre d'un groupe. Le badge Superset/Circuit descend du bloc au groupe
+(`.kd-exgroup`), et la liste imbriquée pose `counter-reset: none` — sans ça la
+numérotation du bloc redémarrait à 1 à chaque groupe. `WorkoutMetrics::summary()`
+compte les enchaînements **au groupe** : le KPI « Enchaînements » d'une séance à
+un bloc de 5 exercices peut désormais afficher « 1 superset · 1 circuit ».
+
+**Tests** : 139 au vert, dont `SupersetGrouperTest` (10 cas : découpage,
+normalisation, liaison, fusion, détachement du milieu, dépôt entrant/sortant) et
+un cas de `PlanFlattenerTest` qui vérifie que `exercises` et `segments` décrivent
+le même contenu dans le même ordre. `WorkoutMetricsTest` a été retourné : « deux
+exercices dans un bloc » n'est plus un superset, il faut la liaison.

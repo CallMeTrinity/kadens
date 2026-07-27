@@ -19,6 +19,7 @@ use App\Security\Voter\WorkoutVoter;
 use App\Service\PlanFlattener;
 use App\Service\SetSynchronizer;
 use App\Service\SlugGenerator;
+use App\Service\SupersetGrouper;
 use App\Service\WorkoutCloner;
 use App\Service\WorkoutEstimator;
 use App\Service\WorkoutMetrics;
@@ -57,6 +58,7 @@ final class WorkoutController extends AbstractController
         private readonly ExerciseRepository $exerciseRepository,
         private readonly WorkoutEstimator $estimator,
         private readonly SetSynchronizer $setSynchronizer,
+        private readonly SupersetGrouper $supersets,
     ) {
     }
 
@@ -417,7 +419,10 @@ final class WorkoutController extends AbstractController
                 'workout' => $workout,
                 'prescribed' => $prescribed,
                 'summary' => $this->prescribedSummaries($workout)[$prescribed->getId()] ?? '',
-            ]);
+                // La ligne re-rendue seule doit garder son rang de superset et sa
+                // bascule de liaison : sans ça, un enregistrement de paramètre les
+                // ferait disparaître jusqu'au rechargement.
+            ] + $this->supersetRowContext($prescribed));
         }
 
         return $this->redirectToRoute('app_workout_edit', ['id' => $workout->getId()]);
@@ -525,7 +530,10 @@ final class WorkoutController extends AbstractController
                 'workout' => $workout,
                 'prescribed' => $prescribed,
                 'summary' => $this->prescribedSummaries($workout)[$prescribed->getId()] ?? '',
-            ]);
+                // La ligne re-rendue seule doit garder son rang de superset et sa
+                // bascule de liaison : sans ça, un enregistrement de paramètre les
+                // ferait disparaître jusqu'au rechargement.
+            ] + $this->supersetRowContext($prescribed));
         }
 
         return $this->redirectToRoute('app_workout_edit', ['id' => $workout->getId()]);
@@ -621,7 +629,11 @@ final class WorkoutController extends AbstractController
         $prescribed = $this->findPrescribed($workout, $prescribedId);
 
         if ($this->isCsrfTokenValid('prescribed_delete'.$prescribedId, $request->getPayload()->getString('_token'))) {
-            $prescribed->getBlock()->removePrescribedExercise($prescribed);
+            $block = $prescribed->getBlock();
+            $block->removePrescribedExercise($prescribed);
+            // Retirer un membre peut laisser un groupe à un seul exercice : le
+            // grouper le dissout (un superset compte au moins deux exercices).
+            $this->supersets->normalize($block);
             $this->entityManager->flush();
         }
 
@@ -636,6 +648,37 @@ final class WorkoutController extends AbstractController
 
         if ($this->isCsrfTokenValid('prescribed_move'.$prescribedId, $request->getPayload()->getString('_token'))) {
             $this->swapPosition($prescribed->getBlock()->getPrescribedExercises()->toArray(), $prescribed, $direction);
+            $this->supersets->settleAfterMove($prescribed);
+            $this->entityManager->flush();
+        }
+
+        return $this->blocksResponse($request, $workout);
+    }
+
+    // ---- Liaisons de superset (intra-bloc) ---------------------------------
+
+    #[Route('/{id}/exercises/{prescribedId}/link', name: 'app_workout_prescribed_link', methods: ['POST'], requirements: ['id' => '\d+', 'prescribedId' => '\d+'])]
+    public function linkPrescribed(Request $request, Workout $workout, int $prescribedId): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
+        $prescribed = $this->findPrescribed($workout, $prescribedId);
+
+        if ($this->isCsrfTokenValid('prescribed_link'.$prescribedId, $request->getPayload()->getString('_token'))) {
+            $this->supersets->linkToPrevious($prescribed);
+            $this->entityManager->flush();
+        }
+
+        return $this->blocksResponse($request, $workout);
+    }
+
+    #[Route('/{id}/exercises/{prescribedId}/unlink', name: 'app_workout_prescribed_unlink', methods: ['POST'], requirements: ['id' => '\d+', 'prescribedId' => '\d+'])]
+    public function unlinkPrescribed(Request $request, Workout $workout, int $prescribedId): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
+        $prescribed = $this->findPrescribed($workout, $prescribedId);
+
+        if ($this->isCsrfTokenValid('prescribed_unlink'.$prescribedId, $request->getPayload()->getString('_token'))) {
+            $this->supersets->detach($prescribed);
             $this->entityManager->flush();
         }
 
@@ -736,6 +779,10 @@ final class WorkoutController extends AbstractController
         if ($source !== $targetBlock) {
             $source?->removePrescribedExercise($prescribed);
             $targetBlock->addPrescribedExercise($prescribed);
+            // Changer de bloc, c'est quitter son groupe : le numéro n'a de sens
+            // que dans son bloc, le garder le ferait entrer par accident dans un
+            // groupe homonyme du bloc d'arrivée.
+            $prescribed->setSupersetGroup(null);
         }
 
         // Ordre courant du bloc cible sans l'élément déplacé, trié par position.
@@ -762,6 +809,14 @@ final class WorkoutController extends AbstractController
         foreach ($ordered as $index => $pe) {
             $pe->setPosition($index);
         }
+
+        // Un déplacement décide de l'appartenance à l'arrivée (déposé au milieu
+        // d'un groupe, on le rejoint) et peut laisser le bloc de départ avec un
+        // groupe à un seul membre.
+        if ($source !== $targetBlock) {
+            $this->supersets->normalize($source);
+        }
+        $this->supersets->settleAfterMove($prescribed);
     }
 
     /**
@@ -939,10 +994,22 @@ final class WorkoutController extends AbstractController
             }
         }
 
+        // Rangs de superset : la mini-modale n'édite que des valeurs, mais il faut
+        // voir qu'un exercice est enchaîné avant de toucher à ses reps.
+        $supersetLabels = [];
+        foreach ($this->planFlattener->flattenWorkout($workout)['blocks'] as $flatBlock) {
+            foreach ($flatBlock['exercises'] as $flat) {
+                if (null !== $flat['groupLabel']) {
+                    $supersetLabels[$flat['prescribed']->getId()] = $flat['groupLabel'];
+                }
+            }
+        }
+
         return [
             'workout' => $workout,
             'prescribedForms' => $prescribedForms,
             'summaries' => $this->prescribedSummaries($workout),
+            'supersetLabels' => $supersetLabels,
         ];
     }
 
@@ -957,9 +1024,14 @@ final class WorkoutController extends AbstractController
         $blockForms = [];
         $prescribedForms = [];
         $setForms = [];
+        $segments = [];
 
         foreach ($workout->getBlocks() as $block) {
             $blockForms[$block->getId()] = $this->createBlockForm($block)->createView();
+            // Le compositeur rend les exercices segment par segment (isolé ou
+            // groupe lié) : le DOM reste plat pour le glisser-déposer, seules les
+            // classes et l'étiquette A1/A2 changent.
+            $segments[$block->getId()] = $this->supersets->segments($block);
 
             foreach ($block->getPrescribedExercises() as $prescribed) {
                 $prescribedForms[$prescribed->getId()] = $this->createPrescribedForm($prescribed)->createView();
@@ -976,8 +1048,42 @@ final class WorkoutController extends AbstractController
             'blockForms' => $blockForms,
             'prescribedForms' => $prescribedForms,
             'setForms' => $setForms,
+            'segments' => $segments,
             'summaries' => $this->prescribedSummaries($workout),
         ];
+    }
+
+    /**
+     * Variables de superset d'UNE ligne du compositeur, pour les streams ciblés
+     * qui re-rendent `_cexo_row` seul. Même découpage que `blocksContext` — c'est
+     * SupersetGrouper qui fait autorité des deux côtés.
+     *
+     * @return array{groupLabel: string|null, groupKind: string, canLink: bool}
+     */
+    private function supersetRowContext(PrescribedExercise $prescribed): array
+    {
+        $block = $prescribed->getBlock();
+        $default = ['groupLabel' => null, 'groupKind' => 'single', 'canLink' => false];
+
+        if (null === $block) {
+            return $default;
+        }
+
+        $isBlockFirst = true;
+        foreach ($this->supersets->segments($block) as $segment) {
+            foreach ($segment['exercises'] as $index => $exercise) {
+                if ($exercise === $prescribed) {
+                    return [
+                        'groupLabel' => null !== $segment['label'] ? $segment['label'].($index + 1) : null,
+                        'groupKind' => $segment['kind'],
+                        'canLink' => !$isBlockFirst,
+                    ];
+                }
+                $isBlockFirst = false;
+            }
+        }
+
+        return $default;
     }
 
     /**

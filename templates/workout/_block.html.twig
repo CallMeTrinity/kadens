@@ -34,14 +34,6 @@
             </div>
         {{ form_end(blockForm) }}
 
-        {# Plusieurs exercices enchaînés = superset (2) / circuit (3+). La mécanique
-           bloc+tours l'exprime déjà : on la nomme, sans nouveau modèle. #}
-        {% if block.prescribedExercises|length > 1 %}
-            <span class="kd-block__superset kd-cblock__superset">
-                {{ ux_icon('lucide:repeat') }} {{ block.prescribedExercises|length == 2 ? 'Superset' : 'Circuit' }}
-            </span>
-        {% endif %}
-
         <div class="kd-cblock__actions">
             {{ include('workout/_action_form.html.twig', {
                 action: path('app_workout_block_move', {id: workout.id, blockId: block.id, direction: 'up'}),
@@ -66,33 +58,55 @@
     </div>
 
     <div class="kd-cblock__items" data-composer-target="items" data-block-id="{{ block.id }}">
-        {# Tri par position en mémoire : après une mutation (ajout/réordonnancement),
-           la PersistentCollection Doctrine garde son ordre de chargement, le #[OrderBy]
-           ne s'appliquant qu'au load DB. On mirroir donc l'ordre « position ASC » ici,
-           sinon le re-render du stream montre l'ordre périmé (correct au rechargement). #}
-        {% for prescribed in block.prescribedExercises|sort((a, b) => a.position <=> b.position) %}
-            <div class="kd-cexo"
-                 data-composer-target="exo"
-                 data-prescribed-id="{{ prescribed.id }}"
-                 data-block-id="{{ block.id }}">
-                {{ include('workout/_cexo_row.html.twig', {
-                    prescribed: prescribed,
-                    summary: summaries[prescribed.id]|default('')
-                }) }}
+        {# Rendu segment par segment (SupersetGrouper) : un exercice isolé ou un
+           groupe lié. Le DOM reste PLAT — les `.kd-cexo` doivent rester enfants
+           directs du conteneur, SortableJS ne trie que ses enfants directs. Le
+           groupe se lit à la classe et au rail de gauche, pas à un wrapper.
 
-                <div class="kd-cexo__params" hidden>
-                    {# Conteneur re-rendu d'un bloc par les mutations de séries (stream
-                       ciblant cet id). .kd-cexo__params (et son `hidden`) survit :
-                       seul le contenu change, le panneau reste ouvert. #}
-                    <div id="prescribed-params-{{ prescribed.id }}">
-                        {{ include('workout/_prescribed_params.html.twig', {
-                            prescribed: prescribed,
-                            prescribedForm: prescribedForms[prescribed.id],
-                            setForms: setForms
-                        }) }}
+           L'ordre vient déjà du service (tri par position en mémoire) : après une
+           mutation, la PersistentCollection garde son ordre de chargement, le
+           #[OrderBy] ne s'appliquant qu'au load DB. #}
+        {% for segment in segments[block.id]|default([]) %}
+            {% set segLoop = loop %}
+            {% for prescribed in segment.exercises %}
+                <div class="kd-cexo
+                            {{- segment.label ? ' kd-cexo--linked' }}
+                            {{- segment.label and loop.first ? ' kd-cexo--linkstart' }}
+                            {{- segment.label and loop.last ? ' kd-cexo--linkend' }}"
+                     data-composer-target="exo"
+                     data-prescribed-id="{{ prescribed.id }}"
+                     data-block-id="{{ block.id }}">
+                    {% if segment.label and loop.first %}
+                        {# Nommé une fois en tête de groupe. Hors de .kd-cexo__row :
+                           le stream ciblé qui re-rend une ligne ne l'emporte pas. #}
+                        <p class="kd-cexo__caption">
+                            {{ ux_icon('lucide:link') }}
+                            {{ segment.kind == 'circuit' ? 'Circuit' : 'Superset' }} {{ segment.label }}
+                            <span>· enchaîné sans repos</span>
+                        </p>
+                    {% endif %}
+                    {{ include('workout/_cexo_row.html.twig', {
+                        prescribed: prescribed,
+                        summary: summaries[prescribed.id]|default(''),
+                        groupLabel: segment.label ? segment.label ~ loop.index : null,
+                        groupKind: segment.kind,
+                        canLink: not (segLoop.first and loop.first)
+                    }) }}
+
+                    <div class="kd-cexo__params" hidden>
+                        {# Conteneur re-rendu d'un bloc par les mutations de séries (stream
+                           ciblant cet id). .kd-cexo__params (et son `hidden`) survit :
+                           seul le contenu change, le panneau reste ouvert. #}
+                        <div id="prescribed-params-{{ prescribed.id }}">
+                            {{ include('workout/_prescribed_params.html.twig', {
+                                prescribed: prescribed,
+                                prescribedForm: prescribedForms[prescribed.id],
+                                setForms: setForms
+                            }) }}
+                        </div>
                     </div>
                 </div>
-            </div>
+            {% endfor %}
         {% else %}
             <div class="kd-cblock__drop">Déposez un exercice ici</div>
         {% endfor %}

@@ -125,6 +125,11 @@ final class IcsCalendarBuilder
 
             foreach ($flatBlock['exercises'] as $flatEx) {
                 $name = $flatEx['exercise']?->getName() ?? 'Exercice';
+                // Rang de superset en tête (« A1 »), pour que l'enchaînement se
+                // lise aussi dans un agenda, où il n'y a aucune mise en forme.
+                if (null !== $flatEx['groupLabel']) {
+                    $name = $flatEx['groupLabel'].' '.$name;
+                }
                 $summary = $flatEx['summary'];
                 $parts[] = '' !== $summary ? '· '.$name.' : '.$summary : '· '.$name;
             }

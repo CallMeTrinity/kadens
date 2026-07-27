@@ -1474,22 +1474,8 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
   padding: 3px var(--kd-space-3);
   white-space: nowrap;
 }
-/* Tag superset/circuit : neutre (structure, pas activité ni statut). */
-.kd-block__superset {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--kd-space-2);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: var(--kd-weight-semibold);
-  letter-spacing: var(--kd-tracking-eyebrow-lg);
-  text-transform: uppercase;
-  color: var(--color-text-secondary);
-  border: 1px solid var(--color-border-pill);
-  padding: 3px var(--kd-space-3);
-  white-space: nowrap;
-}
-.kd-block__superset svg { width: 12px; height: 12px; }
+/* Le tag superset/circuit vivait ici, au bloc. Il est descendu au groupe lié
+   (.kd-exgroup) : un bloc peut porter zéro, un ou plusieurs enchaînements. */
 .kd-block__sum {
   margin-left: auto;
   font-family: var(--font-mono);
@@ -1584,6 +1570,51 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
   line-height: 1.45;
   color: var(--color-text-secondary);
   max-width: 68ch;
+}
+/* Groupe lié (superset / circuit) DANS un bloc : un rail à gauche relie les
+   exercices enchaînés, le reste du bloc coule normalement. Structure, donc
+   niveaux de gris — le rouge reste réservé à l'action, l'intensité et l'échec. */
+.kd-exgroup {
+  border-top: 1px solid var(--color-divider-soft);
+}
+.kd-exgroup__head {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  margin: 0;
+  padding: var(--kd-space-4) var(--kd-space-5) 0 var(--kd-space-13);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow-lg);
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.kd-exgroup__head svg { width: 12px; height: 12px; }
+.kd-exgroup__hint {
+  font-size: 11px;
+  font-weight: var(--kd-weight-regular);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-text-faint);
+}
+/* `counter-reset: none` : sans ça la liste imbriquée redémarrerait la
+   numérotation du bloc à 1 à chaque groupe. */
+.kd-exlist--nested {
+  counter-reset: none;
+  padding: 0;
+  margin: var(--kd-space-2) 0 0 var(--kd-space-5);
+  border-left: 2px solid var(--color-border-strong);
+}
+.kd-exlist--nested .kd-exrow { border-top: 0; }
+.kd-exlist--nested .kd-exrow + .kd-exrow { border-top: 1px solid var(--color-divider-soft); }
+/* Rang dans l'enchaînement (A1, A2) : repère de lecture, pas un titre. */
+.kd-exrow__rank {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-secondary);
 }
 .kd-exrow--empty {
   margin: 0;
@@ -3397,6 +3428,44 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
 }
 .kd-cexo--open { border-color: var(--color-border-strong); }
 
+/* Exercices liés (superset) : le DOM reste plat — SortableJS ne trie que ses
+   enfants directs — donc le groupe se dessine à la marge gauche, pas par un
+   conteneur. Le rail est continu du premier au dernier membre. */
+.kd-cexo--linked {
+  margin-left: var(--kd-space-5);
+  border-left: 2px solid var(--color-border-strong);
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.kd-cexo--linkstart { margin-top: var(--kd-space-1); }
+.kd-cexo__caption {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  margin: 0;
+  padding: var(--kd-space-2) var(--kd-space-4) 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow-lg);
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.kd-cexo__caption svg { width: 12px; height: 12px; }
+.kd-cexo__caption span {
+  font-weight: var(--kd-weight-regular);
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--color-text-faint);
+}
+.kd-cexo__rank {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-secondary);
+}
+
 /* Retour visuel SortableJS (glisser-déposer). ghost = emplacement de dépôt,
    chosen = élément saisi, active = clone qui suit le curseur. Appliqué aux
    lignes d'exercices comme aux cartes de bibliothèque. */
@@ -3830,6 +3899,14 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
   color: var(--color-text-secondary);
 }
 .kd-planpreview__exoname { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+/* Rang de superset (A1) dans l'aperçu au survol : même repère qu'en lecture. */
+.kd-planpreview__rank {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-faint);
+}
 .kd-planpreview__sum {
   flex: 0 1 auto;
   min-width: 0;

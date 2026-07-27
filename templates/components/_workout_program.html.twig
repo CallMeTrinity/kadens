@@ -25,14 +25,9 @@
 
                     {% if block.label %}<span class="kd-block__label">{{ block.label }}</span>{% endif %}
 
-                    {# Un bloc à plusieurs exercices enchaînés EST un superset (2)
-                       ou un circuit (3+) : la mécanique bloc+tours l'exprime
-                       déjà, on la nomme. #}
-                    {% if entry.exercises|length > 1 %}
-                        <span class="kd-block__superset">
-                            {{ entry.exercises|length == 2 ? 'Superset' : 'Circuit' }}
-                        </span>
-                    {% endif %}
+                    {# Les enchaînements se nomment au groupe, dans la liste : un
+                       bloc peut n'en porter aucun, ou plusieurs. L'en-tête ne
+                       garde que ce qui est vrai du bloc entier. #}
                     {% if block.rounds > 1 %}<span class="kd-block__rounds">× {{ block.rounds }} tours</span>{% endif %}
 
                     <span class="kd-block__sum">
@@ -47,36 +42,29 @@
                 {% if entry.exercises is empty %}
                     <p class="kd-exrow--empty">Aucun exercice.</p>
                 {% else %}
+                    {# Segment par segment : un exercice isolé, ou un groupe lié
+                       (superset / circuit) qui s'enchaîne sans repos. Le groupe
+                       est un sous-ensemble du bloc, pas le bloc entier. #}
                     <ol class="kd-exlist">
-                        {% for ex in entry.exercises %}
-                            <li class="kd-exrow">
-                                <div class="kd-exrow__head">
-                                    <span class="kd-exrow__name">{{ ex.exercise ? ex.exercise.name : '—' }}</span>
-
-                                    {# `values` et non `summary` : le RPE a sa
-                                       propre colonne juste à droite. #}
-                                    {% if ex.sets %}
-                                        <span class="kd-exrow__flag">{{ ex.sets|reduce((c, g) => c + g.count, 0) }} séries détaillées</span>
-                                    {% elseif ex.values %}
-                                        <span class="kd-exrow__val">{{ ex.values }}</span>
-                                    {% endif %}
-
-                                    {% if ex.prescribed.rpe %}
-                                        <span class="kd-exrow__rpe{{ ex.prescribed.rpe >= 9 ? ' is-hard' }}">RPE {{ ex.prescribed.rpe }}</span>
-                                    {% endif %}
-                                    {% if ex.rest %}
-                                        <span class="kd-exrow__rest">repos {{ ex.rest }} s</span>
-                                    {% endif %}
-                                </div>
-
-                                {% if ex.sets %}
-                                    {% include 'components/_workout_sets_table.html.twig' with {
-                                        groups: ex.sets, topWeightKg: ex.topWeightKg, type: ex.type
-                                    } only %}
-                                {% endif %}
-
-                                {% if ex.notes %}<p class="kd-exrow__notes">{{ ex.notes|nl2br }}</p>{% endif %}
-                            </li>
+                        {% for segment in entry.segments %}
+                            {% if segment.label %}
+                                <li class="kd-exgroup">
+                                    <p class="kd-exgroup__head">
+                                        {{ ux_icon('lucide:link') }}
+                                        {{ segment.kind == 'circuit' ? 'Circuit' : 'Superset' }} {{ segment.label }}
+                                        <span class="kd-exgroup__hint">enchaîné sans repos</span>
+                                    </p>
+                                    <ol class="kd-exlist kd-exlist--nested">
+                                        {% for ex in segment.exercises %}
+                                            {% include 'components/_workout_exrow.html.twig' with { ex: ex } only %}
+                                        {% endfor %}
+                                    </ol>
+                                </li>
+                            {% else %}
+                                {% for ex in segment.exercises %}
+                                    {% include 'components/_workout_exrow.html.twig' with { ex: ex } only %}
+                                {% endfor %}
+                            {% endif %}
                         {% endfor %}
                     </ol>
                 {% endif %}
