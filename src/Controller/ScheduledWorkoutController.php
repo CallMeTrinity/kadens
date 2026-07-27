@@ -14,6 +14,8 @@ use App\Security\Voter\ScheduledWorkoutVoter;
 use App\Security\Voter\WorkoutVoter;
 use App\Service\PlanFlattener;
 use App\Service\PlanScheduler;
+use App\Service\SessionSheet;
+use App\Service\WorkoutLogger;
 use App\Service\WorkoutMetrics;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -142,6 +144,200 @@ final class ScheduledWorkoutController extends AbstractController
             'summary' => $metrics->summary($workout),
             'blockStats' => $metrics->blockBreakdown($workout),
         ]);
+    }
+
+    // ---- Exécution : la boucle prévu vs réalisé, série par série -------------
+
+    /**
+     * La page qu'on tient en main PENDANT la séance. Distincte de `show`, qui la
+     * donne à lire : ici on pointe, on corrige, on termine.
+     *
+     * Elle n'écrit jamais dans la prescription (voir WorkoutLogger) : valider une
+     * série crée un `LoggedSet` daté, ce qui laisse la séance de bibliothèque et
+     * toutes ses autres dates intactes.
+     *
+     * `prompt` est le repli SANS JS de la clôture incomplète : le bouton
+     * « Terminer » repasse par ici avec ce drapeau, qui ouvre le choix « tout
+     * valider / valider tel quel » côté serveur. Avec JS, la modale s'ouvre sur
+     * place et ce chemin ne sert pas.
+     */
+    #[Route('/{id}/execute', name: 'app_scheduled_workout_execute', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function execute(Request $request, ScheduledWorkout $scheduled, SessionSheet $sheet): Response
+    {
+        $this->denyAccessUnlessGranted(ScheduledWorkoutVoter::EDIT, $scheduled);
+
+        return $this->render('scheduled_workout/execute.html.twig', [
+            'sheet' => $sheet->build($scheduled),
+            'scheduled' => $scheduled,
+            'prompt' => $request->query->getBoolean('prompt'),
+        ]);
+    }
+
+    /**
+     * Valide, corrige ou dévalide UNE série réalisée. Endpoint lean posté par le
+     * contrôleur Stimulus `execlog` (et par de vrais boutons de formulaire sans
+     * JS, d'où le repli par redirection).
+     *
+     * Idempotent côté service : la file d'écriture hors ligne peut rejouer deux
+     * fois le même geste après une reconnexion sans créer de doublon.
+     */
+    #[Route('/{id}/log', name: 'app_scheduled_workout_log', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function log(
+        Request $request,
+        ScheduledWorkout $scheduled,
+        WorkoutLogger $logger,
+        SessionSheet $sheet,
+    ): Response {
+        $this->denyAccessUnlessGranted(ScheduledWorkoutVoter::EDIT, $scheduled);
+        $payload = $request->getPayload();
+
+        if (!$this->isCsrfTokenValid('log'.$scheduled->getId(), $payload->getString('_token'))) {
+            return $this->redirectToRoute('app_scheduled_workout_execute', ['id' => $scheduled->getId()]);
+        }
+
+        $prescribed = $this->findPrescribed($scheduled, $payload->getInt('prescribedId'));
+        $setIndex = $payload->getInt('setIndex');
+
+        if ('unlog' === $payload->getString('action')) {
+            $logger->unlog($scheduled, $prescribed, $setIndex);
+        } else {
+            $logger->log(
+                $scheduled,
+                $prescribed,
+                $setIndex,
+                $this->nullableInt($payload, 'reps'),
+                $this->nullableFloat($payload, 'weightKg'),
+                $this->nullableInt($payload, 'durationSeconds'),
+            );
+        }
+
+        $this->entityManager->flush();
+
+        // Re-rendu ciblé : la carte de l'exercice concerné + la jauge de
+        // progression. Les deux cibles existent sur la page d'exécution, seule
+        // page d'où cet endpoint est posté.
+        if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
+            $request->setRequestFormat(TurboBundle::STREAM_FORMAT);
+
+            return $this->render('scheduled_workout/stream/log.stream.html.twig', [
+                'sheet' => $sheet->build($scheduled),
+                'scheduled' => $scheduled,
+                'focusPrescribedId' => $prescribed->getId(),
+            ]);
+        }
+
+        return $this->redirectToRoute('app_scheduled_workout_execute', ['id' => $scheduled->getId()]);
+    }
+
+    /**
+     * Clôture de la séance. Trois entrées possibles, et c'est le cœur de la règle
+     * demandée : on ne marque « fait » une séance au pointage incomplet qu'après
+     * avoir tranché quoi faire du reste.
+     *
+     *   mode absent -> séance incomplète : on renvoie sur la page d'exécution avec
+     *                  le choix ouvert (repli sans JS ; avec JS la modale a déjà
+     *                  posé la question et poste directement l'un des deux modes).
+     *                  Séance complète : rien à demander, on termine.
+     *   mode=all    -> « j'ai tout fait comme prévu » : les séries manquantes sont
+     *                  validées avec les valeurs prescrites, puis la séance passe
+     *                  à « faite ».
+     *   mode=asis   -> « je termine tel quel » : le manque reste enregistré comme
+     *                  écart, la séance passe quand même à « faite ».
+     *
+     * Le troisième choix de la demande initiale (« effacer les séries vides »,
+     * qui supprimait l'exercice s'il ne restait rien) n'existe pas ici : avec un
+     * réalisé séparé, une série non validée n'a rien à effacer — elle est déjà
+     * absente du réalisé, et la prescription doit rester intacte pour que l'écart
+     * soit lisible.
+     */
+    #[Route('/{id}/finish', name: 'app_scheduled_workout_finish', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function finish(
+        Request $request,
+        ScheduledWorkout $scheduled,
+        WorkoutLogger $logger,
+        SessionSheet $sheet,
+    ): Response {
+        $this->denyAccessUnlessGranted(ScheduledWorkoutVoter::EDIT, $scheduled);
+        $payload = $request->getPayload();
+
+        if (!$this->isCsrfTokenValid('finish'.$scheduled->getId(), $payload->getString('_token'))) {
+            return $this->redirectToRoute('app_scheduled_workout_execute', ['id' => $scheduled->getId()]);
+        }
+
+        $mode = $payload->getString('mode');
+        $progress = $sheet->progress($scheduled);
+
+        if ('' === $mode && !$progress['complete']) {
+            return $this->redirectToRoute('app_scheduled_workout_execute', [
+                'id' => $scheduled->getId(),
+                'prompt' => 1,
+            ]);
+        }
+
+        $added = 'all' === $mode ? $logger->completeAll($scheduled) : 0;
+
+        $scheduled->setStatus(ScheduledStatus::DONE);
+        $this->entityManager->flush();
+
+        $this->addFlash('success', $added > 0
+            ? sprintf('Séance terminée : %d série(s) validée(s) au passage.', $added)
+            : 'Séance terminée.');
+
+        return $this->redirectToRoute('app_scheduled_workout_show', ['id' => $scheduled->getId()]);
+    }
+
+    /**
+     * Remet le pointage à zéro (le statut de la séance n'est pas touché : le
+     * réalisé et le statut sont deux choses distinctes, on peut vouloir
+     * recommencer le pointage d'une séance déjà marquée faite).
+     */
+    #[Route('/{id}/log/reset', name: 'app_scheduled_workout_log_reset', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function resetLog(Request $request, ScheduledWorkout $scheduled, WorkoutLogger $logger): Response
+    {
+        $this->denyAccessUnlessGranted(ScheduledWorkoutVoter::EDIT, $scheduled);
+
+        if ($this->isCsrfTokenValid('log_reset'.$scheduled->getId(), $request->getPayload()->getString('_token'))) {
+            $removed = $logger->reset($scheduled);
+            $this->entityManager->flush();
+
+            $this->addFlash('success', sprintf('Pointage remis à zéro (%d série(s)).', $removed));
+        }
+
+        return $this->redirectToRoute('app_scheduled_workout_execute', ['id' => $scheduled->getId()]);
+    }
+
+    /**
+     * Retrouve un exercice prescrit DANS la séance datée. Même garde que
+     * WorkoutController::findPrescribed : l'id transite par le formulaire, il ne
+     * doit pas permettre de pointer l'exercice d'une autre séance.
+     */
+    private function findPrescribed(ScheduledWorkout $scheduled, int $prescribedId): \App\Entity\PrescribedExercise
+    {
+        foreach ($scheduled->getWorkout()->getBlocks() as $block) {
+            foreach ($block->getPrescribedExercises() as $prescribed) {
+                if ($prescribed->getId() === $prescribedId) {
+                    return $prescribed;
+                }
+            }
+        }
+
+        throw $this->createNotFoundException('Exercice introuvable dans cette séance.');
+    }
+
+    /** Champ numérique optionnel : « non renseigné » doit rester distinct de 0. */
+    private function nullableInt(\Symfony\Component\HttpFoundation\InputBag $payload, string $key): ?int
+    {
+        $raw = trim((string) $payload->get($key, ''));
+
+        return '' === $raw ? null : (int) $raw;
+    }
+
+    private function nullableFloat(\Symfony\Component\HttpFoundation\InputBag $payload, string $key): ?float
+    {
+        $raw = trim((string) $payload->get($key, ''));
+
+        // La virgule décimale est ce qu'un clavier français produit naturellement.
+        return '' === $raw ? null : (float) str_replace(',', '.', $raw);
     }
 
     /**

@@ -4,6 +4,8 @@ namespace App\Entity;
 
 use App\Enum\ScheduledStatus;
 use App\Repository\ScheduledWorkoutRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -53,11 +55,26 @@ class ScheduledWorkout
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $completionNotes = null;
 
+    /**
+     * Séries réalisées à cette date. La moitié « réalisé » de la boucle : elle
+     * vit ici et non dans la séance, qui reste la prescription partagée entre
+     * toutes ses dates. Voir LoggedSet.
+     *
+     * @var Collection<int, LoggedSet>
+     */
+    #[ORM\OneToMany(targetEntity: LoggedSet::class, mappedBy: 'scheduledWorkout', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    private Collection $loggedSets;
+
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $updatedAt = null;
+
+    public function __construct()
+    {
+        $this->loggedSets = new ArrayCollection();
+    }
 
     #[ORM\PrePersist]
     public function onPrePersist(): void
@@ -180,6 +197,38 @@ class ScheduledWorkout
     public function setCreatedAt(\DateTimeImmutable $createdAt): static
     {
         $this->createdAt = $createdAt;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, LoggedSet>
+     */
+    public function getLoggedSets(): Collection
+    {
+        return $this->loggedSets;
+    }
+
+    public function addLoggedSet(LoggedSet $loggedSet): static
+    {
+        // Maintient les DEUX côtés : sans ça la collection en mémoire reste
+        // périmée et un fragment re-rendu par Turbo Stream dans la même requête
+        // montre un état d'avant la validation. Cf. règle projet.
+        if (!$this->loggedSets->contains($loggedSet)) {
+            $this->loggedSets->add($loggedSet);
+            $loggedSet->setScheduledWorkout($this);
+        }
+
+        return $this;
+    }
+
+    public function removeLoggedSet(LoggedSet $loggedSet): static
+    {
+        if ($this->loggedSets->removeElement($loggedSet)) {
+            if ($loggedSet->getScheduledWorkout() === $this) {
+                $loggedSet->setScheduledWorkout(null);
+            }
+        }
 
         return $this;
     }
