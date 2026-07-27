@@ -159,6 +159,76 @@ final class CalendarControllerTest extends WebTestCase
         self::assertNull($this->em->getRepository(ScheduledWorkout::class)->find($id));
     }
 
+    public function testScheduledShowRendersWorkoutInItsDatedContext(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $workout = $this->createWorkout($user, 'Sortie longue');
+        $scheduled = $this->createScheduled($user, $workout, new \DateTimeImmutable('2026-03-15'));
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/schedule/'.$scheduled->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('Sortie longue', $crawler->html());
+        // La date est ce qui distingue cette page de app_workout_show.
+        self::assertSelectorTextContains('.kd-wk__date', 'Dimanche 15 mars 2026');
+        self::assertSelectorTextContains('.kd-done', 'Marquer fait');
+    }
+
+    public function testScheduledShowDeniedToNonOwner(): void
+    {
+        $owner = $this->createUser('owner@example.com');
+        $intruder = $this->createUser('intruder@example.com');
+        $workout = $this->createWorkout($owner, 'Sortie longue');
+        $scheduled = $this->createScheduled($owner, $workout, new \DateTimeImmutable('2026-03-15'));
+
+        $this->client->loginUser($intruder);
+        $this->client->request('GET', '/schedule/'.$scheduled->getId());
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testDoneButtonTogglesStatusAndStaysOnThePage(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $workout = $this->createWorkout($user, 'Sortie longue');
+        $scheduled = $this->createScheduled($user, $workout, new \DateTimeImmutable('2026-03-15'));
+        $id = $scheduled->getId();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/schedule/'.$id);
+
+        $this->client->submit($crawler->filter('.kd-done__form')->form());
+
+        // `return=schedule` : on reste sur la séance au lieu d'être renvoyé au
+        // calendrier, sinon marquer « fait » ferait perdre la page qu'on lisait.
+        self::assertResponseRedirects('/schedule/'.$id);
+
+        $this->em->clear();
+        self::assertSame(ScheduledStatus::DONE, $this->em->getRepository(ScheduledWorkout::class)->find($id)->getStatus());
+
+        // Et la bascule fonctionne dans l'autre sens.
+        $crawler = $this->client->request('GET', '/schedule/'.$id);
+        $this->client->submit($crawler->filter('.kd-done__form')->form());
+
+        $this->em->clear();
+        self::assertSame(ScheduledStatus::PLANNED, $this->em->getRepository(ScheduledWorkout::class)->find($id)->getStatus());
+    }
+
+    public function testCalendarEventLinksToTheDatedPage(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $workout = $this->createWorkout($user, 'Sortie longue');
+        $scheduled = $this->createScheduled($user, $workout, new \DateTimeImmutable('2026-03-15'));
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/calendar/2026/3');
+
+        // Au doigt, la pastille doit mener quelque part sans JS : c'est un lien,
+        // pas un bouton de modale.
+        self::assertCount(2, $crawler->filter('a.kd-calevent__open[href="/schedule/'.$scheduled->getId().'"], a.kd-calevent__eye[href="/schedule/'.$scheduled->getId().'"]'));
+    }
+
     public function testMoveDeniedToNonOwner(): void
     {
         $owner = $this->createUser('owner@example.com');

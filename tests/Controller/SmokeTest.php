@@ -7,6 +7,7 @@ use App\Entity\Exercise;
 use App\Entity\PlanTemplate;
 use App\Entity\PrescribedExercise;
 use App\Entity\PrescribedSet;
+use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
@@ -60,6 +61,10 @@ final class SmokeTest extends WebTestCase
         $template = (new PlanTemplate())->setOwner($user)->setTitle('Plan test')
             ->setSlug('plan-test')->setDurationWeeks(2);
         $em->persist($template);
+
+        $scheduled = (new ScheduledWorkout())->setOwner($user)->setWorkout($workout)
+            ->setScheduledDate(new \DateTimeImmutable('2026-03-15'));
+        $em->persist($scheduled);
         $em->flush();
 
         $client->loginUser($user);
@@ -68,7 +73,7 @@ final class SmokeTest extends WebTestCase
             '/exercise', '/exercise/'.$exercise->getId(),
             '/workout', '/workout/'.$workout->getId(), '/workout/'.$workout->getId().'/edit',
             '/plan-template', '/plan-template/'.$template->getId(), '/plan-template/'.$template->getId().'/edit',
-            '/calendar', '/calendar/week',
+            '/calendar', '/calendar/week', '/schedule/'.$scheduled->getId(),
             '/goal', '/goal/new',
             '/', '/profile/edit', '/profile/settings',
             '/coaching',

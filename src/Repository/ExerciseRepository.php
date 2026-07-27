@@ -41,22 +41,45 @@ class ExerciseRepository extends ServiceEntityRepository
      */
     public function findLibraryForUser(User $user): array
     {
-        return $this->createLibraryQueryBuilder($user)
+        return $this->findLibraryForUsers([$user]);
+    }
+
+    /**
+     * Variante multi-propriétaires : la globale + les exercices perso de PLUSIEURS
+     * membres. Sert le compositeur, où l'on croise deux bibliothèques quand un
+     * coach compose la séance d'un athlète — la sienne (ses variantes maison) et
+     * celle de l'athlète. La séance appartenant à l'athlète, c'est le seul moyen
+     * pour chacun d'utiliser les exercices de l'autre.
+     *
+     * @param list<User> $users
+     *
+     * @return Exercise[]
+     */
+    public function findLibraryForUsers(array $users): array
+    {
+        return $this->createLibraryQueryBuilder($users)
             ->getQuery()
             ->getResult()
         ;
     }
 
     /**
-     * QueryBuilder de la bibliothèque visible par un utilisateur (perso +
-     * global), réutilisé par le form de prescription pour limiter les choix.
+     * QueryBuilder de la bibliothèque visible : la globale (owner null) plus les
+     * exercices perso des membres donnés.
+     *
+     * @param list<User> $users
      */
-    public function createLibraryQueryBuilder(User $user): QueryBuilder
+    public function createLibraryQueryBuilder(array $users): QueryBuilder
     {
-        return $this->createQueryBuilder('e')
-            ->andWhere('e.owner = :user OR e.owner IS NULL')
-            ->setParameter('user', $user)
-            ->orderBy('e.name', 'ASC')
+        $qb = $this->createQueryBuilder('e')->orderBy('e.name', 'ASC');
+
+        if ([] === $users) {
+            return $qb->andWhere('e.owner IS NULL');
+        }
+
+        return $qb
+            ->andWhere('e.owner IN (:users) OR e.owner IS NULL')
+            ->setParameter('users', $users)
         ;
     }
 }

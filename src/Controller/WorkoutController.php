@@ -6,6 +6,7 @@ use App\Entity\Block;
 use App\Entity\Exercise;
 use App\Entity\PrescribedExercise;
 use App\Entity\PrescribedSet;
+use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\BlockRole;
@@ -16,6 +17,7 @@ use App\Form\PrescribedSetType;
 use App\Repository\ExerciseRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\WorkoutVoter;
+use App\Service\CoachedLibrary;
 use App\Service\PlanFlattener;
 use App\Service\SetSynchronizer;
 use App\Service\SlugGenerator;
@@ -63,19 +65,35 @@ final class WorkoutController extends AbstractController
     }
 
     #[Route('', name: 'app_workout_index', methods: ['GET'])]
-    public function index(WorkoutRepository $workoutRepository, WorkoutMetrics $workoutMetrics): Response
-    {
+    public function index(
+        WorkoutRepository $workoutRepository,
+        WorkoutMetrics $workoutMetrics,
+        CoachedLibrary $coachedLibrary,
+    ): Response {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        // Portée : soi + ses athlètes suivis, pour qu'un coach retrouve ici ce
+        // qu'il a composé pour eux (le contenu appartient à l'athlète, il sortait
+        // donc de cet index). La facette « Moi » reste active par défaut.
+        $athletes = $coachedLibrary->athletesOf($user);
+
         // Fetch-join du contenu : les activités distinctes par séance servent aux
         // facettes/filtres de l'index (sans ce join ce serait un N+1).
-        $workouts = $workoutRepository->findLibraryForOwnerWithContent($this->getUser());
+        $workouts = $workoutRepository->findLibraryForOwnersWithContent([$user, ...$athletes]);
 
         $items = [];
         $counts = [];
+        $ownerCounts = [];
         foreach ($workouts as $workout) {
             $activities = $workoutMetrics->distinctActivities($workout);
             $items[] = ['workout' => $workout, 'activities' => $activities];
             foreach ($activities as $activity) {
                 $counts[$activity->value] = ($counts[$activity->value] ?? 0) + 1;
+            }
+            $ownerId = $workout->getOwner()?->getId();
+            if (null !== $ownerId) {
+                $ownerCounts[$ownerId] = ($ownerCounts[$ownerId] ?? 0) + 1;
             }
         }
 
@@ -83,6 +101,7 @@ final class WorkoutController extends AbstractController
             'items' => $items,
             'total' => \count($items),
             'activityFacets' => $this->buildActivityFacets($counts),
+            'ownerFacets' => $coachedLibrary->ownerFacets($user, $athletes, $ownerCounts),
         ]);
     }
 
@@ -160,7 +179,7 @@ final class WorkoutController extends AbstractController
 
         return $this->render('workout/edit.html.twig', [
             'workout' => $workout,
-        ] + $this->blocksContext($workout) + $this->libraryContext());
+        ] + $this->blocksContext($workout) + $this->libraryContext($workout));
     }
 
     /**
@@ -237,8 +256,14 @@ final class WorkoutController extends AbstractController
             return $this->redirectToRoute('app_workout_show', ['id' => $workout->getId()]);
         }
 
-        // Copie de bibliothèque (planLocal = false) : réutilisable et listée.
-        $copy = $cloner->cloneWorkout($workout, $this->getUser(), $workout->getTitle().' (copie)', false);
+        // Copie de bibliothèque (planLocal = false) : réutilisable et listée. Elle
+        // appartient au propriétaire de la source, pas à l'utilisateur courant : un
+        // coach qui duplique la séance de son athlète (l'index les liste désormais)
+        // obtient une variante DANS la bibliothèque de cet athlète. Chez le coach,
+        // elle serait inerte — il ne pourrait ni la poser sur le calendrier de
+        // l'athlète ni dans son plan, qui n'acceptent que du contenu de l'athlète.
+        $owner = $workout->getOwner() ?? $this->getUser();
+        $copy = $cloner->cloneWorkout($workout, $owner, $workout->getTitle().' (copie)', false);
         $this->entityManager->flush();
 
         $this->addFlash('success', 'Séance dupliquée. Compose-la maintenant.');
@@ -324,7 +349,7 @@ final class WorkoutController extends AbstractController
 
         if ($this->isCsrfTokenValid('prescribed_quick_add'.$workout->getId(), $payload->getString('_token'))) {
             $block = $this->findBlock($workout, $payload->getInt('blockId'));
-            $exercise = $this->findLibraryExercise($payload->getInt('exerciseId'));
+            $exercise = $this->findLibraryExercise($payload->getInt('exerciseId'), $workout);
 
             if (null !== $exercise) {
                 // Ajout express : type par défaut déduit de l'activité (distance ×
@@ -740,10 +765,12 @@ final class WorkoutController extends AbstractController
     }
 
     /**
-     * Exercice de la bibliothèque visible par l'utilisateur courant (perso ou
-     * global). Renvoie null si l'id n'existe pas ou appartient à un autre membre.
+     * Exercice utilisable dans cette séance : global, ou perso d'un des membres
+     * dont la bibliothèque est proposée (cf. libraryOwners). Renvoie null si l'id
+     * n'existe pas ou sort de cette portée — même garde côté serveur que la liste
+     * affichée, qui est le seul chemin normal pour arriver ici.
      */
-    private function findLibraryExercise(int $id): ?Exercise
+    private function findLibraryExercise(int $id, Workout $workout): ?Exercise
     {
         $exercise = $this->exerciseRepository->find($id);
         if (null === $exercise) {
@@ -752,7 +779,24 @@ final class WorkoutController extends AbstractController
 
         $owner = $exercise->getOwner();
 
-        return (null === $owner || $owner === $this->getUser()) ? $exercise : null;
+        return (null === $owner || in_array($owner, $this->libraryOwners($workout), true)) ? $exercise : null;
+    }
+
+    /**
+     * Membres dont les exercices perso sont utilisables dans cette séance : son
+     * propriétaire et l'utilisateur courant (identiques hors coaching). L'accès à
+     * la séance a déjà été tranché par WorkoutVoter en amont — si l'utilisateur
+     * courant n'en est pas le propriétaire, c'est qu'il en est le coach accepté.
+     *
+     * @return list<User>
+     */
+    private function libraryOwners(Workout $workout): array
+    {
+        /** @var User $current */
+        $current = $this->getUser();
+        $owner = $workout->getOwner();
+
+        return (null === $owner || $owner === $current) ? [$current] : [$current, $owner];
     }
 
     /**
@@ -1113,13 +1157,18 @@ final class WorkoutController extends AbstractController
 
     /**
      * Contexte de la bibliothèque affichée dans le compositeur : exercices
-     * visibles par l'utilisateur (perso + global) et compteurs par activité.
+     * visibles (globaux + perso) et compteurs par activité.
+     *
+     * Portée : la globale, les exercices du **propriétaire de la séance** et ceux
+     * de l'utilisateur courant. Les deux ensembles se confondent hors coaching ;
+     * quand un coach compose la séance d'un athlète, il a besoin des deux — ses
+     * propres variantes maison ET celles que l'athlète s'est créées.
      *
      * @return array<string, mixed>
      */
-    private function libraryContext(): array
+    private function libraryContext(Workout $workout): array
     {
-        $exercises = $this->exerciseRepository->findLibraryForUser($this->getUser());
+        $exercises = $this->exerciseRepository->findLibraryForUsers($this->libraryOwners($workout));
 
         $countsByActivity = [];
         foreach ($exercises as $exercise) {

@@ -95,10 +95,16 @@
   .kd-calday__add,
   .kd-calday__add--week,
   .kd-kebab__trigger,
-  .kd-usermenu__trigger {
+  .kd-usermenu__trigger,
+  .kd-calevent__toggle,
+  .kd-calevent__eye {
     min-width: 44px;
     min-height: 44px;
   }
+
+  /* Puces de facette : ~22px de haut au dessin, et ce sont les contrôles les plus
+     tapotés des pages d'index. On agrandit la cible sans toucher la pilule. */
+  .kd-libfilter { min-height: 44px; padding-block: var(--kd-space-2); }
 
   .kd-btn--sm { padding: 12px var(--kd-space-7); }
 

@@ -5,6 +5,17 @@
 {% block body %}
     {% set dayNames = {1: 'Lun', 2: 'Mar', 3: 'Mer', 4: 'Jeu', 5: 'Ven', 6: 'Sam', 7: 'Dim'} %}
 
+    {# Première visite (aucune vue mémorisée) sur un petit écran : la vue mois
+       n'y est qu'un agenda vertical de 35 jours, la semaine est la bonne entrée.
+       Le serveur ne connaît pas la largeur d'écran, d'où cette redirection
+       client ; le rendu de la semaine mémorise le choix, elle ne se rejoue pas.
+       Sans JS, on reste sur le mois — dégradation acceptable. #}
+    {% if not viewRemembered %}
+        <div data-controller="calview"
+             data-calview-url-value="{{ path('app_calendar_week', {date: weekPivot}) }}"
+             data-calview-media-value="(max-width: 560px)"></div>
+    {% endif %}
+
     {% for message in app.flashes('success') %}
         <div class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }}{{ message }}</div>
     {% endfor %}

@@ -51,14 +51,34 @@ class WorkoutRepository extends ServiceEntityRepository
      */
     public function findLibraryForOwnerWithContent(User $owner): array
     {
+        return $this->findLibraryForOwnersWithContent([$owner]);
+    }
+
+    /**
+     * Variante multi-propriétaires : l'index des séances d'un coach liste aussi
+     * celles de ses athlètes suivis (cf. CoachedLibrary). Réservée aux **listes de
+     * consultation** — les sélecteurs qui posent une séance sur son propre
+     * calendrier ou dans sa propre trame doivent rester sur la version à un seul
+     * propriétaire, sinon on proposerait la séance d'un athlète à la pose.
+     *
+     * @param list<User> $owners
+     *
+     * @return list<Workout>
+     */
+    public function findLibraryForOwnersWithContent(array $owners): array
+    {
+        if ([] === $owners) {
+            return [];
+        }
+
         return $this->createQueryBuilder('w')
             ->addSelect('b', 'pe', 'ex')
             ->leftJoin('w.blocks', 'b')
             ->leftJoin('b.prescribedExercises', 'pe')
             ->leftJoin('pe.exercise', 'ex')
-            ->andWhere('w.owner = :owner')
+            ->andWhere('w.owner IN (:owners)')
             ->andWhere('w.planLocal = false')
-            ->setParameter('owner', $owner)
+            ->setParameter('owners', $owners)
             ->addOrderBy('w.title', 'ASC')
             ->getQuery()
             ->getResult();

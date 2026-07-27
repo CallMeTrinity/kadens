@@ -42,6 +42,11 @@ final class ExerciseController extends AbstractController
         ]);
     }
 
+    /**
+     * Un ROLE_ADMIN alimente la bibliothèque **globale** (owner null, visible par
+     * tous) : c'est le pendant à la main de la commande d'import, et le seul rôle
+     * qui peut ensuite l'éditer. Tout autre membre crée un exercice perso.
+     */
     #[Route('/new', name: 'app_exercise_new', methods: ['GET', 'POST'])]
     public function new(Request $request, EntityManagerInterface $entityManager): Response
     {
@@ -50,7 +55,7 @@ final class ExerciseController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $exercise->setOwner($this->getUser());
+            $exercise->setOwner($this->isGranted('ROLE_ADMIN') ? null : $this->getUser());
             $entityManager->persist($exercise);
             $entityManager->flush();
 

@@ -28,6 +28,12 @@
             {% endif %}
         </div>
         <div class="kd-phero__actions">
+            {# La bibliothèque d'exercices a quitté la nav principale (3 entrées) :
+               elle a besoin d'un point d'entrée visible, le menu déroulant seul
+               est trop discret pour une page de travail. #}
+            <a href="{{ path('app_exercise_index') }}" class="kd-btn kd-btn--ghost">
+                {{ ux_icon('lucide:dumbbell') }} Mes exercices
+            </a>
             <a href="{{ path('app_profile_settings') }}" class="kd-btn kd-btn--ghost">
                 {{ ux_icon('lucide:settings-2') }} Paramètres
             </a>

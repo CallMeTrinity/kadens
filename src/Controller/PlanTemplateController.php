@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
+use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\ScheduledStatus;
@@ -12,6 +13,7 @@ use App\Repository\PlanTemplateRepository;
 use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\PlanTemplateVoter;
+use App\Service\CoachedLibrary;
 use App\Service\PlanFlattener;
 use App\Service\PlanScheduler;
 use App\Service\PlanVolumeAggregator;
@@ -55,12 +57,20 @@ final class PlanTemplateController extends AbstractController
     }
 
     #[Route('', name: 'app_plan_template_index', methods: ['GET'])]
-    public function index(PlanTemplateRepository $planTemplateRepository): Response
+    public function index(PlanTemplateRepository $planTemplateRepository, CoachedLibrary $coachedLibrary): Response
     {
-        $templates = $planTemplateRepository->findBy(['owner' => $this->getUser()], ['title' => 'ASC']);
+        /** @var User $user */
+        $user = $this->getUser();
+
+        // Même portée que l'index des séances : soi + ses athlètes suivis, pour
+        // qu'un coach retrouve les plans qu'il a bâtis pour eux (ils appartiennent
+        // à l'athlète). Facette « Moi » active par défaut.
+        $athletes = $coachedLibrary->athletesOf($user);
+        $templates = $planTemplateRepository->findForOwnersWithContent([$user, ...$athletes]);
 
         $items = [];
         $counts = [];
+        $ownerCounts = [];
         foreach ($templates as $template) {
             // Activités distinctes de toutes les séances du plan (union), pour les facettes.
             $seen = [];
@@ -78,6 +88,10 @@ final class PlanTemplateController extends AbstractController
             foreach ($activities as $activity) {
                 $counts[$activity->value] = ($counts[$activity->value] ?? 0) + 1;
             }
+            $ownerId = $template->getOwner()?->getId();
+            if (null !== $ownerId) {
+                $ownerCounts[$ownerId] = ($ownerCounts[$ownerId] ?? 0) + 1;
+            }
         }
 
         $facets = [];
@@ -91,6 +105,7 @@ final class PlanTemplateController extends AbstractController
             'items' => $items,
             'total' => \count($items),
             'activityFacets' => $facets,
+            'ownerFacets' => $coachedLibrary->ownerFacets($user, $athletes, $ownerCounts),
         ]);
     }
 
@@ -152,7 +167,7 @@ final class PlanTemplateController extends AbstractController
         $this->ensureSlug($template, $slugGenerator);
 
         return $this->render('plan_template/edit.html.twig',
-            $this->gridContext($template) + $this->paletteContext() + $this->goalsContext($template)
+            $this->gridContext($template) + $this->paletteContext($template) + $this->goalsContext($template)
         );
     }
 
@@ -282,8 +297,11 @@ final class PlanTemplateController extends AbstractController
     }
 
     /**
-     * Duplique un plan visible en une copie appartenant à l'utilisateur courant
-     * (utile pour itérer sans repartir de zéro). Le template source reste intact.
+     * Duplique un plan visible en une copie appartenant au **propriétaire du plan
+     * source** (utile pour itérer sans repartir de zéro). Le template source reste
+     * intact. Un coach qui duplique le plan de son athlète obtient donc une variante
+     * chez cet athlète, pas un plan orphelin dans sa propre bibliothèque : sinon les
+     * copies locales lui appartiendraient et l'athlète ne verrait jamais le résultat.
      */
     #[Route('/{id}/duplicate', name: 'app_plan_template_duplicate', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function duplicate(Request $request, PlanTemplate $template, SlugGenerator $slugGenerator, WorkoutCloner $cloner): Response
@@ -294,8 +312,10 @@ final class PlanTemplateController extends AbstractController
             return $this->redirectToRoute('app_plan_template_edit', ['id' => $template->getId()]);
         }
 
+        $owner = $this->ownerOf($template);
+
         $copy = (new PlanTemplate())
-            ->setOwner($this->getUser())
+            ->setOwner($owner)
             ->setTitle($template->getTitle().' (copie)')
             ->setDescription($template->getDescription())
             ->setDurationWeeks($template->getDurationWeeks())
@@ -305,7 +325,7 @@ final class PlanTemplateController extends AbstractController
         // on clone donc la copie locale, pas seulement le placement. Sans ça, les
         // deux plans partageraient les mêmes séances et s'éditeraient mutuellement.
         foreach ($template->getPlanItems() as $item) {
-            $workoutCopy = $cloner->cloneWorkout($item->getWorkout(), $this->getUser(), $item->getWorkout()->getTitle(), true);
+            $workoutCopy = $cloner->cloneWorkout($item->getWorkout(), $owner, $item->getWorkout()->getTitle(), true);
             $copy->addPlanItem(
                 (new PlanItem())
                     ->setWorkout($workoutCopy)
@@ -342,10 +362,12 @@ final class PlanTemplateController extends AbstractController
             $day = $payload->getInt('day');
             $source = $this->workoutRepository->find($payload->getInt('workoutId'));
 
-            // Case valide + séance possédée par l'utilisateur et de bibliothèque
-            // (jamais une copie locale d'un autre plan).
+            // Case valide + séance possédée par le PROPRIÉTAIRE DU PLAN et de
+            // bibliothèque (jamais une copie locale d'un autre plan). Scoper sur
+            // l'utilisateur courant interdirait à un coach de poser une séance de
+            // son athlète — c'est-à-dire tout ce que la palette lui propose.
             if ($week >= 1 && $week <= (int) $template->getDurationWeeks() && $day >= 1 && $day <= 7
-                && null !== $source && $source->getOwner()?->getId() === $this->getUser()->getId() && !$source->isPlanLocal()) {
+                && null !== $source && $source->getOwner()?->getId() === $this->ownerOf($template)->getId() && !$source->isPlanLocal()) {
                 $this->placeWorkoutInCell($template, $source, $week, $day, null, $cloner);
                 $this->entityManager->flush();
                 $scheduler->resync($template);
@@ -473,7 +495,7 @@ final class PlanTemplateController extends AbstractController
 
             // 3) Le calendrier suit : les séances prévues des cases décalées migrent.
             foreach ($shifted as $item) {
-                $scheduler->rescheduleItem($item, $this->getUser());
+                $scheduler->rescheduleItem($item, $this->ownerOf($template));
             }
         }
 
@@ -518,7 +540,7 @@ final class PlanTemplateController extends AbstractController
 
             // 2) Cloner les cases de la source vers la cible.
             foreach ($sources as $item) {
-                $copy = $cloner->cloneWorkout($item->getWorkout(), $this->getUser(), $item->getWorkout()->getTitle(), true);
+                $copy = $cloner->cloneWorkout($item->getWorkout(), $this->ownerOf($template), $item->getWorkout()->getTitle(), true);
                 $newItem = (new PlanItem())
                     ->setWeekNumber($target)
                     ->setDayOfWeek($item->getDayOfWeek())
@@ -565,7 +587,7 @@ final class PlanTemplateController extends AbstractController
 
                 // Le calendrier suit : les séances prévues issues de cette case
                 // migrent à la nouvelle date (DONE/MISSED conservées).
-                $scheduler->rescheduleItem($item, $this->getUser());
+                $scheduler->rescheduleItem($item, $this->ownerOf($template));
             }
         }
 
@@ -573,6 +595,22 @@ final class PlanTemplateController extends AbstractController
     }
 
     // ---- Helpers -----------------------------------------------------------
+
+    /**
+     * Propriétaire du plan — la seule référence valable pour tout ce que cet
+     * éditeur lit ou crée (bibliothèque proposée, copies locales, calendrier ciblé).
+     * L'utilisateur courant n'est pas forcément le propriétaire : un coach accepté
+     * édite la trame de son athlète, et le contenu doit rester à l'athlète
+     * (cf. CLAUDE.md §3). Repli sur l'utilisateur courant pour un plan sans owner
+     * (données anciennes) — le cas normal ne s'y appuie pas.
+     */
+    private function ownerOf(PlanTemplate $template): User
+    {
+        /** @var User $current */
+        $current = $this->getUser();
+
+        return $template->getOwner() ?? $current;
+    }
 
     /**
      * Garantit un slug (partage public). Les plans créés/dupliqués en ont déjà un ;
@@ -589,12 +627,14 @@ final class PlanTemplateController extends AbstractController
     /**
      * Fork à la pose : la case reçoit sa PROPRE copie (planLocal) de la séance
      * source, éditable et progressable sans toucher la biblio ni les autres cases.
+     * La copie appartient au propriétaire du plan (le contenu appartient toujours
+     * à l'athlète) : c'est elle que référencera la séance datée au calendrier.
      * Persiste l'item ; le flush et le resync calendrier restent à l'appelant
      * (pour grouper les poses multiples si besoin).
      */
     private function placeWorkoutInCell(PlanTemplate $template, Workout $source, int $week, int $day, ?string $notes, WorkoutCloner $cloner): PlanItem
     {
-        $copy = $cloner->cloneWorkout($source, $this->getUser(), $source->getTitle(), true);
+        $copy = $cloner->cloneWorkout($source, $this->ownerOf($template), $source->getTitle(), true);
         $item = (new PlanItem())
             ->setWeekNumber($week)
             ->setDayOfWeek($day)
@@ -676,11 +716,16 @@ final class PlanTemplateController extends AbstractController
      * fois au rendu de la page (hors des flux de grille), avec le contenu
      * fetch-joint pour éviter tout N+1.
      *
+     * Portée : la bibliothèque du **propriétaire du plan**, pas celle de
+     * l'utilisateur courant. Un coach qui compose la trame d'un athlète doit y
+     * retrouver les séances de cet athlète — dont celles qu'il a lui-même créées
+     * pour lui, qui appartiennent à l'athlète (cf. CLAUDE.md §3).
+     *
      * @return array<string, mixed>
      */
-    private function paletteContext(): array
+    private function paletteContext(PlanTemplate $template): array
     {
-        $workouts = $this->workoutRepository->findLibraryForOwnerWithContent($this->getUser());
+        $workouts = $this->workoutRepository->findLibraryForOwnerWithContent($this->ownerOf($template));
 
         $cards = [];
         $countsByActivity = [];

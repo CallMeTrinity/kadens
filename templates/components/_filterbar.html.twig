@@ -9,9 +9,27 @@
      - total       : effectif initial (compteur)
      - countNoun   : nom au singulier ("exercice", "séance", "plan")
      - sortOptions : list de { key, label, dir?('asc'|'desc'), numeric?(bool) }
-     - facetGroups : list de { group, allLabel, facets:[{value,label,count}] }
+     - facetGroups : list de { group, allLabel, facets:[{value,label,count}],
+                               default?(valeur active au chargement, 'all' sinon) }
+
+   `default` sert au groupe « propriétaire » d'un coach : la page s'ouvre sur ses
+   propres entrées, les athlètes sont à une puce. Le contrôleur Stimulus lit cet
+   état initial dans les classes rendues — ne pas activer une puce à la main sans
+   passer par `default`, la logique de filtre ne la verrait pas.
+
+   `<details>` natif : sur téléphone, recherche + tri + deux rangées de puces
+   mangeaient un écran entier avant la première carte. Rendu **ouvert** côté
+   serveur (sans JS rien n'est caché), le contrôleur `collapse` le referme sous
+   560px. Au-dessus, le `<summary>` est masqué en CSS et le panneau reste ouvert.
    ============================================================================ #}
-<div class="kd-filterbar">
+<details class="kd-filterbar" open
+         data-controller="collapse" data-collapse-media-value="(max-width: 560px)">
+    <summary class="kd-filterbar__toggle">
+        {{ ux_icon('lucide:sliders-horizontal') }}
+        <span>Filtres et tri</span>
+        {{ ux_icon('lucide:chevron-down') }}
+    </summary>
+
     <div class="kd-filterbar__row">
         <div class="kd-search">
             {{ ux_icon('lucide:search') }}
@@ -39,16 +57,17 @@
 
     {% for grp in facetGroups|default([]) %}
         {% if grp.facets %}
+            {% set active = grp.default|default('all') %}
             <div class="kd-libfilters">
-                <button type="button" class="kd-libfilter kd-libfilter--on"
+                <button type="button" class="kd-libfilter{{ active == 'all' ? ' kd-libfilter--on' }}"
                         data-filter-target="facet" data-facet-group="{{ grp.group }}" data-facet-value="all"
                         data-action="filter#pickFacet">{{ grp.allLabel }} · {{ total }}</button>
                 {% for f in grp.facets %}
-                    <button type="button" class="kd-libfilter"
+                    <button type="button" class="kd-libfilter{{ active == f.value ? ' kd-libfilter--on' }}"
                             data-filter-target="facet" data-facet-group="{{ grp.group }}" data-facet-value="{{ f.value }}"
                             data-action="filter#pickFacet">{{ f.label }} · {{ f.count }}</button>
                 {% endfor %}
             </div>
         {% endif %}
     {% endfor %}
-</div>
+</details>

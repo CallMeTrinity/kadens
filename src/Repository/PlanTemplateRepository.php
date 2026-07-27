@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\PlanTemplate;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -36,6 +37,39 @@ class PlanTemplateRepository extends ServiceEntityRepository
             ->setParameter('id', $id)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    /**
+     * Plans d'un ou plusieurs propriétaires, contenu fetch-joint. L'index des
+     * plans dérive de chaque trame ses activités distinctes (il traverse cases ->
+     * séance -> blocs -> exercices) : sans ce join, ce serait un N+1 par plan.
+     *
+     * Plusieurs propriétaires parce qu'un coach y voit aussi les plans de ses
+     * athlètes suivis (cf. CoachedLibrary). Les sélecteurs qui posent un plan sur
+     * son propre calendrier restent scopés sur l'utilisateur courant.
+     *
+     * @param list<User> $owners
+     *
+     * @return list<PlanTemplate>
+     */
+    public function findForOwnersWithContent(array $owners): array
+    {
+        if ([] === $owners) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('t')
+            ->addSelect('i', 'w', 'b', 'pe', 'ex')
+            ->leftJoin('t.planItems', 'i')
+            ->leftJoin('i.workout', 'w')
+            ->leftJoin('w.blocks', 'b')
+            ->leftJoin('b.prescribedExercises', 'pe')
+            ->leftJoin('pe.exercise', 'ex')
+            ->andWhere('t.owner IN (:owners)')
+            ->setParameter('owners', $owners)
+            ->addOrderBy('t.title', 'ASC')
+            ->getQuery()
+            ->getResult();
     }
 
     //    /**

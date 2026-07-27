@@ -8,11 +8,18 @@ import { Controller } from '@hotwired/stimulus';
  *
  * L'éditeur de trame a sa propre implémentation (contrôleur `plangrid`, couplée
  * au mode tampon) ; celle-ci est la variante allégée pour les vues figées.
+ *
+ * Souris uniquement, et c'est structurant : le panneau est un `popover="manual"`,
+ * donc sans light-dismiss. Au doigt, un tap émet un `mouseenter` synthétique sans
+ * `mouseleave` correspondant — l'aperçu s'ouvrait et restait collé à l'écran. Sur
+ * tactile, l'accès au détail passe par la page de la séance, pas par un survol.
  */
 export default class extends Controller {
     static targets = ['panel'];
 
     show() {
+        if (!matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+
         const preview = this.hasPanelTarget ? this.panelTarget : this.element.querySelector('.kd-planpreview');
         if (!preview || typeof preview.showPopover !== 'function') return;
 

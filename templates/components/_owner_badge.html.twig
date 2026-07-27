@@ -1,0 +1,15 @@
+{# ============================================================================
+   Propriétaire d'une entrée listée, affiché uniquement quand ce n'est pas soi.
+
+   Ne concerne donc que les index d'un coach, qui voient aussi le contenu de ses
+   athlètes suivis : ce contenu leur appartient (cf. CoachController), le badge
+   dit à qui, et renvoie vers la fiche de travail de l'athlète.
+
+   Paramètre : owner (User|null)
+   ============================================================================ #}
+{% if owner is not null and app.user and owner.id != app.user.id %}
+    <a class="kd-scope kd-scope--link" href="{{ path('app_coach_athlete', {id: owner.id}) }}"
+       title="Fiche de {{ owner.userIdentifier }}">
+        {{ ux_icon('lucide:user') }} {{ owner.userIdentifier }}
+    </a>
+{% endif %}

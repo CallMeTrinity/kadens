@@ -1265,3 +1265,224 @@ normalisation, liaison, fusion, détachement du milieu, dépôt entrant/sortant)
 un cas de `PlanFlattenerTest` qui vérifie que `exercises` et `segments` décrivent
 le même contenu dans le même ordre. `WorkoutMetricsTest` a été retourné : « deux
 exercices dans un bloc » n'est plus un superset, il faut la liaison.
+
+---
+
+## Lot — Les index Séances / Plans s'ouvrent aux athlètes suivis (27/07/2026)
+
+**Le manque.** Le contenu qu'un coach compose pour un athlète appartient à
+l'athlète (`setOwner($athlete)`, règle de propriété inchangée). Les index
+`/workout` et `/plan-template` se scopaient sur `owner = utilisateur courant` :
+un coach ne retrouvait donc **nulle part** ce qu'il avait bâti, sinon fiche par
+fiche sous `/coach/athlete/{id}`. Avec trois athlètes, retrouver « la prépa semi
+de quelqu'un » demandait de se souvenir de qui.
+
+**La portée.** Nouveau service `CoachedLibrary` : il répond à « quels
+propriétaires cet utilisateur peut-il lister » — soi, puis ses athlètes en
+relation **acceptée**. La relation reste dirigée : les bibliothèques de mes
+coachs ne me regardent pas. Les repositories reçoivent la liste
+(`WorkoutRepository::findLibraryForOwnersWithContent`,
+`PlanTemplateRepository::findForOwnersWithContent`, tous deux fetch-joints — le
+second remplace un `findBy` qui faisait déjà un N+1 par plan pour dériver ses
+activités).
+
+Portée **de consultation uniquement**. Les sélecteurs qui posent une séance sur
+son propre calendrier ou dans sa propre trame gardent la version à un seul
+propriétaire (`findLibraryForOwnerWithContent`) : proposer la séance d'un athlète
+à la pose serait un contresens, et `CoachController::scheduleWorkout` refuse
+déjà l'inverse.
+
+**Pas de champ « créé par ».** Distinguer ce que le coach a écrit de ce que
+l'athlète a écrit demanderait une colonne, sans reprise possible de
+l'historique — et le coach a de toute façon le droit de voir et d'éditer tout le
+contenu de son athlète (branche coach des voters). C'est déjà ce que montre la
+fiche athlète.
+
+**À l'écran.** Un groupe de facette `owner` dans la barre de filtres, avec
+**« Moi » actif par défaut** : la page reste celle d'avant pour un usage perso,
+les athlètes sont à une puce. Chaque carte qui n'est pas la sienne porte un badge
+de propriétaire (`components/_owner_badge.html.twig`, variante cliquable de
+`.kd-scope`) qui renvoie à la fiche de l'athlète. L'identifiant de l'athlète
+entre aussi dans `data-filter-text` : chercher son email remonte ses entrées.
+
+Le groupe **disparaît** quand il n'y a aucun athlète (`_filterbar` saute les
+groupes vides) : sans coaching, rien ne change à l'affichage.
+
+**Deux détails qui n'en sont pas.**
+- `_filterbar` accepte désormais un `default` par groupe de facette. C'est ce qui
+  permet d'ouvrir la page sur autre chose que « tout ».
+- Le contrôleur Stimulus `filter` **lisait** un état initial vide (`this.facets =
+  {}` au `connect`). Une puce pré-active en HTML aurait donc été affichée active
+  tout en laissant passer tous les items. `readFacets()` lit maintenant les
+  classes rendues. Corollaire : ne jamais activer une puce à la main dans un
+  template sans passer par `default`.
+
+**Tests** : 143 au vert, dont quatre cas ajoutés à `CoachControllerTest` — les
+deux index listent le contenu de l'athlète avec la facette « Moi » active, une
+relation `PENDING` n'élargit rien, et l'athlète ne voit pas la bibliothèque de
+son coach.
+
+---
+
+## Lot — L'app devient utilisable au téléphone (27/07/2026)
+
+Point de départ : « le site n'est pas utilisable sur téléphone ». La couche
+mobile existait pourtant — trois paliers documentés, agenda vertical, barre de
+navigation basse. Elle était annulée par **une seule déclaration CSS**, et le
+reste des interactions restait pensé pour une souris.
+
+### La cause racine : `backdrop-filter`
+
+`.kd-header` portait `backdrop-filter: saturate(1.1) blur(8px)`. Une valeur autre
+que `none` fait de l'élément le **bloc conteneur de ses descendants en
+`position: fixed`** et crée un contexte d'empilement. Or `.kd-nav`, enfant du
+header, passe en `position: fixed; bottom: 0` sous 560px : elle se calait donc
+sur la boîte de 52px du header au lieu du viewport.
+
+Deux symptômes pour une cause :
+- la barre, haute d'environ 54px pour 52px disponibles, **débordait par le haut
+  de l'écran** — c'est le « menu tronqué avant le scroll » ;
+- son `z-index: 30` la peignait **par-dessus l'avatar et le logo**, seuls chemins
+  vers le profil, les objectifs, le coaching et les paramètres. Tout le compte
+  était donc inatteignable au téléphone.
+
+Le flou est neutralisé sous 560px (fond opaque à la place — il n'a aucun sens
+derrière une barre pleine). Les deux valeurs magiques qui décrivaient la hauteur
+de cette même barre avec **deux nombres différents** (`72px` et `56px`) sont
+remplacées par `--kd-navbar-h`.
+
+### Trois onglets
+
+La nav principale tombe à **Séances / Plans / Calendrier** — le fil de la
+planification. Les exercices rejoignent le menu de compte : c'est un matériau
+qu'on consulte en composant une séance, pas une destination quotidienne. Un accès
+visible est ajouté sur la page profil, le menu déroulant seul étant trop discret.
+
+### La page d'une séance datée — `GET /schedule/{id}`
+
+Le bouton « fait » demandé n'avait nulle part où vivre : `app_workout_show` montre
+la séance de **bibliothèque**, qui ne connaît aucune date et peut être posée sur
+dix jours. Nouvelle page, même composant de lecture (`_workout_read` en `embed`),
+plus une section « Réalisé » en bas : bascule prévue ↔ faite, note d'écart,
+déplacer, retirer. Les endpoints existants sont réutilisés ; ils acceptent un
+champ `return=schedule` pour ne pas éjecter vers le calendrier à chaque geste.
+
+Piège rencontré : `{% embed ... only %}` **isole** le composant. Ce que le bloc
+`actions` utilise doit être passé dans le `with`, la portée du template appelant
+n'y entre pas.
+
+### Le survol cesse d'être un chemin
+
+L'aperçu de séance est un `popover="manual"`, donc **sans light-dismiss**. Au
+doigt, un tap émet un `mouseenter` synthétique sans `mouseleave` : le panneau
+s'ouvrait et restait collé à l'écran. `preview` et `plangrid` se gardent
+désormais derrière `(hover: hover) and (pointer: fine)`.
+
+En conséquence, la pastille de calendrier devient cliquable : son centre est un
+**lien** vers la page datée, intercepté par `dialog#openFine` au pointeur fin
+seulement (modale rapide sur ordinateur, navigation au doigt), et un **œil** à
+droite mène toujours à la page entière. Le HTML de base reste un lien : clavier,
+clic du milieu et sans-JS fonctionnent.
+
+### Le reste
+
+- **« Éditer » n'est plus collant.** La barre flottante en bas d'écran recouvrait
+  deux lignes du programme en permanence — or c'est le programme qu'on vient
+  lire. Elle reste en tête du hero.
+- **Vue semaine par défaut au téléphone.** Le cookie `kd_calview` est `httpOnly`,
+  donc illisible en JS : c'est le serveur qui dit si une vue a déjà été choisie
+  (`viewRemembered`), et le contrôleur `calview` n'aiguille que la première fois.
+  Un choix explicite prime ensuite définitivement.
+- **Filtres repliés au téléphone.** `_filterbar` devient un `<details>` rendu
+  **ouvert** côté serveur, refermé par le contrôleur `collapse` sous 560px. Sans
+  JS, rien n'est caché. Arbitrage assumé : le compteur de résultats reste dans le
+  panneau — le dupliquer casserait `filter_controller` (`this.countTarget` ne lit
+  que le premier target).
+- Cibles tactiles : l'œil, le bouton de statut et les puces de facette (~22px de
+  haut) rejoignent le plancher de 44px sous `@media (pointer: coarse)`.
+
+**Tests** : 153 au vert, dont cinq cas ajoutés — rendu de la page datée, refus à
+un non-propriétaire, bascule du statut dans les deux sens avec retour sur la
+page, et pastille de calendrier rendue en lien.
+
+---
+
+## Lot — Le CSS mobile qui existait sans s'appliquer (27/07/2026)
+
+Deux signalements au téléphone : le contenu passe sous la barre de nav basse, et
+le bouton « Modifier ma fiche » sort de la carte d'en-tête du profil. Le premier
+avait une cause qu'il fallait chercher, parce que le CSS qui devait le régler
+existait déjà.
+
+### Le piège : une `@media` n'ajoute aucune spécificité
+
+Le palier 560px était **regroupé** en tête de `components.css`, avec la nav. Il y
+déclarait un dégagement pour la fin de page :
+
+```css
+@media (max-width: 560px) {
+    .kd-page { padding-bottom: calc(var(--kd-space-13) + var(--kd-navbar-h)); }
+}
+```
+
+Vingt lignes plus bas, la section « Mise en page » définit le composant :
+
+```css
+.kd-page { padding: var(--kd-space-13) min(var(--kd-space-8), 4vw) var(--kd-space-13); }
+```
+
+Même spécificité, déclarée après : **le raccourci `padding` gagne**, y compris
+sous 560px. Le dégagement n'a jamais existé à l'écran. Le média n'y change rien —
+il conditionne l'application d'une règle, pas son poids dans la cascade.
+
+Un audit de la feuille (chaque sélecteur d'une `@media` comparé à la position de
+sa règle de base) a sorti exactement trois occurrences, toutes réelles :
+
+| Surcharge | Écrasée par | Symptôme |
+|---|---|---|
+| `.kd-page` padding-bottom | le raccourci `padding` | fin de page sous la barre de nav |
+| `.kd-editform__bar` `bottom: var(--kd-navbar-h)` | son `bottom: 0` | « Enregistrer » derrière la barre |
+| `.kd-calday__add` `margin-left: auto` | son `align-self: stretch` | le « + » de l'agenda étiré sur toute la largeur |
+
+Les trois surcharges sont déplacées **après la définition de leur composant**,
+dans une `@media` locale, avec le commentaire qui explique pourquoi elles ne
+peuvent pas remonter. Le bloc du header ne garde que ce qu'il définit lui-même
+(`.kd-header`, `.kd-nav`, `.kd-usermenu__panel`, `--kd-navbar-h`) : ces
+surcharges-là étaient correctes, mais par chance de rangement.
+
+La règle est consignée dans `docs/design-system.md §5` : **une surcharge
+responsive vit avec son composant, jamais regroupée par palier.** C'est la
+deuxième fois qu'une seule déclaration CSS annule toute la couche mobile — après
+`backdrop-filter`, la leçon est la même : sur une feuille de 10 000 lignes sans
+build, la position d'une règle est une information de premier ordre.
+
+### `--kd-navbar-h` devient la place occupée
+
+La barre prend l'`env(safe-area-inset-bottom)` en padding (encoche / barre
+gestuelle iOS). La variable l'inclut désormais :
+
+```css
+--kd-navbar-h: calc(56px + env(safe-area-inset-bottom, 0px));
+```
+
+Sans `viewport-fit=cover` dans la meta viewport, l'inset vaut 0 : le comportement
+actuel est inchangé, mais le calcul reste juste si on l'ajoute un jour. À noter,
+le fallback doit s'écrire `0px` et non `0` — sans unité, il invalide le `calc()`.
+
+### En-tête du profil : `flex: none` sur un conteneur qui doit se plier
+
+`.kd-phero__actions` porte trois boutons (« Mes exercices », « Paramètres »,
+« Modifier ma fiche »), soit ~400px en condensé capitales. Il était en
+`flex: none` : sa boîte gardait sa largeur `max-content` et sortait de la carte.
+Son `flex-wrap: wrap` interne ne pouvait rien — on ne passe à la ligne que dans
+une boîte qui a été contrainte.
+
+- Base : `flex: 0 1 auto` + `min-width: 0`. Le conteneur cède, les boutons
+  passent à la ligne. Corrige aussi les largeurs intermédiaires, pas seulement le
+  téléphone.
+- Sous 560px : les actions prennent la largeur entière sous l'identité
+  (`flex: 1 1 100%`, boutons en `flex: 1 1 auto` pour se partager la ligne), et
+  la carte resserre son padding — 24px de gouttière interne plus l'avatar de 64px
+  ne tiennent pas sur 390px.
+
+`.kd-phero__edit` (fiche athlète chez le coach) suit la même règle.

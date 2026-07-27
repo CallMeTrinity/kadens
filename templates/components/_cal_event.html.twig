@@ -2,10 +2,18 @@
    Pastille de séance datée + modale d'édition — partagée par la vue mois
    (`calendar/index`) et la vue semaine (`calendar/week`).
 
-   Deux zones cliquables : gauche = cycle rapide du statut (prévu → fait →
-   manqué) ; droite = ouvre la modale (statut / déplacer / retirer). Filet
-   gauche = statut (seul cas où la couleur code l'état, pas l'activité).
-   Aperçu du contenu au survol via le composant `_plan_preview` (Popover API).
+   Trois zones cliquables : gauche = cycle rapide du statut (prévu → fait →
+   manqué) ; centre = la séance datée ; droite = un œil vers la même page.
+   Filet gauche = statut (seul cas où la couleur code l'état, pas l'activité).
+
+   Le centre est un **lien** vers /schedule/{id}, intercepté par `dialog#openFine`
+   au pointeur fin uniquement : sur ordinateur il ouvre la modale rapide (statut /
+   déplacer / retirer), au doigt il navigue. L'œil, lui, n'est jamais intercepté —
+   c'est le chemin vers la séance entière, y compris sur ordinateur. Le lien reste
+   le comportement de base : sans JS, tout mène à la page.
+
+   Aperçu du contenu au survol via le composant `_plan_preview` (Popover API),
+   souris uniquement (cf. preview_controller).
 
    Attend :
      - scheduled : ScheduledWorkout
@@ -37,8 +45,9 @@
         </button>
     </form>
 
-    {# Zone droite : ouvre la modale d'édition détaillée. #}
-    <button type="button" class="kd-calevent__open" data-action="dialog#open" title="{{ scheduled.workout.title }}">
+    {# Zone centrale : la séance datée. Modale au pointeur fin, navigation au doigt. #}
+    <a href="{{ path('app_scheduled_workout_show', {id: scheduled.id}) }}"
+       class="kd-calevent__open" data-action="dialog#openFine" title="{{ scheduled.workout.title }}">
         <span class="kd-calevent__title">{{ scheduled.workout.title }}</span>
         {% if fw.activities|length or scheduled.workout.estimatedDurationMinutes %}
             <span class="kd-calevent__meta">
@@ -57,7 +66,14 @@
         {% if detailed and overdue %}
             <span class="kd-calevent__flag">{{ ux_icon('lucide:calendar-clock') }} En retard</span>
         {% endif %}
-    </button>
+    </a>
+
+    {# Zone droite : voir la séance en entier. Jamais intercepté — c'est le seul
+       chemin vers le programme complet depuis le calendrier. #}
+    <a href="{{ path('app_scheduled_workout_show', {id: scheduled.id}) }}"
+       class="kd-calevent__eye" aria-label="Voir « {{ scheduled.workout.title }} » en entier">
+        {{ ux_icon('lucide:eye') }}
+    </a>
 
     <dialog class="kd-modal" data-dialog-target="dialog" data-action="click->dialog#backdrop">
         <div class="kd-modal__card">

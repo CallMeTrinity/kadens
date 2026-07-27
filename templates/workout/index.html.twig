@@ -33,6 +33,7 @@
             ],
             facetGroups: [
                 { group: 'activity', allLabel: 'Toutes activités', facets: activityFacets },
+                { group: 'owner', allLabel: 'Tout le monde', facets: ownerFacets, default: app.user.id },
             ],
         }) }}
 
@@ -52,8 +53,9 @@
                     <article class="kd-libcard"
                              data-filter-target="item"
                              data-filter-name="{{ workout.title }}"
-                             data-filter-text="{{ workout.title }} {% for a in item.activities %}{{ a.label }} {% endfor %}"
+                             data-filter-text="{{ workout.title }} {% for a in item.activities %}{{ a.label }} {% endfor %}{{ workout.owner ? workout.owner.userIdentifier }}"
                              data-facet-activity="{% for a in item.activities %}{{ a.value }}{{ not loop.last ? ' ' }}{% endfor %}"
+                             data-facet-owner="{{ workout.owner ? workout.owner.id }}"
                              data-sort-name="{{ workout.title|lower }}"
                              data-sort-created="{{ workout.createdAt ? workout.createdAt|date('U') : 0 }}"
                              data-sort-duration="{{ workout.estimatedDurationMinutes ?? 0 }}"
@@ -68,6 +70,7 @@
                                         <span class="kd-dot">·</span>{{ ux_icon('lucide:clock') }} {{ workout.estimatedDurationMinutes }} min
                                     {% endif %}
                                 </div>
+                                {{ include('components/_owner_badge.html.twig', {owner: workout.owner}) }}
                             </div>
                         </div>
 

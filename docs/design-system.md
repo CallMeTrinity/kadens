@@ -215,7 +215,7 @@ sont dans `assets/fonts/` (subsets latin + latin-ext), les `@font-face` dans
 
 | Palier | Cible | Ce qui bascule |
 |---|---|---|
-| `560px` | téléphone | une colonne, nav en barre basse, calendrier en agenda vertical, barre d'actions de séance collante |
+| `560px` | téléphone | une colonne, nav en barre basse, calendrier en agenda vertical, filtres d'index repliés |
 | `900px` | tablette | éditeurs à deux volets empilés, nav condensée, repères de hero sous le titre |
 | `1200px` | petit portable | palette de l'éditeur de trame sous la grille |
 
@@ -235,6 +235,35 @@ sont dans `assets/fonts/` (subsets latin + latin-ext), les `@font-face` dans
   expression, sinon un liseré de fond apparaît sur les côtés.
 - Un contenu large (tableau, grille, diagramme) défile dans **son propre**
   conteneur `overflow-x: auto`. La page ne défile jamais horizontalement.
+- **Piège `backdrop-filter`** : une valeur autre que `none` fait de l'élément le
+  bloc conteneur de ses descendants en `position: fixed` **et** crée un contexte
+  d'empilement. Un enfant `position: fixed` se cale alors sur lui, pas sur le
+  viewport. C'est ce qui a rendu toute la navigation mobile inutilisable :
+  `.kd-nav`, enfant de `.kd-header`, se posait sur une boîte de 52px de haut et
+  recouvrait l'avatar. Le flou est neutralisé sous 560px — ne pas le réintroduire.
+- **Piège de cascade — où écrire une surcharge responsive.** Une `@media`
+  **n'ajoute aucune spécificité**. Une surcharge écrite *avant* la règle de base
+  du composant qu'elle vise est donc annulée par cette règle de base, qui gagne
+  en étant simplement plus loin dans la feuille. Le bloc `@media (max-width:
+  560px)` de la section header a fait exactement ça : son dégagement de
+  `.kd-page` était écrasé par le raccourci `padding` de la section « Mise en
+  page », et son `bottom: var(--kd-navbar-h)` sur `.kd-editform__bar` par le
+  `bottom: 0` du composant, 6 500 lignes plus bas. Résultat, fin de page et
+  bouton « Enregistrer » sous la barre de nav, alors que le CSS *semblait* les
+  traiter. **Règle : une surcharge responsive vit avec son composant, après sa
+  définition** — jamais regroupée par palier en tête de feuille. Le bloc du
+  header ne garde que ce qu'il définit lui-même (`.kd-header`, `.kd-nav`,
+  `--kd-navbar-h`).
+- **Hauteur de la barre basse** : une seule source, `--kd-navbar-h`, déclarée dans
+  le palier 560px. Toute barre collante posée au-dessus s'en sert, et
+  `.kd-page` s'en sert pour dégager sa fin de page — la barre est `fixed`, elle
+  ne pousse rien. La variable compte l'`env(safe-area-inset-bottom)` que la barre
+  prend en padding : c'est la **place occupée**, pas la hauteur du dessin.
+- **Rien d'important ne dépend d'un survol.** Le survol ne fait qu'accélérer un
+  chemin qui existe au clic. Les contrôles révélés au survol restent visibles en
+  retrait sous `@media (hover: none)`, et un aperçu en `popover="manual"` doit se
+  garder derrière `(hover: hover) and (pointer: fine)` : un tap émet un
+  `mouseenter` synthétique sans `mouseleave`, le panneau resterait collé.
 
 ---
 
