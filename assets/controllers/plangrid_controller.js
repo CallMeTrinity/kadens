@@ -14,6 +14,18 @@ import Sortable from 'sortablejs';
  *    #plan-grid. Comme la grille est re-rendue à chaque mutation, chaque cellule
  *    détruit son instance Sortable à la déconnexion et la recrée à la connexion.
  *
+ *    PRISE DU DRAG : il n'y a plus de poignée (13px, intenable au doigt). La carte
+ *    entière est saisissable, et les deux gestes se départagent par le TEMPS
+ *    (`delay` + `delayOnTouchOnly`) : un tap ouvre l'édition rapide, un appui long
+ *    soulève la carte. Au pointeur fin le délai retombe à zéro, la souris garde son
+ *    drag immédiat. `filter` protège ce qui doit rester utilisable dans la carte
+ *    (le menu kebab, la note en édition en ligne). Le repli du drag reste le
+ *    « Déplacer vers » du menu, seul chemin au clavier et sans JS.
+ *
+ *    Sous 900px, la palette n'est plus une colonne mais une FEUILLE (`openLib` /
+ *    `closeLib`), ouverte par le « + » d'un jour — qui désigne du même geste la case
+ *    visée : taper une carte y pose la séance, sans passer par le mode tampon.
+ *
  * 2. Édition rapide : cliquer une séance ouvre une mini-modale. On charge en `fetch`
  *    le panneau de ses exercices (`app_workout_quick_panel`) dans #quick-panel, où
  *    chaque paramètre (reps/séries/repos…) est éditable. Enregistrer un exercice
@@ -26,11 +38,18 @@ import Sortable from 'sortablejs';
  *    ferait remonter en haut au moindre ajustement.
  */
 export default class extends Controller {
-    static targets = ['cell', 'dialog', 'panel', 'fullLink', 'palette', 'paletteList', 'palettecard'];
+    static targets = ['cell', 'dialog', 'panel', 'fullLink', 'palette', 'paletteList', 'palettecard',
+        'sheet', 'search', 'targetLabel'];
 
     static values = { gridUrl: String };
 
     static SORTABLE_GROUP = 'kd-plan-workouts';
+
+    // Appui long avant de soulever une carte, au doigt uniquement (mêmes valeurs que
+    // le compositeur : assez court pour ne pas se faire attendre, assez long pour
+    // qu'un tap reste un tap ; bouger avant la fin du délai laisse partir le scroll).
+    static TOUCH_DRAG_DELAY = 320;
+    static TOUCH_DRAG_THRESHOLD = 8;
 
     initialize() {
         this.sortables = new WeakMap();
@@ -41,26 +60,54 @@ export default class extends Controller {
         this.libActivity = 'all';
         this.armedWorkoutId = null;
         this.armedCard = null;
+        // Case visée par la palette ouverte depuis un « + ». Non nulle = taper une
+        // carte pose directement, sans armer.
+        this.targetWeek = null;
+        this.targetDay = null;
     }
 
     connect() {
         // Intercepte les soumissions des formulaires du panneau d'édition rapide.
-        // Les formulaires de la trame (ajout/retrait de case) sont hors #quick-panel :
-        // ils gardent leur comportement natif (repli sans JS).
+        // Les formulaires de la trame (poser, déplacer, retirer, semaines) sont hors
+        // #quick-panel : la modale porte `data-turbo="false"`, pas la section — c'est
+        // donc Turbo qui les soumet et applique leur stream de #plan-grid, avec sa
+        // gestion des réponses en erreur. Sans JS, ils postent normalement et le
+        // serveur redirige vers l'éditeur.
         this.onPanelSubmit = this.onPanelSubmit.bind(this);
         this.element.addEventListener('submit', this.onPanelSubmit);
+        // Sur le DOCUMENT et non sur la section : une fois la palette ouverte en
+        // feuille, le focus peut être n'importe où, et Escape doit rester une sortie.
         this.onKeydown = this.onKeydown.bind(this);
-        this.element.addEventListener('keydown', this.onKeydown);
+        document.addEventListener('keydown', this.onKeydown);
+        // Fermeture au clic extérieur, écoutée sur le document pour la même raison
+        // que dans le compositeur : une seule autorité, est-on hors du panneau ou non.
+        this.onOutside = (event) => {
+            if (!this.hasSheetTarget) return;
+            if (!this.sheetTarget.classList.contains('kd-libsheet--open')) return;
+            // Le clic d'OUVERTURE remonte jusqu'ici dans la même phase de bouillonnement,
+            // la classe étant déjà posée : sans cette garde, la feuille se refermerait
+            // aussitôt ouverte.
+            if (event.target.closest('[data-action*="plangrid#openLib"]')) return;
+            if (event.target.closest('.kd-composer__lib')) return;
+            this.closeLib();
+        };
+        document.addEventListener('click', this.onOutside);
         this.applyLibFilter();
     }
 
     disconnect() {
         this.element.removeEventListener('submit', this.onPanelSubmit);
-        this.element.removeEventListener('keydown', this.onKeydown);
+        document.removeEventListener('keydown', this.onKeydown);
+        document.removeEventListener('click', this.onOutside);
+        // Une navigation Turbo pendant que la feuille est ouverte laisserait la page
+        // suivante figée : l'état vit sur <body>, il ne part pas avec le contrôleur.
+        document.body.classList.remove('kd-noscroll');
     }
 
     onKeydown(event) {
-        if (event.key === 'Escape') this.disarm();
+        if (event.key !== 'Escape') return;
+        this.disarm();
+        this.closeLib();
     }
 
     // ---- Glisser-déposer ---------------------------------------------------
@@ -68,8 +115,15 @@ export default class extends Controller {
     cellTargetConnected(el) {
         this.sortables.set(el, Sortable.create(el, {
             group: this.constructor.SORTABLE_GROUP,
-            handle: '.kd-planitem__handle',
             draggable: '.kd-planentry',
+            // Pas de `handle` : toute la carte est la prise (cf. en-tête de fichier).
+            // `filter` exclut ce qui ne doit jamais la soulever — le menu, et la note
+            // en édition en ligne, où l'on saisit du texte.
+            filter: '.kd-kebab, .kd-inlineedit',
+            preventOnFilter: false,
+            delay: this.constructor.TOUCH_DRAG_DELAY,
+            delayOnTouchOnly: true,
+            touchStartThreshold: this.constructor.TOUCH_DRAG_THRESHOLD,
             animation: 150,
             ghostClass: 'kd-drag-ghost',
             chosenClass: 'kd-drag-chosen',
@@ -227,12 +281,63 @@ export default class extends Controller {
         });
     }
 
+    // ---- Palette en feuille (sous 900px) ----------------------------------
+
+    /**
+     * Ouvre la palette SUR une case. Un seul geste pour les deux formes : sur écran
+     * large la classe n'a aucun effet de calque (les règles de feuille sont dans une
+     * `@media`), c'est le focus donné à la recherche qui amène à la colonne de gauche
+     * — mais la case visée est mémorisée dans les deux cas, et le prochain tap sur
+     * une carte y pose la séance.
+     */
+    openLib(event) {
+        const button = event.currentTarget;
+        this.targetWeek = button.dataset.week || null;
+        this.targetDay = button.dataset.day || null;
+        // Viser une case exclut le mode tampon : deux intentions de pose
+        // concurrentes rendraient le prochain clic imprévisible.
+        this.disarm();
+        this.showTargetLabel(button.dataset.cellLabel || '');
+
+        if (this.hasSheetTarget) this.sheetTarget.classList.add('kd-libsheet--open');
+        // Fige la page derrière la feuille. La classe est posée dans les deux cas :
+        // c'est le CSS qui la neutralise au-dessus de 900px, où il n'y a pas de
+        // feuille et où bloquer le défilement serait un bug.
+        document.body.classList.add('kd-noscroll');
+        if (this.hasSearchTarget) this.searchTarget.focus({ preventScroll: false });
+    }
+
+    closeLib() {
+        if (this.hasSheetTarget) this.sheetTarget.classList.remove('kd-libsheet--open');
+        document.body.classList.remove('kd-noscroll');
+        this.targetWeek = null;
+        this.targetDay = null;
+        this.showTargetLabel('');
+    }
+
+    /** Rappelle la case visée en tête de palette (la feuille masque la trame). */
+    showTargetLabel(label) {
+        if (!this.hasTargetLabelTarget) return;
+        this.targetLabelTarget.textContent = label ? `Poser dans ${label}` : '';
+        this.targetLabelTarget.hidden = label === '';
+    }
+
     // ---- Palette : mode tampon (armer puis cliquer les cases) -------------
 
     armWorkout(event) {
         const card = event.currentTarget;
         const id = card.dataset.workoutId;
         if (!id) return;
+
+        // Palette ouverte sur une case : la carte y pose directement. Au doigt, le
+        // mode tampon demanderait de refermer la feuille puis de retrouver la case.
+        if (this.targetWeek && this.targetDay) {
+            const week = this.targetWeek;
+            const day = this.targetDay;
+            this.closeLib();
+            this.placeWorkout(id, week, day);
+            return;
+        }
 
         // Re-cliquer la séance armée la désarme.
         if (this.armedWorkoutId === id) {
@@ -276,6 +381,9 @@ export default class extends Controller {
             group: { name: this.constructor.SORTABLE_GROUP, pull: 'clone', put: false },
             sort: false,
             draggable: '.kd-palettecard',
+            delay: this.constructor.TOUCH_DRAG_DELAY,
+            delayOnTouchOnly: true,
+            touchStartThreshold: this.constructor.TOUCH_DRAG_THRESHOLD,
             animation: 150,
             ghostClass: 'kd-drag-ghost',
             chosenClass: 'kd-drag-chosen',

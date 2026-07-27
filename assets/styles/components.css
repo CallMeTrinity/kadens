@@ -2003,6 +2003,55 @@ a.kd-scope--link:hover {
     font-size: 13px;
 }
 
+/* Item de menu qui demande un CHOIX avant d'agir (« Copier vers S3 »,
+   « Déplacer vers S2 · mer »). Un item ne peut pas être un simple bouton dans ce
+   cas : le libellé annonce l'action, la ligne en dessous porte les selects et la
+   validation. C'est aussi le repli sans JS du glisser-déposer, donc il doit rester
+   utilisable au clavier. */
+.kd-kebab__form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-2);
+    padding: var(--kd-space-3) var(--kd-space-5);
+    border-bottom: 1px solid var(--color-divider);
+}
+
+.kd-kebab__formlabel {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-3);
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--color-text);
+}
+
+.kd-kebab__formlabel svg {
+    width: 15px;
+    height: 15px;
+    flex: none;
+    color: var(--color-text-faint);
+}
+
+.kd-kebab__formrow {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+}
+
+/* Les selects se partagent la largeur du panneau ; `min-width: 0` sans quoi un
+   enfant flex ne descend jamais sous la largeur de sa plus longue option et fait
+   déborder le menu (cf. la note « largeur minimale automatique » du design system). */
+.kd-kebab__formrow .kd-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: var(--kd-space-2) var(--kd-space-3);
+    font-size: 12.5px;
+}
+
+.kd-kebab__formrow .kd-btn {
+    flex: none;
+}
+
 /* ---- Bandeau de KPI ---- */
 .kd-wk__kpis {
     display: grid;
@@ -3350,35 +3399,14 @@ a.kd-planday__item:hover svg {
     color: var(--color-primary);
 }
 
-.kd-planitem form {
-    display: inline-flex;
-    margin: 0;
-}
-
-.kd-planitem__del {
+/* Le menu d'actions de la carte (retirer, déplacer, édition complète) : ancré à
+   droite, il ne prend jamais de largeur au titre. Remplace la croix de 22px, qui
+   était la seule action visible et n'était pas atteignable au doigt.
+   À ne pas réintroduire : un `.kd-planitem form { display: inline-flex }` (hérité
+   de l'ancien bouton de retrait) écraserait la mise en colonne des formulaires du
+   menu — il est plus spécifique que `.kd-kebab__form`. */
+.kd-planitem .kd-kebab {
     flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 22px;
-    height: 22px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: var(--color-text-placeholder);
-    border-radius: var(--kd-radius-sm);
-    cursor: pointer;
-    transition: color .12s ease, background-color .12s ease;
-}
-
-.kd-planitem__del:hover {
-    color: var(--color-status-missed);
-    background: color-mix(in srgb, var(--color-status-missed) 10%, transparent);
-}
-
-.kd-planitem__del svg {
-    width: 13px;
-    height: 13px;
 }
 
 /* Éditeur : agenda vertical (un jour par ligne). Le volet de trame étant
@@ -4526,7 +4554,8 @@ a.kd-summplan__title:hover {
 }
 
 /* Voile de la bibliothèque en feuille. Inexistant tant qu'on n'est pas sous 900px
-   ET la feuille ouverte (cf. la @media en fin de section). */
+   ET la feuille ouverte (cf. la @media `kd-libsheet` en fin de section). Partagé
+   par le compositeur et l'éditeur de trame. */
 .kd-composer__scrim {
     display: none;
 }
@@ -4576,6 +4605,19 @@ a.kd-summplan__title:hover {
 .kd-libpanel__close svg {
     width: 20px;
     height: 20px;
+}
+
+/* Rappel de la case visée quand la palette est ouverte depuis le « + » d'un jour.
+   En feuille, la palette masque la trame : sans ce rappel, on ne sait plus où le
+   prochain tap va poser. Rempli par le contrôleur, `hidden` sinon. */
+.kd-libpanel__target {
+    margin: var(--kd-space-3) 0 0;
+    padding: var(--kd-space-2) var(--kd-space-3);
+    border-left: 2px solid var(--color-primary);
+    background: var(--color-primary-tint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-primary-on-tint);
 }
 
 .kd-libsearch {
@@ -4806,10 +4848,12 @@ button.kd-libx:active {
     align-items: flex-start;
     border: 1px solid var(--color-border);
     border-radius: var(--kd-radius-lg);
-    /* `clip` (et non `hidden`) : borde/arrondit les coins sans devenir un
-     conteneur de défilement, condition pour que la palette `sticky` s'ancre
-     sur le viewport et non sur cet encadré. */
-    overflow: clip;
+    /* Surtout PAS de `clip` ni de `hidden` ici : les menus kebab des cases et des
+     en-têtes de semaine sont des calques absolus qui sortent de l'encadré par le
+     bas — un clip les amputerait (même piège que .kd-cblock dans le compositeur).
+     Le masquage ne servait qu'à empêcher le fond de la palette de sortir des coins
+     arrondis : c'est elle qui porte désormais son rayon. */
+    overflow: visible;
     background: var(--color-surface);
 }
 
@@ -4817,7 +4861,8 @@ button.kd-libx:active {
     padding: var(--kd-space-6);
 }
 
-/* La palette reste visible pendant qu'on scrolle la grille des semaines. */
+/* La palette reste visible pendant qu'on scrolle la grille des semaines. Le rayon
+   est porté ici depuis que l'encadré ne clippe plus (cf. ci-dessus). */
 .kd-planeditor .kd-composer__lib {
     position: sticky;
     top: var(--kd-space-4);
@@ -4825,6 +4870,7 @@ button.kd-libx:active {
     max-height: calc(100vh - var(--kd-space-4) * 2);
     display: flex;
     flex-direction: column;
+    border-radius: var(--kd-radius-lg) 0 0 var(--kd-radius-lg);
 }
 
 /* La liste se réduit et scrolle dans la palette quand la fenêtre est courte. */
@@ -4845,6 +4891,7 @@ button.kd-libx:active {
         width: auto;
         border-right: none;
         border-bottom: 1px solid var(--color-border);
+        border-radius: var(--kd-radius-lg) var(--kd-radius-lg) 0 0;
     }
 
     .kd-planeditor .kd-libpanel__list {
@@ -5735,8 +5782,14 @@ button.kd-libx:active {
    Sous 900px, la bibliothèque cesse d'être un volet empilé au-DESSUS des blocs :
    c'était la première chose que l'on traversait à chaque défilement, pour un
    panneau dont on n'a besoin qu'au moment d'ajouter. Elle devient une feuille qui
-   monte du bas, ouverte depuis le « + Ajouter un exercice » d'un bloc. L'éditeur
-   de trame partage .kd-composer__lib : d'où la portée `--sheet`.
+   monte du bas, ouverte depuis le « + Ajouter un exercice » d'un bloc.
+
+   PORTÉE `kd-libsheet` (et non plus `kd-composer--sheet`) : le compositeur de
+   séance ET l'éditeur de trame partagent .kd-composer__lib et veulent la même
+   feuille (avec la palette de séances au lieu de la bibliothèque d'exercices).
+   Le conteneur des deux volets porte `kd-libsheet`, et son contrôleur y pose
+   `kd-libsheet--open`. Ce qui reste propre au compositeur (débordement, rayon,
+   zone de dépôt) garde la portée `kd-composer--sheet`.
    ---------------------------------------------------------------------------- */
 @media (max-width: 900px) {
     .kd-composer__body {
@@ -5754,11 +5807,17 @@ button.kd-libx:active {
     }
 
     /* ---- La bibliothèque en feuille ---- */
-    .kd-composer--sheet .kd-composer__lib {
+    .kd-libsheet .kd-composer__lib {
         position: fixed;
         left: 0;
         right: 0;
         bottom: 0;
+        /* IMPÉRATIF, et pas décoratif : la palette de l'éditeur de trame est
+           `sticky` avec un `top` sur écran large. Sans le neutraliser ici, le
+           panneau se retrouve ancré EN HAUT et en bas à la fois — il s'étire depuis
+           le haut de l'écran au lieu de monter du bas. Le compositeur ne le voyait
+           pas, sa colonne n'a pas de `top`. */
+        top: auto;
         z-index: 60;
         max-height: 78vh;
         /* `column` et non la valeur par défaut : en `row`, le panneau est étiré à la
@@ -5776,7 +5835,7 @@ button.kd-libx:active {
         transition: transform .18s ease, visibility .18s;
     }
 
-    .kd-composer--libopen .kd-composer__lib {
+    .kd-libsheet--open .kd-composer__lib {
         transform: translateY(0);
         visibility: visible;
     }
@@ -5786,17 +5845,17 @@ button.kd-libx:active {
        qu'un `max-height`), la liste hérite d'une hauteur infinie et le
        `overflow-y: auto` ne s'active jamais. Une hauteur défilable se contraint sur
        TOUTE la chaîne, un seul maillon libre suffit à l'annuler. */
-    .kd-composer--sheet .kd-libpanel {
+    .kd-libsheet .kd-libpanel {
         flex: 1;
         min-height: 0;
         height: auto;
     }
 
-    .kd-composer--sheet .kd-libpanel__head {
+    .kd-libsheet .kd-libpanel__head {
         flex: none;
     }
 
-    .kd-composer--sheet .kd-libpanel__list {
+    .kd-libsheet .kd-libpanel__list {
         flex: 1;
         min-height: 0;
         max-height: none;
@@ -5812,11 +5871,11 @@ button.kd-libx:active {
         padding-bottom: calc(var(--kd-space-5) + var(--kd-navbar-h, 0px));
     }
 
-    .kd-composer--sheet .kd-libpanel__close {
+    .kd-libsheet .kd-libpanel__close {
         display: flex;
     }
 
-    .kd-composer--sheet .kd-libpanel__hint {
+    .kd-libsheet .kd-libpanel__hint {
         display: none;
     }
 
@@ -5826,7 +5885,7 @@ button.kd-libx:active {
         overflow: hidden;
     }
 
-    .kd-composer--libopen .kd-composer__scrim {
+    .kd-libsheet--open .kd-composer__scrim {
         display: block;
         position: fixed;
         inset: 0;
@@ -5909,29 +5968,12 @@ button.kd-libx:active {
     max-width: 60ch;
 }
 
-/* Bouton « Dupliquer sur S{n+1} » poussé à droite de l'en-tête de semaine */
-.kd-planweek__tools {
+/* Actions de semaine (copier vers, retirer) en menu poussé à droite de l'en-tête.
+   Une rangée — un select de destination et deux boutons — ne tenait pas sur une
+   ligne de téléphone : elle passait à la ligne et doublait la hauteur de chaque
+   en-tête de semaine. */
+.kd-planweek__menu {
     margin-left: auto;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--kd-space-3);
-    flex-wrap: wrap;
-    justify-content: flex-end;
-}
-
-.kd-planweek__copy {
-    margin: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--kd-space-2);
-}
-
-.kd-planweek__copy form,
-.kd-planweek__tools form {
-    margin: 0;
-    display: inline-flex;
-    align-items: center;
-    gap: var(--kd-space-2);
 }
 
 .kd-planweek__select {
@@ -6068,26 +6110,11 @@ button.kd-libx:active {
     min-height: 26px;
 }
 
-/* Séance placée : poignée + titre cliquable (ouvre le compositeur) + méta */
+/* Séance placée : la carte entière ouvre l'édition rapide, et c'est aussi la prise
+   du glisser-déposer (départagées par le temps, cf. le contrôleur `plangrid`). Plus
+   de poignée : 13px à saisir, c'était intenable au doigt. */
 .kd-planentry {
     cursor: default;
-}
-
-.kd-planitem__handle {
-    flex: 0 0 auto;
-    display: inline-flex;
-    align-items: center;
-    color: var(--color-text-placeholder);
-    cursor: grab;
-}
-
-.kd-planitem__handle:active {
-    cursor: grabbing;
-}
-
-.kd-planitem__handle svg {
-    width: 13px;
-    height: 13px;
 }
 
 .kd-planitem__link {
@@ -6138,9 +6165,51 @@ button.kd-libx:active {
     height: 11px;
 }
 
-.kd-planitem__delform {
+/* Chemin d'ajout attaché au jour : ouvre la palette SUR cette case. Discret à la
+   souris (il n'apparaît qu'au survol de la case, comme le « + » du calendrier),
+   toujours visible au doigt où il n'y a pas de survol (cf. base.css). */
+.kd-planday__add {
+    flex: 0 0 auto;
+    margin-left: auto;
+    align-self: center;
     display: inline-flex;
-    margin: 0;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    padding: 0;
+    border: 1px dashed var(--color-border-strong);
+    border-radius: var(--kd-radius-sm);
+    background: transparent;
+    color: var(--color-text-placeholder);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity .12s ease, color .12s ease, border-color .12s ease, background-color .12s ease;
+}
+
+.kd-planday:hover .kd-planday__add,
+.kd-planday__add:focus-visible {
+    opacity: 1;
+}
+
+.kd-planday__add:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    background: var(--color-primary-tint);
+}
+
+.kd-planday__add svg {
+    width: 15px;
+    height: 15px;
+}
+
+/* Sans survol, un contrôle qui n'apparaît qu'au survol n'apparaît jamais — et
+   c'est ici le SEUL chemin d'ajout au doigt. Doit rester après l'`opacity: 0`
+   ci-dessus (base.css est importé avant, sa règle jumelle y perdrait). */
+@media (hover: none) {
+    .kd-planday__add {
+        opacity: .55;
+    }
 }
 
 /* Aperçu de séance au survol d'une case — promu en top-layer (popover), donc non
@@ -6489,6 +6558,42 @@ textarea.kd-inlineedit__input {
 .kd-quickexo__form {
     padding: var(--kd-space-4) var(--kd-space-4) var(--kd-space-5);
     border-top: 1px solid var(--color-divider);
+}
+
+/* ----------------------------------------------------------------------------
+   Responsive de l'éditeur de trame
+   PLACÉ EN FIN DE SECTION, APRÈS les composants qu'il surcharge : une `@media`
+   n'ajoute aucune spécificité (cf. docs/design-system.md §5).
+
+   Sous 900px la palette devient une feuille (règles `kd-libsheet`, section
+   compositeur) : la trame récupère toute la largeur, et le seul chemin d'ajout est
+   le « + » du jour. Les menus kebab, eux, sont déjà traités par `.kd-kebab--row`.
+   ---------------------------------------------------------------------------- */
+@media (max-width: 900px) {
+    .kd-planeditor .kd-composer__main {
+        padding: var(--kd-space-5) var(--kd-space-4) var(--kd-space-7);
+    }
+}
+
+@media (max-width: 560px) {
+    .kd-planeditor .kd-composer__main {
+        padding: var(--kd-space-4) var(--kd-space-2) var(--kd-space-6);
+    }
+
+    .kd-planweek {
+        padding: var(--kd-space-5) var(--kd-space-4) var(--kd-space-6);
+    }
+
+    /* La ligne d'un jour ne porte que trois choses : son nom, ses séances, son
+       « + ». Tout ce qu'on reprend en marge revient au titre des séances. */
+    .kd-plangrid--edit .kd-planday {
+        gap: var(--kd-space-3);
+        padding: var(--kd-space-3);
+    }
+
+    .kd-plangrid--edit .kd-planday__name {
+        flex: 0 0 30px;
+    }
 }
 
 /* ============================================================================

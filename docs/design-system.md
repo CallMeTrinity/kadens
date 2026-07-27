@@ -217,7 +217,7 @@ sont dans `assets/fonts/` (subsets latin + latin-ext), les `@font-face` dans
 | Palier | Cible | Ce qui bascule |
 |---|---|---|
 | `560px` | téléphone | une colonne, nav en barre basse, calendrier en agenda vertical, filtres d'index repliés |
-| `900px` | tablette | éditeurs à deux volets empilés, nav condensée, repères de hero sous le titre |
+| `900px` | tablette | bibliothèque/palette des éditeurs en **feuille** (`kd-libsheet`), nav condensée, repères de hero sous le titre |
 | `1200px` | petit portable | palette de l'éditeur de trame sous la grille |
 
 > **Ils ne peuvent pas être tokenisés.** `@media` n'accepte pas `var()`, et le
@@ -265,6 +265,17 @@ sont dans `assets/fonts/` (subsets latin + latin-ext), les `@font-face` dans
   retrait sous `@media (hover: none)`, et un aperçu en `popover="manual"` doit se
   garder derrière `(hover: hover) and (pointer: fine)` : un tap émet un
   `mouseenter` synthétique sans `mouseleave`, le panneau resterait collé.
+- **La feuille des éditeurs est un mécanisme unique : `kd-libsheet`.** Le
+  compositeur de séance et l'éditeur de trame partagent `.kd-composer__lib` ; sous
+  900px, le conteneur des deux volets porte `kd-libsheet` et son contrôleur y pose
+  `kd-libsheet--open` (voile `.kd-composer__scrim`, `.kd-noscroll` sur `<body>`).
+  Ne pas reporter ces règles sur une portée par écran : c'est le même geste, il
+  n'a qu'une définition. Ce qui reste propre à un éditeur (rayon de la colonne,
+  zone de dépôt) garde sa portée à lui (`kd-composer--sheet`, `.kd-planeditor`).
+- **Un conteneur d'éditeur ne clippe jamais son débordement.** Les menus kebab de
+  lignes sont des calques absolus qui sortent par le bas : `overflow: hidden` ou
+  `clip` sur `.kd-cblock` ou `.kd-planeditor` les ampute, et aucun `z-index` ne
+  rattrape ça. Le rayon se porte alors sur les enfants de bord.
 
 ---
 

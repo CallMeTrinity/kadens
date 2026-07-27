@@ -91,7 +91,7 @@
 @media (pointer: coarse) {
   .kd-iconbtn,
   .kd-modal__close,
-  .kd-planitem__del,
+  .kd-planday__add,
   .kd-calday__add,
   .kd-calday__add--week,
   .kd-kebab__trigger,
@@ -111,7 +111,7 @@
   /* Les contrôles qui n'apparaissaient qu'au survol n'ont pas de survol ici :
      ils restent visibles en permanence, en retrait. */
   .kd-calday__add,
-  .kd-planitem__del { opacity: .55; }
+  .kd-planday__add { opacity: .55; }
 }
 
 /* ----------------------------------------------------------------------------

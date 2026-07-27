@@ -72,7 +72,7 @@ export default class extends Controller {
         // peinture, un clic sur un calque au-dessus (menu, en-tête) ne le traversait
         // pas. Ici, une seule autorité : est-on hors du panneau, oui ou non.
         this.onOutside = (event) => {
-            if (!this.element.classList.contains('kd-composer--libopen')) return;
+            if (!this.element.classList.contains('kd-libsheet--open')) return;
             // Le clic d'OUVERTURE remonte jusqu'ici dans la même phase de bouillonnement,
             // la classe étant déjà posée : sans cette garde, la feuille se refermerait
             // aussitôt ouverte.
@@ -405,7 +405,7 @@ export default class extends Controller {
             this.activeBlockId = blockId;
             this.refreshActive();
         }
-        this.element.classList.add('kd-composer--libopen');
+        this.element.classList.add('kd-libsheet--open');
         // Fige la page derrière la feuille. La classe est posée dans les deux cas :
         // c'est le CSS qui la neutralise au-dessus de 900px, où il n'y a pas de
         // feuille et où bloquer le défilement serait un bug.
@@ -416,7 +416,7 @@ export default class extends Controller {
     }
 
     closeLib() {
-        this.element.classList.remove('kd-composer--libopen');
+        this.element.classList.remove('kd-libsheet--open');
         document.body.classList.remove('kd-noscroll');
     }
 

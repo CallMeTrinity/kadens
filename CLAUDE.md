@@ -261,7 +261,36 @@ deux sens, fiche de travail par athlète sous `/coach`, `ROLE_COACH`) — cf. §
 la règle de propriété — et **paramètres de compte** (`/profile/settings` :
 changement de mot de passe, création de compte par `app:user:create`).
 
-Dernier lot (compositeur au téléphone) : l'éditeur de séance passe d'une rangée de
+Dernier lot (éditeur de plan au téléphone) : la mécanique du compositeur est
+appliquée telle quelle à l'éditeur de trame. *Une ligne ne porte que ce qu'elle est
+et un menu ; le reste se déduit du geste.*
+
+- **La feuille de bibliothèque devient un mécanisme unique, `kd-libsheet`.** Le
+  conteneur des deux volets la porte (compositeur **et** `.kd-planeditor`), son
+  contrôleur y pose `kd-libsheet--open` : voile, `.kd-noscroll`, bouton de
+  fermeture et chaîne de hauteurs défilables ont une seule définition. `kd-composer--sheet`
+  ne garde que ce qui est propre au compositeur. Ne pas re-scoper par écran.
+- **Le « + » d'un jour ouvre la palette SUR cette case** : taper une carte y pose
+  la séance. C'est le pendant du « + Ajouter un exercice » d'un bloc. Le mode
+  tampon (armer puis tamponner) reste à la souris mais n'est plus le seul chemin,
+  et viser une case le **désarme** — deux intentions de pose concurrentes rendraient
+  le prochain clic imprévisible. Le bouton vit **hors** de la cellule triée
+  (SortableJS indexe ses enfants directs).
+- **Plus de poignée : la carte de séance entière est la prise**, tap et appui long
+  départagés par le temps (mêmes valeurs que le compositeur). Le reste passe en
+  kebab : Édition complète / Déplacer vers / Retirer, et Copier vers / Retirer la
+  semaine pour l'en-tête. `.kd-kebab__form` sert les deux actions qui demandent un
+  choix avant d'agir. **« Déplacer vers » est le premier repli du glisser-déposer
+  de trame** (clavier et sans JS) : ne pas le retirer.
+- Conséquences à ne pas casser : **plus d'`overflow: clip` sur `.kd-planeditor`**
+  (il ampute les menus, exactement comme `hidden` sur `.kd-cblock` — le rayon est
+  porté par la palette), et pas de `.kd-planitem form { display: inline-flex }`
+  (plus spécifique que `.kd-kebab__form`, il remettrait les menus en ligne).
+  `_menu_form.html.twig` a migré dans `templates/components/`, il sert les deux
+  éditeurs. Les formulaires de la trame restent soumis **par Turbo** : les
+  intercepter en `fetch` avalerait leurs réponses en erreur.
+
+Lot précédent (compositeur au téléphone) : l'éditeur de séance passe d'une rangée de
 neuf éléments par ligne à **deux zones et un geste**. Ce qui tient tout : *une ligne
 ne porte que ce qu'elle est et un menu ; le reste se déduit du geste.*
 

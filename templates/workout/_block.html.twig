@@ -41,19 +41,19 @@
                 {{ ux_icon('lucide:ellipsis') }}
             </summary>
             <div class="kd-kebab__panel">
-                {{ include('workout/_menu_form.html.twig', {
+                {{ include('components/_menu_form.html.twig', {
                     action: path('app_workout_block_move', {id: workout.id, blockId: block.id, direction: 'up'}),
                     token: csrf_token('block_move' ~ block.id),
                     icon: 'lucide:chevron-up',
                     label: 'Monter le bloc'
                 }) }}
-                {{ include('workout/_menu_form.html.twig', {
+                {{ include('components/_menu_form.html.twig', {
                     action: path('app_workout_block_move', {id: workout.id, blockId: block.id, direction: 'down'}),
                     token: csrf_token('block_move' ~ block.id),
                     icon: 'lucide:chevron-down',
                     label: 'Descendre le bloc'
                 }) }}
-                {{ include('workout/_menu_form.html.twig', {
+                {{ include('components/_menu_form.html.twig', {
                     action: path('app_workout_block_delete', {id: workout.id, blockId: block.id}),
                     token: csrf_token('block_delete' ~ block.id),
                     icon: 'lucide:x',

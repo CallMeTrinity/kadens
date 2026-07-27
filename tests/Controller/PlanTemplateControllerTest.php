@@ -165,6 +165,43 @@ final class PlanTemplateControllerTest extends WebTestCase
         self::assertSame('Sortie longue', $item->getWorkout()->getTitle());
     }
 
+    /**
+     * Repli sans JS du glisser-déposer : le menu d'une case porte un vrai
+     * formulaire « Déplacer vers » (selects semaine/jour). C'est le seul chemin de
+     * déplacement au clavier, et le seul praticable au doigt quand la trame est
+     * longue — l'appui long suppose de voir la case d'arrivée.
+     */
+    public function testMoveItemFromTheRowMenuWithoutJs(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $workout = $this->createWorkout($user, 'Sortie longue');
+        $template = $this->createPlanTemplate($user, 'Plan 5k', 3);
+
+        $item = (new PlanItem())->setWeekNumber(1)->setDayOfWeek(1);
+        $item->setWorkout($workout);
+        $template->addPlanItem($item);
+        $this->em->persist($item);
+        $this->em->flush();
+        $itemId = $item->getId();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/plan-template/'.$template->getId().'/edit');
+        self::assertResponseIsSuccessful();
+
+        $form = $crawler->filter('form[action$="/items/'.$itemId.'/move"]')->form();
+        $form['week'] = '3';
+        $form['day'] = '6';
+        $this->client->submit($form);
+
+        // Sans format stream demandé, la route redirige vers l'éditeur (gridResponse).
+        self::assertResponseRedirects('/plan-template/'.$template->getId().'/edit');
+
+        $this->em->clear();
+        $moved = $this->em->getRepository(PlanItem::class)->find($itemId);
+        self::assertSame(3, $moved->getWeekNumber());
+        self::assertSame(6, $moved->getDayOfWeek());
+    }
+
     public function testDuplicateCopiesGrid(): void
     {
         $user = $this->createUser('owner@example.com');

@@ -1824,5 +1824,93 @@ où les valeurs tiennent en trois caractères.
 
 Nouveau token sémantique `--color-scrim` (le voile de `.kd-modal::backdrop`, qui
 était une valeur en dur, le consomme désormais aussi) et nouveau fragment
-`workout/_menu_form.html.twig` — la variante « item de menu » de `_action_form`,
-qui rend un bouton icône seul.
+`_menu_form.html.twig` — la variante « item de menu » de `_action_form`, qui rend
+un bouton icône seul. (Il vit dans `templates/components/` depuis que l'éditeur de
+trame le consomme lui aussi.)
+
+---
+
+## Lot — L'éditeur de plan au téléphone (28/07/2026)
+
+**Le constat.** Le lot précédent avait traité le compositeur de séance ; l'éditeur
+de trame était resté avec exactement les mêmes défauts, un cran plus loin même,
+parce qu'il empile deux niveaux (semaine, puis jour).
+
+- La palette s'empilait **au-dessus** de la trame sous 1200px : on la traversait à
+  chaque défilement, pour un panneau dont on n'a besoin qu'au moment de poser.
+- Poser une séance demandait le mode **tampon** — armer une carte, puis retrouver
+  la case et la taper. Deux gestes séparés par un défilement, et un état invisible
+  entre les deux.
+- Une case posée n'offrait qu'une **croix de 22px** et une **poignée de 13px**.
+  Le déplacement n'avait aucun repli : ni clavier, ni sans JS.
+- L'en-tête de semaine alignait un `<select>` de destination et deux boutons, qui
+  passaient à la ligne et doublaient la hauteur de chaque en-tête.
+
+**Le principe retenu, repris tel quel du compositeur.** *Une ligne ne porte que ce
+qu'elle est et un menu ; le reste se déduit du geste.*
+
+### La palette devient une feuille, et le mécanisme est mutualisé
+
+Les règles de feuille ne sont plus scopées `kd-composer--sheet` mais
+**`kd-libsheet`** : le conteneur des deux volets la porte (compositeur *et*
+`.kd-planeditor`), son contrôleur y pose `kd-libsheet--open`. Le voile
+`.kd-composer__scrim`, `.kd-noscroll` sur `<body>`, le bouton de fermeture, la
+chaîne de hauteurs défilables : une seule définition pour les deux écrans. Ce qui
+reste propre à un éditeur garde sa portée à lui (`kd-composer--sheet` pour le
+débordement et le rayon du compositeur, `.kd-planeditor` pour les siens).
+
+### Le « + » d'un jour désigne la case
+
+C'est le pendant du « + Ajouter un exercice » attaché à un bloc : il ouvre la
+palette **sur** cette case (mémorisée dans le contrôleur), et taper une carte y
+pose directement la séance. Le mode tampon reste, mais il n'est plus le seul
+chemin — et il est explicitement désarmé quand une case est visée, deux intentions
+de pose concurrentes rendant le prochain clic imprévisible. Un rappel
+`Poser dans S2 · mercredi` s'affiche en tête de palette : en feuille, la trame est
+masquée, sans lui on ne sait plus où l'on pose.
+
+Le bouton vit **hors** de `[data-plangrid-target="cell"]` (SortableJS calcule ses
+index sur les enfants directs) et suit le motif du « + » du calendrier : révélé au
+survol à la souris, visible en retrait sous `@media (hover: none)` — c'est le seul
+chemin d'ajout au doigt, il ne peut pas dépendre d'un survol.
+
+### La carte entière est la prise, le reste passe en menu
+
+Même départage par le temps que dans le compositeur (`delay: 320` +
+`delayOnTouchOnly`, `filter` sur le menu et la note en édition en ligne) : tap =
+édition rapide, appui long = soulever. La poignée disparaît.
+
+Le menu kebab de la case porte **Édition complète**, **Déplacer vers** et
+**Retirer de la trame**. Celui de la semaine porte **Copier vers** et **Retirer la
+semaine**. Deux d'entre eux ne sont pas de simples boutons : ils demandent un
+choix avant d'agir, d'où `.kd-kebab__form` (libellé, puis une ligne de `<select>`
+et un bouton). « Déplacer vers » est au passage le **premier repli** du
+glisser-déposer de trame : il n'y en avait aucun, ni au clavier ni sans JS, et
+c'est aussi le seul geste praticable quand la case d'arrivée est à trois semaines
+de défilement. Verrouillé par `testMoveItemFromTheRowMenuWithoutJs`.
+
+### Pièges rencontrés
+
+- **`.kd-planeditor` ne peut plus clipper.** Il portait `overflow: clip` (choisi
+  pour ne pas casser la palette `sticky`) ; les panneaux de menu, calques absolus,
+  en sortent par le bas. Même piège que `overflow: hidden` sur `.kd-cblock`. Le
+  rayon passe sur la palette, qui est l'enfant de bord.
+- **`.kd-planitem form { display: inline-flex }`**, hérité du bouton de retrait,
+  est plus spécifique que `.kd-kebab__form` : il remettait les formulaires du menu
+  en ligne. Supprimé — et signalé sur place, parce que c'est le genre de règle
+  qu'on réintroduit sans y penser.
+- **Une feuille qui monte du bas doit remettre `top: auto`.** La palette de trame
+  est `sticky` avec un `top` sur écran large ; la règle de feuille passait bien en
+  `position: fixed` avec `bottom: 0`, mais le `top` hérité restait — le panneau se
+  retrouvait ancré des **deux** côtés et s'étirait depuis le haut de l'écran au
+  lieu de monter du bas. Le compositeur ne l'avait jamais montré : sa colonne n'a
+  pas de `top`. Mutualiser une règle, c'est hériter des `position` des deux écrans.
+- **`base.css` est importé avant `components.css`.** Sa règle jumelle
+  `@media (pointer: coarse) { .kd-planday__add { opacity: .55 } }` est écrasée par
+  l'`opacity: 0` du composant : la révélation au survol doit être neutralisée dans
+  `components.css`, après la définition (même famille de piège que les `@media`
+  sans spécificité).
+- **On n'a PAS étendu l'interception des soumissions à toute la section.** C'était
+  tentant (le compositeur le fait), mais ici les formulaires de la trame sont déjà
+  soumis par Turbo, qui répond en stream *et* fait remonter les réponses en erreur.
+  Un `fetch` maison les aurait avalées en silence.

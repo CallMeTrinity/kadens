@@ -1,7 +1,8 @@
 {# Formulaire POST autonome rendu comme un ITEM de menu kebab (icône + libellé en
    toutes lettres). Variante de `_action_form.html.twig`, qui rend un bouton icône
    seul : dans un menu déroulant, une icône nue n'est pas lisible, et le `title`
-   n'existe pas au doigt.
+   n'existe pas au doigt. Partagé par le compositeur de séance et l'éditeur de
+   trame, d'où sa place dans components/.
    Paramètres : action (URL), token (CSRF), label, icon, variant ('' | 'danger'),
    confirm (optionnel). #}
 <form method="post" action="{{ action }}"{% if confirm is defined %} onsubmit="return confirm('{{ confirm }}');"{% endif %}>

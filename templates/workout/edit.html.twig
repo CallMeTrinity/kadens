@@ -68,12 +68,12 @@
 
     {# data-turbo="false" : Turbo n'intercepte aucun formulaire ici ; le contrôleur
        `composer` applique lui-même les Turbo Streams via fetch (voir le contrôleur). #}
-    <section class="kd-composer kd-composer--sheet" data-controller="composer" data-turbo="false">
+    <section class="kd-composer kd-composer--sheet kd-libsheet" data-controller="composer" data-turbo="false">
 
         {# ---- Corps : bibliothèque (gauche) + blocs (droite) ---- #}
         <div class="kd-composer__body">
             {# Voile de la bibliothèque en feuille (sous 900px seulement) : inerte tant
-               que `kd-composer--libopen` n'est pas posée. Purement visuel — il assombrit
+               que `kd-libsheet--open` n'est pas posée. Purement visuel — il assombrit
                et absorbe les clics destinés au contenu derrière ; la FERMETURE au clic
                extérieur, elle, est portée par le contrôleur, sur le document. #}
             <div class="kd-composer__scrim"></div>

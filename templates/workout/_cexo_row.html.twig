@@ -80,14 +80,14 @@
                on s'enchaîne à la ligne du dessus. Rien en tête de bloc : il n'y a
                personne au-dessus à qui se lier. #}
             {% if groupLabel %}
-                {{ include('workout/_menu_form.html.twig', {
+                {{ include('components/_menu_form.html.twig', {
                     action: path('app_workout_prescribed_unlink', {id: workout.id, prescribedId: prescribed.id}),
                     token: csrf_token('prescribed_unlink' ~ prescribed.id),
                     icon: 'lucide:unlink',
                     label: 'Détacher de l\'enchaînement'
                 }) }}
             {% elseif canLink %}
-                {{ include('workout/_menu_form.html.twig', {
+                {{ include('components/_menu_form.html.twig', {
                     action: path('app_workout_prescribed_link', {id: workout.id, prescribedId: prescribed.id}),
                     token: csrf_token('prescribed_link' ~ prescribed.id),
                     icon: 'lucide:link',
@@ -97,19 +97,19 @@
 
             {# Repli du glisser-déposer : indispensable au clavier, et plus sûr que
                l'appui long quand la liste est longue. #}
-            {{ include('workout/_menu_form.html.twig', {
+            {{ include('components/_menu_form.html.twig', {
                 action: path('app_workout_prescribed_move', {id: workout.id, prescribedId: prescribed.id, direction: 'up'}),
                 token: csrf_token('prescribed_move' ~ prescribed.id),
                 icon: 'lucide:chevron-up',
                 label: 'Monter l\'exercice'
             }) }}
-            {{ include('workout/_menu_form.html.twig', {
+            {{ include('components/_menu_form.html.twig', {
                 action: path('app_workout_prescribed_move', {id: workout.id, prescribedId: prescribed.id, direction: 'down'}),
                 token: csrf_token('prescribed_move' ~ prescribed.id),
                 icon: 'lucide:chevron-down',
                 label: 'Descendre l\'exercice'
             }) }}
-            {{ include('workout/_menu_form.html.twig', {
+            {{ include('components/_menu_form.html.twig', {
                 action: path('app_workout_prescribed_delete', {id: workout.id, prescribedId: prescribed.id}),
                 token: csrf_token('prescribed_delete' ~ prescribed.id),
                 icon: 'lucide:x',
