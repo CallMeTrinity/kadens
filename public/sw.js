@@ -1,130 +1,117 @@
 /*
- * Kadens — Service Worker (écrit à la main, pas de Workbox).
+ * Kadens — Service Worker (écrit à la main, pas de Workbox : AssetMapper ne
+ * bundle pas, il n'y a donc aucun précache généré au build).
  *
- * Contrainte d'archi (CLAUDE.md §2) : AssetMapper ne bundle pas, donc pas de
- * précache généré. On s'appuie sur deux faits :
- *   1. les assets sous /assets/ sont digestés (hash dans le nom) donc immuables
- *      → cache-first sans péremption, un changement de contenu = nouvelle URL ;
- *   2. les pages de consultation sont auto-suffisantes (aucun AJAX post-chargement,
- *      discipline tenue depuis la Phase 2) → une réponse HTML mise en cache suffit
- *      à les rendre hors ligne.
+ * Objectif : rendre l'app INSTALLABLE (Chrome exige un service worker doté d'un
+ * gestionnaire `fetch`) et donner un repli lisible hors réseau. Ce n'est PAS un
+ * retour au mode hors connexion complet de la Phase 9 : celui-ci servait les
+ * pages de consultation en stale-while-revalidate, ce qui rendait des pages
+ * périmées alors qu'on était en ligne et donnait l'illusion qu'il fallait
+ * recharger. C'est ce qui l'avait fait suspendre. La règle est donc inversée :
  *
- * Servi depuis la racine (/sw.js) pour couvrir tout le scope de l'app.
+ *   → EN LIGNE, LE RÉSEAU GAGNE TOUJOURS POUR DU HTML.
  *
- * Stratégies :
- *   - /assets/*                       → cache-first (immuable).
- *   - pages de consultation           → stale-while-revalidate (instantané +
- *     (workout/{id}, plan-template/{id}, /s/{slug})   fraîcheur en arrière-plan,
- *     cohérent avec la « référence vivante » d'une séance).
- *   - autres navigations              → network-first, repli cache puis offline.html.
- *   - icônes, manifest, autres GET     → cache-first, repli réseau.
- *   - non-GET / cross-origin           → laissés au réseau (jamais mis en cache).
+ * Ce qui est intercepté, et rien d'autre :
+ *   - /assets/*        → cache-first. Les URL sont digestées (hash dans le nom)
+ *                        donc immuables : un changement de contenu = une autre
+ *                        URL, jamais du contenu périmé.
+ *   - /pwa/*           → cache-first. Icônes et écrans de démarrage, immuables.
+ *   - navigations      → network-first, repli sur la copie en cache puis sur
+ *     (mode 'navigate')  /offline.html.
+ *
+ * Ce qui n'est JAMAIS intercepté (on sort du handler, le navigateur fait son
+ * travail normal) :
+ *   - les requêtes non-GET (toutes les mutations) ;
+ *   - le cross-origin ;
+ *   - **les requêtes Turbo** : une visite Turbo Drive ou un Turbo Stream est un
+ *     `fetch()` dont le mode n'est pas 'navigate'. Les traiter comme un asset
+ *     statique servirait des fragments périmés — exactement le piège de la
+ *     Phase 9. Elles tombent dans le « rien d'autre » et vont droit au réseau.
+ *
+ * Le nom de cache est versionné : l'incrémenter purge tout à l'activation.
  */
 
-const VERSION = 'kadens-v2';
-const CACHE = `kadens-${VERSION}`;
+const CACHE = 'kadens-v3';
 
-// Coquille minimale précachée à l'installation. Les assets digestés (CSS/JS/
-// polices) ne sont pas listés ici : ils se peuplent au runtime (cache-first).
+// Coquille minimale, précachée à l'installation. Les assets digestés ne sont pas
+// listés (leurs URL changent à chaque déploiement) : ils se peuplent au runtime.
 const PRECACHE = [
-  '/offline.html',
-  '/manifest.json',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
+    '/offline.html',
+    '/manifest.json',
+    '/pwa/icon-192.png',
 ];
-
-// Pages dont une copie en cache doit rester consultable hors ligne.
-const CONSULTATION = [
-  /^\/workout\/\d+$/,
-  /^\/plan-template\/\d+$/,
-  /^\/s\/[^/]+$/,
-];
-
-const isConsultation = (path) => CONSULTATION.some((re) => re.test(path));
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(PRECACHE)).then(() => self.skipWaiting())
-  );
+    event.waitUntil(
+        caches.open(CACHE)
+            .then((cache) => cache.addAll(PRECACHE))
+            .then(() => self.skipWaiting())
+    );
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+    event.waitUntil(
+        caches.keys()
+            .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+            .then(() => self.clients.claim())
+    );
 });
 
-/** Cache-first : sert le cache s'il existe, sinon réseau puis mise en cache. */
+/** Cache-first : réservé aux URL immuables (/assets/, /pwa/). */
 async function cacheFirst(request) {
-  const cached = await caches.match(request);
-  if (cached) {
-    return cached;
-  }
-  const response = await fetch(request);
-  if (response && response.ok) {
-    const cache = await caches.open(CACHE);
-    cache.put(request, response.clone());
-  }
-  return response;
-}
-
-/** Stale-while-revalidate : réponse immédiate depuis le cache, MAJ en fond. */
-async function staleWhileRevalidate(request) {
-  const cache = await caches.open(CACHE);
-  const cached = await cache.match(request);
-  const network = fetch(request)
-    .then((response) => {
-      if (response && response.ok) {
-        cache.put(request, response.clone());
-      }
-      return response;
-    })
-    .catch(() => null);
-  return cached || (await network) || caches.match('/offline.html');
-}
-
-/** Network-first : réseau d'abord, repli cache puis page hors ligne. */
-async function networkFirst(request) {
-  const cache = await caches.open(CACHE);
-  try {
-    const response = await fetch(request);
-    if (response && response.ok && request.method === 'GET') {
-      cache.put(request, response.clone());
+    const cached = await caches.match(request);
+    if (cached) {
+        return cached;
     }
+
+    const response = await fetch(request);
+    if (response && response.ok) {
+        const cache = await caches.open(CACHE);
+        cache.put(request, response.clone());
+    }
+
     return response;
-  } catch {
-    const cached = await cache.match(request);
-    return cached || cache.match('/offline.html');
-  }
+}
+
+/** Network-first : le réseau fait foi, le cache n'est qu'un filet hors ligne. */
+async function networkFirst(request) {
+    const cache = await caches.open(CACHE);
+
+    try {
+        const response = await fetch(request);
+        if (response && response.ok) {
+            cache.put(request, response.clone());
+        }
+
+        return response;
+    } catch {
+        const cached = await cache.match(request);
+
+        return cached || cache.match('/offline.html');
+    }
 }
 
 self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  const url = new URL(request.url);
+    const { request } = event;
 
-  // Ne jamais interférer avec les mutations ni le cross-origin.
-  if (request.method !== 'GET' || url.origin !== self.location.origin) {
-    return;
-  }
-
-  // Assets digestés : immuables → cache-first.
-  if (url.pathname.startsWith('/assets/')) {
-    event.respondWith(cacheFirst(request));
-    return;
-  }
-
-  // Navigations (chargement d'une page).
-  if (request.mode === 'navigate') {
-    if (isConsultation(url.pathname)) {
-      event.respondWith(staleWhileRevalidate(request));
-    } else {
-      event.respondWith(networkFirst(request));
+    if (request.method !== 'GET') {
+        return;
     }
-    return;
-  }
 
-  // Icônes, manifest, autres GET statiques.
-  event.respondWith(cacheFirst(request));
+    const url = new URL(request.url);
+    if (url.origin !== self.location.origin) {
+        return;
+    }
+
+    if (url.pathname.startsWith('/assets/') || url.pathname.startsWith('/pwa/')) {
+        event.respondWith(cacheFirst(request));
+
+        return;
+    }
+
+    if (request.mode === 'navigate') {
+        event.respondWith(networkFirst(request));
+    }
+
+    // Tout le reste (Turbo, exports Excel, flux ICS…) : aucune interception.
 });

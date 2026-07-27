@@ -261,7 +261,45 @@ deux sens, fiche de travail par athlète sous `/coach`, `ROLE_COACH`) — cf. §
 la règle de propriété — et **paramètres de compte** (`/profile/settings` :
 changement de mot de passe, création de compte par `app:user:create`).
 
-Dernier lot (utilisabilité au téléphone) : la couche mobile existait mais était
+Dernier lot (PWA installable) : la **Phase 9 est réactivée, mais amputée**. Ce
+qu'on veut, c'est l'installabilité (icône, nom, écran de démarrage, plein écran) ;
+ce qu'on ne veut plus, c'est le mode hors connexion complet, qui servait des pages
+périmées *en ligne* et avait fait suspendre la phase. Règle qui tient tout :
+**en ligne, le réseau gagne toujours pour du HTML.**
+
+- **Le service worker reste indispensable** : Chrome n'offre l'installation que si
+  un SW avec gestionnaire `fetch` est enregistré. `public/sw.js` est donc réécrit
+  et n'intercepte que trois choses : `/assets/*` et `/pwa/*` en **cache-first**
+  (URL digestées ou immuables), et les **navigations** (`request.mode === 'navigate'`)
+  en **network-first** avec repli `offline.html`. Tout le reste sort du handler.
+- **Corollaire à ne pas casser : Turbo n'est jamais intercepté.** Une visite Turbo
+  Drive ou un Turbo Stream est un `fetch()` dont le `mode` n'est **pas** `navigate` ;
+  un handler qui traiterait « tout le reste » en cache-first servirait des fragments
+  périmés. C'était exactement le piège de la Phase 9.
+- **Enregistrement conditionné côté serveur**, dans `base.html.twig` et non dans
+  `app.js` : `app.environment == 'prod'` enregistre, tout autre environnement
+  **désenregistre** ce qui traîne (un SW laissé par un test `APP_ENV=prod` sur
+  localhost masquerait les modifications en dev). Tester en local = `APP_ENV=prod`.
+- **Les visuels vivent dans `public/pwa/`, jamais `public/icons/`.** Apache déclare
+  par défaut un `Alias /icons/` vers ses icônes d'autoindex, qu'on ne peut pas
+  retirer sur mutualisé : `/icons/*` n'atteindrait jamais `public/`. `public/icons/`
+  est supprimé.
+- **`tools/build-pwa-icons.php` est la source des visuels** (comme
+  `tools/fetch-fonts.sh` l'est des polices) : il part de `assets/icons/kadens.png`,
+  isole le K **par composantes connexes** (les traits de vitesse chevauchent le K
+  en abscisse, aucun recadrage rectangulaire ne les sépare) pour les icônes, garde
+  le lockup complet pour les écrans de démarrage, et **génère aussi**
+  `templates/components/_pwa_splash.html.twig`. Ce fragment est **généré, ne pas
+  l'éditer à la main** : iOS exige une correspondance **exacte** de la media query,
+  un lien sans fichier (ou l'inverse) donne un écran de lancement blanc. Un test
+  (`PwaHeadTest`) vérifie que les deux n'ont pas divergé.
+- **`viewport-fit=cover` ajouté à la `<meta viewport>`** : sans lui
+  `env(safe-area-inset-bottom)` vaut 0, donc `--kd-navbar-h` ignore la barre
+  gestuelle iOS et la nav basse passe dessous en mode standalone.
+- Manifest repeint « Presse » (`theme_color` encre `#0b0b0b`, `background_color`
+  papier `#ffffff`) + trois `shortcuts` (Calendrier / Séances / Plans).
+
+Lot précédent (utilisabilité au téléphone) : la couche mobile existait mais était
 annulée par **une déclaration CSS**. `backdrop-filter` sur `.kd-header` en faisait
 le bloc conteneur de ses descendants `position: fixed` : la barre de nav basse se
 calait sur le header (52px) au lieu du viewport — rognée en haut de l'écran, et

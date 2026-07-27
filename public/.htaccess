@@ -5,6 +5,21 @@
 # to each configured DirectoryIndex file (e.g. index.php, index.html, index.pl).
 DirectoryIndex index.php
 
+# --- PWA ---------------------------------------------------------------------
+# Le service worker ne doit jamais être servi depuis un cache HTTP : un sw.js
+# périmé bloque toute mise à jour de l'app installée jusqu'à expiration.
+# Le manifest suit la même règle (il porte les icônes et le nom installés).
+#
+# Note : les visuels PWA vivent dans public/pwa/ et NON public/icons/. Apache
+# déclare par défaut un `Alias /icons/` vers ses icônes d'autoindex, qu'on ne
+# peut pas retirer sur mutualisé — /icons/* n'atteindrait jamais public/.
+<IfModule mod_headers.c>
+    <FilesMatch "^(sw\.js|manifest\.json)$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+</IfModule>
+# -----------------------------------------------------------------------------
+
 # By default, Apache does not evaluate symbolic links if you did not enable this
 # feature in your server configuration. Uncomment the following line if you
 # install assets as symlinks or if you experience problems related to symlinks

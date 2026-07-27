@@ -2,16 +2,17 @@
 <html lang="fr">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+        {# `viewport-fit=cover` est la condition pour que env(safe-area-inset-bottom)
+           soit non nul : sans lui, --kd-navbar-h ignore la barre gestuelle iOS et
+           la nav basse passe dessous en mode standalone. #}
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
         <title>{% block title %}Kadens{% endblock %}</title>
-        <link rel="icon" href="{{ asset('icons/kadens.png') }}" type="image/png">
+        <meta name="description" content="{% block meta_description %}Kadens — bibliothèque d'exercices, séances, plans multi-semaines et calendrier d'entraînement.{% endblock %}">
 
-        {# Mode hors connexion / PWA suspendu (voir CLAUDE.md §6). On garde juste
-           la teinte de barre navigateur, sans manifest ni service worker. #}
-        <meta name="theme-color" content="#0b0b0b">
+        {{ include('components/_pwa_head.html.twig') }}
 
         {% block stylesheets %}
-            {# Polices « Carnet clair » self-hostées : chargées via AssetMapper
+            {# Polices « Presse » self-hostées : chargées via AssetMapper
                (app.css → fonts.css). Plus de dépendance Google Fonts. #}
         {% endblock %}
 
@@ -31,5 +32,33 @@
         <main id="main" class="{% block main_class %}kd-page{% endblock %}">
             {% block body %}{% endblock %}
         </main>
+
+        {# Service worker : PROD SEULEMENT. En dev il n'apporte rien (rien à
+           installer) et un SW qui traîne masque les modifications — c'est ce qui
+           avait fait suspendre la Phase 9. Pour le tester en local : APP_ENV=prod.
+           Enregistré ici plutôt que dans app.js pour rester conditionnable côté
+           serveur ; `navigator.serviceWorker` n'existe qu'en contexte sécurisé
+           (HTTPS ou localhost), le test suffit à ne rien casser ailleurs. #}
+        {% if app.environment == 'prod' %}
+            <script>
+                if ('serviceWorker' in navigator) {
+                    window.addEventListener('load', function () {
+                        navigator.serviceWorker.register('/sw.js');
+                    });
+                }
+            </script>
+        {% else %}
+            {# Filet : un SW enregistré en testant APP_ENV=prod en local reste actif
+               sur localhost et servirait du HTML en cache une fois revenu en dev. #}
+            <script>
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations()
+                        .then(function (registrations) {
+                            registrations.forEach(function (registration) { registration.unregister(); });
+                        })
+                        .catch(function () {});
+                }
+            </script>
+        {% endif %}
     </body>
 </html>
