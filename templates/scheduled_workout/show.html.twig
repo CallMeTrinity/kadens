@@ -16,7 +16,7 @@
        passé ici explicitement, la portée du template appelant n'y entre pas. #}
     {% embed 'components/_workout_read.html.twig' with {
         flat: flat, summary: summary, blockStats: blockStats,
-        scheduled: scheduled
+        scheduled: scheduled, progress: progress, logs: logs
     } only %}
         {% block actions %}
             <div class="kd-wk__bar">
@@ -34,6 +34,24 @@
                     {% endif %}
                 </div>
             </div>
+
+            {# Entrée vers le pointage. C'est l'action qu'on cherche en arrivant
+               sur la page le jour même, elle est donc dans le hero et pas en bas
+               de page. Le libellé dit où on en est : « démarrer » et « reprendre »
+               ne demandent pas la même confiance. #}
+            {% if is_granted('SCHEDULED_WORKOUT_EDIT', scheduled) and progress.total > 0 %}
+                <a href="{{ path('app_scheduled_workout_execute', {id: scheduled.id}) }}"
+                   class="kd-btn kd-btn--primary kd-wk__start">
+                    {{ ux_icon(progress.done > 0 ? 'lucide:play' : 'lucide:circle-play') }}
+                    {% if progress.complete %}
+                        Revoir le pointage
+                    {% elseif progress.done > 0 %}
+                        Reprendre ({{ progress.done }}/{{ progress.total }})
+                    {% else %}
+                        Démarrer la séance
+                    {% endif %}
+                </a>
+            {% endif %}
 
             {# Noms français en dur, comme le calendrier : twig/intl-extra n'est
                pas installé et l'app est monolingue. #}

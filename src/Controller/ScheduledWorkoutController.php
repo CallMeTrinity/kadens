@@ -3,9 +3,11 @@
 namespace App\Controller;
 
 use App\Entity\PlanTemplate;
+use App\Entity\PrescribedExercise;
 use App\Entity\ScheduledWorkout;
 use App\Enum\ScheduledStatus;
 use App\Form\PlanInstantiationType;
+use App\Repository\LoggedSetRepository;
 use App\Repository\PlanTemplateRepository;
 use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
@@ -19,6 +21,7 @@ use App\Service\WorkoutLogger;
 use App\Service\WorkoutMetrics;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\InputBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
@@ -132,8 +135,13 @@ final class ScheduledWorkoutController extends AbstractController
      * lecture, mêmes services) : la vue ne calcule rien.
      */
     #[Route('/{id}', name: 'app_scheduled_workout_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(ScheduledWorkout $scheduled, PlanFlattener $planFlattener, WorkoutMetrics $metrics): Response
-    {
+    public function show(
+        ScheduledWorkout $scheduled,
+        PlanFlattener $planFlattener,
+        WorkoutMetrics $metrics,
+        SessionSheet $sheet,
+        LoggedSetRepository $loggedSets,
+    ): Response {
         $this->denyAccessUnlessGranted(ScheduledWorkoutVoter::VIEW, $scheduled);
 
         $workout = $scheduled->getWorkout();
@@ -143,6 +151,15 @@ final class ScheduledWorkoutController extends AbstractController
             'flat' => $planFlattener->flattenWorkout($workout),
             'summary' => $metrics->summary($workout),
             'blockStats' => $metrics->blockBreakdown($workout),
+            // Avancement du pointage : la fiche montre où on en est et donne
+            // l'entrée vers la page d'exécution (démarrer ou reprendre).
+            'progress' => $sheet->progress($scheduled),
+            // Le réalisé. Une fois la séance pointée, c'est LUI qu'on vient
+            // relire : le tableau de séries affiche les valeurs réelles et ne
+            // garde le prévu qu'en repère là où il diffère. Seule cette page
+            // (datée) en fournit — la bibliothèque et la page publique décrivent
+            // une prescription, qui n'a pas de date donc pas de réalisé.
+            'logs' => $loggedSets->indexedFor($scheduled),
         ]);
     }
 
@@ -198,7 +215,9 @@ final class ScheduledWorkoutController extends AbstractController
         $prescribed = $this->findPrescribed($scheduled, $payload->getInt('prescribedId'));
         $setIndex = $payload->getInt('setIndex');
 
-        if ('unlog' === $payload->getString('action')) {
+        // `op` et non `action` : un champ nommé `action` masquerait la propriété
+        // `action` du <form> côté JS (voir _exec_line.html.twig).
+        if ('unlog' === $payload->getString('op')) {
             $logger->unlog($scheduled, $prescribed, $setIndex);
         } else {
             $logger->log(
@@ -219,10 +238,14 @@ final class ScheduledWorkoutController extends AbstractController
         if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
             $request->setRequestFormat(TurboBundle::STREAM_FORMAT);
 
+            $built = $sheet->build($scheduled);
+
             return $this->render('scheduled_workout/stream/log.stream.html.twig', [
-                'sheet' => $sheet->build($scheduled),
+                'sheet' => $built,
                 'scheduled' => $scheduled,
-                'focusPrescribedId' => $prescribed->getId(),
+                // L'étape et non l'exercice seul : le panneau affiche aussi son
+                // rang et son contexte de bloc.
+                'stop' => $sheet->findStop($built, $prescribed->getId()),
             ]);
         }
 
@@ -311,7 +334,7 @@ final class ScheduledWorkoutController extends AbstractController
      * WorkoutController::findPrescribed : l'id transite par le formulaire, il ne
      * doit pas permettre de pointer l'exercice d'une autre séance.
      */
-    private function findPrescribed(ScheduledWorkout $scheduled, int $prescribedId): \App\Entity\PrescribedExercise
+    private function findPrescribed(ScheduledWorkout $scheduled, int $prescribedId): PrescribedExercise
     {
         foreach ($scheduled->getWorkout()->getBlocks() as $block) {
             foreach ($block->getPrescribedExercises() as $prescribed) {
@@ -325,14 +348,14 @@ final class ScheduledWorkoutController extends AbstractController
     }
 
     /** Champ numérique optionnel : « non renseigné » doit rester distinct de 0. */
-    private function nullableInt(\Symfony\Component\HttpFoundation\InputBag $payload, string $key): ?int
+    private function nullableInt(InputBag $payload, string $key): ?int
     {
         $raw = trim((string) $payload->get($key, ''));
 
         return '' === $raw ? null : (int) $raw;
     }
 
-    private function nullableFloat(\Symfony\Component\HttpFoundation\InputBag $payload, string $key): ?float
+    private function nullableFloat(InputBag $payload, string $key): ?float
     {
         $raw = trim((string) $payload->get($key, ''));
 
@@ -578,7 +601,7 @@ final class ScheduledWorkoutController extends AbstractController
      * year/month), avec repli sur le mois courant si absent ou invalide. Respecte
      * la vue préférée (semaine → semaine contenant le 1er du mois visé).
      */
-    private function monthFromPayload(\Symfony\Component\HttpFoundation\InputBag $payload): Response
+    private function monthFromPayload(InputBag $payload): Response
     {
         $year = $payload->getInt('year');
         $month = $payload->getInt('month');

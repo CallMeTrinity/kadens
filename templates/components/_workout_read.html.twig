@@ -7,6 +7,7 @@
      flat        sortie de PlanFlattener::flattenWorkout   (requis)
      summary     sortie de WorkoutMetrics::summary         (optionnel)
      blockStats  sortie de WorkoutMetrics::blockBreakdown  (optionnel)
+     logs        réalisé indexé [prescribedId][setIndex]   (optionnel)
 
    Les métriques sont optionnelles : sans elles, la page reste valide et rend
    le seul programme. C'est ce qui permet de réutiliser ce composant partout
@@ -19,6 +20,10 @@
 {% set workout = flat.workout %}
 {% set summary = summary|default(null) %}
 {% set blockStats = blockStats|default([]) %}
+{# Réalisé, seulement sur la fiche DATÉE : la page de bibliothèque et la page
+   publique décrivent une prescription, qui n'a pas de date donc pas de réalisé.
+   Vide par défaut, ces deux appelants n'ont rien à changer. #}
+{% set logs = logs|default({}) %}
 
 {# Statistiques indexées par position de bloc, pour retrouver celles d'un bloc
    pendant la boucle de rendu (les deux listes suivent le même ordre). #}
@@ -144,7 +149,7 @@
                      aria-labelledby="wk-panel-programme">
                 <h2 class="kd-wk__paneltitle" id="wk-panel-programme" data-tabs-target="panelTitle">Programme</h2>
                 {% include 'components/_workout_program.html.twig' with {
-                    blocks: flat.blocks, statsByIndex: statsByIndex
+                    blocks: flat.blocks, statsByIndex: statsByIndex, logs: logs
                 } only %}
             </section>
 

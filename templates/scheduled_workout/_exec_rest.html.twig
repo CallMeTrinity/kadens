@@ -1,0 +1,38 @@
+{# Minuteur de repos, en barre basse. C'est le seul élément purement client de
+   la page : rien n'est enregistré, un repos n'est pas une donnée de séance.
+
+   Les préréglages couvrent l'essentiel de ce qu'on utilise en salle. Le repos
+   PRESCRIT de l'exercice courant s'ajoute en tête quand il ne tombe pas sur un
+   préréglage : c'est celui qu'on veut par défaut, et il change d'un exercice à
+   l'autre — le contrôleur le réécrit à chaque changement de panneau.
+
+   Masquée tant que le JS n'est pas branché : un minuteur sans JS n'est qu'une
+   rangée de boutons qui ne font rien. C'est le seul endroit de la page qui
+   assume de disparaître sans script, parce que le pointage, lui, reste entier.
+
+   Attendus : aucun. #}
+<div class="kd-execrest" data-execlog-target="rest" hidden>
+    <div class="kd-execrest__display">
+        {{ ux_icon('lucide:timer') }}
+        <span class="kd-execrest__value" data-execlog-target="restValue" role="timer" aria-live="off">--:--</span>
+        <button type="button" class="kd-execrest__stop" data-action="execlog#stopRest"
+                data-execlog-target="restStop" hidden>
+            {{ ux_icon('lucide:x') }}<span class="kd-sr-only">Arrêter le repos</span>
+        </button>
+    </div>
+
+    <div class="kd-execrest__presets">
+        {# Le préréglage prescrit, injecté par le contrôleur selon l'exercice
+           affiché. Masqué quand l'exercice n'a pas de repos prescrit. #}
+        <button type="button" class="kd-execrest__preset kd-execrest__preset--prescribed"
+                data-action="execlog#startRest" data-execlog-seconds-param="0"
+                data-execlog-target="restPrescribed" hidden></button>
+
+        {% for seconds in [30, 60, 90, 120] %}
+            <button type="button" class="kd-execrest__preset"
+                    data-action="execlog#startRest" data-execlog-seconds-param="{{ seconds }}">
+                {{ seconds < 60 ? seconds ~ ' s' : (seconds // 60) ~ ' min' ~ (seconds % 60 ? '30' : '') }}
+            </button>
+        {% endfor %}
+    </div>
+</div>

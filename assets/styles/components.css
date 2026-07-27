@@ -8363,3 +8363,890 @@ a.kd-coachitem__name:hover {
         flex-basis: 100%;
     }
 }
+
+/* ============================================================================
+   SÉANCE EN COURS (page d'exécution) — un exercice à la fois, pointage série
+   par série.
+
+   C'est la seule page de l'app qu'on utilise DEBOUT, une main occupée, parfois
+   sans réseau. Tout en découle :
+
+   - un exercice à la fois, avec un rail de navigation : dérouler une séance de
+     six exercices pour retrouver la bonne ligne entre deux séries est
+     ingérable ;
+   - la coche est en bout de ligne, à droite, la plus grosse cible (44px) ;
+   - rien ne bouge sous le doigt : valider ne change ni la hauteur de la ligne
+     ni l'ordre, seulement des couleurs. Une ligne qui se réordonne au moment où
+     on la tape est intapotable ;
+   - l'écart ne s'affiche que s'il existe. Sur 16 séries, une légende
+     systématique coûte un écran entier.
+
+   Couleur : les statuts gardent leurs tokens dédiés (--color-status-*), c'est
+   l'exception prévue par la règle « une seule couleur ». Vert = pointé,
+   rouge (l'accent) = en cours, gris = à faire.
+
+   L'ordre des règles suit la discipline du fichier : chaque surcharge
+   responsive vit APRÈS la définition de son composant (une @media n'ajoute
+   aucune spécificité, cf. docs/design-system.md §5).
+   ============================================================================ */
+
+.kd-exec {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-6);
+}
+
+/* ---- Barre du haut : chrono, titre, clôture ---- */
+/* Flex qui passe à la ligne, et non une grille à pistes `auto` : celle-ci
+   poussait simplement son contenu hors du conteneur dès qu'il manquait de la
+   largeur, au lieu de le replier. Une barre d'en-tête doit se réorganiser, pas
+   déborder. */
+.kd-exectop {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--kd-space-3) var(--kd-space-5);
+    padding-bottom: var(--kd-space-5);
+    border-bottom: 2px solid var(--color-text);
+}
+
+.kd-exectop__back {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+}
+
+.kd-exectop__back:hover {
+    border-color: var(--color-text);
+    color: var(--color-text);
+}
+
+.kd-exectop__clock {
+    flex: none;
+    display: flex;
+    align-items: baseline;
+    gap: var(--kd-space-2);
+    font-family: var(--font-mono);
+}
+
+.kd-exectop__elapsed {
+    font-size: 20px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text);
+}
+
+/* Dépasser la durée estimée n'est pas une faute : on le signale, on ne le
+   sanctionne pas. D'où l'accent et non un token d'erreur. */
+.kd-exectop__elapsed.is-over {
+    color: var(--color-primary);
+}
+
+.kd-exectop__target {
+    font-size: 12px;
+    color: var(--color-text-faint);
+}
+
+/* Le titre est ce qui cède : il s'ellipse, les deux minuteurs et le bouton de
+   clôture gardent leur taille. */
+.kd-exectop__titles {
+    flex: 1 1 6rem;
+    min-width: 0;
+}
+
+/* Nom de séance = contenu saisi : casse normale, jamais le condensé capitales
+   (règle 4 du design system). */
+.kd-exectop__title {
+    font-family: var(--font-body);
+    font-size: 16px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.kd-exectop__date {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-faint);
+}
+
+.kd-execfinish {
+    flex: none;
+    margin-left: auto;
+}
+
+.kd-execfinish__btn {
+    white-space: nowrap;
+}
+
+/* ---- Jauge de pointage ---- */
+.kd-execprog {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-2);
+}
+
+.kd-execprog__count {
+    display: flex;
+    align-items: baseline;
+    gap: var(--kd-space-4);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.kd-execprog__count strong {
+    font-size: 16px;
+    color: var(--color-text);
+}
+
+.kd-execprog__flag {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-1);
+    font-size: 11px;
+}
+
+.kd-execprog.is-complete .kd-execprog__flag {
+    color: var(--color-status-done);
+}
+
+.kd-execprog__track {
+    height: 4px;
+    background: var(--color-track);
+}
+
+.kd-execprog__fill {
+    display: block;
+    height: 100%;
+    background: var(--color-primary);
+    transition: width 180ms ease-out;
+}
+
+.kd-execprog.is-complete .kd-execprog__fill {
+    background: var(--color-status-done);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .kd-execprog__fill {
+        transition: none;
+    }
+}
+
+/* Indicateur réseau : masqué tant que tout va bien. */
+.kd-exec__net {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    padding: var(--kd-space-3) var(--kd-space-4);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-subtle);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.kd-exec__net.is-offline {
+    border-color: var(--color-primary);
+    background: var(--color-primary-tint);
+    color: var(--color-primary-on-tint);
+}
+
+/* ---- Corps : rail + scène ---- */
+.kd-exec__body {
+    display: grid;
+    grid-template-columns: 13rem 1fr;
+    gap: var(--kd-space-8);
+    align-items: start;
+}
+
+/* `min-width: 0` sur LES DEUX colonnes, et ce n'est pas cosmétique.
+   Un enfant de grille vaut `min-width: auto` par défaut : il refuse de descendre
+   sous la largeur minimale de son contenu. Le panneau contient un tableau de
+   séries à colonnes fixes (44px pour la coche, 2,25rem pour le badge) — sans
+   cette ligne, la piste `1fr` dépasse sa part, la grille déborde du conteneur,
+   le rail est écrasé à quelques pixels et le panneau lui passe dessus. C'est le
+   pendant, sur les grilles, du piège `flex-shrink` sur les flex. */
+.kd-execstage,
+.kd-execrail {
+    min-width: 0;
+}
+
+/* ---- Rail de navigation ---- */
+.kd-execrail {
+    position: sticky;
+    top: var(--kd-space-6);
+    max-height: calc(100vh - 8rem);
+    overflow-y: auto;
+}
+
+.kd-execrail__list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-2);
+}
+
+/* Le filet gauche porte l'état. C'est la seule information qu'on lit du coin de
+   l'œil entre deux séries, elle ne doit dépendre ni du texte ni de l'icône. */
+.kd-execrail__item {
+    border-left: 3px solid var(--color-border-strong);
+}
+
+.kd-execrail__item.is-complete {
+    border-left-color: var(--color-status-done);
+}
+
+.kd-execrail__item.is-current {
+    border-left-color: var(--color-primary);
+}
+
+.kd-execrail__link {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    align-items: center;
+    gap: var(--kd-space-1) var(--kd-space-3);
+    min-height: 44px;
+    padding: var(--kd-space-2) var(--kd-space-3);
+    background: var(--color-surface);
+    color: var(--color-text-secondary);
+    text-decoration: none;
+}
+
+.kd-execrail__item.is-current .kd-execrail__link {
+    background: var(--color-surface-raised);
+    color: var(--color-text);
+}
+
+.kd-execrail__link:hover {
+    background: var(--color-surface-hover);
+}
+
+.kd-execrail__num {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-faint);
+}
+
+.kd-execrail__icon {
+    display: inline-flex;
+    line-height: 0;
+}
+
+.kd-execrail__name {
+    min-width: 0;
+    font-size: 13px;
+    line-height: 1.25;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.kd-execrail__count {
+    grid-column: 3;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-faint);
+}
+
+.kd-execrail__item.is-complete .kd-execrail__count {
+    color: var(--color-status-done);
+}
+
+/* ---- Panneau d'exercice ---- */
+.kd-execpanel {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-raised);
+    padding: var(--kd-space-8);
+}
+
+.kd-execpanel__head {
+    margin-bottom: var(--kd-space-8);
+}
+
+.kd-execpanel__context {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-3);
+    font-family: var(--font-display);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-secondary);
+}
+
+.kd-execpanel__step {
+    font-family: var(--font-mono);
+    color: var(--color-primary);
+}
+
+/* Nom d'exercice = contenu saisi : casse normale. */
+.kd-execpanel__name {
+    margin-top: var(--kd-space-2);
+    font-family: var(--font-body);
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1.15;
+    color: var(--color-text);
+}
+
+.kd-execpanel__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--kd-space-2);
+    margin-top: var(--kd-space-4);
+}
+
+.kd-execpanel__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-1);
+    padding: 2px var(--kd-space-3);
+    border: 1px solid var(--color-border);
+    font-size: 11px;
+    color: var(--color-text-secondary);
+}
+
+.kd-execpanel__chip--count {
+    margin-left: auto;
+    font-family: var(--font-mono);
+}
+
+.kd-execpanel.is-complete .kd-execpanel__chip--count {
+    border-color: var(--color-status-done);
+    color: var(--color-status-done);
+}
+
+.kd-execpanel__planned,
+.kd-execpanel__notes {
+    margin-bottom: var(--kd-space-4);
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+/* En-têtes de colonnes. La gouttière reproduit exactement celle de la ligne :
+   badge, effort, charge, coche. */
+.kd-execcols {
+    display: grid;
+    grid-template-columns: 2.25rem 1fr 1fr 44px;
+    gap: var(--kd-space-3);
+    padding: 0 var(--kd-space-3) var(--kd-space-2);
+    font-family: var(--font-display);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--color-text-faint);
+}
+
+.kd-execcols__effort {
+    grid-column: 2;
+    text-align: center;
+}
+
+.kd-execcols__weight {
+    grid-column: 3;
+    text-align: center;
+}
+
+/* ---- Lignes de série ---- */
+.kd-execlines {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-2);
+}
+
+.kd-execline__form {
+    display: grid;
+    grid-template-columns: 2.25rem 1fr 1fr 44px;
+    align-items: center;
+    gap: var(--kd-space-3);
+    padding: var(--kd-space-2) var(--kd-space-3);
+    border: 1px solid var(--color-border-muted);
+    background: var(--color-surface);
+}
+
+/* La ligne validée est un bandeau : c'est le retour visuel du geste, il doit se
+   voir sans être lu. */
+.kd-execline.is-done .kd-execline__form {
+    border-color: var(--color-status-done);
+    background: var(--color-surface-subtle);
+}
+
+/* Une série faite en plus du prévu : elle existe, mais elle n'était pas
+   demandée. Le pointillé le dit sans la dévaloriser. */
+.kd-execline.is-extra .kd-execline__form {
+    border-style: dashed;
+}
+
+.kd-execline__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.kd-execline__rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.75rem;
+    height: 1.75rem;
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--kd-radius-full);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.kd-execline.is-done .kd-execline__rank {
+    border-color: var(--color-status-done);
+    color: var(--color-status-done);
+}
+
+.kd-execline__field {
+    display: block;
+    min-width: 0;
+}
+
+/* Champ de saisie rapide : jamais moins de 16px, en dessous iOS zoome à la mise
+   au point et déplace toute la page sous le doigt. */
+.kd-execline__input {
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0 var(--kd-space-2);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-raised);
+    font-family: var(--font-mono);
+    font-size: 16px;
+    text-align: center;
+    color: var(--color-text);
+}
+
+.kd-execline__input::-webkit-outer-spin-button,
+.kd-execline__input::-webkit-inner-spin-button {
+    appearance: none;
+    margin: 0;
+}
+
+.kd-execline__input[type='number'] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+}
+
+.kd-execline__input:focus-visible {
+    border-color: var(--color-text);
+}
+
+.kd-execline__input::placeholder {
+    color: var(--color-text-placeholder);
+}
+
+.kd-execline__done {
+    grid-column: 2 / 4;
+    min-width: 0;
+    font-family: var(--font-display);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text-secondary);
+}
+
+.kd-execline.is-done .kd-execline__done {
+    color: var(--color-status-done);
+}
+
+/* 44px : la cible tactile minimale du socle. C'est le bouton central de la
+   page, il n'a pas le droit d'être plus petit. */
+.kd-execline__check {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-surface-raised);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
+.kd-execline.is-done .kd-execline__check {
+    border-color: var(--color-status-done);
+    background: var(--color-status-done);
+    color: var(--color-on-primary);
+}
+
+/* Les deux icônes sont dans le DOM, le CSS choisit. C'est ce qui permet à
+   l'affichage optimiste de basculer en changeant une seule classe, sans que le
+   JS ait à manipuler du SVG. */
+.kd-execline__ico {
+    display: none;
+    line-height: 0;
+}
+
+.kd-execline__ico--off {
+    display: inline-flex;
+}
+
+.kd-execline.is-done .kd-execline__ico--off {
+    display: none;
+}
+
+.kd-execline.is-done .kd-execline__ico--on {
+    display: inline-flex;
+}
+
+/* Repli sans JS : corriger une valeur d'une série déjà validée. Le contrôleur
+   `execlog` enregistre au changement, ce bouton n'a donc plus lieu d'être dès
+   qu'il est branché. */
+.kd-execline__save {
+    grid-column: 4;
+    justify-self: end;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    margin-top: var(--kd-space-2);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-raised);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
+.kd-exec--js .kd-execline__save {
+    display: none;
+}
+
+/* L'écart, et seulement quand il existe. Aligné sous les champs. */
+.kd-execline__gap {
+    padding: var(--kd-space-1) 0 0 calc(2.25rem + var(--kd-space-3) * 2);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-primary);
+}
+
+/* ---- Série en plus, et navigation ---- */
+.kd-execpanel__add {
+    margin-top: var(--kd-space-3);
+    display: flex;
+    justify-content: flex-end;
+}
+
+.kd-execpanel__addbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border: 1px dashed var(--color-border-strong);
+    background: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
+.kd-execpanel__addbtn:hover {
+    border-style: solid;
+    color: var(--color-text);
+}
+
+.kd-execpanel__nav {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--kd-space-4);
+    margin-top: var(--kd-space-8);
+    padding-top: var(--kd-space-5);
+    border-top: 1px solid var(--color-divider);
+}
+
+.kd-execpanel__navbtn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    min-height: 44px;
+    padding: 0 var(--kd-space-5);
+    border: 1px solid var(--color-border-strong);
+    font-family: var(--font-display);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+.kd-execpanel__navbtn:hover {
+    background: var(--color-surface-hover);
+}
+
+.kd-execpanel__navbtn--next {
+    margin-left: auto;
+}
+
+/* ---- Minuteur de repos (barre basse) ---- */
+/* `sticky` et non `fixed` : elle accompagne le bas du contenu au lieu de le
+   masquer en permanence. Même pattern que .kd-editform__bar. */
+.kd-execrest {
+    position: sticky;
+    bottom: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--kd-space-3) var(--kd-space-5);
+    padding: var(--kd-space-4) 0;
+    background: linear-gradient(to top, var(--color-surface) 70%, transparent);
+}
+
+.kd-execrest__display {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    color: var(--color-text-secondary);
+}
+
+.kd-execrest__value {
+    font-family: var(--font-mono);
+    font-size: 20px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text-faint);
+}
+
+.kd-execrest__value.is-running {
+    color: var(--color-text);
+}
+
+/* Repos dépassé : l'accent, parce que c'est une information d'intensité (on
+   refroidit), pas une erreur. */
+.kd-execrest__value.is-over {
+    color: var(--color-primary);
+}
+
+.kd-execrest__stop {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: 1px solid var(--color-border);
+    background: none;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
+.kd-execrest__presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--kd-space-2);
+    margin-left: auto;
+}
+
+.kd-execrest__preset {
+    min-height: 36px;
+    padding: 0 var(--kd-space-4);
+    border: 1px solid var(--color-border-strong);
+    background: var(--color-surface-raised);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+}
+
+.kd-execrest__preset:hover {
+    border-color: var(--color-text);
+    color: var(--color-text);
+}
+
+/* Le repos prescrit de l'exercice courant : c'est celui qu'on veut par défaut,
+   il se distingue des préréglages génériques. */
+.kd-execrest__preset--prescribed {
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+}
+
+.kd-exec__reset {
+    display: flex;
+    justify-content: center;
+}
+
+/* ---- Modale de clôture incomplète ---- */
+.kd-execdialog {
+    max-width: 26rem;
+    width: calc(100vw - 2 * var(--kd-space-8));
+    padding: 0;
+    border: 1px solid var(--color-text);
+    background: var(--color-surface-raised);
+    color: var(--color-text);
+}
+
+.kd-execdialog::backdrop {
+    background: rgb(0 0 0 / 0.5);
+}
+
+.kd-execdialog__card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-5);
+    padding: var(--kd-space-8);
+}
+
+.kd-execdialog__title {
+    font-family: var(--font-display);
+    font-size: 18px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.kd-execdialog__body {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+}
+
+.kd-execdialog__actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-3);
+}
+
+.kd-execdialog__hint {
+    font-size: 12px;
+    color: var(--color-text-faint);
+}
+
+/* ---- Tablette : le rail se resserre ---- */
+@media (max-width: 900px) {
+    .kd-exec__body {
+        grid-template-columns: 4.5rem 1fr;
+        gap: var(--kd-space-5);
+    }
+
+    /* Plus la place d'un nom : le numéro et l'icône suffisent, le nom reste
+       accessible dans le titre du panneau juste à côté. */
+    .kd-execrail__name {
+        display: none;
+    }
+
+    .kd-execrail__link {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        gap: var(--kd-space-1);
+        text-align: center;
+    }
+
+    .kd-execrail__count {
+        grid-column: 1;
+    }
+
+    .kd-execpanel {
+        padding: var(--kd-space-5);
+    }
+}
+
+/* ---- Téléphone ----
+   Ces surcharges DOIVENT rester après les règles de base ci-dessus : une @media
+   n'ajoute aucune spécificité, et `.kd-execrest { bottom: 0 }` l'écraserait
+   sinon — c'est exactement le piège documenté dans design-system.md §5. */
+@media (max-width: 560px) {
+    /* La barre de repos se cale au-dessus de la nav basse, sinon les
+       préréglages passent dessous et deviennent intapotables. */
+    .kd-execrest {
+        bottom: var(--kd-navbar-h);
+        z-index: 10;
+    }
+
+    /* Le chrono passe sur sa propre ligne : à trois éléments plus le bouton de
+       clôture, la barre du haut ne tient pas en largeur. `order` le renvoie en
+       fin de flex, `flex-basis: 100%` le force à sa propre ligne. */
+    .kd-exectop__clock {
+        order: 1;
+        flex-basis: 100%;
+    }
+
+    .kd-exec__body {
+        grid-template-columns: 3.5rem 1fr;
+        gap: var(--kd-space-3);
+    }
+
+    .kd-execrail {
+        position: static;
+        max-height: none;
+    }
+
+    .kd-execpanel {
+        padding: var(--kd-space-4);
+    }
+
+    .kd-execpanel__name {
+        font-size: 18px;
+    }
+
+    /* La ligne se comprime au lieu de défiler : un défilement horizontal
+       imbriqué dans une page qui ne défile pas n'a aucun repère visuel. */
+    .kd-execline__form {
+        grid-template-columns: 1.75rem 1fr 1fr 44px;
+        gap: var(--kd-space-2);
+        padding: var(--kd-space-2);
+    }
+
+    .kd-execcols {
+        grid-template-columns: 1.75rem 1fr 1fr 44px;
+        gap: var(--kd-space-2);
+        padding-inline: var(--kd-space-2);
+    }
+
+    .kd-execline__gap {
+        padding-left: calc(1.75rem + var(--kd-space-2) * 2);
+    }
+
+    .kd-execpanel__navbtn {
+        padding: 0 var(--kd-space-4);
+    }
+}
+
+/* ---- Réalisé dans le tableau de séries (fiche datée seulement) ----
+   Le tableau montre alors les valeurs RÉELLES. Le prévu ne subsiste qu'en
+   repère, et seulement là où il diffère : afficher les deux systématiquement
+   doublerait la hauteur de chaque ligne pour une information qui, neuf fois sur
+   dix, est « c'était conforme ». */
+.kd-setrow__planned {
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.3;
+    color: var(--color-primary);
+}
+
+/* Une série prévue mais non faite : on ne la cache pas, on l'éteint. C'est ce
+   qui rend l'écart lisible — une séance à 3 séries sur 4 doit se voir. */
+.kd-setrow.is-missed {
+    color: var(--color-text-faint);
+}
+
+.kd-setrow.is-missed .kd-setrow__rank {
+    text-decoration: line-through;
+}
+
+/* Une série faite en plus du prévu, ajoutée après les lignes prescrites. */
+.kd-setrow.is-extra .kd-setrow__rank {
+    color: var(--color-primary);
+}
+
+/* Exercice sans séries (course, AMRAP…) marqué fait : le réalisé s'y réduit à
+   « fait », il n'y a pas de tableau où l'afficher. */
+.kd-exrow__logged {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    margin-top: var(--kd-space-3);
+    font-family: var(--font-display);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--color-status-done);
+}

@@ -1,0 +1,26 @@
+{# Une pastille du rail. Extrait parce qu'il est rendu de DEUX endroits : le rail
+   complet au chargement, et le Turbo Stream d'une validation (qui ne re-rend que
+   la pastille concernée). Dupliquer ce balisage, c'était le laisser diverger au
+   premier changement.
+
+   L'id doit survivre au remplacement : c'est la cible du stream.
+
+   Attendus : stop (SheetStop). #}
+{% import 'components/_activity.html.twig' as activity %}
+{% set ex = stop.exercise %}
+
+<li class="kd-execrail__item{{ ex.complete ? ' is-complete' }}"
+    id="railitem-{{ ex.prescribed.id }}">
+    <a href="#exlog-{{ ex.prescribed.id }}"
+       class="kd-execrail__link"
+       data-execlog-target="railLink"
+       data-action="execlog#select"
+       data-execlog-index-param="{{ stop.ordinal - 1 }}">
+        <span class="kd-execrail__num">{{ '%02d'|format(stop.ordinal) }}</span>
+        <span class="kd-execrail__icon" aria-hidden="true">
+            {{- ex.exercise ? ux_icon(activity.icon(ex.exercise.activity)) : ux_icon('lucide:circle-dot') -}}
+        </span>
+        <span class="kd-execrail__name">{{ ex.exercise ? ex.exercise.name : '—' }}</span>
+        <span class="kd-execrail__count">{{ ex.doneCount }}/{{ ex.lineCount }}</span>
+    </a>
+</li>

@@ -1,6 +1,12 @@
 {# Une ligne d'exercice en lecture (nom, valeurs, RPE, repos, tableau de séries,
    notes). Extrait de `_workout_program` pour être rendu à l'identique qu'il soit
-   isolé ou membre d'un superset. Attend `ex` = entrée FlatPrescribed. #}
+   isolé ou membre d'un superset.
+
+   Attend `ex` = entrée FlatPrescribed, et `logs` = réalisé indexé par exercice
+   puis par rang (optionnel, seule la fiche datée en fournit). #}
+{% set logs = logs|default({}) %}
+{% set exLogs = logs[ex.prescribed.id]|default({}) %}
+
 <li class="kd-exrow">
     <div class="kd-exrow__head">
         {% if ex.groupLabel %}<span class="kd-exrow__rank">{{ ex.groupLabel }}</span>{% endif %}
@@ -26,8 +32,14 @@
 
     {% if ex.setLines %}
         {% include 'components/_workout_sets_table.html.twig' with {
-            lines: ex.setLines, topWeightKg: ex.topWeightKg, type: ex.type
+            lines: ex.setLines, topWeightKg: ex.topWeightKg, type: ex.type,
+            logs: exLogs
         } only %}
+    {% elseif exLogs is not empty %}
+        {# Exercice sans séries (course, AMRAP…) : le réalisé se réduit à « fait ».
+           Le dire explicitement évite qu'il paraisse non réalisé au milieu d'une
+           séance dont tout le reste est coché. #}
+        <p class="kd-exrow__logged">{{ ux_icon('lucide:check') }} Réalisé</p>
     {% endif %}
 
     {% if ex.notes %}<p class="kd-exrow__notes">{{ ex.notes|nl2br }}</p>{% endif %}
