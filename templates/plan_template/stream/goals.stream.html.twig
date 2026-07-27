@@ -1,0 +1,9 @@
+{# Réponse Turbo Stream d'un rattachement/détachement d'objectif : on remplace le
+   CONTENU du conteneur (action="update"), pas l'élément lui-même — l'id
+   #plan-goals survit ainsi à chaque mutation (même piège que #plan-grid).
+   Contexte fourni par goalsContext(). #}
+<turbo-stream action="update" target="plan-goals">
+    <template>
+        {{ include('plan_template/_goals.html.twig') }}
+    </template>
+</turbo-stream>

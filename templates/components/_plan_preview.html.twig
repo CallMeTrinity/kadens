@@ -2,7 +2,12 @@
    échapper à l'overflow de la grille. Auto-suffisant (aucun AJAX). Positionné en
    JS par le contrôleur porteur (`plangrid` en édition, `preview` en lecture).
 
-   Attend `fw` = sortie de PlanFlattener::flattenWorkout (workout + blocks). #}
+   Attend `fw` = sortie de PlanFlattener::flattenWorkout (workout + blocks).
+
+   Séries détaillées : même rendu que la vue séance (une ligne par groupe de
+   séries, pastille de type en tête), pas le résumé compact d'une seule chaîne —
+   il devenait illisible dès qu'une prescription mélangeait plusieurs types. #}
+{% import 'components/_set_type.html.twig' as settype %}
 <div class="kd-planpreview" popover="manual" data-preview-target="panel">
     <p class="kd-planpreview__title">{{ fw.workout.title }}</p>
     {% if fw.blocks is empty %}
@@ -15,9 +20,21 @@
                 </p>
                 <ul class="kd-planpreview__exos">
                     {% for ex in b.exercises %}
-                        <li>
+                        <li{% if ex.sets %} class="kd-planpreview__exo--detailed"{% endif %}>
                             <span class="kd-planpreview__exoname">{{ ex.exercise ? ex.exercise.name : '—' }}</span>
-                            {% if ex.summary %}<span class="kd-planpreview__sum">{{ ex.summary }}</span>{% endif %}
+                            {% if ex.sets %}
+                                <ul class="kd-setlist kd-setlist--preview">
+                                    {% for g in ex.sets %}
+                                        <li class="kd-setline kd-setline--{{ g.type.value }}">
+                                            {{ settype.slot(g.type) }}
+                                            <span class="kd-setline__count">{% if g.count > 1 %}{{ g.count }}×{% endif %}</span>
+                                            <span class="kd-setline__detail">{{ g.detail }}</span>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            {% elseif ex.summary %}
+                                <span class="kd-planpreview__sum">{{ ex.summary }}</span>
+                            {% endif %}
                         </li>
                     {% else %}
                         <li class="kd-planpreview__empty">—</li>

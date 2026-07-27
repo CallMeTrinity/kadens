@@ -1,0 +1,61 @@
+{# Tableau des séries détaillées d'un exercice.
+
+   Un vrai <table> : ce sont des données tabulaires, et c'est ce qui donne
+   gratuitement la navigation par lecteur d'écran (en-têtes annoncés à chaque
+   cellule via scope="col").
+
+   Les groupes viennent de PlanFlattener::detailedSetGroups : les séries
+   consécutives identiques sont fusionnées, mais chaque groupe garde son rang
+   réel (firstIndex/lastIndex) — c'est ce qui permet d'écrire « 03 — 06 » sans
+   mentir sur la numérotation.
+
+   Attendus : groups (list<FlatSetGroup>), topWeightKg (?float), type (?PrescriptionType). #}
+{% import 'components/_set_type.html.twig' as settype %}
+
+{% set show_percent = topWeightKg is not null and topWeightKg > 0 %}
+
+<div class="kd-settable__wrap">
+    <table class="kd-settable">
+        <thead>
+            <tr>
+                <th scope="col" class="kd-settable__c-type">Type</th>
+                <th scope="col" class="kd-settable__c-num">Série</th>
+                <th scope="col">{{ type is not null and type.value == 'sets_time' ? 'Durée' : 'Reps' }}</th>
+                <th scope="col" class="kd-settable__c-num">Charge</th>
+                {% if show_percent %}<th scope="col" class="kd-settable__c-num">% du max</th>{% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for g in groups %}
+                {# Une série de travail ordinaire est la référence : on la marque
+                   d'un filet et d'un fond, le reste s'efface autour. #}
+                <tr class="kd-setrow kd-setrow--{{ g.type.value }}">
+                    <td class="kd-settable__c-type">
+                        {% if g.count > 1 %}
+                            <span class="kd-setrow__mult">{{ g.count }}×</span>
+                        {% else %}
+                            {{ settype.slot(g.type) }}
+                        {% endif %}
+                    </td>
+                    <td class="kd-settable__c-num kd-setrow__rank">
+                        {{- '%02d'|format(g.firstIndex) -}}
+                        {%- if g.lastIndex > g.firstIndex %} — {{ '%02d'|format(g.lastIndex) }}{% endif -%}
+                    </td>
+                    {# `effort` et non `detail` : la charge a sa propre colonne. #}
+                    <td class="kd-setrow__detail">
+                        {{ g.effort }}
+                        {% if g.typeLabel %}<span class="kd-setrow__tag">· {{ g.typeLabel|lower }}</span>{% endif %}
+                    </td>
+                    <td class="kd-settable__c-num">
+                        {{- g.weightKg is not null ? g.weightKg|number_format(g.weightKg == g.weightKg|round ? 0 : 1, ',', ' ') ~ ' kg' : '—' -}}
+                    </td>
+                    {% if show_percent %}
+                        <td class="kd-settable__c-num kd-setrow__pct">
+                            {{- g.weightKg is not null ? (g.weightKg / topWeightKg * 100)|round ~ ' %' : '—' -}}
+                        </td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

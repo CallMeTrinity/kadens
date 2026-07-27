@@ -1,0 +1,93 @@
+{# Bloc « Progression prévue » — trace ce que le plan PRESCRIT, semaine par
+   semaine (lot A de docs/feature-progression.md). Jamais de réalisé : le titre
+   le dit explicitement. Auto-suffisant, aucun AJAX post-rendu (offline-safe).
+
+   Attend :
+   - volume : list de séries de charge par semaine (ProgressionAggregator::weeklyVolume)
+   - trajectories : list de trajectoires d'exercice (::exerciseTrajectories)
+
+   Barres proportionnelles côté serveur (mêmes tokens que .kd-obar / .kd-actbar) :
+   pas de lib de charts, cohérent AssetMapper. La couleur reste réservée aux
+   activités (course/muscu) ; une barre neutre par défaut. #}
+{% import 'components/_activity.html.twig' as activity %}
+
+{% macro bars(points, modifier, showVal) %}
+    <div class="kd-prog__bars">
+        {% for p in points %}
+            <div class="kd-prog__col{{ p.value is null or p.value == 0 ? ' is-empty' }}">
+                {% if showVal %}<span class="kd-prog__val">{{ p.label ?? '—' }}</span>{% endif %}
+                <div class="kd-prog__track">
+                    {% if p.heightPct > 0 %}
+                        <span class="kd-prog__bar{{ modifier ? ' kd-prog__bar--' ~ modifier }}"
+                              style="height: {{ p.heightPct }}%"
+                              title="S{{ p.week }} · {{ p.label ?? '—' }}"></span>
+                    {% endif %}
+                </div>
+                <span class="kd-prog__wk">S{{ p.week }}</span>
+            </div>
+        {% endfor %}
+    </div>
+{% endmacro %}
+
+{% if volume is not empty or trajectories is not empty %}
+    <section class="kd-card kd-prog">
+        <div class="kd-card__head">
+            <h2 class="kd-card__title">{{ ux_icon('lucide:trending-up') }} Progression prévue</h2>
+        </div>
+        <p class="kd-prog__lead">Ce que le plan prescrit, semaine par semaine. Aucune donnée de réalisé.</p>
+
+        {% if volume is not empty %}
+            <div class="kd-prog__part">
+                <h3 class="kd-prog__subtitle">Charge par semaine</h3>
+                <div class="kd-prog__series">
+                    {% for s in volume %}
+                        <div class="kd-prog__row">
+                            <div class="kd-prog__rowhead">
+                                <span class="kd-prog__dot{{ s.modifier ? ' kd-prog__dot--' ~ s.modifier }}"></span>
+                                {{ s.label }}
+                            </div>
+                            {{ _self.bars(s.points, s.modifier, false) }}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        {% if trajectories is not empty %}
+            {# Sélecteur : charts pré-rendus, bascule 100 % client (contrôleur
+               `progression`). Sans JS, tous les charts restent visibles. #}
+            <div class="kd-prog__part kd-prog__traj" data-controller="progression">
+                <div class="kd-prog__trajhead">
+                    <h3 class="kd-prog__subtitle">Progression d'un exercice</h3>
+                    <select class="kd-planweek__select" aria-label="Choisir un exercice"
+                            data-progression-target="select" data-action="progression#change">
+                        {% for t in trajectories %}
+                            <option value="{{ t.exercise.id }}">{{ t.exercise.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {% for t in trajectories %}
+                    <figure class="kd-prog__chart" data-progression-target="chart"
+                            data-progression-exercise="{{ t.exercise.id }}">
+                        <figcaption class="kd-prog__caption">
+                            {{ activity.badge(t.exercise.activity, false) }}
+                            <span class="kd-prog__exname">{{ t.exercise.name }}</span>
+                            <span class="kd-prog__metric">{{ t.metricLabel }}</span>
+                            {% if t.direction != 'flat' %}
+                                <span class="kd-prog__trend kd-prog__trend--{{ t.direction }}">
+                                    {{ ux_icon(t.direction == 'up' ? 'lucide:trending-up' : 'lucide:trending-down') }}
+                                    {{ t.firstLabel }} → {{ t.lastLabel }}
+                                </span>
+                            {% endif %}
+                        </figcaption>
+                        {{ _self.bars(t.points, activity.modifier(t.exercise.activity), true) }}
+                        {% if t.lowerIsBetter %}
+                            <p class="kd-prog__hint">Barre haute = allure plus rapide.</p>
+                        {% endif %}
+                    </figure>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </section>
+{% endif %}

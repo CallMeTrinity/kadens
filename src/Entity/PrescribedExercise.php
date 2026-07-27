@@ -4,6 +4,8 @@ namespace App\Entity;
 
 use App\Enum\PrescriptionType;
 use App\Repository\PrescribedExerciseRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 
@@ -55,10 +57,32 @@ class PrescribedExercise
     private ?string $intensityZone = null;
 
     #[ORM\Column(nullable: true)]
+    private ?int $elevationGainMeters = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $rpe = null;
+
+    #[ORM\Column(nullable: true)]
     private ?int $restSeconds = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $notes = null;
+
+    /**
+     * Séries détaillées (mode optionnel des types de force). Vide = mode scalaire
+     * (le compteur `sets`/`reps`/`weightKg` fait foi). Non vide = ces lignes
+     * priment sur le compteur (voir hasDetailedSets et les helpers dérivés).
+     *
+     * @var Collection<int, PrescribedSet>
+     */
+    #[ORM\OrderBy(['position' => 'ASC'])]
+    #[ORM\OneToMany(targetEntity: PrescribedSet::class, mappedBy: 'prescribedExercise', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    private Collection $detailedSets;
+
+    public function __construct()
+    {
+        $this->detailedSets = new ArrayCollection();
+    }
 
     public function getId(): ?int
     {
@@ -221,6 +245,30 @@ class PrescribedExercise
         return $this;
     }
 
+    public function getElevationGainMeters(): ?int
+    {
+        return $this->elevationGainMeters;
+    }
+
+    public function setElevationGainMeters(?int $elevationGainMeters): static
+    {
+        $this->elevationGainMeters = $elevationGainMeters;
+
+        return $this;
+    }
+
+    public function getRpe(): ?int
+    {
+        return $this->rpe;
+    }
+
+    public function setRpe(?int $rpe): static
+    {
+        $this->rpe = $rpe;
+
+        return $this;
+    }
+
     public function getRestSeconds(): ?int
     {
         return $this->restSeconds;
@@ -243,5 +291,119 @@ class PrescribedExercise
         $this->notes = $notes;
 
         return $this;
+    }
+
+    // ---- Séries détaillées -------------------------------------------------
+
+    /**
+     * @return Collection<int, PrescribedSet>
+     */
+    public function getDetailedSets(): Collection
+    {
+        return $this->detailedSets;
+    }
+
+    public function addDetailedSet(PrescribedSet $set): static
+    {
+        // Maintient les DEUX côtés de la relation : sans ça la collection en
+        // mémoire reste périmée et le stream re-rendu dans la foulée ne montre pas
+        // la série (visible seulement au rechargement). Cf. mémoire projet.
+        if (!$this->detailedSets->contains($set)) {
+            $this->detailedSets->add($set);
+            $set->setPrescribedExercise($this);
+        }
+
+        return $this;
+    }
+
+    public function removeDetailedSet(PrescribedSet $set): static
+    {
+        if ($this->detailedSets->removeElement($set)) {
+            if ($set->getPrescribedExercise() === $this) {
+                $set->setPrescribedExercise(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * L'exercice est-il en mode « séries détaillées » ? Non vide = les lignes
+     * priment sur le compteur scalaire.
+     */
+    public function hasDetailedSets(): bool
+    {
+        return !$this->detailedSets->isEmpty();
+    }
+
+    // ---- Valeurs dérivées (mode scalaire OU détaillé) ----------------------
+    // Consommées par les services de calcul (WorkoutMetrics, WorkoutEstimator,
+    // ProgressionAggregator) pour rester détaillé-aware sans dupliquer la logique.
+
+    /**
+     * Nombre de séries « de travail » (hors échauffement) : lignes détaillées
+     * comptées si présentes, sinon le compteur scalaire `sets`.
+     */
+    public function getWorkingSetCount(): int
+    {
+        if (!$this->hasDetailedSets()) {
+            return $this->sets ?? 0;
+        }
+
+        $count = 0;
+        foreach ($this->detailedSets as $set) {
+            if ($set->getSetType()->countsAsWorking()) {
+                ++$count;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * Tonnage (reps × charge, sommé) des séries de travail, hors échauffement et
+     * SANS les tours de bloc (le service les applique). Mode scalaire : dérivé du
+     * compteur pour les SETS_REPS chargés, 0 sinon.
+     */
+    public function getTonnageKg(): float
+    {
+        if ($this->hasDetailedSets()) {
+            $tonnage = 0.0;
+            foreach ($this->detailedSets as $set) {
+                if ($set->getSetType()->countsAsWorking()
+                    && null !== $set->getReps() && null !== $set->getWeightKg()) {
+                    $tonnage += $set->getReps() * $set->getWeightKg();
+                }
+            }
+
+            return $tonnage;
+        }
+
+        if (PrescriptionType::SETS_REPS === $this->prescriptionType
+            && null !== $this->weightKg && null !== $this->reps) {
+            return ($this->sets ?? 0) * $this->reps * $this->weightKg;
+        }
+
+        return 0.0;
+    }
+
+    /**
+     * Charge la plus lourde prescrite (top set) : max des charges des lignes
+     * détaillées, sinon la charge scalaire. Sert de métrique de progression.
+     */
+    public function getTopWeightKg(): ?float
+    {
+        if (!$this->hasDetailedSets()) {
+            return $this->weightKg;
+        }
+
+        $top = null;
+        foreach ($this->detailedSets as $set) {
+            if (null !== $set->getWeightKg()) {
+                $top = null === $top ? $set->getWeightKg() : max($top, $set->getWeightKg());
+            }
+        }
+
+        return $top;
     }
 }

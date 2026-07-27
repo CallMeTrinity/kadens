@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\PlanTemplate;
 use App\Entity\Workout;
 use App\Service\PlanFlattener;
+use App\Service\WorkoutMetrics;
 use Symfony\Bridge\Doctrine\Attribute\MapEntity;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
@@ -24,9 +25,14 @@ final class PublicShareController extends AbstractController
     public function workout(
         #[MapEntity(mapping: ['slug' => 'slug'])] Workout $workout,
         PlanFlattener $planFlattener,
+        WorkoutMetrics $metrics,
     ): Response {
+        // Mêmes repères qu'en interne : la synthèse est dérivée du contenu déjà
+        // publié, elle n'expose rien de plus que la séance elle-même.
         return $this->render('public_share/workout.html.twig', [
             'flat' => $planFlattener->flattenWorkout($workout),
+            'summary' => $metrics->summary($workout),
+            'blockStats' => $metrics->blockBreakdown($workout),
         ]);
     }
 

@@ -1,0 +1,13 @@
+{# Bandeau de compte à rebours du prochain objectif. Attend `goal`. #}
+{% set days = goal.daysUntil %}
+<a href="{{ path('app_goal_show', {id: goal.id}) }}" class="kd-goalbanner">
+    <span class="kd-goalbanner__icon" aria-hidden="true">{{ ux_icon('lucide:target') }}</span>
+    <span class="kd-goalbanner__count">
+        {% if days == 0 %}Jour J{% elseif days > 0 %}J-{{ days }}{% else %}J+{{ -days }}{% endif %}
+    </span>
+    <span class="kd-goalbanner__body">
+        <span class="kd-goalbanner__label">Prochain objectif</span>
+        <span class="kd-goalbanner__title">{{ goal.title }} · {{ goal.targetDate|date('d/m/Y') }}</span>
+    </span>
+    <span class="kd-goalbanner__chev" aria-hidden="true">{{ ux_icon('lucide:arrow-right') }}</span>
+</a>

@@ -30,8 +30,8 @@ enum PrescriptionType: string
      *
      * Source unique consommée par : le form (affichage dynamique des champs),
      * le nettoyage serveur (on annule tout champ hors sous-ensemble) et le rendu
-     * via PlanFlattener. `restSeconds` et `notes` sont transverses, donc absents
-     * d'ici.
+     * via PlanFlattener. `restSeconds`, `rpe` et `notes` sont transverses (valables
+     * pour tous les types), donc absents d'ici.
      *
      * @return list<string>
      */
@@ -42,8 +42,8 @@ enum PrescriptionType: string
             self::SETS_TIME => ['sets', 'durationSeconds', 'weightKg'],
             self::AMRAP => ['durationSeconds', 'targetReps'],
             self::FOR_TIME => ['targetReps', 'capSeconds'],
-            self::DISTANCE_PACE => ['distanceMeters', 'paceSecondsPerKm'],
-            self::DURATION => ['durationSeconds', 'intensityZone'],
+            self::DISTANCE_PACE => ['sets', 'distanceMeters', 'paceSecondsPerKm', 'intensityZone', 'elevationGainMeters'],
+            self::DURATION => ['durationSeconds', 'paceSecondsPerKm', 'intensityZone'],
         };
     }
 

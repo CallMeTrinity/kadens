@@ -37,6 +37,12 @@ class ProfileType extends AbstractType
             'attr' => ['placeholder' => $placeholder],
         ];
 
+        $zoneMax = static fn (string $label): array => [
+            'label' => $label,
+            'required' => false,
+            'attr' => ['inputmode' => 'numeric', 'min' => 60, 'max' => 230, 'placeholder' => 'auto'],
+        ];
+
         $builder
             // --- Identité ---
             ->add('birthDate', DateType::class, [
@@ -92,6 +98,25 @@ class ProfileType extends AbstractType
                 'attr' => ['inputmode' => 'numeric', 'min' => 0, 'placeholder' => 'ex. 240'],
             ])
             ->add('swim100mSeconds', DurationType::class, $time('100 m natation', 'ex. 1:35'))
+            // --- Zones cardio (BPM) ---
+            // FC max/repos alimentent la dérivation auto (Karvonen). Les bornes de
+            // zone sont facultatives : renseignées, elles surchargent la valeur
+            // dérivée (placeholder = borne calculée) ; laissées vides, elles suivent
+            // FC max/repos.
+            ->add('maxHeartRate', IntegerType::class, [
+                'label' => 'FC max (bpm)',
+                'required' => false,
+                'attr' => ['inputmode' => 'numeric', 'min' => 100, 'max' => 230, 'placeholder' => 'ex. 190'],
+            ])
+            ->add('restingHeartRate', IntegerType::class, [
+                'label' => 'FC repos (bpm)',
+                'required' => false,
+                'attr' => ['inputmode' => 'numeric', 'min' => 30, 'max' => 120, 'placeholder' => 'ex. 50'],
+            ])
+            ->add('hrZone1Max', IntegerType::class, $zoneMax('Z1 · Récupération (max)'))
+            ->add('hrZone2Max', IntegerType::class, $zoneMax('Z2 · Endurance (max)'))
+            ->add('hrZone3Max', IntegerType::class, $zoneMax('Z3 · Tempo (max)'))
+            ->add('hrZone4Max', IntegerType::class, $zoneMax('Z4 · Seuil (max)'))
         ;
     }
 

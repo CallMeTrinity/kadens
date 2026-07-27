@@ -7,7 +7,7 @@ use App\Entity\PlanTemplate;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\ScheduledStatus;
-use App\Form\PlanTemplateType;
+use App\Repository\GoalRepository;
 use App\Repository\PlanTemplateRepository;
 use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
@@ -15,6 +15,7 @@ use App\Security\Voter\PlanTemplateVoter;
 use App\Service\PlanFlattener;
 use App\Service\PlanScheduler;
 use App\Service\PlanVolumeAggregator;
+use App\Service\ProgressionAggregator;
 use App\Service\SlugGenerator;
 use App\Service\WorkoutCloner;
 use App\Service\WorkoutMetrics;
@@ -30,6 +31,18 @@ use Symfony\UX\Turbo\TurboBundle;
 #[Route('/plan-template')]
 final class PlanTemplateController extends AbstractController
 {
+    /**
+     * Titre d'un brouillon créé en un clic. Sert aussi de repère pour savoir si le
+     * slug mérite d'être régénéré au premier vrai renommage (cf. updateMeta).
+     */
+    public const DRAFT_PLAN_TITLE = 'Nouveau plan';
+
+    /** Bloc de départ d'un nouveau plan : on ajoute ensuite semaine par semaine. */
+    public const DRAFT_PLAN_WEEKS = 4;
+
+    /** Plafond de la trame (borne haute de `durationWeeks`). */
+    public const MAX_WEEKS = 52;
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly FormFactoryInterface $formFactory,
@@ -37,6 +50,7 @@ final class PlanTemplateController extends AbstractController
         private readonly WorkoutRepository $workoutRepository,
         private readonly WorkoutMetrics $workoutMetrics,
         private readonly PlanVolumeAggregator $volumeAggregator,
+        private readonly GoalRepository $goalRepository,
     ) {
     }
 
@@ -80,70 +94,76 @@ final class PlanTemplateController extends AbstractController
         ]);
     }
 
-    #[Route('/new', name: 'app_plan_template_new', methods: ['GET', 'POST'])]
+    /**
+     * Crée un brouillon titré par défaut, sur un bloc de 4 semaines, et bascule
+     * directement sur l'éditeur de trame (pas d'écran de formulaire intermédiaire :
+     * le titre s'édite en ligne, les semaines s'ajoutent au pied de la trame). Même
+     * geste que `CoachController::newPlan`, qui procédait déjà ainsi.
+     */
+    #[Route('/new', name: 'app_plan_template_new', methods: ['POST'])]
     public function new(Request $request, SlugGenerator $slugGenerator): Response
     {
-        $template = new PlanTemplate();
-        $form = $this->createForm(PlanTemplateType::class, $template);
-        $form->handleRequest($request);
-
-        if ($form->isSubmitted() && $form->isValid()) {
-            $template->setOwner($this->getUser());
-            $template->setSlug($slugGenerator->generate($template->getTitle(), PlanTemplate::class));
-            $this->entityManager->persist($template);
-            $this->entityManager->flush();
-
-            $this->addFlash('success', 'Plan créé. Compose sa trame maintenant.');
-
-            return $this->redirectToRoute('app_plan_template_edit', ['id' => $template->getId()]);
+        if (!$this->isCsrfTokenValid('plan_new', $request->getPayload()->getString('_token'))) {
+            throw $this->createAccessDeniedException();
         }
 
-        return $this->render('plan_template/new.html.twig', [
-            'form' => $form,
-        ]);
+        $title = trim($request->getPayload()->getString('title')) ?: self::DRAFT_PLAN_TITLE;
+
+        $template = (new PlanTemplate())
+            ->setOwner($this->getUser())
+            ->setTitle($title)
+            ->setDurationWeeks(self::DRAFT_PLAN_WEEKS)
+            ->setSlug($slugGenerator->generate($title, PlanTemplate::class));
+
+        $this->entityManager->persist($template);
+        $this->entityManager->flush();
+
+        return $this->redirectToRoute('app_plan_template_edit', ['id' => $template->getId(), 'rename' => 1]);
     }
 
     #[Route('/{id}', name: 'app_plan_template_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(PlanTemplate $template, SlugGenerator $slugGenerator): Response
+    public function show(PlanTemplate $template, SlugGenerator $slugGenerator, PlanTemplateRepository $planTemplateRepository, ProgressionAggregator $progression): Response
     {
         $this->denyAccessUnlessGranted(PlanTemplateVoter::VIEW, $template);
         $this->ensureSlug($template, $slugGenerator);
 
+        // Précharge tout le contenu en une requête : la mise à plat ET les agrégats
+        // de progression parcourent chaque case (anti-N+1). Même instance managée.
+        $loaded = $planTemplateRepository->findWithContent($template->getId()) ?? $template;
+
         return $this->render('plan_template/show.html.twig', [
-            'flat' => $this->planFlattener->flattenPlanTemplate($template),
+            'flat' => $this->planFlattener->flattenPlanTemplate($loaded),
+            'progression' => [
+                'volume' => $progression->weeklyVolume($loaded),
+                'trajectories' => $progression->exerciseTrajectories($loaded),
+            ],
         ]);
     }
 
-    #[Route('/{id}/edit', name: 'app_plan_template_edit', methods: ['GET', 'POST'], requirements: ['id' => '\d+'])]
-    public function edit(Request $request, PlanTemplate $template, SlugGenerator $slugGenerator): Response
+    /**
+     * L'éditeur de trame. Titre et description s'éditent en ligne (endpoint
+     * `meta`), le nombre de semaines par les boutons du pied de trame : plus aucun
+     * formulaire de métadonnées ici, donc plus de POST sur cette route.
+     */
+    #[Route('/{id}/edit', name: 'app_plan_template_edit', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function edit(PlanTemplate $template, SlugGenerator $slugGenerator): Response
     {
         $this->denyAccessUnlessGranted(PlanTemplateVoter::EDIT, $template);
         $this->ensureSlug($template, $slugGenerator);
 
-        $form = $this->createForm(PlanTemplateType::class, $template);
-        $form->handleRequest($request);
-
-        if ($form->isSubmitted() && $form->isValid()) {
-            $this->entityManager->flush();
-
-            $this->addFlash('success', 'Plan mis à jour.');
-
-            return $this->redirectToRoute('app_plan_template_edit', ['id' => $template->getId()]);
-        }
-
-        return $this->render('plan_template/edit.html.twig', [
-            'form' => $form,
-        ] + $this->gridContext($template) + $this->paletteContext());
+        return $this->render('plan_template/edit.html.twig',
+            $this->gridContext($template) + $this->paletteContext() + $this->goalsContext($template)
+        );
     }
 
     /**
      * Édition en ligne d'un champ du plan (titre/description) depuis l'en-tête
      * cliquable de l'éditeur (contrôleur `inline-edit`). Renvoie la valeur
-     * persistée (texte brut) que le JS réaffiche ; repli sans JS = le formulaire
-     * complet replié dans l'éditeur.
+     * persistée (texte brut) que le JS réaffiche. C'est le SEUL chemin d'édition
+     * des métadonnées : il n'y a plus de formulaire de repli.
      */
     #[Route('/{id}/meta', name: 'app_plan_template_meta', methods: ['POST'], requirements: ['id' => '\d+'])]
-    public function updateMeta(Request $request, PlanTemplate $template): Response
+    public function updateMeta(Request $request, PlanTemplate $template, SlugGenerator $slugGenerator): Response
     {
         $this->denyAccessUnlessGranted(PlanTemplateVoter::EDIT, $template);
         $payload = $request->getPayload();
@@ -159,6 +179,12 @@ final class PlanTemplateController extends AbstractController
                     return new Response('Le titre ne peut pas être vide.', Response::HTTP_UNPROCESSABLE_ENTITY);
                 }
                 $template->setTitle($value);
+                // Un plan créé en un clic naît avec un slug dérivé du titre par
+                // défaut : on le régénère au premier renommage, mais uniquement dans
+                // ce cas (un plan déjà nommé garde son lien de partage public).
+                if ($slugGenerator->derivesFrom($template->getSlug(), self::DRAFT_PLAN_TITLE)) {
+                    $template->setSlug($slugGenerator->generate($value, PlanTemplate::class));
+                }
                 break;
             case 'description':
                 $template->setDescription('' === $value ? null : $value);
@@ -170,6 +196,74 @@ final class PlanTemplateController extends AbstractController
         $this->entityManager->flush();
 
         return new Response($value);
+    }
+
+    /**
+     * Rattache/détache un objectif à ce plan (relation N:N, réversible).
+     *
+     * Scoping : les objectifs proposés et acceptés sont ceux du PROPRIÉTAIRE du
+     * plan, pas de l'utilisateur courant — un coach qui travaille sur le contenu de
+     * son athlète doit rattacher les objectifs de l'athlète. Même raisonnement que
+     * le repli `PlanScheduler::resync()`.
+     */
+    #[Route('/{id}/goals', name: 'app_plan_template_goals', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function updateGoals(Request $request, PlanTemplate $template): Response
+    {
+        $this->denyAccessUnlessGranted(PlanTemplateVoter::EDIT, $template);
+        $payload = $request->getPayload();
+
+        if ($this->isCsrfTokenValid('plan_goals'.$template->getId(), $payload->getString('_token'))) {
+            $goal = $this->goalRepository->find($payload->getInt('goalId'));
+
+            if (null !== $goal && $goal->getOwner() === $template->getOwner()) {
+                if ('detach' === $payload->getString('action')) {
+                    $template->removeGoal($goal);
+                } else {
+                    $template->addGoal($goal);
+                }
+                $this->entityManager->flush();
+            }
+        }
+
+        return $this->goalsResponse($request, $template);
+    }
+
+    /**
+     * Réponse d'une mutation de rattachement : stream ciblé sur #plan-goals (repli
+     * sans JS : redirection vers l'éditeur), calqué sur `gridResponse()`.
+     */
+    private function goalsResponse(Request $request, PlanTemplate $template): Response
+    {
+        if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
+            $request->setRequestFormat(TurboBundle::STREAM_FORMAT);
+
+            return $this->render('plan_template/stream/goals.stream.html.twig', $this->goalsContext($template));
+        }
+
+        return $this->redirectToRoute('app_plan_template_edit', ['id' => $template->getId()]);
+    }
+
+    /**
+     * Contexte du bandeau d'objectifs : les objectifs liés (via la relation, donc
+     * à jour dans la requête courante) et ceux, à venir, qu'on peut encore lier.
+     *
+     * @return array<string, mixed>
+     */
+    private function goalsContext(PlanTemplate $template): array
+    {
+        $owner = $template->getOwner();
+        $linked = $template->getGoals();
+
+        $available = null === $owner ? [] : array_values(array_filter(
+            $this->goalRepository->findUpcomingForOwner($owner),
+            static fn ($goal) => !$linked->contains($goal),
+        ));
+
+        return [
+            'template' => $template,
+            'linkedGoals' => $linked,
+            'availableGoals' => $available,
+        ];
     }
 
     #[Route('/{id}/delete', name: 'app_plan_template_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
@@ -314,10 +408,17 @@ final class PlanTemplateController extends AbstractController
     {
         $this->denyAccessUnlessGranted(PlanTemplateVoter::EDIT, $template);
 
-        if ($this->isCsrfTokenValid('week_add'.$template->getId(), $request->getPayload()->getString('_token'))
-            && (int) $template->getDurationWeeks() < 52) {
-            $template->setDurationWeeks((int) $template->getDurationWeeks() + 1);
-            $this->entityManager->flush();
+        if ($this->isCsrfTokenValid('week_add'.$template->getId(), $request->getPayload()->getString('_token'))) {
+            // `count` absent (bouton « + 1 semaine ») = une seule semaine. On borne
+            // à ce qui reste avant le plafond plutôt que de refuser tout le paquet.
+            $current = (int) $template->getDurationWeeks();
+            $requested = max(1, $request->getPayload()->getInt('count', 1));
+            $added = min($requested, self::MAX_WEEKS - $current);
+
+            if ($added > 0) {
+                $template->setDurationWeeks($current + $added);
+                $this->entityManager->flush();
+            }
         }
 
         return $this->gridResponse($request, $template);

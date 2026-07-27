@@ -1,0 +1,77 @@
+{#
+    Carte de relation coach ↔ athlète.
+
+    Attend :
+      - `relation` : entité Coaching
+      - `me`       : utilisateur courant (app.user), pour orienter l'affichage
+    Optionnel :
+      - `linkAthlete` : lie la carte à l'espace de travail de l'athlète (dashboard coach)
+
+    Le statut réutilise les tokens de statut de séance via CoachingStatus::modifier
+    (done / planned / missed), comme GoalOutcome : pas de nouvelle famille de couleur.
+#}
+{% set other = relation.otherParty(me) %}
+{% set iAmCoach = relation.coach == me %}
+{% set canRespond = relation.status.value == 'pending' and relation.isRecipient(me) %}
+{% set workspace = iAmCoach and relation.isActive and (linkAthlete ?? false) %}
+
+<article class="kd-coachcard{{ relation.isActive ? '' : ' is-muted' }}">
+    <span class="kd-coachcard__avatar" aria-hidden="true">{{ other ? other.userIdentifier|first|upper : '?' }}</span>
+
+    <div class="kd-coachcard__body">
+        <div class="kd-coachcard__top">
+            <h3 class="kd-coachcard__name">
+                {% if workspace %}
+                    <a href="{{ path('app_coach_athlete', {id: other.id}) }}">{{ other.userIdentifier }}</a>
+                {% else %}
+                    {{ other ? other.userIdentifier : 'Utilisateur supprimé' }}
+                {% endif %}
+            </h3>
+            <span class="kd-badge kd-badge--{{ relation.status.modifier }}">
+                {{ ux_icon(relation.status.icon) }} {{ relation.status.label }}
+            </span>
+        </div>
+
+        <p class="kd-coachcard__role">
+            {{ iAmCoach ? 'Tu entraînes cette personne' : 'Cette personne t\'entraîne' }}
+            {% if relation.status.value == 'pending' %}
+                · {{ relation.isRecipient(me) ? 'demande reçue' : 'demande envoyée' }}
+                le {{ relation.createdAt|date('d/m/Y') }}
+            {% elseif relation.respondedAt %}
+                · depuis le {{ relation.respondedAt|date('d/m/Y') }}
+            {% endif %}
+        </p>
+    </div>
+
+    <div class="kd-coachcard__actions">
+        {% if canRespond %}
+            <form method="post" action="{{ path('app_coaching_respond', {id: relation.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('coaching_respond' ~ relation.id) }}">
+                <input type="hidden" name="decision" value="accept">
+                <button type="submit" class="kd-btn kd-btn--primary kd-btn--sm">
+                    {{ ux_icon('lucide:user-check') }} Accepter
+                </button>
+            </form>
+            <form method="post" action="{{ path('app_coaching_respond', {id: relation.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('coaching_respond' ~ relation.id) }}">
+                <input type="hidden" name="decision" value="decline">
+                <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm">
+                    {{ ux_icon('lucide:user-x') }} Refuser
+                </button>
+            </form>
+        {% elseif relation.isActive %}
+            {% if workspace %}
+                <a href="{{ path('app_coach_athlete', {id: other.id}) }}" class="kd-btn kd-btn--secondary kd-btn--sm">
+                    {{ ux_icon('lucide:clipboard-list') }} Programmer
+                </a>
+            {% endif %}
+            <form method="post" action="{{ path('app_coaching_end', {id: relation.id}) }}"
+                  onsubmit="return confirm('Terminer cette relation ? Le contenu déjà créé reste chez son propriétaire.');">
+                <input type="hidden" name="_token" value="{{ csrf_token('coaching_end' ~ relation.id) }}">
+                <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm">
+                    {{ ux_icon('lucide:x') }} Terminer
+                </button>
+            </form>
+        {% endif %}
+    </div>
+</article>

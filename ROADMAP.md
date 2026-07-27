@@ -81,6 +81,13 @@ PlanItem (N) >── (1) Workout
 
 ScheduledWorkout (N) >── (1) Workout  la séance planifiée (référence vivante)
 ScheduledWorkout (N) >── (0..1) PlanTemplate  d'où vient l'instanciation (nullable)
+
+User (1) ──< (N) Goal                échéance datée (hors ROADMAP initial)
+PlanTemplate (N) >──< (N) Goal       « ce plan prépare cette échéance »
+                                     table plan_template_goal, côté propriétaire
+                                     sur PlanTemplate. Libre et réversible : le
+                                     lien documente l'intention, l'ancrage réel au
+                                     calendrier reste l'instanciation.
 ```
 
 ### 2.2 Enums
@@ -188,7 +195,8 @@ ScheduledWorkout (N) >── (0..1) PlanTemplate  d'où vient l'instanciation (n
 - `durationWeeks` (int — nombre de semaines de la trame)
 - `slug` (string, unique — partage lecture, optionnel)
 - `createdAt`, `updatedAt`
-- Relations : `items` (OneToMany vers `PlanItem`).
+- Relations : `items` (OneToMany vers `PlanItem`), `goals` (ManyToMany vers `Goal`,
+  côté **propriétaire** — table `plan_template_goal`).
 
 **`PlanItem`** (case de la trame d'un plan)
 - `id`

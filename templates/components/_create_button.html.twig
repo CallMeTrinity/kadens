@@ -1,0 +1,22 @@
+{# Bouton de création en un clic. La création ne passe plus par un écran de
+   formulaire : le POST crée un brouillon titré par défaut et redirige vers
+   l'éditeur, où le titre s'édite en ligne (il s'ouvre tout de suite).
+
+   Paramètres :
+   - route   : nom de route POST (app_workout_new, app_plan_template_new…)
+   - token   : intention CSRF attendue par le contrôleur
+   - label   : libellé du bouton
+   - icon    : icône Lucide (défaut : plus)
+   - class   : classes du bouton (défaut : bouton primaire)
+   - params  : paramètres de route additionnels (défaut : aucun)
+   - fields  : champs cachés supplémentaires, nom => valeur (défaut : aucun)
+   - style   : style inline éventuel (mise en page ponctuelle) #}
+<form method="post" action="{{ path(route, params|default({})) }}"{% if style is defined %} style="{{ style }}"{% endif %}>
+    <input type="hidden" name="_token" value="{{ csrf_token(token) }}">
+    {% for name, value in fields|default({}) %}
+        <input type="hidden" name="{{ name }}" value="{{ value }}">
+    {% endfor %}
+    <button type="submit" class="{{ class|default('kd-btn kd-btn--primary') }}">
+        {{ ux_icon(icon|default('lucide:plus')) }} {{ label }}
+    </button>
+</form>

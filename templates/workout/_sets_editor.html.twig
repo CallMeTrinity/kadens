@@ -1,0 +1,102 @@
+{# Éditeur de séries détaillées (mode force uniquement : SETS_REPS / SETS_TIME).
+   Opt-in : tant qu'il n'y a pas de série, on propose « Détailler les séries » ;
+   une fois détaillé, chaque série porte son type (échauffement, dégressive, drop
+   set…) et ses valeurs propres. Le compteur scalaire reste le repli (mode simple).
+   Mise en page calquée sur la vue séance (chip de type + valeurs + unités inline)
+   pour un rendu WYSIWYG. Toutes les mutations postent vers WorkoutController et
+   re-rendent le panneau. Paramètres : workout, prescribed, setForms. #}
+{% set ptype = prescribed.prescriptionType %}
+{% if ptype and ptype.value in ['sets_reps', 'sets_time'] %}
+    {% set setForms = setForms|default({}) %}
+
+    {% if prescribed.hasDetailedSets %}
+        <div class="kd-sets">
+            <div class="kd-sets__head">
+                <span class="kd-sets__title">{{ ux_icon('lucide:list-ordered') }} Séries</span>
+                <form method="post" action="{{ path('app_workout_set_clear', {id: workout.id, prescribedId: prescribed.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('set_clear' ~ prescribed.id) }}">
+                    <button type="submit" class="kd-sets__revert" title="Revenir au compteur simple (séries identiques)">
+                        {{ ux_icon('lucide:rotate-ccw') }} Mode simple
+                    </button>
+                </form>
+            </div>
+
+            <ol class="kd-sets__list">
+                {% for set in prescribed.detailedSets|sort((a, b) => a.position <=> b.position) %}
+                    {% set sform = setForms[set.id] is defined ? setForms[set.id] : null %}
+                    <li class="kd-set kd-set--{{ set.setType.value }}">
+                        <span class="kd-set__num">{{ loop.index }}</span>
+                        {% if sform %}
+                            {{ form_start(sform, { attr: { class: 'kd-set__form' } }) }}
+                                {{ form_widget(sform.setType, { attr: {
+                                    class: 'kd-set__type',
+                                    'data-action': 'change->composer#submitForm',
+                                    'aria-label': 'Type de série',
+                                } }) }}
+                                <span class="kd-set__vals">
+                                    {% if sform.reps is defined %}
+                                        {{ form_widget(sform.reps, { attr: {
+                                            class: 'kd-set__val', placeholder: '—',
+                                            'data-action': 'change->composer#submitForm',
+                                        } }) }}
+                                        <span class="kd-set__unit">reps</span>
+                                    {% endif %}
+                                    {% if sform.durationSeconds is defined %}
+                                        {{ form_widget(sform.durationSeconds, { attr: {
+                                            class: 'kd-set__val kd-set__val--time',
+                                            'data-action': 'change->composer#submitForm',
+                                        } }) }}
+                                    {% endif %}
+                                    <span class="kd-set__at">@</span>
+                                    {{ form_widget(sform.weightKg, { attr: {
+                                        class: 'kd-set__val', placeholder: '—',
+                                        'data-action': 'change->composer#submitForm',
+                                    } }) }}
+                                    <span class="kd-set__unit">kg</span>
+                                </span>
+                            {{ form_end(sform) }}
+                        {% endif %}
+                        <div class="kd-set__actions">
+                            {{ include('workout/_action_form.html.twig', {
+                                action: path('app_workout_set_move', {id: workout.id, setId: set.id, direction: 'up'}),
+                                token: csrf_token('set_move' ~ set.id),
+                                icon: 'lucide:chevron-up',
+                                label: 'Monter la série'
+                            }) }}
+                            {{ include('workout/_action_form.html.twig', {
+                                action: path('app_workout_set_move', {id: workout.id, setId: set.id, direction: 'down'}),
+                                token: csrf_token('set_move' ~ set.id),
+                                icon: 'lucide:chevron-down',
+                                label: 'Descendre la série'
+                            }) }}
+                            {{ include('workout/_action_form.html.twig', {
+                                action: path('app_workout_set_delete', {id: workout.id, setId: set.id}),
+                                token: csrf_token('set_delete' ~ set.id),
+                                icon: 'lucide:x',
+                                variant: 'danger',
+                                label: 'Supprimer la série'
+                            }) }}
+                        </div>
+                    </li>
+                {% endfor %}
+            </ol>
+
+            <form method="post" action="{{ path('app_workout_set_add', {id: workout.id, prescribedId: prescribed.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('set_add' ~ prescribed.id) }}">
+                <button type="submit" class="kd-sets__add">
+                    {{ ux_icon('lucide:plus') }} Ajouter une série
+                </button>
+            </form>
+        </div>
+    {% else %}
+        <div class="kd-sets kd-sets--collapsed">
+            <form method="post" action="{{ path('app_workout_set_add', {id: workout.id, prescribedId: prescribed.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('set_add' ~ prescribed.id) }}">
+                <button type="submit" class="kd-sets__detail">
+                    {{ ux_icon('lucide:list-plus') }} Détailler les séries
+                </button>
+            </form>
+            <span class="kd-sets__hint">Échauffement, dégressive, drop set… — une série par ligne, chacune son type.</span>
+        </div>
+    {% endif %}
+{% endif %}

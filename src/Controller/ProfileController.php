@@ -3,12 +3,19 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Form\ChangePasswordType;
 use App\Form\ProfileType;
+use App\Repository\CoachingRepository;
+use App\Repository\GoalRepository;
+use App\Service\HeartRateZones;
 use App\Service\ProfileStats;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
@@ -23,8 +30,12 @@ final class ProfileController extends AbstractController
      * manuellement (comme l'ancien HomeController).
      */
     #[Route('/', name: 'app_profile', methods: ['GET'])]
-    public function index(ProfileStats $profileStats): Response
-    {
+    public function index(
+        ProfileStats $profileStats,
+        HeartRateZones $heartRateZones,
+        GoalRepository $goalRepository,
+        CoachingRepository $coachingRepository,
+    ): Response {
         $user = $this->getUser();
         if (!$user instanceof User) {
             return $this->redirectToRoute('app_login');
@@ -32,6 +43,12 @@ final class ProfileController extends AbstractController
 
         return $this->render('profile/index.html.twig', [
             'stats' => $profileStats->for($user),
+            'hrZones' => $heartRateZones->forUser($user),
+            'upcomingGoals' => $goalRepository->findUpcomingForOwner($user, 3),
+            // Découvrabilité : une demande de coaching reçue doit se voir depuis
+            // la page d'accueil, pas seulement dans /coaching.
+            'coachingReceived' => $coachingRepository->findPendingReceivedBy($user),
+            'coachingActive' => $coachingRepository->findAcceptedCoaches($user),
         ]);
     }
 
@@ -55,6 +72,52 @@ final class ProfileController extends AbstractController
         }
 
         return $this->render('profile/edit.html.twig', [
+            'form' => $form,
+        ]);
+    }
+
+    /**
+     * Paramètres du compte : identifiants et sécurité (le contenu sportif reste
+     * sur la fiche athlète). Sous `^/profile`, donc protégé par access_control.
+     */
+    #[Route('/profile/settings', name: 'app_profile_settings', methods: ['GET', 'POST'])]
+    public function settings(
+        Request $request,
+        EntityManagerInterface $entityManager,
+        UserPasswordHasherInterface $passwordHasher,
+        Security $security,
+    ): Response {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $form = $this->createForm(ChangePasswordType::class);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $plainPassword = (string) $form->get('plainPassword')->getData();
+
+            // Refus du « changement » qui n'en est pas un : sans ça, le
+            // formulaire répondrait « mot de passe mis à jour » sans rien changer.
+            if ($passwordHasher->isPasswordValid($user, $plainPassword)) {
+                $form->get('plainPassword')->addError(
+                    new FormError('Le nouveau mot de passe doit être différent de l\'actuel.')
+                );
+            } else {
+                $user->setPassword($passwordHasher->hashPassword($user, $plainPassword));
+                $entityManager->flush();
+
+                // Le hash fait partie du token stocké en session : sans
+                // ré-authentification, la requête suivante verrait un utilisateur
+                // « changé » et déconnecterait l'auteur du changement.
+                $security->login($user);
+
+                $this->addFlash('success', 'Mot de passe mis à jour.');
+
+                return $this->redirectToRoute('app_profile_settings');
+            }
+        }
+
+        return $this->render('profile/settings.html.twig', [
             'form' => $form,
         ]);
     }

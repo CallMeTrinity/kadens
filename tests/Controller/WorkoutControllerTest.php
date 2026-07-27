@@ -6,11 +6,13 @@ use App\Entity\Block;
 use App\Entity\Exercise;
 use App\Entity\PlanTemplate;
 use App\Entity\PrescribedExercise;
+use App\Entity\PrescribedSet;
 use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
+use App\Enum\SetType;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -48,22 +50,62 @@ final class WorkoutControllerTest extends WebTestCase
         self::assertResponseRedirects('/login');
     }
 
-    public function testCreateWorkoutGeneratesSlug(): void
+    /**
+     * La création est un simple POST depuis l'index : pas d'écran de formulaire,
+     * on atterrit sur le compositeur avec un brouillon titré par défaut, dont le
+     * titre s'ouvre d'emblée (`rename=1`).
+     */
+    public function testCreateWorkoutLandsOnComposerWithDraftTitle(): void
     {
         $user = $this->createUser('owner@example.com');
         $this->client->loginUser($user);
 
-        $this->client->request('GET', '/workout/new');
-        self::assertResponseIsSuccessful();
+        $this->client->request('GET', '/workout');
+        $this->client->submitForm('Nouvelle séance');
 
-        $this->client->submitForm('Créer', [
-            'workout[title]' => 'Séance jambes',
-        ]);
-
-        $created = $this->em->getRepository(Workout::class)->findOneBy(['title' => 'Séance jambes']);
+        $created = $this->em->getRepository(Workout::class)->findOneBy(['title' => 'Nouvelle séance']);
         self::assertNotNull($created);
-        self::assertSame('seance-jambes', $created->getSlug());
-        self::assertResponseRedirects('/workout/'.$created->getId().'/edit');
+        self::assertSame('nouvelle-seance', $created->getSlug());
+        self::assertResponseRedirects('/workout/'.$created->getId().'/edit?rename=1');
+    }
+
+    /**
+     * Le slug d'un brouillon suit son PREMIER vrai renommage ; une séance déjà
+     * nommée garde le sien, pour ne pas casser son lien de partage public.
+     */
+    public function testRenamingRefreshesDraftSlugOnlyOnce(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $this->client->loginUser($user);
+
+        $this->client->request('GET', '/workout');
+        $this->client->submitForm('Nouvelle séance');
+
+        $created = $this->em->getRepository(Workout::class)->findOneBy(['title' => 'Nouvelle séance']);
+        self::assertNotNull($created);
+        $id = $created->getId();
+
+        $this->renameWorkout($id, 'Séance jambes');
+        $this->em->clear();
+        self::assertSame('seance-jambes', $this->em->getRepository(Workout::class)->find($id)->getSlug());
+
+        // Second renommage : le slug ne bouge plus.
+        $this->renameWorkout($id, 'Séance jambes lourdes');
+        $this->em->clear();
+        self::assertSame('seance-jambes', $this->em->getRepository(Workout::class)->find($id)->getSlug());
+    }
+
+    private function renameWorkout(int $id, string $title): void
+    {
+        $crawler = $this->client->request('GET', '/workout/'.$id.'/edit');
+        $token = $crawler->filter('h1.kd-inlineedit')->attr('data-inline-edit-token-value');
+
+        $this->client->request('POST', '/workout/'.$id.'/meta', [
+            '_token' => $token,
+            'field' => 'title',
+            'value' => $title,
+        ]);
+        self::assertResponseIsSuccessful();
     }
 
     public function testAddBlockThenExerciseNullsIrrelevantFields(): void
@@ -289,6 +331,45 @@ final class WorkoutControllerTest extends WebTestCase
         self::assertResponseIsSuccessful();
         self::assertSelectorTextContains('body', 'Squat');
         self::assertSelectorTextContains('body', '4 × 8 @ 60 kg');
+
+        // Bandeau de synthèse : 4 séries × 8 reps × 60 kg = 1 920 kg.
+        self::assertSelectorExists('.kd-wk__kpis');
+        self::assertSelectorTextContains('.kd-wk__kpis', '1 920');
+        // Les deux panneaux sont rendus côté serveur : sans JS, la page est
+        // complète (le contrôleur `tabs` n'en masque un qu'après coup).
+        self::assertSelectorExists('[data-tabs-name="programme"]');
+        self::assertSelectorExists('[data-tabs-name="analyse"]');
+    }
+
+    public function testShowGroupsDetailedSetsIntoARangedTable(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise($user, 'Soulevé de terre');
+        $workout = $this->createWorkout($user, 'Séance dos');
+
+        $block = (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(0);
+        $prescribed = (new PrescribedExercise())
+            ->setExercise($exercise)
+            ->setPosition(0)
+            ->setPrescriptionType(PrescriptionType::SETS_REPS);
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(0)->setSetType(SetType::WARMUP)->setReps(6)->setWeightKg(70.0));
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(1)->setSetType(SetType::NORMAL)->setReps(6)->setWeightKg(140.0));
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(2)->setSetType(SetType::NORMAL)->setReps(6)->setWeightKg(140.0));
+        $block->addPrescribedExercise($prescribed);
+        $workout->addBlock($block);
+        $this->em->persist($block);
+        $this->em->flush();
+        $this->em->clear();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('.kd-settable');
+        // Groupe fusionné : deux séries de travail rendues sur une ligne « 02 — 03 ».
+        self::assertStringContainsString('02 — 03', $crawler->filter('.kd-settable')->text());
+        // % de la charge la plus lourde : l'échauffement à 70/140.
+        self::assertStringContainsString('50 %', $crawler->filter('.kd-settable')->text());
     }
 
     public function testShowDeniedToNonOwner(): void
@@ -313,6 +394,57 @@ final class WorkoutControllerTest extends WebTestCase
         $this->em->flush();
 
         return $user;
+    }
+
+    /**
+     * Le scénario qui perdait des séries : 4 en mode simple → détailler → +2 →
+     * retour au mode simple devait redonner 4. Le compteur suit désormais la liste.
+     */
+    public function testDetailedSetCountSyncsBackToTheScalar(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise($user, 'Squat');
+        $workout = $this->createWorkout($user, 'Séance jambes');
+
+        $block = (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(0);
+        $prescribed = $this->makePrescribed($exercise, 0)->setSets(4)->setReps(8)->setWeightKg(100.0);
+        $block->addPrescribedExercise($prescribed);
+        $workout->addBlock($block);
+        $this->em->persist($block);
+        $this->em->flush();
+
+        $workoutId = $workout->getId();
+        $prescribedId = $prescribed->getId();
+        $addUrl = '/workout/'.$workoutId.'/exercises/'.$prescribedId.'/sets';
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/workout/'.$workoutId.'/edit');
+        $addToken = $crawler->filter('form[action="'.$addUrl.'"] input[name="_token"]')->first()->attr('value');
+
+        // Détailler : le compteur s'éclate en 4 lignes de travail.
+        $this->client->request('POST', $addUrl, ['_token' => $addToken]);
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(PrescribedExercise::class)->find($prescribedId);
+        self::assertCount(4, $reloaded->getDetailedSets());
+        self::assertSame(4, $reloaded->getSets());
+
+        // Deux séries de plus : le compteur suit.
+        $this->client->request('POST', $addUrl, ['_token' => $addToken]);
+        $this->client->request('POST', $addUrl, ['_token' => $addToken]);
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(PrescribedExercise::class)->find($prescribedId);
+        self::assertSame(6, $reloaded->getSets());
+
+        // Retour au mode simple : on repart de 6, pas de 4.
+        $crawler = $this->client->request('GET', '/workout/'.$workoutId.'/edit');
+        $clearUrl = $addUrl.'/clear';
+        $clearToken = $crawler->filter('form[action="'.$clearUrl.'"] input[name="_token"]')->first()->attr('value');
+        $this->client->request('POST', $clearUrl, ['_token' => $clearToken]);
+
+        $this->em->clear();
+        $reloaded = $this->em->getRepository(PrescribedExercise::class)->find($prescribedId);
+        self::assertCount(0, $reloaded->getDetailedSets());
+        self::assertSame(6, $reloaded->getSets());
     }
 
     private function createExercise(User $owner, string $name): Exercise

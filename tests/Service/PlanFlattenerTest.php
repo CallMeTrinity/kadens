@@ -7,12 +7,15 @@ use App\Entity\Exercise;
 use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
 use App\Entity\PrescribedExercise;
+use App\Entity\PrescribedSet;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
+use App\Enum\SetType;
 use App\Service\PlanFlattener;
 use App\Service\UnitFormatter;
+use App\Service\WorkoutEstimator;
 use App\Service\WorkoutMetrics;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -23,7 +26,7 @@ final class PlanFlattenerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->flattener = new PlanFlattener(new UnitFormatter(), new WorkoutMetrics());
+        $this->flattener = new PlanFlattener(new UnitFormatter(), new WorkoutMetrics(new WorkoutEstimator()));
     }
 
     #[DataProvider('summaryCases')]
@@ -41,6 +44,79 @@ final class PlanFlattenerTest extends TestCase
         $flat = $this->flattener->flattenWorkout($workout);
 
         self::assertSame($expected, $flat['blocks'][0]['exercises'][0]['summary']);
+    }
+
+    public function testDetailedSetsSummaryGroupsConsecutiveIdenticalSets(): void
+    {
+        $exercise = (new Exercise())->setName('Développé couché')->setActivity(ActivityType::GYM);
+        $prescribed = (new PrescribedExercise())
+            ->setPrescriptionType(PrescriptionType::SETS_REPS)
+            ->setExercise($exercise)
+            ->setPosition(0);
+        // Échauffement + 2 séries de travail identiques (regroupées) + drop set.
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(0)->setSetType(SetType::WARMUP)->setReps(10)->setWeightKg(40.0));
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(1)->setSetType(SetType::NORMAL)->setReps(8)->setWeightKg(100.0));
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(2)->setSetType(SetType::NORMAL)->setReps(8)->setWeightKg(100.0));
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(3)->setSetType(SetType::DROP_SET)->setReps(6)->setWeightKg(80.0));
+
+        $block = (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(0);
+        $block->addPrescribedExercise($prescribed);
+        $workout = (new Workout())->setTitle('Séance')->setSlug('seance');
+        $workout->addBlock($block);
+
+        $flat = $this->flattener->flattenWorkout($workout)['blocks'][0]['exercises'][0];
+
+        self::assertSame(
+            'Échauf 10 reps @ 40 kg · 2× 8 reps @ 100 kg · Drop set 6 reps @ 80 kg',
+            $flat['summary'],
+        );
+        // Structure : 3 groupes (les 2 séries de travail identiques fusionnées).
+        self::assertNotNull($flat['sets']);
+        self::assertCount(3, $flat['sets']);
+        self::assertSame(2, $flat['sets'][1]['count']);
+        self::assertNull($flat['sets'][1]['typeLabel']); // NORMAL : pas de libellé
+        self::assertSame('Drop set', $flat['sets'][2]['typeLabel']);
+    }
+
+    /**
+     * Le regroupement condense l'affichage, il ne doit pas faire perdre le rang
+     * réel des séries : le tableau de lecture affiche « 02 — 03 » sur un groupe
+     * de deux, et dérive le « % du max » de la charge brute conservée.
+     */
+    public function testDetailedSetGroupsKeepSetNumberingAndRawWeight(): void
+    {
+        $exercise = (new Exercise())->setName('Soulevé de terre')->setActivity(ActivityType::GYM);
+        $prescribed = (new PrescribedExercise())
+            ->setPrescriptionType(PrescriptionType::SETS_REPS)
+            ->setExercise($exercise)
+            ->setPosition(0);
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(0)->setSetType(SetType::WARMUP)->setReps(6)->setWeightKg(70.0));
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(1)->setSetType(SetType::NORMAL)->setReps(6)->setWeightKg(140.0));
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(2)->setSetType(SetType::NORMAL)->setReps(6)->setWeightKg(140.0));
+        $prescribed->addDetailedSet((new PrescribedSet())->setPosition(3)->setSetType(SetType::TO_FAILURE)->setReps(6)->setWeightKg(140.0));
+
+        $block = (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(0);
+        $block->addPrescribedExercise($prescribed);
+        $workout = (new Workout())->setTitle('Séance')->setSlug('seance-num');
+        $workout->addBlock($block);
+
+        $flat = $this->flattener->flattenWorkout($workout)['blocks'][0]['exercises'][0];
+        $groups = $flat['sets'];
+
+        self::assertCount(3, $groups);
+        // Groupe isolé : rang unique.
+        self::assertSame(1, $groups[0]['firstIndex']);
+        self::assertSame(1, $groups[0]['lastIndex']);
+        // Groupe fusionné : la plage couvre les deux séries d'origine.
+        self::assertSame(2, $groups[1]['firstIndex']);
+        self::assertSame(3, $groups[1]['lastIndex']);
+        // Le groupe suivant reprend la numérotation là où elle en était.
+        self::assertSame(4, $groups[2]['firstIndex']);
+
+        self::assertSame(70.0, $groups[0]['weightKg']);
+        self::assertSame(140.0, $groups[1]['weightKg']);
+        // Référence du pourcentage : la charge la plus lourde de l'exercice.
+        self::assertSame(140.0, $flat['topWeightKg']);
     }
 
     /**
@@ -143,11 +219,33 @@ final class PlanFlattenerTest extends TestCase
             '5 km @ 5:00/km',
         ];
 
-        yield 'duration avec zone' => [
+        yield 'duration avec zone (valeur libre héritée)' => [
             (new PrescribedExercise())
                 ->setPrescriptionType(PrescriptionType::DURATION)
                 ->setDurationSeconds(2400)->setIntensityZone('Z2'),
             '40:00 · Z2',
+        ];
+
+        yield 'distance_pace intervalles + zone + dénivelé' => [
+            (new PrescribedExercise())
+                ->setPrescriptionType(PrescriptionType::DISTANCE_PACE)
+                ->setSets(8)->setDistanceMeters(400)->setPaceSecondsPerKm(210)
+                ->setIntensityZone('z5')->setElevationGainMeters(100),
+            '8 × 400 m @ 3:30/km · Z5 VO2max · D+ 100 m',
+        ];
+
+        yield 'duration avec allure et zone Karvonen' => [
+            (new PrescribedExercise())
+                ->setPrescriptionType(PrescriptionType::DURATION)
+                ->setDurationSeconds(2700)->setPaceSecondsPerKm(300)->setIntensityZone('z2'),
+            '45:00 @ 5:00/km · Z2 Endurance',
+        ];
+
+        yield 'rpe transverse' => [
+            (new PrescribedExercise())
+                ->setPrescriptionType(PrescriptionType::SETS_REPS)
+                ->setSets(5)->setReps(5)->setRpe(9),
+            '5 × 5 · RPE 9',
         ];
     }
 }

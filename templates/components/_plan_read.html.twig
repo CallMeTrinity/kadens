@@ -19,6 +19,14 @@
     <div class="kd-workouthead__meta">
         <span class="kd-badge">{{ ux_icon('lucide:calendar-range') }} {{ template.durationWeeks }} semaine{{ template.durationWeeks > 1 ? 's' }}</span>
         <span class="kd-badge">{{ ux_icon('lucide:clipboard-list') }} {{ template.planItems|length }} séance{{ template.planItems|length > 1 ? 's' }}</span>
+        {# Objectifs préparés : jamais sur la page publique, ils sont privés. #}
+        {% if not public %}
+            {% for goal in template.goals %}
+                <a href="{{ path('app_goal_show', {id: goal.id}) }}" class="kd-badge kd-badge--accent">
+                    {{ ux_icon('lucide:target') }} {{ goal.title }}
+                </a>
+            {% endfor %}
+        {% endif %}
     </div>
 
     {% if template.description %}

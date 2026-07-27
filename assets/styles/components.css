@@ -1,7 +1,7 @@
 /* ============================================================================
    Kadens — composants réutilisables
    Classes de présentation partagées par toutes les vues (header, boutons,
-   cartes, badges, stats, grilles). Identité « Carnet clair ».
+   cartes, badges, stats, grilles). Identité « Presse ».
 
    Règle absolue : aucune couleur ni police en dur. Uniquement des tokens
    sémantiques (--color-*, --font-*) définis dans tokens.css.
@@ -45,9 +45,10 @@ turbo-frame { display: block; }
   text-decoration: none;
   color: var(--color-text-strong);
   font-family: var(--font-display);
-  font-weight: var(--kd-weight-bold);
-  font-size: 17px;
-  letter-spacing: -.01em;
+  font-weight: var(--kd-weight-extrabold);
+  font-size: 21px;
+  letter-spacing: var(--kd-tracking-display);
+  text-transform: uppercase;
 }
 .kd-brand:hover { color: var(--color-text-strong); }
 .kd-brand__mark {
@@ -73,21 +74,23 @@ turbo-frame { display: block; }
   align-items: center;
   gap: var(--kd-space-2);
   padding: 7px var(--kd-space-4);
-  border-radius: var(--kd-radius-md);
-  font-size: 13px;
-  font-weight: var(--kd-weight-medium);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-action);
+  text-transform: uppercase;
   color: var(--color-text-secondary);
   text-decoration: none;
-  transition: background-color .12s ease, color .12s ease;
+  border-bottom: 2px solid transparent;
+  transition: color .12s ease, border-color .12s ease;
 }
 .kd-nav__link svg { width: 16px; height: 16px; opacity: .85; }
-.kd-nav__link:hover {
-  color: var(--color-text-strong);
-  background: var(--color-surface-subtle);
-}
+.kd-nav__link:hover { color: var(--color-text); }
+/* Repère de page courante : filet sous l'entrée, pas d'aplat teinté — le rouge
+   reste réservé aux actions, la position suffit à dire « vous êtes ici ». */
 .kd-nav__link.is-active {
-  color: var(--color-primary);
-  background: var(--color-primary-tint);
+  color: var(--color-text);
+  border-bottom-color: var(--color-text);
 }
 
 .kd-header__end {
@@ -96,38 +99,138 @@ turbo-frame { display: block; }
   align-items: center;
   gap: var(--kd-space-5);
 }
-.kd-header__user {
+/* Menu de compte — <details> natif (clavier + sans-JS), panneau flottant.
+   Porte tout ce qui relève du compte et non du travail quotidien : profil,
+   objectifs, coaching, paramètres, déconnexion. */
+.kd-usermenu { position: relative; }
+.kd-usermenu__trigger {
   display: inline-flex;
   align-items: center;
   gap: var(--kd-space-2);
-  font-family: var(--font-mono);
-  font-size: 11px;
+  padding: var(--kd-space-1) var(--kd-space-2);
+  border-radius: var(--kd-radius-pill);
+  cursor: pointer;
   color: var(--color-text-faint);
+  list-style: none;
 }
-.kd-header__user svg { width: 15px; height: 15px; }
-.kd-header__logout {
+.kd-usermenu__trigger::-webkit-details-marker { display: none; }
+.kd-usermenu__trigger:hover { background: var(--color-fill); }
+.kd-usermenu__trigger.is-active { color: var(--color-text); }
+.kd-usermenu__trigger svg {
+  width: 14px;
+  height: 14px;
+  transition: transform .15s ease;
+}
+.kd-usermenu[open] .kd-usermenu__trigger svg { transform: rotate(180deg); }
+.kd-usermenu__avatar {
   display: inline-flex;
-  color: var(--color-text-faint);
-  padding: var(--kd-space-2);
-  border-radius: var(--kd-radius-sm);
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: var(--color-surface-ink);
+  color: var(--color-on-ink);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 14px;
 }
-.kd-header__logout:hover { color: var(--color-primary); background: var(--color-surface-subtle); }
-.kd-header__logout svg { width: 16px; height: 16px; }
+.kd-usermenu__panel {
+  position: absolute;
+  top: calc(100% + var(--kd-space-3));
+  right: 0;
+  z-index: 40;
+  min-width: 208px;
+  padding: var(--kd-space-3);
+  background: var(--color-surface-raised);
+  /* Sans ombre (identité au filet), un panneau flottant a besoin d'un contour
+     franc pour se détacher du contenu qu'il recouvre — d'où l'encre, pas le
+     filet de carte habituel. Même règle pour .kd-modal et .kd-preview. */
+  border: 1px solid var(--color-text);
+}
+.kd-usermenu__who {
+  margin: 0 0 var(--kd-space-2);
+  padding: 0 var(--kd-space-3) var(--kd-space-3);
+  border-bottom: 1px solid var(--color-divider);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-faint);
+  overflow-wrap: anywhere;
+}
+.kd-usermenu__list { display: flex; flex-direction: column; }
+.kd-usermenu__link {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  padding: var(--kd-space-3);
+  border-radius: var(--kd-radius-md);
+  font-size: 13px;
+  color: var(--color-text-strong);
+}
+.kd-usermenu__link:hover { background: var(--color-fill); }
+.kd-usermenu__link.is-active { color: var(--color-text); background: var(--color-fill); font-weight: var(--kd-weight-semibold); }
+.kd-usermenu__link svg { width: 15px; height: 15px; flex: none; }
+.kd-usermenu__link--out {
+  margin-top: var(--kd-space-2);
+  padding-top: var(--kd-space-3);
+  border-top: 1px solid var(--color-divider);
+  border-radius: 0 0 var(--kd-radius-md) var(--kd-radius-md);
+  color: var(--color-text-secondary);
+}
 
-/* Nav condensée : on masque les libellés, on garde les icônes */
-@media (max-width: 780px) {
-  .kd-nav__link span { display: none; }
-  .kd-nav__link { padding: 7px var(--kd-space-3); }
-  .kd-header__user span { display: none; }
+/* Nav condensée (tablette) : les libellés rétrécissent, ils ne disparaissent
+   pas. Les masquer laissait quatre icônes sans nom accessible — `display: none`
+   retire l'élément de l'arbre d'accessibilité, le lien perdait donc son nom. */
+@media (max-width: 900px) {
+  .kd-nav { gap: 0; margin-left: 0; }
+  .kd-nav__link { padding: 7px var(--kd-space-3); font-size: 13px; }
+  .kd-nav__link svg { display: none; }
+  .kd-header__inner { padding: 0 var(--kd-space-5); gap: var(--kd-space-5); }
+}
+
+/* Téléphone : la nav principale quitte l'en-tête pour une barre basse, à portée
+   de pouce. L'en-tête ne garde que la marque et le menu de compte. */
+@media (max-width: 560px) {
+  .kd-header__inner { height: 52px; }
+
+  .kd-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    margin: 0;
+    background: var(--color-surface-raised);
+    border-top: 1px solid var(--color-text);
+    /* Encoche / barre gestuelle iOS. */
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .kd-nav__link {
+    flex: 1;
+    flex-direction: column;
+    gap: 3px;
+    justify-content: center;
+    padding: var(--kd-space-3) 0;
+    font-size: 11px;
+    letter-spacing: .04em;
+    border-bottom: 0;
+    border-top: 3px solid transparent;
+  }
+  .kd-nav__link svg { display: block; width: 19px; height: 19px; }
+  .kd-nav__link.is-active { border-top-color: var(--color-text); }
+
+  /* La barre basse recouvrirait la fin du contenu. */
+  .kd-page { padding-bottom: calc(var(--kd-space-13) + 72px); }
 }
 
 /* ----------------------------------------------------------------------------
    Mise en page
    ---------------------------------------------------------------------------- */
+/* Gouttières fluides : 20px de marge sur téléphone n'a pas le même sens qu'en
+   1080px de large. min() garde la valeur de maquette tant qu'il y a la place. */
 .kd-page {
   max-width: 1080px;
   margin: 0 auto;
-  padding: var(--kd-space-13) var(--kd-space-8) var(--kd-space-13);
+  padding: var(--kd-space-13) min(var(--kd-space-8), 4vw) var(--kd-space-13);
 }
 
 .kd-eyebrow {
@@ -140,12 +243,17 @@ turbo-frame { display: block; }
   margin: 0;
 }
 
+/* Titre de page. Barlow Condensed est nettement plus étroite que la display
+   précédente : la taille monte et l'interlignage se resserre, sinon le titre
+   se lit maigre. Fluide plutôt que tributaire d'un point de rupture. */
 .kd-title {
   font-family: var(--font-display);
-  font-weight: var(--kd-weight-semibold);
-  font-size: 26px;
-  line-height: 1.15;
-  color: var(--color-text-strong);
+  font-weight: var(--kd-weight-extrabold);
+  font-size: clamp(34px, 6vw, 52px);
+  line-height: .92;
+  letter-spacing: var(--kd-tracking-display);
+  text-transform: uppercase;
+  color: var(--color-text);
   margin: var(--kd-space-2) 0 0;
 }
 
@@ -177,7 +285,7 @@ turbo-frame { display: block; }
 .kd-grid--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .kd-grid--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
-@media (max-width: 820px) {
+@media (max-width: 900px) {
   .kd-grid--3, .kd-grid--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
@@ -206,9 +314,11 @@ turbo-frame { display: block; }
 
 .kd-card__title {
   font-family: var(--font-display);
-  font-weight: var(--kd-weight-semibold);
-  font-size: 15px;
-  color: var(--color-text-strong);
+  font-weight: var(--kd-weight-bold);
+  font-size: 19px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--color-text);
   margin: 0;
 }
 
@@ -218,13 +328,15 @@ turbo-frame { display: block; }
 .kd-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--kd-space-2);
-  font-family: var(--font-body);
-  font-size: 13px;
-  font-weight: var(--kd-weight-semibold);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: var(--kd-weight-bold);
+  letter-spacing: var(--kd-tracking-action);
+  text-transform: uppercase;
   line-height: 1;
-  padding: 10px var(--kd-space-6);
-  border-radius: var(--kd-radius-md);
+  padding: 11px var(--kd-space-8);
   border: 1px solid transparent;
   cursor: pointer;
   text-decoration: none;
@@ -237,20 +349,22 @@ turbo-frame { display: block; }
   border-color: var(--color-primary);
   color: var(--color-on-primary);
 }
+/* Un aplat rouge s'éclaircit au survol (le foncé fermerait le bouton) ; un
+   texte rouge sur fond clair, lui, fonce — d'où deux tokens distincts. */
 .kd-btn--primary:hover {
-  background: var(--color-primary-hover);
-  border-color: var(--color-primary-hover);
+  background: var(--color-primary-bright);
+  border-color: var(--color-primary-bright);
   color: var(--color-on-primary);
 }
 
 .kd-btn--secondary {
   background: var(--color-surface-raised);
-  border-color: var(--color-border-strong);
-  color: var(--color-text-strong);
+  border-color: var(--color-text);
+  color: var(--color-text);
 }
 .kd-btn--secondary:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+  background: var(--color-text);
+  color: var(--color-surface-raised);
 }
 
 .kd-btn--ghost {
@@ -260,9 +374,9 @@ turbo-frame { display: block; }
   padding-left: var(--kd-space-3);
   padding-right: var(--kd-space-3);
 }
-.kd-btn--ghost:hover { color: var(--color-primary); }
+.kd-btn--ghost:hover { color: var(--color-text); background: var(--color-fill); }
 
-.kd-btn--sm { padding: 7px var(--kd-space-4); font-size: 12px; }
+.kd-btn--sm { padding: 8px var(--kd-space-5); font-size: 13px; }
 
 /* ----------------------------------------------------------------------------
    Badges / pills
@@ -274,16 +388,27 @@ turbo-frame { display: block; }
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: var(--kd-weight-semibold);
-  letter-spacing: var(--kd-tracking-eyebrow);
+  letter-spacing: var(--kd-tracking-eyebrow-lg);
   text-transform: uppercase;
-  padding: 4px var(--kd-space-3);
-  border-radius: var(--kd-radius-pill);
-  background: var(--color-fill);
+  padding: 3px var(--kd-space-3);
+  border: 1px solid var(--color-border-pill);
+  background: transparent;
   color: var(--color-text-secondary);
   white-space: nowrap;
 }
-.kd-badge--run  { background: var(--color-activity-run-tint); color: var(--color-activity-run-text); }
-.kd-badge--gym  { background: var(--color-activity-gym-tint); color: var(--color-activity-gym-text); }
+/* Code activité : l'icône dit laquelle, le filet gauche la range dans
+   l'échelle catégorielle. Les cinq activités sont couvertes. */
+.kd-badge--run  { border-left: 3px solid var(--color-activity-run); }
+.kd-badge--gym  { border-left: 3px solid var(--color-activity-gym); }
+.kd-badge--swim { border-left: 3px solid var(--color-activity-swim); }
+.kd-badge--bike { border-left: 3px solid var(--color-activity-bike); }
+.kd-badge--mobility { border-left: 3px solid var(--color-activity-mobility); }
+/* Accent — réservé à l'objectif (le seul aplat rouge non actionnable). */
+.kd-badge--accent {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
 
 /* Statuts prévu / réalisé — pastille + libellé */
 .kd-badge--done    { color: var(--color-status-done); }
@@ -299,10 +424,12 @@ turbo-frame { display: block; }
    ---------------------------------------------------------------------------- */
 .kd-stat__value {
   font-family: var(--font-display);
-  font-weight: var(--kd-weight-bold);
-  font-size: 28px;
+  font-weight: var(--kd-weight-extrabold);
+  font-size: 36px;
   line-height: 1;
-  color: var(--color-text-strong);
+  letter-spacing: var(--kd-tracking-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
 }
 .kd-stat__label {
   font-family: var(--font-mono);
@@ -347,9 +474,11 @@ turbo-frame { display: block; }
 .kd-navcard__icon svg { width: 20px; height: 20px; }
 .kd-navcard__title {
   font-family: var(--font-display);
-  font-weight: var(--kd-weight-semibold);
-  font-size: 15px;
-  color: var(--color-text-strong);
+  font-weight: var(--kd-weight-bold);
+  font-size: 18px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--color-text);
 }
 .kd-navcard__desc {
   font-size: 12.5px;
@@ -566,8 +695,11 @@ turbo-frame { display: block; }
 .kd-libcard--gym .kd-libcard__icon { background: var(--color-activity-gym-tint); color: var(--color-activity-gym); }
 
 .kd-libcard__body { flex: 1 1 auto; min-width: 0; }
+/* Contenu saisi (nom d'exercice, de séance, de plan) : police de corps en
+   casse normale. Le condensé en capitales est réservé aux libellés de
+   structure — un nom propre en capitales condensées devient illisible. */
 .kd-libcard__name {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: var(--kd-weight-semibold);
   font-size: 15px;
   line-height: 1.25;
@@ -696,11 +828,10 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
   transition: border-color .12s ease, box-shadow .12s ease;
 }
 .kd-input::placeholder { color: var(--color-text-placeholder); }
-.kd-input:focus {
-  outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-tint);
-}
+/* Le halo teinté d'avant ne tenait pas les 3:1 de WCAG 1.4.11. On garde l'aide
+   visuelle au survol du champ, mais l'anneau de focus global (base.css) reste
+   en place : il est le seul indicateur fiable. */
+.kd-input:focus { border-color: var(--color-text); }
 .kd-input--area { min-height: 96px; resize: vertical; line-height: 1.5; }
 
 .kd-select {
@@ -823,9 +954,10 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
 }
 .kd-auth__wordmark {
   font-family: var(--font-display);
-  font-weight: var(--kd-weight-bold);
-  font-size: 20px;
-  letter-spacing: -.01em;
+  font-weight: var(--kd-weight-extrabold);
+  font-size: 26px;
+  letter-spacing: var(--kd-tracking-display);
+  text-transform: uppercase;
 }
 
 .kd-auth__card {
@@ -840,9 +972,12 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
 .kd-auth__head { text-align: center; margin-bottom: var(--kd-space-11); }
 .kd-auth__title {
   font-family: var(--font-display);
-  font-weight: var(--kd-weight-semibold);
-  font-size: 22px;
-  color: var(--color-text-strong);
+  font-weight: var(--kd-weight-extrabold);
+  font-size: 30px;
+  line-height: 1;
+  letter-spacing: var(--kd-tracking-display);
+  text-transform: uppercase;
+  color: var(--color-text);
   margin: 0;
 }
 .kd-auth__sub {
@@ -893,10 +1028,8 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
   background-repeat: no-repeat;
   background-position: center;
 }
-.kd-check input[type="checkbox"]:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px var(--color-primary-tint);
-}
+/* Anneau global (base.css) : rien à neutraliser ici, la case est un vrai
+   contrôle natif et doit garder l'indicateur commun. */
 
 .kd-btn--block { width: 100%; justify-content: center; padding: 12px var(--kd-space-6); }
 
@@ -985,114 +1118,812 @@ a.kd-libcard__name:hover { color: var(--color-primary); }
   max-width: 68ch;
 }
 
+/* ============================================================================
+   SÉANCE — page de consultation (refonte « Presse »)
+   Hero encre pleine, bandeau de KPI, onglets Programme / Analyse, blocs en
+   accordéon. Composant partagé avec la page publique de partage :
+   components/_workout_read.html.twig.
+
+   Tout le bloc est en pleine largeur logique de .kd-page ; les filets 1px
+   remplacent cartes et ombres, d'où des séparateurs plutôt que des gouttières.
+   ---------------------------------------------------------------------------- */
+.kd-wk { display: block; }
+
+/* ---- Hero : aplat encre, titre condensé, repères en colonnes ---- */
+.kd-wk__hero {
+  background: var(--color-surface-ink);
+  color: var(--color-on-ink);
+  /* Le hero mord sur les gouttières de .kd-page pour occuper toute la largeur
+     de la colonne de lecture : c'est ce qui lui donne son caractère d'affiche.
+     La marge négative DOIT reprendre exactement le padding de .kd-page, sinon
+     un liseré de fond apparaît sur les côtés. */
+  margin: calc(-1 * var(--kd-space-13)) calc(-1 * min(var(--kd-space-8), 4vw)) var(--kd-space-10);
+  padding: var(--kd-space-8) min(var(--kd-space-8), 4vw) var(--kd-space-12);
+}
+.kd-wk__heroinner { max-width: 1080px; margin: 0 auto; }
+
+.kd-wk__herobody {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--kd-space-10);
+  margin-top: var(--kd-space-12);
+}
+.kd-wk__herotitle { flex: 1 1 20rem; min-width: 0; }
+
+.kd-wk__eyebrow {
+  margin: 0 0 var(--kd-space-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow-xl);
+  text-transform: uppercase;
+  color: var(--color-primary-on-ink);
+}
+.kd-wk__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-extrabold);
+  font-size: clamp(40px, 8vw, 84px);
+  line-height: .88;
+  letter-spacing: var(--kd-tracking-display);
+  text-transform: uppercase;
+  overflow-wrap: break-word;
+}
+.kd-wk__desc {
+  margin: var(--kd-space-7) 0 0;
+  max-width: 56ch;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--color-on-ink-muted);
+}
+
+/* Repères d'en-tête : colonnes séparées par un filet, façon ours de journal. */
+.kd-wk__herostats {
+  display: flex;
+  flex: 0 0 auto;
+  margin: 0;
+  border-left: 1px solid var(--color-border-on-ink);
+}
+.kd-wk__herostat {
+  padding: 0 var(--kd-space-9);
+  border-right: 1px solid var(--color-border-on-ink);
+}
+.kd-wk__herostat:last-child { border-right: 0; padding-right: 0; }
+.kd-wk__herostat dt {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow-xl);
+  text-transform: uppercase;
+  color: var(--color-on-ink-faint);
+}
+.kd-wk__herostat dd {
+  margin: var(--kd-space-1) 0 0;
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 34px;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+.kd-wk__unit { font-size: .48em; color: var(--color-on-ink-muted); }
+
+.kd-wk__heroacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kd-space-3);
+  list-style: none;
+  margin: var(--kd-space-9) 0 0;
+  padding: 0;
+}
+/* Les badges d'activité passent en inversé sur l'aplat encre. */
+.kd-wk__heroacts .kd-badge {
+  border-color: var(--color-border-on-ink-strong);
+  color: var(--color-on-ink-muted);
+}
+
+/* ---- Barre d'actions, posée en tête du hero ---- */
+.kd-wk__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--kd-space-5);
+}
+.kd-wk__back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: var(--kd-tracking-eyebrow-lg);
+  text-transform: uppercase;
+  color: var(--color-on-ink-muted);
+  text-decoration: none;
+}
+.kd-wk__back:hover { color: var(--color-on-ink); }
+.kd-wk__back svg { width: 14px; height: 14px; }
+
+.kd-wk__baractions {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+}
+/* Variante de bouton sur aplat encre : le secondaire habituel (bordure encre)
+   deviendrait invisible ici. */
+.kd-btn--onink {
+  background: var(--color-on-ink);
+  border-color: var(--color-on-ink);
+  color: var(--color-text);
+}
+.kd-btn--onink:hover {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+.kd-wk__feedback {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-primary-on-ink);
+}
+
+/* ---- Menu kebab (actions secondaires) — <details> natif ---- */
+.kd-kebab { position: relative; }
+.kd-kebab__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--color-border-on-ink-strong);
+  color: var(--color-on-ink);
+  cursor: pointer;
+  list-style: none;
+}
+.kd-kebab__trigger::-webkit-details-marker { display: none; }
+.kd-kebab__trigger:hover { border-color: var(--color-on-ink); }
+.kd-kebab__trigger svg { width: 18px; height: 18px; }
+.kd-kebab__panel {
+  position: absolute;
+  top: calc(100% + var(--kd-space-2));
+  right: 0;
+  z-index: 40;
+  min-width: 232px;
+  padding: var(--kd-space-2) 0;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-text);
+}
+.kd-kebab__panel form { margin: 0; }
+.kd-kebab__item {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  width: 100%;
+  padding: var(--kd-space-4) var(--kd-space-7);
+  background: transparent;
+  border: 0;
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  color: var(--color-text);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.kd-kebab__item:hover { background: var(--color-fill); color: var(--color-text); }
+.kd-kebab__item svg { width: 15px; height: 15px; flex: none; color: var(--color-text-faint); }
+
+/* ---- Bandeau de KPI ---- */
+.kd-wk__kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin: 0 0 var(--kd-space-10);
+  border: 1px solid var(--color-border);
+  border-bottom-width: 1px;
+  background: var(--color-surface-raised);
+}
+.kd-wk__kpi {
+  padding: var(--kd-space-8) var(--kd-space-9);
+  border-right: 1px solid var(--color-border);
+}
+.kd-wk__kpi:last-child { border-right: 0; }
+.kd-wk__kpi dt {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow-xl);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-wk__kpi dd {
+  margin: var(--kd-space-2) 0 0;
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-extrabold);
+  font-size: 40px;
+  line-height: 1;
+  letter-spacing: var(--kd-tracking-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+.kd-wk__kpi--accent dd { color: var(--color-primary); }
+.kd-wk__kpi .kd-wk__unit { color: var(--color-text-faint); }
+.kd-wk__kpimeta {
+  margin: var(--kd-space-3) 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+/* Jauge d'intensité : 10 crans, à l'échelle du RPE. */
+.kd-wk__gauge {
+  display: flex;
+  gap: 3px;
+  margin: var(--kd-space-4) 0 0;
+}
+.kd-wk__gaugetick {
+  width: 14px;
+  height: 6px;
+  background: var(--color-primary-track);
+}
+.kd-wk__gaugetick.is-on { background: var(--color-primary); }
+
+/* ---- Onglets ---- */
+.kd-wk__tablist {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-10);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--kd-space-9);
+}
+.kd-wk__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  padding: var(--kd-space-6) 0;
+  margin-bottom: -1px;
+  background: transparent;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-action);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  cursor: pointer;
+}
+.kd-wk__tab svg { width: 15px; height: 15px; }
+.kd-wk__tab:hover { color: var(--color-text); }
+.kd-wk__tab.is-active {
+  color: var(--color-text);
+  font-weight: var(--kd-weight-bold);
+  border-bottom-color: var(--color-text);
+}
+/* Titre de panneau : seul repère quand JS est absent, masqué par le contrôleur
+   dès que la barre d'onglets prend le relais. */
+.kd-wk__paneltitle {
+  margin: var(--kd-space-10) 0 var(--kd-space-6);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 22px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+.kd-wk__panel:first-of-type .kd-wk__paneltitle { margin-top: 0; }
+
 /* ----------------------------------------------------------------------------
-   Séance — blocs en lecture
-   Rôles de bloc différenciés par l'icône seule : la couleur reste neutre (la
-   règle « la couleur porte du sens » réserve terracotta/olive aux activités).
+   Séance — blocs en lecture (accordéon <details>)
+   Rôles de bloc différenciés par l'icône seule : la couleur reste neutre, elle
+   est réservée aux actions et à l'intensité.
    ---------------------------------------------------------------------------- */
 .kd-blocks {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--kd-space-8);
+  border-top: 1px solid var(--color-border);
 }
-.kd-block {
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border);
-  border-radius: var(--kd-radius-lg);
-  padding: var(--kd-space-8) var(--kd-space-9);
-}
+.kd-block { border-bottom: 1px solid var(--color-border); }
+
 .kd-block__head {
   display: flex;
   align-items: center;
-  gap: var(--kd-space-4);
-  padding-bottom: var(--kd-space-6);
-  margin-bottom: var(--kd-space-6);
-  border-bottom: 1px solid var(--color-divider);
+  gap: var(--kd-space-6);
+  padding: var(--kd-space-7) var(--kd-space-5);
+  cursor: pointer;
+  list-style: none;
+}
+.kd-block__head::-webkit-details-marker { display: none; }
+.kd-block__head:hover { background: var(--color-surface-hover); }
+
+.kd-block__num {
+  flex: none;
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-extrabold);
+  font-size: 32px;
+  line-height: 1;
+  color: var(--color-border-strong);
+  font-variant-numeric: tabular-nums;
 }
 .kd-block__role {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: var(--kd-weight-bold);
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+.kd-block__role svg { width: 16px; height: 16px; color: var(--color-text-faint); }
+.kd-block__label {
+  font-family: var(--font-body);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+.kd-block__rounds {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text);
+  border: 1px solid var(--color-text);
+  padding: 3px var(--kd-space-3);
+  white-space: nowrap;
+}
+/* Tag superset/circuit : neutre (structure, pas activité ni statut). */
+.kd-block__superset {
   display: inline-flex;
   align-items: center;
   gap: var(--kd-space-2);
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: var(--kd-weight-semibold);
-  letter-spacing: var(--kd-tracking-eyebrow);
+  letter-spacing: var(--kd-tracking-eyebrow-lg);
   text-transform: uppercase;
   color: var(--color-text-secondary);
-  background: var(--color-fill);
-  border-radius: var(--kd-radius-pill);
-  padding: 5px var(--kd-space-4);
+  border: 1px solid var(--color-border-pill);
+  padding: 3px var(--kd-space-3);
+  white-space: nowrap;
 }
-.kd-block__role svg { width: 13px; height: 13px; }
-.kd-block__label {
-  font-family: var(--font-display);
-  font-weight: var(--kd-weight-semibold);
-  font-size: 15px;
-  color: var(--color-text-strong);
-}
-.kd-block__rounds {
+.kd-block__superset svg { width: 12px; height: 12px; }
+.kd-block__sum {
   margin-left: auto;
   font-family: var(--font-mono);
   font-size: 11px;
-  font-weight: var(--kd-weight-semibold);
-  color: var(--color-primary);
-  background: var(--color-primary-tint);
-  border-radius: var(--kd-radius-pill);
-  padding: 4px var(--kd-space-4);
+  color: var(--color-text-secondary);
   white-space: nowrap;
 }
+.kd-block__chevron {
+  flex: none;
+  display: inline-flex;
+  color: var(--color-text-faint);
+  transition: transform .15s ease;
+}
+.kd-block__chevron svg { width: 18px; height: 18px; }
+.kd-block__wrap[open] .kd-block__chevron { transform: rotate(180deg); }
 
 /* Liste d'exercices d'un bloc — numérotée (counter mono) */
 .kd-exlist {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 0 0 var(--kd-space-5);
   counter-reset: kd-ex;
 }
 .kd-exrow {
-  display: flex;
-  gap: var(--kd-space-5);
-  padding: var(--kd-space-5) 0;
-  border-top: 1px solid var(--color-divider);
+  padding: var(--kd-space-5) var(--kd-space-5) var(--kd-space-5) var(--kd-space-13);
+  border-top: 1px solid var(--color-divider-soft);
 }
-.kd-exrow:first-child { border-top: 0; padding-top: 0; }
-.kd-exrow:last-child { padding-bottom: 0; }
-.kd-exrow::before {
+.kd-exrow:hover { background: var(--color-surface-hover); }
+.kd-exrow__head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: var(--kd-space-4);
+}
+.kd-exrow__head::before {
   counter-increment: kd-ex;
   content: counter(kd-ex);
-  flex: 0 0 auto;
+  flex: none;
+  width: 18px;
+  margin-left: calc(-1 * var(--kd-space-8));
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+  font-variant-numeric: tabular-nums;
+}
+.kd-exrow__name {
+  font-size: 16px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text);
+}
+/* Valeurs et paramètres : mono, poussés à droite dans l'ordre de lecture
+   « ce qu'on fait » → « à quelle intensité » → « combien on récupère ». */
+.kd-exrow__val {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text);
+  white-space: nowrap;
+}
+.kd-exrow__flag {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+  border: 1px solid var(--color-border-pill);
+  padding: 2px var(--kd-space-2);
+  white-space: nowrap;
+}
+.kd-exrow__rpe {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  padding-left: var(--kd-space-6);
+  border-left: 1px solid var(--color-border);
+  white-space: nowrap;
+}
+.kd-exrow__rpe.is-hard { color: var(--color-primary); }
+.kd-exrow__rest {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+  white-space: nowrap;
+}
+.kd-exrow__notes {
+  margin: var(--kd-space-3) 0 0;
+  padding-left: var(--kd-space-5);
+  border-left: 2px solid var(--color-primary);
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+  max-width: 68ch;
+}
+.kd-exrow--empty {
+  margin: 0;
+  padding: var(--kd-space-5) var(--kd-space-5) var(--kd-space-7) var(--kd-space-13);
+  font-size: 13px;
+  color: var(--color-text-faint);
+}
+
+/* ---- Tableau des séries détaillées ---- */
+.kd-settable__wrap {
+  margin: var(--kd-space-5) 0 0;
+  /* Le tableau garde ses colonnes plutôt que de s'écraser : il défile dans son
+     propre conteneur, jamais la page. */
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+}
+.kd-settable {
+  width: 100%;
+  min-width: 30rem;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.kd-settable thead th {
+  padding: var(--kd-space-3) var(--kd-space-6);
+  background: var(--color-surface-ink);
+  color: var(--color-on-ink);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow-lg);
+  text-transform: uppercase;
+  text-align: left;
+  white-space: nowrap;
+}
+.kd-settable__c-num { text-align: right; }
+.kd-settable thead .kd-settable__c-num { text-align: right; }
+.kd-settable__c-type { width: 4rem; }
+.kd-settable td {
+  padding: var(--kd-space-3) var(--kd-space-6);
+  border-top: 1px solid var(--color-divider-soft);
+  background: var(--color-surface-raised);
+}
+/* Le groupe de séries de travail est la référence de lecture : il porte un
+   filet gauche et un fond, tout le reste s'efface autour. */
+.kd-setrow--normal td {
+  background: var(--color-surface-subtle);
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text);
+}
+.kd-setrow--normal td:first-child { box-shadow: inset 3px 0 0 var(--color-text); }
+.kd-setrow--warmup td { color: var(--color-text-secondary); }
+.kd-setrow__mult {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 17px;
+}
+.kd-setrow__rank { color: var(--color-text-faint); font-size: 11px; }
+.kd-setrow__tag { color: var(--color-text-faint); font-size: 11px; }
+.kd-setrow--to_failure .kd-setrow__tag { color: var(--color-primary); }
+.kd-setrow__pct { color: var(--color-text-faint); font-size: 11px; }
+
+/* ----------------------------------------------------------------------------
+   Séance — panneau « Analyse » (barres proportionnelles, rendu serveur)
+   ---------------------------------------------------------------------------- */
+.kd-analysis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-raised);
+}
+.kd-analysis__card {
+  padding: var(--kd-space-10) var(--kd-space-9);
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+.kd-analysis__card--wide { grid-column: 1 / -1; }
+.kd-analysis__title {
+  margin: 0 0 var(--kd-space-4);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 19px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--color-text);
+}
+.kd-analysis__hint {
+  margin: 0 0 var(--kd-space-7);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+
+/* Barre empilée + légende (répartition par région) */
+.kd-stack { display: flex; height: 14px; gap: 2px; }
+.kd-stack__seg { height: 100%; }
+.kd-cat--1 { background: var(--color-cat-1); }
+.kd-cat--2 { background: var(--color-cat-2); }
+.kd-cat--3 { background: var(--color-cat-3); }
+.kd-cat--4 { background: var(--color-cat-4); }
+
+.kd-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kd-space-4) var(--kd-space-9);
+  list-style: none;
+  margin: var(--kd-space-6) 0 0;
+  padding: 0;
+}
+.kd-legend__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.kd-legend__key { width: 9px; height: 9px; flex: none; }
+.kd-legend__val { color: var(--color-text); font-weight: var(--kd-weight-semibold); }
+
+/* Barres horizontales (volume par bloc) */
+.kd-bars { list-style: none; margin: 0; padding: 0; }
+.kd-bars__row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--kd-space-2) var(--kd-space-5);
+  margin-bottom: var(--kd-space-6);
+}
+.kd-bars__row:last-child { margin-bottom: 0; }
+.kd-bars__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.kd-bars__val {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+.kd-bars__track {
+  grid-column: 1 / -1;
+  height: 10px;
+  background: var(--color-track);
+}
+.kd-bars__fill { display: block; height: 100%; background: var(--color-cat-1); }
+
+/* Timeline de durée : un segment par bloc, largeur proportionnelle */
+.kd-timeline { display: flex; height: 36px; }
+.kd-timeline__seg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-on-ink);
+  overflow: hidden;
+}
+/* Le rôle du bloc pilote la densité, pas une couleur métier. */
+.kd-timeline__seg--warmup { background: var(--color-cat-3); }
+.kd-timeline__seg--main { background: var(--color-cat-1); }
+.kd-timeline__seg--cooldown { background: var(--color-cat-2); }
+
+/* ---- Séance : tablette ---- */
+@media (max-width: 900px) {
+  /* Les repères d'en-tête passent sous le titre en trois colonnes égales, avec
+     un filet haut au lieu du filet gauche. */
+  .kd-wk__herostats {
+    flex: 1 1 100%;
+    border-left: 0;
+    border-top: 1px solid var(--color-border-on-ink);
+    padding-top: var(--kd-space-6);
+  }
+  .kd-wk__herostat { flex: 1; padding: 0 var(--kd-space-5) 0 0; }
+  .kd-wk__herostat:first-child { padding-left: 0; }
+  .kd-analysis__card { border-right: 0; }
+}
+
+/* ---- Séance : téléphone ---- */
+@media (max-width: 560px) {
+  .kd-wk__hero { padding-bottom: var(--kd-space-10); }
+  .kd-wk__herobody { margin-top: var(--kd-space-9); gap: var(--kd-space-7); }
+  .kd-wk__herostat dd { font-size: 26px; }
+  .kd-wk__desc { font-size: 14px; }
+
+  /* Le bandeau de KPI s'empile : les filets verticaux deviennent horizontaux. */
+  .kd-wk__kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kd-wk__kpi {
+    padding: var(--kd-space-6) var(--kd-space-7);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .kd-wk__kpi:nth-child(2n) { border-right: 0; }
+  .kd-wk__kpi dd { font-size: 30px; }
+
+  .kd-wk__tablist { gap: var(--kd-space-8); }
+  .kd-wk__tab { font-size: 15px; padding: var(--kd-space-5) 0; }
+
+  /* En-tête de bloc : le résumé passe à la ligne sous le titre plutôt que de
+     comprimer le nom du bloc. */
+  .kd-block__head {
+    flex-wrap: wrap;
+    gap: var(--kd-space-3) var(--kd-space-4);
+    padding: var(--kd-space-6) var(--kd-space-3);
+  }
+  .kd-block__num { font-size: 24px; }
+  .kd-block__role { font-size: 18px; }
+  .kd-block__sum { flex-basis: 100%; margin-left: 0; white-space: normal; }
+  .kd-block__chevron { margin-left: auto; }
+
+  .kd-exrow {
+    padding-left: var(--kd-space-10);
+    padding-right: var(--kd-space-3);
+  }
+  .kd-exrow__head { gap: var(--kd-space-2) var(--kd-space-4); }
+  .kd-exrow__name { flex-basis: 100%; font-size: 15px; }
+  /* Le nom occupant sa propre ligne, les valeurs n'ont plus à être poussées. */
+  .kd-exrow__val,
+  .kd-exrow__flag { margin-left: 0; }
+  .kd-exrow__rpe { padding-left: 0; border-left: 0; }
+
+  .kd-analysis { grid-template-columns: 1fr; }
+  .kd-analysis__card { padding: var(--kd-space-8) var(--kd-space-7); }
+
+  /* Barre d'actions collante en bas, comme la maquette : « Éditer » reste
+     atteignable sans remonter toute la séance. Elle se pose au-dessus de la
+     barre de navigation basse. */
+  .kd-wk__bar { position: static; }
+  .kd-wk__baractions {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+    z-index: 25;
+    gap: var(--kd-space-3);
+    padding: var(--kd-space-5) var(--kd-space-6);
+    background: var(--color-surface-raised);
+    border-top: 1px solid var(--color-text);
+  }
+  .kd-wk__baractions .kd-btn { flex: 1; }
+  /* Sur fond papier, la variante « sur encre » redeviendrait invisible. */
+  .kd-btn--onink {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--color-on-primary);
+  }
+  .kd-kebab__trigger {
+    border-color: var(--color-text);
+    color: var(--color-text);
+  }
+  .kd-kebab__panel { bottom: calc(100% + var(--kd-space-2)); top: auto; }
+  .kd-wk__feedback { display: none; }
+
+  /* Le contenu doit pouvoir défiler au-delà des deux barres empilées. */
+  .kd-wk { padding-bottom: var(--kd-space-13); }
+}
+
+
+/* ---- Pastille de type de série (partagée lecture + survol + compositeur) ----
+   Un sigle carré (W / D / F / DS) plutôt qu'un libellé : lisible d'un coup
+   d'œil et de largeur quasi constante, ce qui permet de l'aligner en colonne
+   devant chaque ligne de série.
+
+   Deux axes seulement, contre quatre teintes auparavant : l'ENCRE pour ce qui
+   structure la série (échauffement, dégressive), le ROUGE pour ce qui la pousse
+   (échec, drop set) ; le PLEIN pour le travail effectif, le CONTOUR pour ce qui
+   n'en est pas (échauffement) ou n'est qu'une prolongation (drop set). La
+   lettre porte l'identification, la couleur ne fait que trancher. */
+.kd-setbadge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px; height: 22px;
-  border-radius: var(--kd-radius-full);
-  background: var(--color-fill);
-  color: var(--color-text-faint);
-  font-family: var(--font-mono);
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
   font-size: 11px;
-  font-weight: var(--kd-weight-semibold);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  border: 1px solid var(--color-text-secondary);
+  background: var(--color-text-secondary);
+  color: var(--color-surface-raised);
+  white-space: nowrap;
+  cursor: default;
 }
-.kd-exrow__body { flex: 1 1 auto; min-width: 0; }
-.kd-exrow__name {
-  font-size: 14px;
-  font-weight: var(--kd-weight-semibold);
-  color: var(--color-text-strong);
+.kd-setbadge--warmup {
+  background: var(--color-set-warmup-tint);
+  border-color: var(--color-set-warmup);
+  color: var(--color-set-warmup);
 }
-.kd-exrow__params {
+.kd-setbadge--degressive {
+  background: var(--color-set-degressive);
+  border-color: var(--color-set-degressive);
+}
+.kd-setbadge--to_failure {
+  background: var(--color-set-failure);
+  border-color: var(--color-set-failure);
+}
+.kd-setbadge--drop_set {
+  background: var(--color-set-dropset-tint);
+  border-color: var(--color-set-dropset);
+  color: var(--color-set-dropset);
+}
+/* Gouttière de largeur fixe : les lignes sans type (série normale) restent
+   alignées sur celles qui en portent un. */
+.kd-setbadge__slot {
+  flex: 0 0 auto;
   display: inline-flex;
+  justify-content: center;
+  min-width: 22px;
+}
+
+/* Séries détaillées en lecture : une ligne par groupe (pastille · compteur · détail). */
+.kd-setlist {
+  list-style: none;
+  margin: var(--kd-space-2) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-1);
+}
+.kd-setline {
+  display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: var(--kd-space-2);
-  margin-left: var(--kd-space-3);
+  gap: var(--kd-space-3);
   font-family: var(--font-mono);
   font-size: 12px;
   color: var(--color-text-secondary);
 }
-.kd-exrow__params .kd-dot { color: var(--color-text-placeholder); }
-.kd-exrow__rest { color: var(--color-text-faint); }
+.kd-setline__count {
+  flex: 0 0 2.2em;
+  text-align: right;
+  color: var(--color-text-faint);
+}
+.kd-setline__detail { min-width: 0; color: var(--color-text-strong); }
+.kd-setline--warmup .kd-setline__detail { color: var(--color-text-secondary); }
 .kd-exrow__notes {
   font-size: 13px;
   line-height: 1.5;
@@ -1429,7 +2260,7 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
 .kd-plangrid--edit .kd-planday.is-empty { border-style: solid; }
 
 /* Lecture : 7 colonnes, agenda vertical sous 880px */
-@media (max-width: 880px) {
+@media (max-width: 900px) {
   .kd-plangrid { grid-template-columns: 1fr; gap: var(--kd-space-2); }
   .kd-plangrid .kd-planday {
     flex-direction: row;
@@ -1516,14 +2347,16 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
 }
 .kd-viewtoggle__btn svg { width: 15px; height: 15px; }
 .kd-viewtoggle__btn:hover { color: var(--color-text-strong); }
+/* Sans ombre, l'onglet actif se distingue par l'aplat encre inversé plutôt que
+   par une élévation simulée. */
 .kd-viewtoggle__btn.is-active {
-  background: var(--color-surface-raised);
-  color: var(--color-primary);
-  box-shadow: var(--shadow-card);
+  background: var(--color-surface-ink);
+  color: var(--color-on-ink);
 }
 
-/* Cadre défilable : le mois garde ses 7 colonnes et défile plutôt que de
-   s'écraser sur petit écran (la structure hebdomadaire reste lisible). */
+/* Cadre défilable : au-delà du téléphone, le mois garde ses 7 colonnes et
+   défile plutôt que de s'écraser (la structure hebdomadaire reste lisible).
+   Sous 560px il bascule en agenda vertical, cf. plus bas. */
 .kd-cal { overflow-x: auto; }
 .kd-cal__grid {
   display: grid;
@@ -1532,9 +2365,10 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   min-width: 720px;
   background: var(--color-border-cell);
   border: 1px solid var(--color-border-cell);
-  border-radius: var(--kd-radius-lg);
   overflow: hidden;
 }
+/* Nom du jour dans la case : utile seulement quand la colonne disparaît. */
+.kd-calday__dow { display: none; }
 .kd-cal__dow {
   background: var(--color-surface-subtle);
   font-family: var(--font-mono);
@@ -1582,6 +2416,43 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   flex-direction: column;
   gap: var(--kd-space-2);
   min-width: 0;
+}
+
+/* Téléphone : agenda vertical. Une grille de 7 colonnes à 390px donnerait des
+   cases de 52px, et le scroll horizontal à 720px de large était impraticable au
+   doigt. Le même motif existe déjà pour .kd-week et .kd-plangrid. */
+@media (max-width: 560px) {
+  .kd-cal { overflow-x: visible; }
+  .kd-cal__grid { display: block; min-width: 0; gap: 0; }
+  /* Les en-têtes de colonne n'ont plus de colonne à nommer ; chaque jour porte
+     désormais son propre libellé. */
+  .kd-cal__dow { display: none; }
+  /* Les jours hors du mois courant ne sont là que pour compléter la grille. */
+  .kd-calday--out { display: none; }
+
+  .kd-calday {
+    flex-direction: row;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: var(--kd-space-3);
+    min-height: 0;
+    padding: var(--kd-space-4) var(--kd-space-5);
+    border-bottom: 1px solid var(--color-divider);
+  }
+  .kd-calday__dow {
+    display: block;
+    flex: none;
+    width: 2.4rem;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-text-faint);
+    padding-top: 3px;
+  }
+  .kd-calday__num { align-self: flex-start; order: -1; min-width: 1.6rem; }
+  .kd-calday__events { flex: 1 1 100%; }
+  .kd-calday__add { align-self: center; margin-left: auto; }
 }
 
 /* Pastille de séance datée — deux zones cliquables distinctes.
@@ -1823,11 +2694,11 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
 .kd-modal {
   width: min(440px, calc(100vw - 2 * var(--kd-space-8)));
   padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--kd-radius-xl);
+  /* Contour encre : sans ombre, un élément flottant a besoin d'un bord franc
+     pour se détacher du contenu qu'il recouvre (cf. .kd-usermenu__panel). */
+  border: 1px solid var(--color-text);
   background: var(--color-surface-raised);
   color: var(--color-text-strong);
-  box-shadow: var(--shadow-card);
 }
 .kd-modal::backdrop { background: color-mix(in srgb, var(--kd-ink-900) 42%, transparent); }
 .kd-modal__card { padding: var(--kd-space-9) var(--kd-space-10) var(--kd-space-10); }
@@ -1841,10 +2712,12 @@ a.kd-planday__item:hover svg { color: var(--color-primary); }
   flex: 1 1 auto;
   min-width: 0;
   font-family: var(--font-display);
-  font-weight: var(--kd-weight-semibold);
-  font-size: 17px;
-  line-height: 1.25;
-  color: var(--color-text-strong);
+  font-weight: var(--kd-weight-bold);
+  font-size: 21px;
+  line-height: 1.1;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--color-text);
   margin: 0;
 }
 .kd-modal__sub {
@@ -2100,7 +2973,9 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
 /* ---- Corps deux volets ---- */
 .kd-composer__body { display: flex; align-items: stretch; }
 .kd-composer__lib {
-  width: 326px;
+  /* Largeur de maquette, mais qui cède avant de pousser la colonne principale
+     sous sa largeur utile sur un écran étroit. */
+  width: min(326px, 38vw);
   flex: none;
   border-right: 1px solid var(--color-border);
   background: var(--color-surface-raised);
@@ -2146,7 +3021,6 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
   flex: 1;
   min-width: 0;
   border: none;
-  outline: none;
   background: transparent;
   font-family: var(--font-body);
   font-size: 13px;
@@ -2231,9 +3105,9 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
 .kd-libx--gym .kd-libx__code { background: var(--color-activity-gym-tint); color: var(--color-activity-gym); }
 .kd-libx__body { flex: 1; min-width: 0; }
 .kd-libx__name {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: var(--kd-weight-semibold);
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.2;
   color: var(--color-text-strong);
 }
@@ -2292,7 +3166,7 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
 /* La liste se réduit et scrolle dans la palette quand la fenêtre est courte. */
 .kd-planeditor .kd-composer__lib .kd-libpanel { flex: 1; min-height: 0; }
 
-@media (max-width: 1100px) {
+@media (max-width: 1200px) {
   .kd-planeditor { flex-direction: column; align-items: stretch; }
   .kd-planeditor .kd-composer__lib {
     position: static;
@@ -2532,13 +3406,16 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
 }
 .kd-drag-ghost > * { visibility: hidden; }
 .kd-drag-chosen { cursor: grabbing; }
+/* L'élément en cours de déplacement se détache par un contour encre, pas par
+   une ombre : l'identité ne connaît que le filet. */
 .kd-drag-active {
-  box-shadow: var(--shadow-raised, 0 6px 16px rgba(0, 0, 0, .18));
+  outline: 2px solid var(--color-text);
+  outline-offset: -1px;
   opacity: .96;
 }
 .kd-cexo__handle:active { cursor: grabbing; }
 .kd-cexo__row { display: flex; align-items: center; gap: var(--kd-space-4); padding: var(--kd-space-3) var(--kd-space-4); }
-.kd-cexo__handle { flex: none; display: flex; color: var(--color-ink-outside, var(--color-text-placeholder)); cursor: grab; }
+.kd-cexo__handle { flex: none; display: flex; color: var(--color-text-placeholder); cursor: grab; }
 .kd-cexo__handle svg { width: 15px; height: 15px; }
 .kd-cexo__code {
   flex: none;
@@ -2558,9 +3435,9 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
 .kd-cexo__code--gym { background: var(--color-activity-gym-tint); color: var(--color-activity-gym); }
 .kd-cexo__body { flex: 1; min-width: 0; }
 .kd-cexo__name {
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: var(--kd-weight-semibold);
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.2;
   color: var(--color-text-strong);
   overflow: hidden;
@@ -2606,6 +3483,143 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
 .kd-cexo__reorder { display: flex; gap: var(--kd-space-2); margin-top: var(--kd-space-4); }
 .kd-cexo__reorder form { display: inline-flex; margin: 0; }
 
+/* ---- Résumé compact des séries détaillées sur la ligne repliée ---- */
+.kd-cexo__sets {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  margin-top: 4px;
+}
+.kd-cexo__setcount {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-secondary);
+  background: var(--color-fill);
+  padding: 2px 7px;
+  border-radius: var(--kd-radius-sm);
+}
+
+/* ---- Éditeur de séries détaillées (mode force) ----
+   Mise en page WYSIWYG : proche de la vue séance (chip de type + valeurs +
+   unités inline). Couleur neutre (le type de série n'est ni activité ni statut) :
+   l'accent gauche et l'emphase du chip suffisent à distinguer les types. */
+.kd-sets {
+  margin-top: var(--kd-space-5);
+  padding-top: var(--kd-space-4);
+  border-top: 1px dashed var(--color-divider);
+}
+.kd-sets--collapsed {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kd-space-3) var(--kd-space-4);
+}
+.kd-sets--collapsed form { margin: 0; }
+.kd-sets__hint { font-size: 11px; color: var(--color-text-faint); }
+.kd-sets__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kd-space-4);
+  margin-bottom: var(--kd-space-3);
+}
+.kd-sets__head form { margin: 0; }
+.kd-sets__title {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-semibold);
+  font-size: 12px;
+  color: var(--color-text-strong);
+}
+.kd-sets__title svg { width: 14px; height: 14px; color: var(--color-text-faint); }
+
+.kd-sets__detail,
+.kd-sets__add,
+.kd-sets__revert {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  padding: var(--kd-space-2) var(--kd-space-4);
+  border: 1px solid var(--color-divider);
+  border-radius: var(--kd-radius-sm);
+  background: var(--color-surface-raised);
+  color: var(--color-text-secondary);
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: var(--kd-weight-medium);
+  cursor: pointer;
+}
+.kd-sets__detail:hover,
+.kd-sets__add:hover,
+.kd-sets__revert:hover { border-color: var(--color-primary); color: var(--color-primary); }
+.kd-sets__detail svg,
+.kd-sets__add svg,
+.kd-sets__revert svg { width: 14px; height: 14px; }
+.kd-sets__revert { font-size: 11px; padding: 3px var(--kd-space-3); }
+.kd-sets__add { margin-top: var(--kd-space-3); }
+
+.kd-sets__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--kd-space-2); }
+.kd-set {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  padding: var(--kd-space-3);
+  border: 1px solid var(--color-divider-soft);
+  border-left: 3px solid var(--color-divider);
+  border-radius: var(--kd-radius-sm);
+  background: var(--color-surface-raised);
+}
+/* Accent gauche + fond teinté par type : mêmes couleurs que la pastille en
+   lecture, pour qu'une ligne se reconnaisse au même signal des deux côtés. */
+.kd-set--warmup { border-left-color: var(--color-set-warmup); background: var(--color-set-warmup-tint); }
+.kd-set--degressive { border-left-color: var(--color-set-degressive); background: var(--color-set-degressive-tint); }
+.kd-set--to_failure { border-left-color: var(--color-set-failure); background: var(--color-set-failure-tint); }
+.kd-set--drop_set { border-left-color: var(--color-set-dropset); background: var(--color-set-dropset-tint); }
+.kd-set__num {
+  flex: none;
+  width: 20px; height: 20px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+  background: var(--color-fill);
+  border-radius: var(--kd-radius-full);
+}
+.kd-set__form {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  margin: 0;
+}
+.kd-set__type {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 116px;
+  font-size: 11px;
+  font-weight: var(--kd-weight-medium);
+}
+.kd-set__vals { display: inline-flex; align-items: center; gap: var(--kd-space-2); }
+.kd-set__val { width: 58px; text-align: center; }
+.kd-set__val--time { width: 72px; }
+.kd-set__unit { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-faint); }
+.kd-set__at { color: var(--color-text-faint); font-size: 13px; }
+.kd-set__form select,
+.kd-set__form input { padding: var(--kd-space-2) var(--kd-space-3); font-size: 12px; }
+.kd-set__actions { flex: none; display: flex; gap: var(--kd-space-1); margin-left: auto; }
+.kd-set__actions form { margin: 0; display: inline-flex; }
+
+@media (max-width: 560px) {
+  .kd-set { flex-wrap: wrap; }
+  .kd-set__form { width: 100%; }
+  .kd-set__actions { margin-left: 0; }
+}
+
 /* ---- Responsive : les deux volets s'empilent ---- */
 @media (max-width: 900px) {
   .kd-composer__body { flex-direction: column; }
@@ -2647,7 +3661,31 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
   background: var(--color-surface-raised);
   color: var(--color-text);
 }
-.kd-planweek__add { margin: var(--kd-space-6) 0 0; display: flex; justify-content: center; }
+/* Pied de trame : la durée du plan se construit semaine par semaine (bouton « +1 »)
+   ou par paquet (champ « + N »), il n'y a plus de champ « nombre de semaines ». */
+.kd-planweek__add {
+  margin: var(--kd-space-6) 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: var(--kd-space-4);
+}
+.kd-planweek__addmany { display: flex; align-items: center; gap: var(--kd-space-2); }
+.kd-planweek__addlabel {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-planweek__addcount { width: 4.5em; text-align: center; }
+.kd-planweek__addfull {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
 
 /* Charge de la semaine ventilée par activité (chips + détail dépliable). */
 .kd-weekvol {
@@ -2752,20 +3790,19 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
   position: fixed;
   inset: auto;                 /* neutralise le centrage UA du popover */
   margin: 0;
-  width: min(300px, calc(100vw - 2 * var(--kd-space-6)));
+  width: min(340px, calc(100vw - 2 * var(--kd-space-6)));
   max-height: 60vh;
-  overflow-y: auto;
+  overflow: hidden auto;       /* jamais de débordement latéral, cf. __sum */
   padding: var(--kd-space-5);
-  border: 1px solid var(--color-border);
-  border-radius: var(--kd-radius-lg);
+  /* Contour encre : élément flottant, même règle que .kd-modal. */
+  border: 1px solid var(--color-text);
   background: var(--color-surface-raised);
-  box-shadow: var(--shadow-pop, var(--shadow-card));
 }
 .kd-planpreview__title {
   margin: 0 0 var(--kd-space-3);
-  font-family: var(--font-display);
+  font-family: var(--font-body);
   font-weight: var(--kd-weight-semibold);
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--color-text-strong);
 }
 .kd-planpreview__block { margin-top: var(--kd-space-3); }
@@ -2777,17 +3814,49 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
   letter-spacing: var(--kd-tracking-eyebrow-lg);
   color: var(--color-text-faint);
 }
-.kd-planpreview__exos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.kd-planpreview__exos li {
+.kd-planpreview__exos { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--kd-space-2); }
+/* Nom à gauche, résumé à droite tant que les deux tiennent sur la ligne. Un
+   résumé long repasse sous le nom au lieu de déborder du panneau.
+   `> li` impératif : sans lui, les lignes de la sous-liste `.kd-setlist--preview`
+   héritent de ce wrap + `space-between` et chaque série éclate sur trois lignes. */
+.kd-planpreview__exos > li {
   display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   justify-content: space-between;
-  gap: var(--kd-space-4);
+  gap: 0 var(--kd-space-4);
   font-family: var(--font-body);
   font-size: 12px;
   color: var(--color-text-secondary);
 }
-.kd-planpreview__exoname { min-width: 0; }
-.kd-planpreview__sum { flex: 0 0 auto; font-family: var(--font-mono); font-size: 11px; color: var(--color-text-faint); }
+.kd-planpreview__exoname { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.kd-planpreview__sum {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  text-align: right;
+  overflow-wrap: anywhere;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+/* Exercice en séries détaillées : le nom prend sa ligne, la liste de séries se
+   déploie dessous en pleine largeur (même rendu qu'en vue séance, en plus dense). */
+.kd-planpreview__exo--detailed {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+.kd-setlist--preview {
+  margin: 3px 0 0 2px;
+  padding-left: var(--kd-space-3);
+  border-left: 1px solid var(--color-divider);  /* rattache les séries à leur exercice */
+  gap: 3px;
+}
+.kd-setlist--preview .kd-setline { gap: var(--kd-space-2); font-size: 11px; }
+.kd-setlist--preview .kd-setline__count { flex: 0 0 1.8em; }
+.kd-setlist--preview .kd-setbadge { min-width: 16px; height: 16px; }
+.kd-setlist--preview .kd-setbadge__slot { min-width: 16px; }
 .kd-planpreview__empty { margin: 2px 0 0; font-size: 12px; color: var(--color-text-placeholder); }
 
 /* ----------------------------------------------------------------------------
@@ -2808,17 +3877,9 @@ a.kd-summplan__title:hover { color: var(--color-primary); }
   box-sizing: border-box;
   padding: 2px 4px;
   border: 1px solid var(--color-primary);
-  border-radius: var(--kd-radius-sm);
   background: var(--color-surface-raised);
-  outline: none;
 }
 textarea.kd-inlineedit__input { min-height: 3.2em; resize: vertical; }
-.kd-metafallback > summary {
-  cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  color: var(--color-text-faint);
-}
 
 /* ----------------------------------------------------------------------------
    Mini-modale d'édition rapide (éditeur de plan)
@@ -3079,31 +4140,6 @@ textarea.kd-inlineedit__input { min-height: 3.2em; resize: vertical; }
 }
 .kd-profile__grouphead svg { width: 16px; height: 16px; color: var(--color-text-secondary); }
 
-/* Fieldsets de l'éditeur de fiche (regroupement identité / force / endurance). */
-.kd-profile__fieldset {
-  border: 0;
-  border-top: 1px solid var(--color-divider);
-  padding: var(--kd-space-7) 0 0;
-  margin: var(--kd-space-7) 0 0;
-}
-.kd-profile__fieldset:first-of-type {
-  border-top: 0;
-  padding-top: 0;
-  margin-top: 0;
-}
-.kd-profile__legend {
-  display: flex;
-  align-items: center;
-  gap: var(--kd-space-3);
-  font-family: var(--font-display);
-  font-weight: var(--kd-weight-semibold);
-  font-size: 14px;
-  color: var(--color-text-strong);
-  padding: 0;
-  margin-bottom: var(--kd-space-5);
-}
-.kd-profile__legend svg { width: 16px; height: 16px; color: var(--color-text-secondary); }
-
 /* ── Abonnement calendrier (ICS) ─────────────────────────────────────────────
    Modale « S'abonner » : lien(s) de flux à copier + aide + régénération.
    Réutilise .kd-modal*/.kd-input/.kd-btn ; couleur d'alerte = terracotta
@@ -3149,3 +4185,956 @@ textarea.kd-inlineedit__input { min-height: 3.2em; resize: vertical; }
 .kd-feed__warn svg { flex: none; width: 18px; height: 18px; margin-top: 1px; }
 
 .kd-feed__regen { display: flex; justify-content: flex-end; }
+
+/* ---------------------------------------------------------------------------
+   Exercice prescrit : rappel de l'exercice (lecture seule) en tête du form
+   d'édition, et zones cardio du profil.
+   La couleur reste neutre : l'intensité Z1..Z5 n'est pas une activité, on
+   n'empiète donc pas sur le code terracotta/olive (« la couleur porte du sens »).
+--------------------------------------------------------------------------- */
+.kd-prescribed__exo { margin: 0 0 var(--kd-space-4); }
+
+.kd-hrzones__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-2);
+}
+.kd-hrzone {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  padding: var(--kd-space-3) var(--kd-space-4);
+  border: 1px solid var(--color-border);
+  border-left-width: 4px;
+  border-radius: var(--kd-radius-sm);
+  background: var(--color-surface-subtle);
+}
+.kd-hrzone__tag {
+  flex: none;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.8rem;
+  color: var(--color-text-strong);
+  min-width: 2ch;
+}
+.kd-hrzone__name { flex: 1; color: var(--color-text); }
+.kd-hrzone__bpm {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+/* Rampe d'intensité : le filet gauche remonte l'échelle catégorielle de Z1 au
+   gris le plus clair jusqu'à l'encre pleine en Z4, et bascule sur l'accent en
+   Z5 seulement — le rouge marque le maximum, il ne balise pas la rampe. */
+.kd-hrzone--z1 { border-left-color: var(--color-cat-4); }
+.kd-hrzone--z2 { border-left-color: var(--color-cat-3); }
+.kd-hrzone--z3 { border-left-color: var(--color-cat-2); }
+.kd-hrzone--z4 { border-left-color: var(--color-cat-1); }
+.kd-hrzone--z5 { border-left-color: var(--color-primary); }
+.kd-hrzones__hint {
+  margin: var(--kd-space-4) 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+/* ============================================================================
+   PROFIL — refonte visuelle (en-tête athlète, sections, métriques, fiche)
+   Tout tokenisé. La couleur ne code que l'activité (run/gym) ou le statut ;
+   ailleurs on reste neutre (« la couleur porte du sens »).
+   ========================================================================== */
+
+/* ── En-tête athlète : monogramme + identité + vitals + action ────────────── */
+.kd-phero {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-8);
+  flex-wrap: wrap;
+  padding: var(--kd-space-9) var(--kd-space-10);
+  margin-bottom: var(--kd-space-12);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-xl);
+  box-shadow: var(--shadow-card);
+}
+.kd-phero__avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--kd-radius-full);
+  background: var(--color-primary);
+  color: var(--kd-paper-0);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 28px;
+  line-height: 1;
+  box-shadow: var(--shadow-accent);
+}
+.kd-phero__main { flex: 1 1 12rem; min-width: 0; }
+.kd-phero__name {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-extrabold);
+  font-size: clamp(32px, 5vw, 44px);
+  line-height: .95;
+  letter-spacing: var(--kd-tracking-display);
+  text-transform: uppercase;
+  color: var(--color-text);
+  margin: var(--kd-space-2) 0 0;
+  word-break: break-word;
+}
+.kd-phero__edit { flex: none; align-self: center; }
+/* Plusieurs actions dans l'en-tête (paramètres + édition de la fiche). */
+.kd-phero__actions {
+  flex: none;
+  align-self: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kd-space-4);
+}
+
+.kd-vitals {
+  list-style: none;
+  margin: var(--kd-space-5) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kd-space-3);
+}
+.kd-vitals__item {
+  font-size: 12.5px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text-secondary);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-pill);
+  padding: var(--kd-space-1) var(--kd-space-5);
+}
+
+/* ── Rythme de sections ───────────────────────────────────────────────────── */
+.kd-section { margin-bottom: var(--kd-space-13); }
+.kd-section:last-child { margin-bottom: 0; }
+.kd-section__block { margin-bottom: var(--kd-space-6); }
+.kd-section__block:last-child { margin-bottom: 0; }
+
+/* ── Métrique compacte (compteurs de bibliothèque) ────────────────────────── */
+.kd-metric {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-6);
+  padding: var(--kd-space-7) var(--kd-space-8);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+}
+.kd-metric__icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px; height: 40px;
+  border-radius: var(--kd-radius-md);
+  background: var(--color-primary-tint);
+  color: var(--color-primary);
+}
+.kd-metric__icon svg { width: 20px; height: 20px; }
+.kd-metric__value {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 24px;
+  line-height: 1;
+  color: var(--color-text-strong);
+}
+.kd-metric__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin-top: var(--kd-space-2);
+}
+
+/* ── Répartition par activité : barres proportionnelles ───────────────────── */
+.kd-actbars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kd-space-6);
+}
+.kd-actbar__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kd-space-4);
+  margin-bottom: var(--kd-space-3);
+}
+.kd-actbar__count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+.kd-actbar__track {
+  height: 8px;
+  border-radius: var(--kd-radius-pill);
+  background: var(--color-surface-subtle);
+  overflow: hidden;
+}
+.kd-actbar__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-border-strong);
+  transition: width .2s ease;
+}
+.kd-actbar__fill--run { background: var(--color-activity-run); }
+.kd-actbar__fill--gym { background: var(--color-activity-gym); }
+
+/* ── Fiche : définitions « ligne à ligne » (label à gauche, valeur à droite,
+   filet fin entre chaque). Plus lisible que la grille 150px dans une carte
+   étroite. ─────────────────────────────────────────────────────────────────── */
+.kd-deflist--profile {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0 var(--kd-space-5);
+  margin: 0;
+}
+.kd-deflist--profile dt {
+  padding: var(--kd-space-4) 0;
+  border-top: 1px solid var(--color-divider);
+  text-transform: none;
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: normal;
+  font-weight: var(--kd-weight-regular);
+  color: var(--color-text-secondary);
+}
+.kd-deflist--profile dd {
+  padding: var(--kd-space-4) 0;
+  margin: 0;
+  border-top: 1px solid var(--color-divider);
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--color-text-strong);
+}
+.kd-deflist--profile dt:first-of-type,
+.kd-deflist--profile dd:first-of-type { border-top: 0; }
+.kd-deflist__empty { color: var(--color-text-placeholder); }
+/* Valeur dérivée (IMC, Total SBD, DOTS) : accentuée, elle se calcule pour toi. */
+.kd-deflist__derived {
+  color: var(--color-primary-on-tint);
+  font-weight: var(--kd-weight-bold);
+}
+
+.kd-profile__bio {
+  white-space: pre-line;
+  color: var(--color-text);
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ============================================================================
+   PROFIL — éditeur de fiche (sections en cartes + grilles)
+   ========================================================================== */
+.kd-editform { display: flex; flex-direction: column; gap: var(--kd-space-8); }
+
+.kd-formsection { padding: var(--kd-space-9) var(--kd-space-10); }
+.kd-formsection__head {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--kd-space-5);
+  padding-bottom: var(--kd-space-7);
+  margin-bottom: var(--kd-space-7);
+  border-bottom: 1px solid var(--color-divider);
+}
+.kd-formsection__icon {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px; height: 38px;
+  border-radius: var(--kd-radius-md);
+  background: var(--color-surface-subtle);
+  color: var(--color-text-secondary);
+}
+.kd-formsection__icon svg { width: 19px; height: 19px; }
+.kd-formsection__icon--run { background: var(--color-activity-run-tint); color: var(--color-activity-run); }
+.kd-formsection__icon--gym { background: var(--color-activity-gym-tint); color: var(--color-activity-gym); }
+.kd-formsection__title {
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 19px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--color-text);
+  margin: 0;
+}
+.kd-formsection__hint {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--color-text-soft);
+  margin: var(--kd-space-2) 0 0;
+  max-width: 62ch;
+}
+
+.kd-formgrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--kd-space-6) var(--kd-space-8);
+}
+.kd-formgrid + .kd-formgrid { margin-top: var(--kd-space-6); }
+.kd-formgrid--full { grid-template-columns: 1fr; }
+.kd-formgrid--zones { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 900px) {
+  .kd-formgrid, .kd-formgrid--zones { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 560px) {
+  .kd-formgrid, .kd-formgrid--zones { grid-template-columns: 1fr; }
+}
+
+/* Barre d'action collante en bas de l'éditeur. */
+.kd-editform__bar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--kd-space-4);
+  padding: var(--kd-space-6) 0;
+  margin-top: var(--kd-space-2);
+  background: linear-gradient(to top, var(--color-surface) 60%, transparent);
+}
+
+/* ============================================================================
+   OBJECTIFS DATÉS (Goal) — cartes, hero, compte à rebours, marqueurs calendrier.
+   Priorité : A ressort en accent primaire (LE pic visé), B/C restent sobres.
+   La couleur reste réservée aux activités/statuts ; la priorité joue sur le
+   contraste, pas sur une couleur métier.
+   ============================================================================ */
+
+/* --- Badge de priorité A/B/C --- */
+.kd-prio {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 var(--kd-space-2);
+  border-radius: var(--kd-radius-sm);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: var(--kd-weight-bold);
+  line-height: 1;
+}
+.kd-prio--a { background: var(--color-primary-tint); color: var(--color-primary-on-tint); }
+.kd-prio--b { background: var(--color-surface-subtle); color: var(--color-text-strong); border: 1px solid var(--color-border); }
+.kd-prio--c { background: transparent; color: var(--color-text-secondary); border: 1px solid var(--color-border); }
+
+/* --- Liste d'objectifs (index, profil) --- */
+.kd-goallist {
+  display: grid;
+  gap: var(--kd-space-4);
+}
+
+/* ----------------------------------------------------------------------------
+   Objectif ↔ Plan (relation N:N)
+   Le bandeau de l'éditeur de plan (« à quoi sert ce plan ») et la liste des plans
+   de préparation sur la fiche objectif. Couleur : terracotta, l'objectif est un
+   accent primaire dans les maquettes — jamais une couleur d'activité.
+   ---------------------------------------------------------------------------- */
+.kd-plangoals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-3);
+  margin: var(--kd-space-5) 0 0;
+}
+.kd-plangoals__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+}
+.kd-plangoals__label svg { width: 13px; height: 13px; }
+.kd-plangoals__empty { font-size: 12px; color: var(--color-text-placeholder); }
+.kd-plangoals__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  padding: var(--kd-space-1) var(--kd-space-2) var(--kd-space-1) var(--kd-space-4);
+  border-radius: var(--kd-radius-pill);
+  background: var(--color-primary-tint);
+  font-size: 12px;
+}
+.kd-plangoals__pill a { color: var(--color-primary-on-tint); font-weight: var(--kd-weight-semibold); }
+.kd-plangoals__days { font-family: var(--font-mono); font-size: 10px; color: var(--color-primary); }
+.kd-plangoals__remove {
+  display: inline-flex;
+  padding: 2px;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  color: var(--color-primary);
+  border-radius: var(--kd-radius-full);
+}
+.kd-plangoals__remove:hover { background: var(--color-surface-raised); }
+.kd-plangoals__remove svg { width: 12px; height: 12px; }
+.kd-plangoals__add { display: flex; align-items: center; gap: var(--kd-space-2); }
+.kd-plangoals__select { max-width: 220px; }
+
+.kd-goalplans { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--kd-space-2); }
+.kd-goalplan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-3);
+  padding: var(--kd-space-3) 0;
+  border-bottom: 1px solid var(--color-divider-soft);
+}
+.kd-goalplan:last-child { border-bottom: 0; }
+.kd-goalplan__name { font-weight: var(--kd-weight-semibold); color: var(--color-text-strong); }
+.kd-goalplan__actions { margin-left: auto; display: flex; align-items: center; gap: var(--kd-space-2); }
+.kd-goalplans__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kd-space-3);
+  margin-top: var(--kd-space-5);
+}
+.kd-goalplans__attach { display: flex; align-items: center; gap: var(--kd-space-2); }
+.kd-goalplans__attach select { max-width: 260px; }
+
+.kd-goalcard {
+  display: flex;
+  align-items: stretch;
+  gap: var(--kd-space-7);
+  text-decoration: none;
+  color: inherit;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-6) var(--kd-space-8);
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.kd-goalcard:hover { border-color: var(--color-border-strong); box-shadow: var(--shadow-card); }
+.kd-goalcard.is-past { opacity: .7; }
+
+.kd-goalcard__count {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 74px;
+  padding-right: var(--kd-space-7);
+  border-right: 1px solid var(--color-divider);
+}
+.kd-goalcard__num {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: var(--kd-weight-bold);
+  color: var(--color-primary);
+  line-height: 1;
+}
+.kd-goalcard__num--now { color: var(--color-primary); }
+.kd-goalcard__num--past { color: var(--color-text-secondary); }
+.kd-goalcard__date {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin-top: var(--kd-space-2);
+}
+
+.kd-goalcard__body { display: flex; flex-direction: column; gap: var(--kd-space-3); justify-content: center; min-width: 0; }
+.kd-goalcard__top { display: flex; align-items: center; gap: var(--kd-space-3); }
+.kd-goalcard__title {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-strong);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-goalcard__meta { display: flex; align-items: center; flex-wrap: wrap; gap: var(--kd-space-4); }
+.kd-goalcard__target {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.kd-goalcard__target svg { width: 14px; height: 14px; }
+
+@media (max-width: 560px) {
+  .kd-goalcard { flex-direction: column; gap: var(--kd-space-4); }
+  .kd-goalcard__count {
+    flex-direction: row;
+    gap: var(--kd-space-3);
+    min-width: 0;
+    padding-right: 0;
+    padding-bottom: var(--kd-space-4);
+    border-right: none;
+    border-bottom: 1px solid var(--color-divider);
+    align-self: stretch;
+    justify-content: flex-start;
+  }
+  .kd-goalcard__date { margin-top: 0; }
+  .kd-goalcard__title { white-space: normal; }
+}
+
+/* --- En-tête de la page objectif (hero avec compte à rebours) --- */
+.kd-goalhero {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-9);
+  flex-wrap: wrap;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-primary);
+  border-radius: var(--kd-radius-xl);
+  padding: var(--kd-space-9) var(--kd-space-10);
+  margin-bottom: var(--kd-space-9);
+}
+.kd-goalhero__count {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-right: var(--kd-space-9);
+  border-right: 1px solid var(--color-divider);
+}
+.kd-goalhero__num {
+  font-family: var(--font-display);
+  font-size: 40px;
+  font-weight: var(--kd-weight-bold);
+  color: var(--color-primary);
+  line-height: 1;
+}
+.kd-goalhero__num--past { color: var(--color-text-secondary); }
+.kd-goalhero__unit {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: var(--kd-tracking-eyebrow);
+  color: var(--color-text-faint);
+  margin-top: var(--kd-space-2);
+}
+.kd-goalhero__main { flex: 1 1 220px; min-width: 0; }
+.kd-goalhero__top { display: flex; align-items: center; gap: var(--kd-space-4); }
+.kd-goalhero__top .kd-title { margin: 0; }
+.kd-goalhero__actions { display: flex; gap: var(--kd-space-4); flex-wrap: wrap; align-items: center; }
+
+@media (max-width: 560px) {
+  .kd-goalhero__count { padding-right: 0; border-right: none; }
+}
+
+/* --- Formulaire : section résultat --- */
+.kd-goalresult {
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-6) var(--kd-space-7) var(--kd-space-3);
+  margin: var(--kd-space-4) 0 var(--kd-space-7);
+}
+.kd-goalresult__legend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  padding: 0 var(--kd-space-3);
+}
+.kd-goalresult__legend svg { width: 13px; height: 13px; }
+
+/* --- Formulaire « préparer avec un plan » --- */
+.kd-goalprepare {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--kd-space-5);
+  flex-wrap: wrap;
+  margin-top: var(--kd-space-5);
+}
+.kd-goalprepare .kd-field { flex: 1 1 260px; margin: 0; }
+
+/* --- Séances menant à l'échéance --- */
+.kd-goallead { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--kd-space-2); }
+.kd-goallead__row {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-6);
+  padding: var(--kd-space-4) var(--kd-space-6);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-md);
+}
+.kd-goallead__date {
+  flex: 0 0 auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-faint);
+  min-width: 44px;
+}
+.kd-goallead__title {
+  flex: 1 1 auto;
+  color: var(--color-text-strong);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-goallead__title:hover { color: var(--color-primary); }
+
+/* --- Bandeau compte à rebours (calendrier) --- */
+.kd-goalbanner {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-6);
+  text-decoration: none;
+  color: inherit;
+  background: var(--color-primary-tint);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-5) var(--kd-space-8);
+  margin-bottom: var(--kd-space-6);
+}
+.kd-goalbanner__icon { display: inline-flex; color: var(--color-primary-on-tint); }
+.kd-goalbanner__icon svg { width: 20px; height: 20px; }
+.kd-goalbanner__count {
+  flex: 0 0 auto;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: var(--kd-weight-bold);
+  color: var(--color-primary-on-tint);
+}
+.kd-goalbanner__body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kd-goalbanner__label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: var(--kd-tracking-eyebrow);
+  color: var(--color-primary-on-tint);
+  opacity: .8;
+}
+.kd-goalbanner__title {
+  font-size: 14px;
+  font-weight: var(--kd-weight-medium);
+  color: var(--color-text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.kd-goalbanner__chev { flex: 0 0 auto; color: var(--color-primary-on-tint); }
+.kd-goalbanner__chev svg { width: 18px; height: 18px; }
+
+/* --- Marqueur d'objectif sur une case du calendrier --- */
+.kd-calgoal {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  text-decoration: none;
+  background: var(--color-primary-tint);
+  color: var(--color-primary-on-tint);
+  border-radius: var(--kd-radius-xs);
+  padding: 2px var(--kd-space-2);
+  margin-bottom: 2px;
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  line-height: 1.3;
+}
+.kd-calgoal svg { width: 12px; height: 12px; flex: 0 0 auto; }
+.kd-calgoal span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kd-calgoal--week { font-size: 12px; padding: var(--kd-space-2) var(--kd-space-3); margin-bottom: var(--kd-space-3); }
+.kd-calday--goal .kd-calday__num { color: var(--color-primary); font-weight: var(--kd-weight-bold); }
+
+/* ============================================================================
+   Progression prévue (plan_template/show) — barres proportionnelles par semaine.
+   Rendu 100 % serveur (aucune lib de charts). La couleur reste réservée aux
+   activités ; barre neutre par défaut. Voir components/_progression.html.twig.
+   ========================================================================== */
+.kd-prog { margin-top: var(--kd-space-11); }
+.kd-prog__lead {
+  margin: 0 0 var(--kd-space-8);
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.kd-prog__part + .kd-prog__part {
+  margin-top: var(--kd-space-11);
+  padding-top: var(--kd-space-9);
+  border-top: 1px solid var(--color-divider);
+}
+.kd-prog__subtitle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--kd-weight-semibold);
+  letter-spacing: var(--kd-tracking-eyebrow);
+  text-transform: uppercase;
+  color: var(--color-text-faint);
+  margin: 0 0 var(--kd-space-7);
+}
+
+/* Séries de charge : une ligne par métrique (temps, tonnage, distance…) */
+.kd-prog__series { display: flex; flex-direction: column; gap: var(--kd-space-9); }
+.kd-prog__rowhead {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-strong);
+  margin-bottom: var(--kd-space-4);
+}
+.kd-prog__dot {
+  width: 9px; height: 9px;
+  border-radius: var(--kd-radius-full);
+  background: var(--color-border-strong);
+  flex: 0 0 auto;
+}
+.kd-prog__dot--run { background: var(--color-activity-run); }
+.kd-prog__dot--gym { background: var(--color-activity-gym); }
+
+/* Grille de colonnes : une par semaine, barre alignée en bas */
+.kd-prog__bars {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(28px, 1fr);
+  gap: var(--kd-space-3);
+  align-items: end;
+  overflow-x: auto;
+}
+.kd-prog__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--kd-space-2);
+  min-width: 28px;
+}
+.kd-prog__track {
+  width: 100%;
+  height: 96px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: var(--color-surface-subtle);
+  border-radius: var(--kd-radius-sm);
+}
+.kd-prog__bar {
+  display: block;
+  width: 100%;
+  min-height: 3px;
+  border-radius: var(--kd-radius-sm);
+  background: var(--color-border-strong);
+}
+.kd-prog__bar--run { background: var(--color-activity-run); }
+.kd-prog__bar--gym { background: var(--color-activity-gym); }
+.kd-prog__col.is-empty .kd-prog__track { opacity: .5; }
+.kd-prog__val {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  text-align: center;
+  line-height: 1.2;
+  min-height: 1.2em;
+}
+.kd-prog__wk {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--color-text-faint);
+}
+
+/* Trajectoire d'un exercice : sélecteur + charts empilés (un visible) */
+.kd-prog__trajhead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--kd-space-6);
+  flex-wrap: wrap;
+  margin-bottom: var(--kd-space-7);
+}
+.kd-prog__trajhead .kd-prog__subtitle { margin: 0; }
+.kd-prog__chart + .kd-prog__chart { margin-top: var(--kd-space-9); }
+.kd-prog__caption {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kd-space-3) var(--kd-space-4);
+  margin-bottom: var(--kd-space-6);
+}
+.kd-prog__exname { font-family: var(--font-body); font-weight: var(--kd-weight-semibold); color: var(--color-text-strong); }
+.kd-prog__metric { font-family: var(--font-mono); font-size: 11px; color: var(--color-text-faint); }
+.kd-prog__trend {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--kd-space-2);
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-secondary);
+}
+.kd-prog__trend svg { width: 14px; height: 14px; }
+.kd-prog__trend--up svg { color: var(--color-status-done); }
+.kd-prog__trend--down svg { color: var(--color-status-missed); }
+.kd-prog__hint {
+  margin: var(--kd-space-4) 0 0;
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+
+/* ============================================================================
+   COACHING — relation coach ↔ athlète (page unique /coaching, fiche de travail
+   par athlète sous /coach).
+   Aucune couleur métier propre : le statut de relation réutilise les tokens de
+   statut de séance (done / planned / missed) via CoachingStatus::modifier(),
+   comme le fait GoalOutcome. Le reste est neutre.
+   ========================================================================== */
+
+.kd-coachlist {
+  display: grid;
+  gap: var(--kd-space-4);
+}
+
+/* ── Carte de relation : monogramme + identité + statut + actions ─────────── */
+.kd-coachcard {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-6);
+  flex-wrap: wrap;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--kd-radius-lg);
+  padding: var(--kd-space-6) var(--kd-space-8);
+  transition: border-color .12s ease, box-shadow .12s ease;
+}
+.kd-coachcard:hover { border-color: var(--color-border-strong); box-shadow: var(--shadow-card); }
+/* Relation inactive (demande en attente, refusée, terminée) : présente mais en retrait. */
+.kd-coachcard.is-muted { opacity: .75; }
+
+.kd-coachcard__avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--kd-radius-full);
+  background: var(--color-surface-subtle);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-strong);
+  font-family: var(--font-display);
+  font-weight: var(--kd-weight-bold);
+  font-size: 17px;
+  line-height: 1;
+}
+
+.kd-coachcard__body { flex: 1 1 14rem; min-width: 0; }
+.kd-coachcard__top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--kd-space-3) var(--kd-space-4);
+}
+.kd-coachcard__name {
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: var(--kd-weight-semibold);
+  color: var(--color-text-strong);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kd-coachcard__name a { color: inherit; text-decoration: none; }
+.kd-coachcard__name a:hover { color: var(--color-primary); }
+.kd-coachcard__role {
+  margin: var(--kd-space-2) 0 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.kd-coachcard__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-3);
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+.kd-coachcard__actions form { margin: 0; }
+
+/* ── Formulaires courts (invitation, création, pose) : une ligne qui s'empile ─ */
+.kd-coachform {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--kd-space-4);
+  flex-wrap: wrap;
+}
+.kd-coachform__field { flex: 1 1 14rem; min-width: 0; }
+.kd-coachform__field--narrow { flex: 0 1 9rem; }
+.kd-coachform__hint {
+  flex-basis: 100%;
+  margin: var(--kd-space-3) 0 0;
+  font-size: 12px;
+  color: var(--color-text-faint);
+}
+/* Placé avant le formulaire, l'indice garde sa marge basse plutôt que haute. */
+.kd-card > .kd-coachform__hint:not(:last-child) { margin: 0 0 var(--kd-space-5); }
+
+/* ── Listes compactes (séances, plans, prochaines dates d'un athlète) ─────── */
+.kd-coachitems {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.kd-coachitem {
+  display: flex;
+  align-items: center;
+  gap: var(--kd-space-4);
+  padding: var(--kd-space-4) 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+.kd-coachitem:last-child { border-bottom: none; }
+.kd-coachitem__name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-strong);
+  text-decoration: none;
+  font-weight: var(--kd-weight-medium);
+}
+a.kd-coachitem__name:hover { color: var(--color-primary); }
+.kd-coachitem__meta {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+.kd-coachitem__date {
+  flex: none;
+  min-width: 42px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 560px) {
+  .kd-coachcard__actions { margin-left: 0; flex-basis: 100%; }
+  .kd-coachform__field,
+  .kd-coachform__field--narrow { flex-basis: 100%; }
+}

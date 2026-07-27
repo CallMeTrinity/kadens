@@ -109,6 +109,28 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(nullable: true)]
     private ?int $swim100mSeconds = null;
 
+    // --- Fiche athlète : zones cardio (BPM) ---------------------------------
+    // FC max/repos alimentent la dérivation Karvonen (service HeartRateZones) ;
+    // les hrZoneNMax surchargent la borne haute d'une zone (null = dérivée).
+
+    #[ORM\Column(nullable: true)]
+    private ?int $maxHeartRate = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $restingHeartRate = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $hrZone1Max = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $hrZone2Max = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $hrZone3Max = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $hrZone4Max = null;
+
     /**
      * @var Collection<int, Exercise>
      */
@@ -133,12 +155,37 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\OneToMany(targetEntity: ScheduledWorkout::class, mappedBy: 'owner')]
     private Collection $scheduledWorkouts;
 
+    /**
+     * @var Collection<int, Goal>
+     */
+    #[ORM\OneToMany(targetEntity: Goal::class, mappedBy: 'owner')]
+    private Collection $goals;
+
+    /**
+     * Relations où cet utilisateur entraîne quelqu'un.
+     *
+     * @var Collection<int, Coaching>
+     */
+    #[ORM\OneToMany(targetEntity: Coaching::class, mappedBy: 'coach')]
+    private Collection $coachingAsCoach;
+
+    /**
+     * Relations où cet utilisateur est entraîné.
+     *
+     * @var Collection<int, Coaching>
+     */
+    #[ORM\OneToMany(targetEntity: Coaching::class, mappedBy: 'athlete')]
+    private Collection $coachingAsAthlete;
+
     public function __construct()
     {
         $this->exercises = new ArrayCollection();
         $this->workouts = new ArrayCollection();
         $this->planTemplates = new ArrayCollection();
         $this->scheduledWorkouts = new ArrayCollection();
+        $this->goals = new ArrayCollection();
+        $this->coachingAsCoach = new ArrayCollection();
+        $this->coachingAsAthlete = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -494,6 +541,78 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    public function getMaxHeartRate(): ?int
+    {
+        return $this->maxHeartRate;
+    }
+
+    public function setMaxHeartRate(?int $maxHeartRate): static
+    {
+        $this->maxHeartRate = $maxHeartRate;
+
+        return $this;
+    }
+
+    public function getRestingHeartRate(): ?int
+    {
+        return $this->restingHeartRate;
+    }
+
+    public function setRestingHeartRate(?int $restingHeartRate): static
+    {
+        $this->restingHeartRate = $restingHeartRate;
+
+        return $this;
+    }
+
+    public function getHrZone1Max(): ?int
+    {
+        return $this->hrZone1Max;
+    }
+
+    public function setHrZone1Max(?int $hrZone1Max): static
+    {
+        $this->hrZone1Max = $hrZone1Max;
+
+        return $this;
+    }
+
+    public function getHrZone2Max(): ?int
+    {
+        return $this->hrZone2Max;
+    }
+
+    public function setHrZone2Max(?int $hrZone2Max): static
+    {
+        $this->hrZone2Max = $hrZone2Max;
+
+        return $this;
+    }
+
+    public function getHrZone3Max(): ?int
+    {
+        return $this->hrZone3Max;
+    }
+
+    public function setHrZone3Max(?int $hrZone3Max): static
+    {
+        $this->hrZone3Max = $hrZone3Max;
+
+        return $this;
+    }
+
+    public function getHrZone4Max(): ?int
+    {
+        return $this->hrZone4Max;
+    }
+
+    public function setHrZone4Max(?int $hrZone4Max): static
+    {
+        $this->hrZone4Max = $hrZone4Max;
+
+        return $this;
+    }
+
     /**
      * IMC dérivé (poids / taille²), arrondi à une décimale, si taille et poids
      * sont renseignés.
@@ -623,6 +742,102 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             // set the owning side to null (unless already changed)
             if ($scheduledWorkout->getOwner() === $this) {
                 $scheduledWorkout->setOwner(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Goal>
+     */
+    public function getGoals(): Collection
+    {
+        return $this->goals;
+    }
+
+    public function addGoal(Goal $goal): static
+    {
+        if (!$this->goals->contains($goal)) {
+            $this->goals->add($goal);
+            $goal->setOwner($this);
+        }
+
+        return $this;
+    }
+
+    public function removeGoal(Goal $goal): static
+    {
+        if ($this->goals->removeElement($goal)) {
+            if ($goal->getOwner() === $this) {
+                $goal->setOwner(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Rôle coach (accordé par `app:user:promote-coach`). Ne remplace pas
+     * ROLE_USER : un coach reste un athlète et garde son propre contenu.
+     */
+    public function isCoach(): bool
+    {
+        return \in_array('ROLE_COACH', $this->getRoles(), true);
+    }
+
+    /**
+     * @return Collection<int, Coaching>
+     */
+    public function getCoachingAsCoach(): Collection
+    {
+        return $this->coachingAsCoach;
+    }
+
+    public function addCoachingAsCoach(Coaching $coaching): static
+    {
+        if (!$this->coachingAsCoach->contains($coaching)) {
+            $this->coachingAsCoach->add($coaching);
+            $coaching->setCoach($this);
+        }
+
+        return $this;
+    }
+
+    public function removeCoachingAsCoach(Coaching $coaching): static
+    {
+        if ($this->coachingAsCoach->removeElement($coaching)) {
+            if ($coaching->getCoach() === $this) {
+                $coaching->setCoach(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Coaching>
+     */
+    public function getCoachingAsAthlete(): Collection
+    {
+        return $this->coachingAsAthlete;
+    }
+
+    public function addCoachingAsAthlete(Coaching $coaching): static
+    {
+        if (!$this->coachingAsAthlete->contains($coaching)) {
+            $this->coachingAsAthlete->add($coaching);
+            $coaching->setAthlete($this);
+        }
+
+        return $this;
+    }
+
+    public function removeCoachingAsAthlete(Coaching $coaching): static
+    {
+        if ($this->coachingAsAthlete->removeElement($coaching)) {
+            if ($coaching->getAthlete() === $this) {
+                $coaching->setAthlete(null);
             }
         }
 

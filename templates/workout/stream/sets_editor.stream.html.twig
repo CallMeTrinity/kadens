@@ -1,0 +1,17 @@
+{# Réponse d'une mutation structurelle des séries (ajout/retrait/déplacement,
+   passage simple <-> détaillé). On re-rend tout le panneau de paramètres
+   (#prescribed-params-{id} : formulaire prescrit + éditeur de séries) pour que la
+   visibilité des champs scalaires suive le mode, ET la pastille de résumé
+   (#cexo-row-{id}). Le conteneur .kd-cexo__params (avec son `hidden`) survit :
+   on ne remplace que son contenu, le panneau reste ouvert. Contexte :
+   workout, prescribed, prescribedForm, setForms, summary. #}
+<turbo-stream action="update" target="prescribed-params-{{ prescribed.id }}">
+    <template>
+        {{ include('workout/_prescribed_params.html.twig') }}
+    </template>
+</turbo-stream>
+<turbo-stream action="replace" target="cexo-row-{{ prescribed.id }}">
+    <template>
+        {{ include('workout/_cexo_row.html.twig') }}
+    </template>
+</turbo-stream>

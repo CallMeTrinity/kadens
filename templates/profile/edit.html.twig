@@ -9,50 +9,94 @@
 
     <div class="kd-pagehead">
         <div>
-            <p class="kd-eyebrow">Profil</p>
+            <p class="kd-eyebrow kd-eyebrow--accent">Profil</p>
             <h1 class="kd-title">Fiche athlète</h1>
-            <p class="kd-lead">Tout est facultatif. Poids et charges en kg, temps en <code>mm:ss</code> ou <code>h:mm:ss</code>.</p>
+            <p class="kd-lead">Tout est facultatif, la fiche se remplit à ton rythme. Poids et charges en kg, temps en <code>mm:ss</code> ou <code>h:mm:ss</code>.</p>
         </div>
     </div>
 
-    <div class="kd-card" style="max-width:720px;">
-        {{ form_start(form) }}
-            <fieldset class="kd-profile__fieldset">
-                <legend class="kd-profile__legend">{{ ux_icon('lucide:user') }} Identité</legend>
+    {{ form_start(form, {attr: {class: 'kd-editform'}}) }}
+        <section class="kd-card kd-formsection">
+            <header class="kd-formsection__head">
+                <span class="kd-formsection__icon">{{ ux_icon('lucide:user') }}</span>
+                <div>
+                    <h2 class="kd-formsection__title">Identité</h2>
+                    <p class="kd-formsection__hint">Âge, gabarit et objectif. L'IMC est calculé pour toi.</p>
+                </div>
+            </header>
+            <div class="kd-formgrid">
                 {{ form_row(form.birthDate) }}
                 {{ form_row(form.sex) }}
                 {{ form_row(form.heightCm) }}
                 {{ form_row(form.weightKg) }}
                 {{ form_row(form.trainingYears) }}
                 {{ form_row(form.mainGoal) }}
+            </div>
+            <div class="kd-formgrid kd-formgrid--full">
                 {{ form_row(form.bio) }}
-            </fieldset>
+            </div>
+        </section>
 
-            <fieldset class="kd-profile__fieldset">
-                <legend class="kd-profile__legend">{{ ux_icon('lucide:dumbbell') }} Records de force (1RM)</legend>
+        <section class="kd-card kd-formsection">
+            <header class="kd-formsection__head">
+                <span class="kd-formsection__icon kd-formsection__icon--gym">{{ ux_icon('lucide:dumbbell') }}</span>
+                <div>
+                    <h2 class="kd-formsection__title">Records de force (1RM)</h2>
+                    <p class="kd-formsection__hint">Charge maximale sur une répétition. Le total SBD et le score DOTS en découlent.</p>
+                </div>
+            </header>
+            <div class="kd-formgrid">
                 {{ form_row(form.squat1rmKg) }}
                 {{ form_row(form.bench1rmKg) }}
                 {{ form_row(form.deadlift1rmKg) }}
                 {{ form_row(form.ohp1rmKg) }}
                 {{ form_row(form.weightedPullupKg) }}
-            </fieldset>
+            </div>
+        </section>
 
-            <fieldset class="kd-profile__fieldset">
-                <legend class="kd-profile__legend">{{ ux_icon('lucide:footprints') }} Records d'endurance</legend>
+        <section class="kd-card kd-formsection">
+            <header class="kd-formsection__head">
+                <span class="kd-formsection__icon kd-formsection__icon--run">{{ ux_icon('lucide:footprints') }}</span>
+                <div>
+                    <h2 class="kd-formsection__title">Records d'endurance</h2>
+                    <p class="kd-formsection__hint">Tes meilleurs chronos et ta puissance vélo.</p>
+                </div>
+            </header>
+            <div class="kd-formgrid">
                 {{ form_row(form.run5kSeconds) }}
                 {{ form_row(form.run10kSeconds) }}
                 {{ form_row(form.halfMarathonSeconds) }}
                 {{ form_row(form.marathonSeconds) }}
                 {{ form_row(form.cyclingFtpWatts) }}
                 {{ form_row(form.swim100mSeconds) }}
-            </fieldset>
-
-            <div class="kd-formactions">
-                <button type="submit" class="kd-btn kd-btn--primary">
-                    {{ ux_icon('lucide:save') }} Enregistrer
-                </button>
-                <a href="{{ path('app_profile') }}" class="kd-btn kd-btn--ghost">Annuler</a>
             </div>
-        {{ form_end(form) }}
-    </div>
+        </section>
+
+        <section class="kd-card kd-formsection">
+            <header class="kd-formsection__head">
+                <span class="kd-formsection__icon kd-formsection__icon--run">{{ ux_icon('lucide:heart-pulse') }}</span>
+                <div>
+                    <h2 class="kd-formsection__title">Cardio & zones d'intensité</h2>
+                    <p class="kd-formsection__hint">FC max et repos suffisent : les zones Z1–Z5 se calculent (Karvonen). Les bornes ci-dessous ne servent qu'à surcharger une zone (laisse « auto » sinon).</p>
+                </div>
+            </header>
+            <div class="kd-formgrid">
+                {{ form_row(form.maxHeartRate) }}
+                {{ form_row(form.restingHeartRate) }}
+            </div>
+            <div class="kd-formgrid kd-formgrid--zones">
+                {{ form_row(form.hrZone1Max) }}
+                {{ form_row(form.hrZone2Max) }}
+                {{ form_row(form.hrZone3Max) }}
+                {{ form_row(form.hrZone4Max) }}
+            </div>
+        </section>
+
+        <div class="kd-editform__bar">
+            <a href="{{ path('app_profile') }}" class="kd-btn kd-btn--ghost">Annuler</a>
+            <button type="submit" class="kd-btn kd-btn--primary">
+                {{ ux_icon('lucide:save') }} Enregistrer
+            </button>
+        </div>
+    {{ form_end(form) }}
 {% endblock %}

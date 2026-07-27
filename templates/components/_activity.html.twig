@@ -1,15 +1,18 @@
 {# ============================================================================
    Composant activité — source unique du couple (icône Lucide, modificateur de
    couleur) par ActivityType. À réutiliser partout où une activité s'affiche
-   (séances, calendrier, etc.). La couleur ne porte du sens que pour course/trail
-   (terracotta) et muscu/renfo (olive) ; les autres activités restent neutres
-   (règle « la couleur porte du sens »).
+   (séances, calendrier, etc.).
+
+   L'activité est portée par l'ICÔNE ; le modificateur ne fait que la ranger
+   dans l'échelle catégorielle en niveaux de gris (--color-cat-*). C'est ce qui
+   permet de couvrir les cinq activités : l'ancienne palette n'en codait que
+   deux (course, muscu) faute d'une troisième couleur disponible.
 
    Usage :
      {% import 'components/_activity.html.twig' as activity %}
-     {{ activity.badge(exercise.activity) }}          {# pastille icône + label #}
-     {{ activity.icon(exercise.activity) }}            {# 'lucide:...'          #}
-     {{ activity.modifier(exercise.activity) }}        {# 'run' | 'gym' | ''    #}
+     {{ activity.badge(exercise.activity) }}   {# pastille icône + label        #}
+     {{ activity.icon(exercise.activity) }}     {# 'lucide:...'                 #}
+     {{ activity.modifier(exercise.activity) }} {# 'run'|'gym'|'swim'|'bike'|…  #}
    ============================================================================ #}
 
 {%- macro icon(activity) -%}
@@ -21,7 +24,10 @@
 {%- endmacro -%}
 
 {%- macro modifier(activity) -%}
-    {{- {'running': 'run', 'gym': 'gym'}[activity.value] ?? '' -}}
+    {{- {
+        'running': 'run', 'gym': 'gym', 'swimming': 'swim',
+        'cycling': 'bike', 'mobility': 'mobility',
+    }[activity.value] ?? '' -}}
 {%- endmacro -%}
 
 {%- macro badge(activity, with_label = true) -%}

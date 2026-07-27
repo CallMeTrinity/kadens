@@ -4,6 +4,7 @@ namespace App\Security\Voter;
 
 use App\Entity\PlanTemplate;
 use App\Entity\User;
+use App\Service\CoachingResolver;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Security\Core\Authentication\Token\TokenInterface;
 use Symfony\Component\Security\Core\Authorization\Voter\Vote;
@@ -16,6 +17,8 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
  * - Plan AVEC owner : voir/éditer/supprimer réservé au propriétaire.
  * - Plan SANS owner (owner null) : future bibliothèque globale de plans,
  *   lecture ouverte à tous, édition/suppression réservées à un ROLE_ADMIN.
+ * - Plan d'un athlète coaché : son coach **accepté** est co-éditeur, et peut
+ *   donc bâtir un plan directement dans l'éditeur de plan habituel.
  *
  * Un éventuel partage public en lecture (slug) passera par une route dédiée,
  * pas par ce voter.
@@ -26,8 +29,10 @@ final class PlanTemplateVoter extends Voter
     public const EDIT = 'PLAN_TEMPLATE_EDIT';
     public const DELETE = 'PLAN_TEMPLATE_DELETE';
 
-    public function __construct(private readonly Security $security)
-    {
+    public function __construct(
+        private readonly Security $security,
+        private readonly CoachingResolver $coachingResolver,
+    ) {
     }
 
     protected function supports(string $attribute, mixed $subject): bool
@@ -39,7 +44,9 @@ final class PlanTemplateVoter extends Voter
     protected function voteOnAttribute(string $attribute, mixed $subject, TokenInterface $token, ?Vote $vote = null): bool
     {
         /** @var PlanTemplate $subject */
-        if (null === $subject->getOwner()) {
+        $owner = $subject->getOwner();
+
+        if (null === $owner) {
             return self::VIEW === $attribute || $this->security->isGranted('ROLE_ADMIN');
         }
 
@@ -49,6 +56,10 @@ final class PlanTemplateVoter extends Voter
             return false;
         }
 
-        return $subject->getOwner() === $user;
+        if ($owner === $user) {
+            return true;
+        }
+
+        return $this->coachingResolver->isAcceptedCoachOf($user, $owner);
     }
 }

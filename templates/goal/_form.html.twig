@@ -1,0 +1,21 @@
+{{ form_start(form, {attr: {class: 'kd-form', novalidate: 'novalidate'}}) }}
+    {{ form_row(form.title) }}
+    {{ form_row(form.targetDate) }}
+    {{ form_row(form.activity) }}
+    {{ form_row(form.priority) }}
+    {{ form_row(form.targetValue) }}
+    {{ form_row(form.description) }}
+
+    <fieldset class="kd-goalresult">
+        <legend class="kd-goalresult__legend">{{ ux_icon('lucide:flag') }} Résultat (après l'échéance)</legend>
+        {{ form_row(form.outcome) }}
+        {{ form_row(form.resultNote) }}
+    </fieldset>
+
+    <div class="kd-formactions">
+        <button type="submit" class="kd-btn kd-btn--primary">
+            {{ ux_icon('lucide:check') }} {{ button_label|default('Enregistrer') }}
+        </button>
+        <a href="{{ cancel_path|default(path('app_goal_index')) }}" class="kd-btn kd-btn--ghost">Annuler</a>
+    </div>
+{{ form_end(form) }}

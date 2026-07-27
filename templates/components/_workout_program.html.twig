@@ -1,0 +1,86 @@
+{# Panneau « Programme » : les blocs d'une séance, en accordéon.
+
+   Un <details open> natif plutôt qu'un contrôleur Stimulus : on gagne
+   gratuitement le clavier, l'état sans JS et l'ouverture forcée à l'impression.
+
+   Attendus : blocks (flat.blocks), statsByIndex (WorkoutMetrics::blockBreakdown
+   indexé par position, optionnel). #}
+{% import 'components/_set_type.html.twig' as settype %}
+
+{% set role_icon = {'warmup': 'lucide:flame', 'main': 'lucide:activity', 'cooldown': 'lucide:wind'} %}
+
+<ol class="kd-blocks">
+    {% for entry in blocks %}
+        {% set block = entry.block %}
+        {% set stat = statsByIndex[loop.index0]|default(null) %}
+        <li class="kd-block">
+            <details class="kd-block__wrap" open>
+                <summary class="kd-block__head">
+                    <span class="kd-block__num">{{ '%02d'|format(loop.index) }}</span>
+
+                    <span class="kd-block__role">
+                        {{ ux_icon(role_icon[block.role.value] ?? 'lucide:activity') }}
+                        {{ block.role.label }}
+                    </span>
+
+                    {% if block.label %}<span class="kd-block__label">{{ block.label }}</span>{% endif %}
+
+                    {# Un bloc à plusieurs exercices enchaînés EST un superset (2)
+                       ou un circuit (3+) : la mécanique bloc+tours l'exprime
+                       déjà, on la nomme. #}
+                    {% if entry.exercises|length > 1 %}
+                        <span class="kd-block__superset">
+                            {{ entry.exercises|length == 2 ? 'Superset' : 'Circuit' }}
+                        </span>
+                    {% endif %}
+                    {% if block.rounds > 1 %}<span class="kd-block__rounds">× {{ block.rounds }} tours</span>{% endif %}
+
+                    <span class="kd-block__sum">
+                        {%- if stat and stat.seconds > 0 %}≈ {{ (stat.seconds / 60)|round(0, 'ceil') }} min{% endif -%}
+                        {%- if stat and stat.tonnageKg > 0 %} · {{ stat.tonnageKg|round|number_format(0, ',', ' ') }} kg{% endif -%}
+                        {%- if entry.exercises|length %} · {{ entry.exercises|length }} exercice{{ entry.exercises|length > 1 ? 's' }}{% endif -%}
+                    </span>
+
+                    <span class="kd-block__chevron" aria-hidden="true">{{ ux_icon('lucide:chevron-down') }}</span>
+                </summary>
+
+                {% if entry.exercises is empty %}
+                    <p class="kd-exrow--empty">Aucun exercice.</p>
+                {% else %}
+                    <ol class="kd-exlist">
+                        {% for ex in entry.exercises %}
+                            <li class="kd-exrow">
+                                <div class="kd-exrow__head">
+                                    <span class="kd-exrow__name">{{ ex.exercise ? ex.exercise.name : '—' }}</span>
+
+                                    {# `values` et non `summary` : le RPE a sa
+                                       propre colonne juste à droite. #}
+                                    {% if ex.sets %}
+                                        <span class="kd-exrow__flag">{{ ex.sets|reduce((c, g) => c + g.count, 0) }} séries détaillées</span>
+                                    {% elseif ex.values %}
+                                        <span class="kd-exrow__val">{{ ex.values }}</span>
+                                    {% endif %}
+
+                                    {% if ex.prescribed.rpe %}
+                                        <span class="kd-exrow__rpe{{ ex.prescribed.rpe >= 9 ? ' is-hard' }}">RPE {{ ex.prescribed.rpe }}</span>
+                                    {% endif %}
+                                    {% if ex.rest %}
+                                        <span class="kd-exrow__rest">repos {{ ex.rest }} s</span>
+                                    {% endif %}
+                                </div>
+
+                                {% if ex.sets %}
+                                    {% include 'components/_workout_sets_table.html.twig' with {
+                                        groups: ex.sets, topWeightKg: ex.topWeightKg, type: ex.type
+                                    } only %}
+                                {% endif %}
+
+                                {% if ex.notes %}<p class="kd-exrow__notes">{{ ex.notes|nl2br }}</p>{% endif %}
+                            </li>
+                        {% endfor %}
+                    </ol>
+                {% endif %}
+            </details>
+        </li>
+    {% endfor %}
+</ol>
