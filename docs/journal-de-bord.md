@@ -77,6 +77,10 @@ Socle Symfony en place (Docker, MariaDB, CI/CD). Design tokens posés.
   `^/export` en `ROLE_USER`. Liens « Exporter en Excel » sur `workout/show`,
   `plan_template/show` et l'en-tête du calendrier. Pas de migration (aucun changement
   de schéma).
+- **Phase 9 — PWA : RÉACTIVÉE en 2026-07 sous une forme amputée** (voir le lot
+  « PWA installable » en fin de journal). La suspension ci-dessous n'a plus cours
+  pour l'installabilité, mais sa cause reste vraie et gouverne le nouveau service
+  worker : plus jamais de HTML servi depuis le cache quand le réseau répond.
 - **Phase 9 — PWA : SUSPENDUE (mode hors connexion mis de côté).** La contrainte
   offline (« pages auto-suffisantes, zéro AJAX post-chargement ») bridait la
   dynamisation des vues : on la lève pour l'instant. `app.js` **n'enregistre plus**
@@ -1486,3 +1490,117 @@ une boîte qui a été contrainte.
   ne tiennent pas sur 390px.
 
 `.kd-phero__edit` (fiche athlète chez le coach) suit la même règle.
+
+---
+
+## Lot — PWA installable (icône, écran de démarrage, mode standalone)
+
+Reprise de la **Phase 9, amputée de sa moitié dangereuse**. On veut
+l'installabilité (icône d'écran d'accueil, nom, écran de démarrage, plein écran
+sans barre d'URL) ; on ne veut plus le mode hors connexion complet, qui servait
+des pages périmées **alors qu'on était en ligne** et avait fait suspendre la
+phase. Règle qui gouverne tout le lot : **en ligne, le réseau gagne toujours
+pour du HTML.**
+
+### Le service worker n'est pas optionnel
+
+C'est le point contre-intuitif : on ne voulait plus de cache, mais Chrome ne
+propose l'installation que si un service worker doté d'un gestionnaire `fetch`
+est enregistré. Il fallait donc le réécrire, pas le supprimer.
+
+`public/sw.js` (cache `kadens-v3`) n'intercepte que trois choses :
+
+- `/assets/*` et `/pwa/*` → **cache-first**. Les URL AssetMapper sont digestées
+  (hash dans le nom) et les visuels PWA ne bougent pas : un changement de contenu
+  produit une autre URL, jamais du contenu périmé.
+- les **navigations** (`request.mode === 'navigate'`) → **network-first**, repli
+  sur la copie en cache puis sur `/offline.html`.
+
+Tout le reste sort du handler sans être touché : non-GET, cross-origin, exports,
+flux ICS — et surtout **Turbo**. Une visite Turbo Drive ou un Turbo Stream est un
+`fetch()` dont le `mode` n'est **pas** `navigate` : un handler qui traiterait
+« tout le reste » en cache-first servirait des fragments périmés, ce qui est
+exactement le piège dans lequel la Phase 9 était tombée. C'est la ligne à ne pas
+franchir si le service worker évolue.
+
+### Enregistrement conditionné côté serveur
+
+L'enregistrement quitte `app.js` pour `base.html.twig`, où l'environnement est
+connaissable : `app.environment == 'prod'` enregistre, **tout autre
+environnement désenregistre** ce qui traîne. Ce n'est pas de la précaution
+gratuite — tester avec `APP_ENV=prod` en local laisse un service worker actif sur
+`localhost`, qui continue ensuite à servir du HTML en cache une fois revenu en
+dev. C'est la panne d'origine de la Phase 9, reproduite à volonté.
+
+Conséquence pratique : **pour vérifier l'installabilité en local, il faut
+`APP_ENV=prod`.** En dev il n'y a rien à installer.
+
+### `/pwa/` et surtout pas `/icons/`
+
+Apache déclare par défaut un `Alias /icons/` vers ses propres icônes
+d'autoindex. Sur le mutualisé Infomaniak on ne peut pas le retirer : tout fichier
+de `public/icons/` est **inatteignable en prod**, quel que soit le `.htaccess`.
+Les visuels vivent donc dans `public/pwa/`, et `public/icons/` est supprimé (il
+ne contenait que l'ancien monogramme terracotta, hors identité depuis « Presse »
+et de toute façon jamais servi). `assets/icons/` n'est pas concerné : AssetMapper
+le publie sous `/assets/icons/…`.
+
+Ajouté au `.htaccess` : `Cache-Control: no-cache, must-revalidate` sur `sw.js` et
+`manifest.json`. Un `sw.js` figé dans un cache HTTP bloque toute mise à jour de
+l'app installée jusqu'à expiration.
+
+### Les visuels : `tools/build-pwa-icons.php`
+
+Générateur commité (comme `tools/fetch-fonts.sh` pour les polices), source unique
+`assets/icons/kadens.png`. Deux découpes de la marque :
+
+- **Le K seul pour les icônes.** Le lockup complet fait 1,57 de rapport : dans une
+  tuile carrée il tombe à ~50 % de hauteur et devient illisible sous 48px. Les
+  traits de vitesse sont retirés **par étiquetage de composantes connexes**, pas
+  par un recadrage — ils chevauchent le K en abscisse, aucune découpe
+  rectangulaire ne les sépare. Les trois masses du K pèsent chacune > 30 % de la
+  plus grosse, les six traits < 3 % : le seuil à 8 % tranche largement.
+- **Le lockup complet pour les écrans de démarrage**, où la place ne manque pas.
+
+Fond opaque `#ffffff` partout : le transparent est proscrit, iOS compose sur du
+noir et la moitié sombre du K disparaîtrait. Couverture de 0,55 pour les
+`maskable` (zone sûre à 80 % du côté), 0,74 pour l'`apple-touch-icon` (iOS rogne
+les angles), 0,80 pour les icônes standard.
+
+Les 34 écrans de démarrage (17 devices × portrait/paysage) passent en palette
+255 couleurs : la marque n'en compte que trois, le reste n'est que de
+l'antialiasing — 3,7 Mo → 1,2 Mo sans perte visible.
+
+### Le fragment splash est généré, pas écrit
+
+Le même script produit `templates/components/_pwa_splash.html.twig`. iOS exige
+une correspondance **exacte** de la media query et ne redimensionne rien : un
+`<link>` sans fichier, ou un fichier sans `<link>`, donne un écran de lancement
+blanc. Laisser la liste se maintenir à la main garantissait la dérive. Le test
+`PwaHeadTest::testEveryStartupImageIsBackedByAFile` vérifie la bijection dans les
+deux sens à partir du HTML réellement rendu.
+
+Android n'a pas besoin de ces images : il compose son écran de démarrage depuis
+le manifest (`name` + `background_color` + icône 512).
+
+### Détail qui n'a rien à voir avec le cache : `viewport-fit=cover`
+
+Ajouté à la `<meta viewport>`. Sans lui, `env(safe-area-inset-bottom)` vaut **0** :
+`--kd-navbar-h` ignore alors la barre gestuelle iOS et la nav basse passe dessous
+en mode standalone. La couche mobile du lot précédent avait posé le calcul, il lui
+manquait la déclaration qui le rend non nul — même famille de bug que le
+`backdrop-filter`, une seule déclaration qui annule tout un dispositif.
+
+### Reste
+
+Manifest repeint « Presse » (`theme_color` encre `#0b0b0b`, `background_color`
+papier `#ffffff`, l'ancien terracotta datait de « Carnet clair ») + trois
+`shortcuts` (Calendrier / Séances / Plans). `offline.html` restylé « Presse »
+(rayon 0, accent rouge, cible tactile 44px) — ses couleurs restent codées en dur,
+seule entorse tolérée à la règle des tokens : la page doit s'afficher sans
+feuille de style, et les URL AssetMapper étant digestées on ne peut pas les y
+inscrire. Elle affiche `/pwa/icon-192.png`, précaché.
+
+**Non vérifiable ici** : installation réelle, rendu de l'écran de démarrage iOS et
+audit Lighthouse demandent un navigateur sur `kadens.antoninpamart.fr` (HTTPS
+requis pour le service worker).

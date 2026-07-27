@@ -238,8 +238,7 @@ project/
 │   │   └── calendar_controller.js
 │   ├── styles/
 │   │   └── app.css
-│   ├── manifest.json                 PWA (Phase 9)
-│   └── sw.js                         service worker manuel (Phase 9)
+│   └── icons/                        marque + jeu Lucide figé en local
 │
 ├── config/
 │   ├── packages/                     config des bundles
@@ -308,6 +307,17 @@ project/
 │   ├── calendar/
 │   ├── public_share/                 vues lecture seule (slug)
 │   └── components/                    fragments Twig réutilisables
+│
+├── public/                            servi tel quel, HORS AssetMapper
+│   ├── manifest.json                 PWA — installabilité
+│   ├── sw.js                         service worker manuel (pas de Workbox)
+│   ├── offline.html                  repli hors ligne, autonome
+│   └── pwa/                          icônes + écrans de démarrage (PAS /icons,
+│                                     masqué par l'Alias d'autoindex Apache)
+│
+├── tools/                             générateurs, lancés à la main
+│   ├── fetch-fonts.sh                → assets/fonts/ + styles/fonts.css
+│   └── build-pwa-icons.php           → public/pwa/ + components/_pwa_splash
 │
 ├── tests/
 │   ├── Entity/
