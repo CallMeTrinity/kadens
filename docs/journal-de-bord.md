@@ -1974,3 +1974,71 @@ les métadonnées.
 insère son `<textarea>` en **frère** du display, pas à sa place : un retrait porté
 par le paragraphe ne s'appliquerait pas au champ, qui viendrait coller aux bords du
 cadre. Vaut pour tout futur usage du contrôleur dans un conteneur à retrait.
+
+---
+
+## Lot — Pages d'erreur 404 / 403 / 5xx (28/07/2026)
+
+**Le besoin.** En prod, une adresse morte, un voter qui dit non ou une panne
+renvoyaient la page blanche générique de Symfony : hors identité, en anglais, sans
+la moindre sortie. C'est la seule famille de vues qu'on ne conçoit jamais parce
+qu'on ne la voit pas en développement — en dev, la page de debug prend sa place.
+
+**La forme.** Quatre templates dans `templates/bundles/TwigBundle/Exception/`
+(`error404`, `error403`, `error500`, `error.html.twig`), tous minces : ils étendent
+`base.html.twig` et passent leur texte au squelette commun
+`templates/components/_error.html.twig`. Composition « Presse » : le code HTTP en
+très gros au filet, puis statut, titre, phrase, actions, et une ligne d'aide.
+
+### Pourquoi un `error.html.twig` générique en plus des trois
+
+Symfony cherche `error{code}.html.twig`, **puis** `error.html.twig`. Le générique
+est ce qui fait que « 50X » est couvert sans écrire un template par code : 502, 503
+et 504 (proxy, redémarrage, timeout sur le mutualisé) y tombent, comme les 4xx
+rares (405, 429). Il bascule son texte et sa couleur sur `status_code >= 500`.
+
+### Le rouge ne sort que sur un échec serveur
+
+`kd-error--fault` (chiffre en `--color-primary`) n'est posé que par la 500 et par le
+générique en 5xx. Une 404 ou une 403 sont des **réponses normales** du système, pas
+des pannes : elles restent à l'encre. C'est l'application directe de la règle
+« la couleur porte du sens » (`CLAUDE.md` §5, règle 2) — repeindre les quatre pages
+en rouge aurait vidé le signal.
+
+### Ce que le squelette n'a pas le droit de faire
+
+Aucun accès base, aucun service métier, aucune donnée. Une page d'erreur doit se
+rendre **quand le reste est cassé** — si la panne est côté MariaDB, la 500 doit
+quand même s'afficher. Corollaire : `app.request` est gardé par un `if`, le rendu
+pouvant avoir lieu hors cycle de requête, et les liens proposés dépendent de
+`app.user` (anonyme → `/login`, pas une page qui redirigerait aussitôt).
+
+### Piège : ces pages ne se voient pas en dev, et ne se testent pas par HTTP
+
+`TwigErrorRenderer::render()` court-circuite ses templates dès que `kernel.debug`
+est vrai, et rend la page de debug à la place. Conséquences :
+
+- **Pour les regarder en local** : `APP_ENV=prod` (le préviseur `/_error/{code}`,
+  lui, n'existe qu'en dev — donc en debug, donc il montre la page de debug, pas la
+  nôtre).
+- **Pour les tester** : `ErrorPageTest` rend les templates **directement** par le
+  service Twig, avec une requête empilée dans le `RequestStack`. Une requête HTTP
+  en test (debug=1) ne les exercerait jamais. `strict_variables` étant actif en
+  test, ce rendu attrape ce qu'on veut attraper : variable inexistante, filtre
+  absent, route morte.
+
+Vérifié en plus par un rendu réel du noyau en `prod`/`debug=0` sur une adresse
+inconnue. À noter si l'exercice se refait : en CLI, `error_renderer` est choisi par
+`kernel.runtime_mode.web`, qui vient de la **query string** `APP_RUNTIME_MODE` — il
+faut `APP_RUNTIME_MODE='web=1'` (et non `web`), sinon c'est le `CliErrorRenderer`
+qui répond et on ne teste rien.
+
+### Détails
+
+- L'adresse demandée n'est rappelée qu'en 404 (`showUri`), tronquée à 120
+  caractères — `twig/string-extra` n'est pas installé, la troncature est faite à la
+  main au `slice`.
+- « Réessayer » n'apparaît qu'en 5xx : rejouer une 404 ou une 403 ne peut rien
+  donner d'autre.
+- Aucune nouvelle icône : `search`, `lock`, `zap`, `home`, `calendar-days`,
+  `log-in`, `rotate-cw` étaient déjà figées en local.

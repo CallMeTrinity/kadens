@@ -274,7 +274,26 @@ deux sens, fiche de travail par athlète sous `/coach`, `ROLE_COACH`) — cf. §
 la règle de propriété — et **paramètres de compte** (`/profile/settings` :
 changement de mot de passe, création de compte par `app:user:create`).
 
-Dernier lot (bloc-notes privé) : un fourre-tout du propriétaire sur une séance et
+Dernier lot (pages d'erreur) : 404, 403 et 5xx ont enfin une page à l'identité,
+dans `templates/bundles/TwigBundle/Exception/`. Quatre templates minces
+(`error404`, `error403`, `error500`, et un `error.html.twig` **générique** —
+Symfony cherche le code exact puis lui, c'est ce qui couvre 502/503/504 sans un
+template par code) qui étendent `base.html.twig` et passent leur texte au squelette
+commun `components/_error.html.twig`. À ne pas casser :
+
+- **Le squelette ne touche à rien** : pas de base, pas de service, pas de donnée.
+  Une page d'erreur doit se rendre quand le reste est cassé — c'est tout l'intérêt
+  de la 500. `app.request` y est gardé par un `if` (rendu possible hors requête) et
+  les liens dépendent de `app.user` (anonyme → `/login`).
+- **Le rouge ne sort que sur un échec serveur** (`kd-error--fault`, 5xx). Une 404 ou
+  une 403 sont des réponses normales du système, pas des pannes : elles restent à
+  l'encre, sinon le signal se vide (§5, règle 2).
+- **Ces pages sont invisibles en dev** : `TwigErrorRenderer` court-circuite ses
+  templates dès que `kernel.debug` est vrai. Les regarder = `APP_ENV=prod` ; les
+  tester = les rendre **directement** par Twig (`ErrorPageTest`), une requête HTTP
+  en test ne les exercerait jamais.
+
+Lot précédent (bloc-notes privé) : un fourre-tout du propriétaire sur une séance et
 sur un plan, où se construit le déroulé en vrac avant qu'il devienne des blocs ou
 des cases. Règle et gardes en §3. À l'écran : un `<details>` rendu **ouvert côté
 serveur** dès qu'il contient quelque chose, sous l'en-tête des deux éditeurs, qui
