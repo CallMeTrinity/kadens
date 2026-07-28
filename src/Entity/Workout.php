@@ -28,6 +28,19 @@ class Workout
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
 
+    /**
+     * Bloc-notes libre du PROPRIÉTAIRE. Contrairement à `description`, qui décrit
+     * la séance pour quiconque la lit (coach, partage public), ce champ n'est
+     * visible que de `owner` : brouillon, déroulé en vrac, rappels personnels.
+     *
+     * Portée à ne pas casser : jamais dans `PlanFlattener`, jamais dans les vues
+     * de consultation, d'export ou de partage public — l'exposer quelque part le
+     * rendrait lisible par le coach, qui est co-éditeur de tout le reste. La garde
+     * vit dans les contrôleurs (`updateMeta`) et dans les éditeurs (Twig).
+     */
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $notes = null;
+
     #[ORM\Column(length: 255, unique: true)]
     private ?string $slug = null;
 
@@ -125,6 +138,18 @@ class Workout
     public function setDescription(?string $description): static
     {
         $this->description = $description;
+
+        return $this;
+    }
+
+    public function getNotes(): ?string
+    {
+        return $this->notes;
+    }
+
+    public function setNotes(?string $notes): static
+    {
+        $this->notes = $notes;
 
         return $this;
     }

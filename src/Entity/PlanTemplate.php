@@ -28,6 +28,14 @@ class PlanTemplate
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
 
+    /**
+     * Bloc-notes libre du PROPRIÉTAIRE, même règle que `Workout::$notes` : c'est
+     * le fourre-tout où se construit le déroulé du plan avant d'exister en cases.
+     * Visible du seul `owner`, jamais du coach, jamais du partage public.
+     */
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $notes = null;
+
     #[ORM\Column]
     private ?int $durationWeeks = null;
 
@@ -127,6 +135,18 @@ class PlanTemplate
     public function setDescription(?string $description): static
     {
         $this->description = $description;
+
+        return $this;
+    }
+
+    public function getNotes(): ?string
+    {
+        return $this->notes;
+    }
+
+    public function setNotes(?string $notes): static
+    {
+        $this->notes = $notes;
 
         return $this;
     }

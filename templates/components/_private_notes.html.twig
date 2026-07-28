@@ -1,0 +1,40 @@
+{# Bloc-notes privé du propriétaire (séance ou plan).
+
+   Sert les deux éditeurs, d'où les paramètres : `entity` (qui porte `owner` et
+   `notes`), `url` (endpoint `meta` de l'entité) et `token` (son jeton CSRF).
+
+   Portée : ce fragment ne s'affiche QUE pour le propriétaire. Un coach accepté
+   est co-éditeur de tout le reste du contenu de son athlète — c'est justement ce
+   dont ce bloc s'exclut. La garde est doublée côté serveur dans `updateMeta`, la
+   condition Twig ne protège que l'affichage.
+
+   Comparaison par `id` et non par objet : `owner` peut être un proxy Doctrine non
+   initialisé, que Twig comparerait attribut par attribut (donc à tort différent).
+
+   Le champ suit la mécanique `inline-edit` des métadonnées : cliquer ouvre un
+   textarea, le blur (ou Ctrl/Cmd+Entrée) enregistre. Comme le titre et la
+   description, il n'a pas de repli sans JS — choix assumé du projet. #}
+{% if entity.owner and app.user and entity.owner.id == app.user.id %}
+    <details class="kd-notes"{{ entity.notes ? ' open' : '' }}>
+        <summary class="kd-notes__head">
+            {{ ux_icon('lucide:lock') }}
+            <span class="kd-notes__title">Notes privées</span>
+            <span class="kd-notes__hint">visibles de vous seul</span>
+        </summary>
+
+        {% set placeholder = "Tout ce qui n'a pas encore sa place : déroulé en vrac, idées, rappels…" %}
+        <div class="kd-notes__body">
+            <p class="kd-notes__text kd-inlineedit kd-inlineedit--note{{ entity.notes ? '' : ' kd-inlineedit--empty' }}"
+               data-controller="inline-edit"
+               data-inline-edit-url-value="{{ url }}"
+               data-inline-edit-token-value="{{ token }}"
+               data-inline-edit-field-value="notes"
+               data-inline-edit-type-value="textarea"
+               data-inline-edit-placeholder-value="{{ placeholder }}"
+               data-inline-edit-target="display"
+               data-value="{{ entity.notes }}"
+               data-action="click->inline-edit#start"
+               title="Cliquer pour modifier">{{ entity.notes ?: placeholder }}</p>
+        </div>
+    </details>
+{% endif %}

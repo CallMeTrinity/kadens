@@ -1914,3 +1914,63 @@ de défilement. Verrouillé par `testMoveItemFromTheRowMenuWithoutJs`.
   tentant (le compositeur le fait), mais ici les formulaires de la trame sont déjà
   soumis par Turbo, qui répond en stream *et* fait remonter les réponses en erreur.
   Un `fetch` maison les aurait avalées en silence.
+
+---
+
+## Lot — Bloc-notes privé sur une séance et sur un plan (28/07/2026)
+
+**Le besoin.** Un endroit où jeter le déroulé en vrac et le construire petit à
+petit : le brouillon qui précède les blocs et les cases. La `description` ne peut
+pas jouer ce rôle — elle est lue par le coach, par le partage public et par
+l'export ; ce qu'on y écrit s'adresse à quelqu'un.
+
+**La règle.** `notes` est la **seule** chose que le coach ne voit pas du contenu de
+son athlète. C'est une exception assumée à « le coach est co-éditeur de tout », et
+elle tient parce qu'elle est étroite : un champ, deux entités, aucune lecture
+ailleurs.
+
+### Le modèle
+
+`Workout::$notes` et `PlanTemplate::$notes` (TEXT nullable, migration
+`Version20260728100000`). Rien d'autre : pas d'entité, pas de voter, pas de table
+de jointure — l'alternative « un bloc-notes par utilisateur » (chacun le sien sur
+la même séance) a été écartée, elle payait une entité et un voter pour un besoin
+que personne n'a encore exprimé.
+
+### La portée, doublée
+
+- **À l'écran** : `templates/components/_private_notes.html.twig` ne se rend que si
+  `entity.owner.id == app.user.id`. Comparaison par `id`, pas par objet : `owner`
+  peut être un proxy Doctrine non initialisé, que Twig comparerait attribut par
+  attribut, donc à tort différent.
+- **Au serveur** : `updateMeta` (séance et plan) refuse `field=notes` en 403 quand
+  l'utilisateur n'est pas le propriétaire. L'attribut `EDIT` de la route ne suffit
+  pas — c'est précisément lui que le coach possède. Sans cette garde, l'endpoint
+  répondant la valeur persistée, un coach aurait pu **lire** le brouillon en le
+  réécrivant.
+- **Nulle part ailleurs** : le champ n'entre pas dans `PlanFlattener`, donc ni la
+  page de consultation, ni `public_share`, ni l'export Excel, ni l'ICS ne peuvent
+  le faire fuiter par inadvertance. C'est l'intérêt de ne pas l'exposer au
+  flattener.
+
+### Ce qui n'est pas copié
+
+`WorkoutCloner` ne recopie pas `notes`. Le fork à la pose est le cas dominant en
+nombre : chaque case d'un plan en aurait reçu un exemplaire, et le même fourre-tout
+se serait retrouvé dupliqué dix fois. La `description`, elle, décrit la séance
+elle-même et suit la copie.
+
+### L'écran
+
+Un `<details>` rendu **ouvert par le serveur** dès qu'il contient quelque chose,
+posé sous l'en-tête des deux éditeurs. Le champ réutilise `inline-edit` en mode
+`textarea` : cliquer ouvre, blur (ou Ctrl/Cmd+Entrée) enregistre. Comme le titre et
+la description, il n'a pas de repli sans JS — c'est la règle déjà en vigueur pour
+les métadonnées.
+
+### Piège rencontré
+
+**Le padding vit sur `.kd-notes__body`, pas sur `.kd-notes__text`.** `inline-edit`
+insère son `<textarea>` en **frère** du display, pas à sa place : un retrait porté
+par le paragraphe ne s'appliquerait pas au champ, qui viendrait coller aux bords du
+cadre. Vaut pour tout futur usage du contrôleur dans un conteneur à retrait.

@@ -66,6 +66,14 @@
         </div>
     </div>
 
+    {# Fourre-tout du propriétaire, replié tant qu'il est vide. Le coach ne le voit
+       pas, même s'il édite la séance (garde dans le composant et dans `updateMeta`). #}
+    {{ include('components/_private_notes.html.twig', {
+        entity: workout,
+        url: path('app_workout_meta', {id: workout.id}),
+        token: csrf_token('workout_meta' ~ workout.id),
+    }, with_context = false) }}
+
     {# data-turbo="false" : Turbo n'intercepte aucun formulaire ici ; le contrôleur
        `composer` applique lui-même les Turbo Streams via fetch (voir le contrôleur). #}
     <section class="kd-composer kd-composer--sheet kd-libsheet" data-controller="composer" data-turbo="false">
