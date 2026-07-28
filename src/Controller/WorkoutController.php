@@ -183,10 +183,13 @@ final class WorkoutController extends AbstractController
     }
 
     /**
-     * Édition en ligne d'un champ de la séance (titre/description) depuis l'en-tête
-     * cliquable du compositeur (contrôleur `inline-edit`, même pattern que le plan).
-     * Renvoie la valeur persistée (texte brut) que le JS réaffiche. C'est le SEUL
-     * chemin d'édition des métadonnées : il n'y a plus de formulaire de repli.
+     * Édition en ligne d'un champ de la séance (titre/description/notes) depuis
+     * l'en-tête cliquable du compositeur (contrôleur `inline-edit`, même pattern que
+     * le plan). Renvoie la valeur persistée (texte brut) que le JS réaffiche. C'est
+     * le SEUL chemin d'édition des métadonnées : il n'y a plus de formulaire de repli.
+     *
+     * `notes` est le seul champ à porter une garde plus stricte que l'attribut EDIT
+     * de la route : c'est un bloc-notes privé, réservé au propriétaire.
      */
     #[Route('/{id}/meta', name: 'app_workout_meta', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function updateMeta(Request $request, Workout $workout, SlugGenerator $slugGenerator): Response
@@ -209,6 +212,14 @@ final class WorkoutController extends AbstractController
                 break;
             case 'description':
                 $workout->setDescription('' === $value ? null : $value);
+                break;
+            case 'notes':
+                // Bloc-notes privé : EDIT ne suffit pas, un coach accepté le porte
+                // aussi. Seul le propriétaire écrit ici, comme lui seul le lit.
+                if ($workout->getOwner() !== $this->getUser()) {
+                    return new Response('', Response::HTTP_FORBIDDEN);
+                }
+                $workout->setNotes('' === $value ? null : $value);
                 break;
             default:
                 return new Response('', Response::HTTP_BAD_REQUEST);

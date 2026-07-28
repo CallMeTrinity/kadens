@@ -172,10 +172,13 @@ final class PlanTemplateController extends AbstractController
     }
 
     /**
-     * Édition en ligne d'un champ du plan (titre/description) depuis l'en-tête
+     * Édition en ligne d'un champ du plan (titre/description/notes) depuis l'en-tête
      * cliquable de l'éditeur (contrôleur `inline-edit`). Renvoie la valeur
      * persistée (texte brut) que le JS réaffiche. C'est le SEUL chemin d'édition
      * des métadonnées : il n'y a plus de formulaire de repli.
+     *
+     * `notes` est le seul champ à porter une garde plus stricte que l'attribut EDIT
+     * de la route : c'est un bloc-notes privé, réservé au propriétaire.
      */
     #[Route('/{id}/meta', name: 'app_plan_template_meta', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function updateMeta(Request $request, PlanTemplate $template, SlugGenerator $slugGenerator): Response
@@ -203,6 +206,14 @@ final class PlanTemplateController extends AbstractController
                 break;
             case 'description':
                 $template->setDescription('' === $value ? null : $value);
+                break;
+            case 'notes':
+                // Bloc-notes privé : EDIT ne suffit pas, un coach accepté le porte
+                // aussi. Seul le propriétaire écrit ici, comme lui seul le lit.
+                if ($template->getOwner() !== $this->getUser()) {
+                    return new Response('', Response::HTTP_FORBIDDEN);
+                }
+                $template->setNotes('' === $value ? null : $value);
                 break;
             default:
                 return new Response('', Response::HTTP_BAD_REQUEST);

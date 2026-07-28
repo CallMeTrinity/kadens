@@ -543,6 +543,117 @@ final class CoachControllerTest extends WebTestCase
         self::assertCount(0, $crawler->filter('[data-facet-group="owner"]'));
     }
 
+    /**
+     * Le bloc-notes est la seule chose que le coach ne voit pas du contenu de son
+     * athlète : il édite la séance, mais le brouillon privé reste hors de sa vue.
+     */
+    public function testCoachSeesNoPrivateNotesOnAthleteWorkout(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+        $workout = $this->createWorkout($athlete, 'Séance athlète');
+        $workout->setNotes('Brouillon perso de l’athlète');
+        $this->em->flush();
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId().'/edit');
+
+        // Le compositeur s'ouvre (le coach est co-éditeur) mais sans le bloc.
+        self::assertResponseIsSuccessful();
+        self::assertCount(0, $crawler->filter('.kd-notes'));
+        self::assertStringNotContainsString('Brouillon perso', $crawler->html());
+    }
+
+    /** Le propriétaire, lui, voit son bloc — et sa page n'a pas changé de nature. */
+    public function testOwnerSeesPrivateNotesOnOwnWorkout(): void
+    {
+        $athlete = $this->createUser('athlete@example.com');
+        $workout = $this->createWorkout($athlete, 'Séance athlète');
+        $workout->setNotes('Brouillon perso de l’athlète');
+        $this->em->flush();
+
+        $this->client->loginUser($athlete);
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId().'/edit');
+
+        self::assertCount(1, $crawler->filter('.kd-notes'));
+        self::assertStringContainsString('Brouillon perso', $crawler->html());
+    }
+
+    /**
+     * Garde serveur : EDIT ne suffit pas pour le champ `notes`. Sans elle, un coach
+     * pourrait écrire (donc lire en réponse) le brouillon de son athlète en postant
+     * directement l'endpoint, malgré l'absence du bloc à l'écran.
+     */
+    public function testCoachCannotWriteAthletePrivateNotes(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+        $workout = $this->createWorkout($athlete, 'Séance athlète');
+        $template = $this->createPlanTemplate($athlete, 'Prépa athlète', 4);
+
+        $this->client->loginUser($coach);
+
+        // Le jeton CSRF est bien celui de la page : c'est la propriété, pas le
+        // jeton, qui doit refuser.
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId().'/edit');
+        $this->client->request('POST', '/workout/'.$workout->getId().'/meta', [
+            '_token' => $crawler->filter('h1.kd-inlineedit')->attr('data-inline-edit-token-value'),
+            'field' => 'notes',
+            'value' => 'Note du coach',
+        ]);
+        self::assertResponseStatusCodeSame(403);
+
+        $crawler = $this->client->request('GET', '/plan-template/'.$template->getId().'/edit');
+        $this->client->request('POST', '/plan-template/'.$template->getId().'/meta', [
+            '_token' => $crawler->filter('h1.kd-inlineedit')->attr('data-inline-edit-token-value'),
+            'field' => 'notes',
+            'value' => 'Note du coach',
+        ]);
+        self::assertResponseStatusCodeSame(403);
+
+        $this->em->clear();
+        self::assertNull($this->em->getRepository(Workout::class)->find($workout->getId())->getNotes());
+        self::assertNull($this->em->getRepository(PlanTemplate::class)->find($template->getId())->getNotes());
+    }
+
+    /** Le propriétaire écrit ses notes par le même endpoint, sur les deux entités. */
+    public function testOwnerWritesPrivateNotes(): void
+    {
+        $athlete = $this->createUser('athlete@example.com');
+        $workout = $this->createWorkout($athlete, 'Séance athlète');
+        $template = $this->createPlanTemplate($athlete, 'Prépa athlète', 4);
+
+        $this->client->loginUser($athlete);
+
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId().'/edit');
+        $this->client->request('POST', '/workout/'.$workout->getId().'/meta', [
+            '_token' => $crawler->filter('.kd-notes__text')->attr('data-inline-edit-token-value'),
+            'field' => 'notes',
+            'value' => "Semaine 1 : en vrac\nSemaine 2 : à voir",
+        ]);
+        self::assertResponseIsSuccessful();
+
+        $crawler = $this->client->request('GET', '/plan-template/'.$template->getId().'/edit');
+        $this->client->request('POST', '/plan-template/'.$template->getId().'/meta', [
+            '_token' => $crawler->filter('.kd-notes__text')->attr('data-inline-edit-token-value'),
+            'field' => 'notes',
+            'value' => 'Déroulé provisoire',
+        ]);
+        self::assertResponseIsSuccessful();
+
+        $this->em->clear();
+        self::assertSame(
+            "Semaine 1 : en vrac\nSemaine 2 : à voir",
+            $this->em->getRepository(Workout::class)->find($workout->getId())->getNotes()
+        );
+        self::assertSame(
+            'Déroulé provisoire',
+            $this->em->getRepository(PlanTemplate::class)->find($template->getId())->getNotes()
+        );
+    }
+
     // ---------------------------------------------------------------- helpers
 
     /** @param list<string> $roles */

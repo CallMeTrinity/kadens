@@ -163,6 +163,19 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   champ « créé par » : le coach voit/édite déjà tout le contenu de son athlète.
   À l'écran, une facette `owner` avec **« Moi » actif par défaut** et un badge de
   propriétaire sur les cartes des autres.
+- **Le bloc-notes privé est la seule exception à « le coach voit tout ».**
+  `Workout.notes` et `PlanTemplate.notes` (TEXT nullable) sont un fourre-tout du
+  **propriétaire seul** : brouillon, déroulé en vrac. À distinguer de
+  `description`, qui s'adresse à un lecteur (coach, partage public, export). La
+  portée est doublée : le composant `components/_private_notes.html.twig` ne se
+  rend que pour l'owner (comparaison **par `id`** — `owner` peut être un proxy que
+  Twig comparerait attribut par attribut), et `updateMeta` refuse `field=notes` en
+  403 hors propriétaire — l'attribut `EDIT` de la route ne suffit pas, c'est
+  justement celui que le coach possède, et l'endpoint renvoie la valeur persistée
+  (donc écrire, ce serait lire). À ne pas casser : le champ n'entre **jamais** dans
+  `PlanFlattener` — c'est ce qui garantit qu'aucune vue de consultation, page
+  publique, export Excel ou flux ICS ne le laisse fuiter. `WorkoutCloner` ne le
+  copie pas non plus (le fork à la pose le dupliquerait dans chaque case d'un plan).
 - **Objectif ↔ Plan : relation N:N, libre et réversible.** Table de jointure
   `plan_template_goal`, côté propriétaire sur `PlanTemplate` (`addGoal`/`removeGoal`,
   qui maintiennent **les deux côtés** — sinon un fragment re-rendu par Turbo Stream
@@ -261,7 +274,16 @@ deux sens, fiche de travail par athlète sous `/coach`, `ROLE_COACH`) — cf. §
 la règle de propriété — et **paramètres de compte** (`/profile/settings` :
 changement de mot de passe, création de compte par `app:user:create`).
 
-Dernier lot (éditeur de plan au téléphone) : la mécanique du compositeur est
+Dernier lot (bloc-notes privé) : un fourre-tout du propriétaire sur une séance et
+sur un plan, où se construit le déroulé en vrac avant qu'il devienne des blocs ou
+des cases. Règle et gardes en §3. À l'écran : un `<details>` rendu **ouvert côté
+serveur** dès qu'il contient quelque chose, sous l'en-tête des deux éditeurs, qui
+réutilise `inline-edit` en `textarea` (donc pas de repli sans JS, comme le reste
+des métadonnées). Piège à retenir : `inline-edit` insère son champ en **frère** du
+display — le retrait doit vivre sur le conteneur (`.kd-notes__body`), sinon le
+textarea colle aux bords.
+
+Lot précédent (éditeur de plan au téléphone) : la mécanique du compositeur est
 appliquée telle quelle à l'éditeur de trame. *Une ligne ne porte que ce qu'elle est
 et un menu ; le reste se déduit du geste.*
 

@@ -51,6 +51,15 @@
         </div>
     </div>
 
+    {# Fourre-tout du propriétaire, replié tant qu'il est vide. C'est ici que se
+       construit le déroulé du plan en vrac, avant qu'il devienne des cases. Le
+       coach ne le voit pas (garde dans le composant et dans `updateMeta`). #}
+    {{ include('components/_private_notes.html.twig', {
+        entity: template,
+        url: path('app_plan_template_meta', {id: template.id}),
+        token: csrf_token('plan_meta' ~ template.id),
+    }, with_context = false) }}
+
     {# À quoi sert ce plan. Conteneur cible d'un Turbo Stream : les mutations de
        rattachement ne touchent que son CONTENU (action="update"), l'id survit. #}
     <div id="plan-goals">

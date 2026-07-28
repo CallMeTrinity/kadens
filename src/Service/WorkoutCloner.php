@@ -20,6 +20,11 @@ use Doctrine\ORM\EntityManagerInterface;
  * La copie est persistée (l'arbre suit par cascade persist de Workout::blocks /
  * Block::prescribedExercises) mais PAS flushée : l'appelant maîtrise la
  * transaction.
+ *
+ * Le bloc-notes privé (`notes`) n'est délibérément PAS copié : le fork à la pose
+ * en dupliquerait un exemplaire dans chaque case de plan, alors que ce champ est un
+ * brouillon attaché à un contexte précis. La description, elle, décrit bien la
+ * séance elle-même et suit la copie.
  */
 final class WorkoutCloner
 {

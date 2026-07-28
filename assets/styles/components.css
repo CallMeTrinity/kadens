@@ -6386,6 +6386,93 @@ textarea.kd-inlineedit__input {
 }
 
 /* ----------------------------------------------------------------------------
+   Bloc-notes privé (compositeur de séance, éditeur de plan)
+   <details> natif, rendu ouvert par le serveur dès qu'il contient quelque chose.
+   Volontairement sourd : c'est un brouillon, il ne doit pas rivaliser avec le
+   titre ni avec le contenu de l'éditeur. Pas de rouge — la couleur porte du sens
+   et ce bloc n'en a aucun d'urgent.
+   ---------------------------------------------------------------------------- */
+.kd-notes {
+    margin: 0 0 var(--kd-space-10);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+}
+
+.kd-notes__head {
+    list-style: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-3);
+    padding: var(--kd-space-4) var(--kd-space-6);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-eyebrow-lg);
+    text-transform: uppercase;
+    color: var(--color-text-faint);
+}
+
+.kd-notes__head::-webkit-details-marker {
+    display: none;
+}
+
+.kd-notes__head:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text-secondary);
+}
+
+.kd-notes__head svg {
+    width: 13px;
+    height: 13px;
+    flex: none;
+}
+
+/* Le rappel de portée n'a de valeur qu'au premier regard : il s'efface dès que
+   le bloc est ouvert, et sur les écrans étroits où la place manque. */
+.kd-notes__hint {
+    margin-left: auto;
+    text-transform: none;
+    letter-spacing: 0;
+    font-family: var(--font-body);
+    font-size: 12px;
+    color: var(--color-text-placeholder);
+}
+
+.kd-notes[open] .kd-notes__hint {
+    display: none;
+}
+
+/* Le padding vit sur le conteneur, pas sur le texte : `inline-edit` insère son
+   textarea en FRÈRE du display, il doit hériter du même retrait. */
+.kd-notes__body {
+    padding: var(--kd-space-3) var(--kd-space-6) var(--kd-space-7);
+}
+
+/* Le fourre-tout : de la place d'emblée (on y écrit longtemps), et les sauts de
+   ligne préservés — c'est du texte brut, pas de la mise en forme. */
+.kd-notes__text {
+    margin: 0;
+    min-height: 8em;
+    font-family: var(--font-body);
+    font-size: 14px;
+    line-height: 1.65;
+    color: var(--color-text-secondary);
+    white-space: pre-wrap;
+}
+
+.kd-notes textarea.kd-inlineedit__input {
+    min-height: 14em;
+    line-height: 1.65;
+}
+
+@media (max-width: 560px) {
+    .kd-notes__hint {
+        display: none;
+    }
+}
+
+/* ----------------------------------------------------------------------------
    Mini-modale d'édition rapide (éditeur de plan)
    Le panneau (#quick-panel) liste les exercices de la copie locale avec leurs
    paramètres éditables. Chrome resserré + corps défilable ; le lien « Édition
