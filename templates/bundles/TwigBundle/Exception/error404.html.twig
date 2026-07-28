@@ -1,0 +1,14 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Page introuvable — Kadens{% endblock %}
+
+{% block body %}
+    {{ include('components/_error.html.twig', {
+        code: 404,
+        icon: 'lucide:search',
+        heading: 'Page introuvable',
+        lead: "Cette adresse ne mène à rien : la séance, le plan ou l'exercice a peut-être été supprimé, ou le lien est incomplet.",
+        hint: "Si tu es arrivé ici par un lien de partage, redemande-le : l'adresse publique change au premier vrai renommage de la séance ou du plan.",
+        showUri: true,
+    }) }}
+{% endblock %}

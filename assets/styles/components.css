@@ -8450,3 +8450,100 @@ a.kd-coachitem__name:hover {
         flex-basis: 100%;
     }
 }
+
+/* ----------------------------------------------------------------------------
+   Pages d'erreur (404 / 403 / 5xx)
+
+   Rendues par `templates/bundles/TwigBundle/Exception/*` via le squelette
+   `components/_error.html.twig`. Composition « Presse » : un chiffre énorme au
+   filet, le texte dessous, aucun ornement. Rien de collant, rien qui dépende
+   d'une donnée — ces pages doivent tenir quand le reste est cassé.
+   ---------------------------------------------------------------------------- */
+.kd-error {
+    max-width: 62ch;
+    padding-block: var(--kd-space-11) var(--kd-space-13);
+}
+
+/* Le chiffre EST l'illustration : pas de pictogramme décoratif à côté. Fluide
+   plutôt que tributaire d'un point de rupture, comme .kd-title. */
+.kd-error__code {
+    font-family: var(--font-display);
+    font-weight: var(--kd-weight-extrabold);
+    font-size: clamp(88px, 20vw, 168px);
+    line-height: .78;
+    letter-spacing: var(--kd-tracking-display);
+    color: var(--color-text);
+    margin: 0;
+}
+
+/* Rouge réservé au vrai échec serveur (5xx) : une 404 ou une 403 sont des
+   réponses normales du système, elles restent à l'encre. Cf. CLAUDE.md §5. */
+.kd-error--fault .kd-error__code {
+    color: var(--color-primary);
+}
+
+.kd-error__status {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-3);
+    margin: var(--kd-space-8) 0 0;
+    padding-top: var(--kd-space-6);
+    border-top: 2px solid var(--color-text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-eyebrow-lg);
+    text-transform: uppercase;
+    color: var(--color-text-faint);
+}
+
+.kd-error__status svg {
+    width: 14px;
+    height: 14px;
+    flex: none;
+}
+
+.kd-error .kd-title {
+    margin-top: var(--kd-space-4);
+}
+
+/* Adresse demandée (404). `anywhere` et pas `break-all` : une URL longue casse
+   n'importe où plutôt que de pousser une barre de défilement horizontale. */
+.kd-error__uri {
+    margin: var(--kd-space-6) 0 0;
+    padding: var(--kd-space-4) var(--kd-space-5);
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    overflow-wrap: anywhere;
+}
+
+.kd-error__acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--kd-space-5);
+    list-style: none;
+    margin: var(--kd-space-11) 0 0;
+    padding: 0;
+}
+
+.kd-error__hint {
+    margin: var(--kd-space-10) 0 0;
+    padding-top: var(--kd-space-6);
+    border-top: 1px solid var(--color-divider);
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--color-text-soft);
+    max-width: 60ch;
+}
+
+/* Doit rester APRÈS les règles de base ci-dessus : une @media n'ajoute aucune
+   spécificité (cf. docs/design-system.md §5). */
+@media (max-width: 560px) {
+    .kd-error__acts > li,
+    .kd-error__acts .kd-btn {
+        width: 100%;
+    }
+}

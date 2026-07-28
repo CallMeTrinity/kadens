@@ -1,0 +1,18 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Erreur serveur — Kadens{% endblock %}
+
+{% block body %}
+    {# Seule page où le rouge est justifié : c'est un échec, et il vient de nous.
+       Rien ici ne touche la base — si la panne est côté MariaDB, la page doit
+       quand même s'afficher. #}
+    {{ include('components/_error.html.twig', {
+        code: 500,
+        icon: 'lucide:zap',
+        heading: 'Erreur serveur',
+        lead: "Quelque chose a cassé de notre côté. Rien de ce que tu venais de saisir n'a forcément été perdu, mais la page n'a pas pu être rendue.",
+        hint: "Si ça se reproduit sur la même page, c'est un bug : note ce que tu faisais, il est journalisé côté serveur.",
+        fault: true,
+        retry: true,
+    }) }}
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends 'base.html.twig' %}
+
+{#
+    Repli générique : Symfony cherche d'abord `error{code}.html.twig`, puis ce
+    fichier. Il sert donc tout ce qui n'a pas de page dédiée — 502, 503, 504 en
+    tête (proxy, redémarrage, timeout sur le mutualisé Infomaniak), et les 4xx
+    rares (405, 429...). C'est ce qui fait que « 50X » est couvert sans écrire un
+    template par code.
+#}
+{% set fault = status_code >= 500 %}
+
+{% block title %}{{ fault ? 'Service indisponible' : 'Requête refusée' }} — Kadens{% endblock %}
+
+{% block body %}
+    {{ include('components/_error.html.twig', {
+        code: status_code,
+        icon: fault ? 'lucide:zap' : 'lucide:circle-dot',
+        heading: fault ? 'Service indisponible' : 'Requête refusée',
+        lead: fault
+            ? "Le serveur ne répond pas correctement. C'est momentané dans la plupart des cas : un redémarrage, un délai dépassé."
+            : "Cette requête n'a pas pu être traitée. Reviens en arrière et recommence, ou repars de l'accueil.",
+        hint: fault
+            ? "Si l'attente se prolonge, l'application est probablement en cours de déploiement."
+            : null,
+        fault: fault,
+        retry: fault,
+    }) }}
+{% endblock %}

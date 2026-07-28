@@ -1,0 +1,17 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Accès refusé — Kadens{% endblock %}
+
+{% block body %}
+    {# Un anonyme ne voit pas cette page : le point d'entrée du pare-feu le renvoie
+       vers /login. Elle s'adresse donc à quelqu'un de connecté à qui un voter a
+       dit non — presque toujours parce que le contenu appartient à un autre
+       compte, ou parce qu'une relation de coaching n'est pas (ou plus) acceptée. #}
+    {{ include('components/_error.html.twig', {
+        code: 403,
+        icon: 'lucide:lock',
+        heading: 'Accès refusé',
+        lead: "Ce contenu ne t'appartient pas. Séances, plans, objectifs et notes restent privés à leur propriétaire.",
+        hint: "Un coach ne voit le contenu de son athlète qu'une fois la relation acceptée des deux côtés — et le bloc-notes privé reste au propriétaire, dans tous les cas.",
+    }) }}
+{% endblock %}

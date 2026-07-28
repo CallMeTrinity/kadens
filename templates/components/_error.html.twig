@@ -1,0 +1,76 @@
+{#
+    Squelette commun aux pages d'erreur (`templates/bundles/TwigBundle/Exception/`).
+
+    Paramètres :
+      code     (int)    code HTTP, affiché en grand
+      heading  (string) titre humain, condensé capitales
+      lead     (string) une phrase : ce qui s'est passé, vu de l'utilisateur
+      hint     (string) facultatif — la suite à donner, en petit
+      fault    (bool)   « ça vient de nous » : passe le chiffre en rouge
+      icon     (string) pictogramme lucide facultatif, devant la ligne de statut
+      showUri  (bool)   rappelle l'adresse demandée (utile en 404, bruit ailleurs)
+      retry    (bool)   ajoute « Réessayer » (rechargement de la même adresse)
+
+    Règles tenues ici, à ne pas casser :
+    - **aucun accès base ni service métier**. Une page d'erreur doit se rendre
+      quand le reste est cassé — c'est tout l'intérêt de la 500. Pas de requête,
+      pas de compteur, pas de `PlanFlattener`.
+    - `app.request` est **gardé** : le rendu peut avoir lieu hors cycle de requête
+      (rendu direct du template en test, commande console).
+    - le rouge ne sort que sur un **vrai échec serveur** (cf. CLAUDE.md §5, règle 2).
+      Une 404 ou une 403 sont des réponses normales du système, pas des pannes :
+      elles restent à l'encre.
+    - les liens proposés existent pour tout le monde : anonyme, on renvoie vers la
+      connexion, pas vers une page qui redirigerait aussitôt.
+#}
+<div class="kd-error{% if fault|default(false) %} kd-error--fault{% endif %}">
+    <p class="kd-error__code">{{ code }}</p>
+
+    <p class="kd-error__status">
+        {% if icon is defined and icon %}{{ ux_icon(icon) }}{% endif %}
+        <span>Erreur {{ code }}</span>
+    </p>
+
+    <h1 class="kd-title">{{ heading }}</h1>
+    <p class="kd-lead">{{ lead }}</p>
+
+    {% if showUri|default(false) and app.request %}
+        {# Tronqué à la main : `twig/string-extra` n'est pas installé, et une URL
+           d'un kilomètre déformerait la colonne. Échappé par Twig, comme le reste. #}
+        {% set uri = app.request.requestUri %}
+        <p class="kd-error__uri">{{ uri|length > 120 ? uri|slice(0, 120) ~ '…' : uri }}</p>
+    {% endif %}
+
+    <ul class="kd-error__acts">
+        {% if app.user %}
+            <li>
+                <a class="kd-btn kd-btn--primary" href="{{ path('app_profile') }}">
+                    {{ ux_icon('lucide:home') }} Retour à l'accueil
+                </a>
+            </li>
+            <li>
+                <a class="kd-btn kd-btn--secondary" href="{{ path('app_calendar_index') }}">
+                    {{ ux_icon('lucide:calendar-days') }} Calendrier
+                </a>
+            </li>
+        {% else %}
+            <li>
+                <a class="kd-btn kd-btn--primary" href="{{ path('app_login') }}">
+                    {{ ux_icon('lucide:log-in') }} Se connecter
+                </a>
+            </li>
+        {% endif %}
+
+        {% if retry|default(false) and app.request %}
+            <li>
+                <a class="kd-btn kd-btn--ghost" href="{{ app.request.requestUri }}" data-turbo="false">
+                    {{ ux_icon('lucide:rotate-cw') }} Réessayer
+                </a>
+            </li>
+        {% endif %}
+    </ul>
+
+    {% if hint is defined and hint %}
+        <p class="kd-error__hint">{{ hint }}</p>
+    {% endif %}
+</div>
