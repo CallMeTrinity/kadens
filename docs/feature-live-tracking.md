@@ -7,9 +7,10 @@
 
 ---
 
-> **État (2026-07-29)** : cadrage validé, **KL-01 livré** (règle révisée dans
-> `ROADMAP.md`, `CLAUDE.md`, `docs/feature-progression.md` et le journal).
-> Prochain ticket : **KL-02**.
+> **État (2026-07-29)** : cadrage validé, **KL-01 et KL-02 livrés** (règle révisée
+> partout, puis le modèle du réalisé en base : `LoggedExercise` / `LoggedSet`,
+> `ScheduledWorkout` étendue et sa FK `workout` passée en `SET NULL`).
+> Prochain ticket : **KL-03** (`LogMetrics`).
 
 ---
 
@@ -410,27 +411,65 @@ le `SET NULL` — c'est la section que KL-02 viendra lire.
 donc **le plus sensible du lot**.
 
 **Fini quand** :
-- [ ] `LoggedExercise` et `LoggedSet` conformes à §2.2
-- [ ] `ScheduledWorkout` gagne `uuid`, `title`, `startedAt`, `endedAt` et la
+- [x] `LoggedExercise` et `LoggedSet` conformes à §2.2
+- [x] `ScheduledWorkout` gagne `uuid`, `title`, `startedAt`, `endedAt` et la
       collection `loggedExercises`
-- [ ] **`ScheduledWorkout.workout` passe en `ON DELETE SET NULL`**, et le
+- [x] **`ScheduledWorkout.workout` passe en `ON DELETE SET NULL`**, et le
       commentaire du code qui justifiait le `CASCADE` est réécrit (§2.3 point 1)
-- [ ] Migration en **deux temps** : d'abord peupler `uuid` et `title` sur les
+- [x] Migration en **deux temps** : d'abord peupler `uuid` et `title` sur les
       lignes existantes (le titre recopié depuis `workout`), ensuite poser la
       contrainte d'unicité. Une contrainte posée avant le remplissage échouerait
       sur toutes les lignes déjà en base
-- [ ] Tout endroit qui affiche une séance datée gère `workout === null` et
+- [x] Tout endroit qui affiche une séance datée gère `workout === null` et
       retombe sur `title`. Chercher les usages, il y en a dans le calendrier, la
       page `/schedule/{id}`, l'export et le flux ICS
-- [ ] Index unique sur `ScheduledWorkout.uuid` et `LoggedSet.uuid`
-- [ ] Index `(exercise_id)` sur `LoggedExercise` (c'est la requête d'historique)
-- [ ] `ScheduledWorkoutRepository::findByUuid()`
-- [ ] Migration jouée et rejouée à blanc sur MariaDB 10.4, **sur une copie de la
-      base de prod** et pas seulement sur une base vide
+- [x] Index unique sur `ScheduledWorkout.uuid` et `LoggedSet.uuid`
+- [x] Index `(exercise_id)` sur `LoggedExercise` (c'est la requête d'historique)
+- [x] `ScheduledWorkoutRepository::findByUuid()`
+- [~] Migration jouée et rejouée à blanc sur MariaDB 10.4, **sur une copie de la
+      base de prod** et pas seulement sur une base vide — jouée, annulée puis
+      rejouée sur la base de **dev peuplée** (44 séances datées réelles, uuid
+      tous distincts, aucun titre nul), et la chaîne complète des 17 migrations
+      rejouée sur une base vierge. La copie de prod reste à faire au moment du
+      déploiement : elle demande un accès qu'une session de dev n'a pas.
 
 **Piège** : `uuid` en `binary(16)` ou en `char(36)` ? Prendre `char(36)` avec le
 type Doctrine `uuid` de `symfony/uid`. Le gain de place du binaire ne compense
 pas l'illisibilité en debug sur un projet de cette taille.
+
+**Livré le 29/07/2026.** Trois points décidés en cours de route, à ne pas
+redécouvrir :
+
+1. **Le type `uuid` de `symfony/uid` ne donne PAS `char(36)` sur MariaDB.** Sa
+   détection de « type GUID natif » compare `getGuidTypeDeclarationSQL()` au
+   `CHAR(36)` d'une chaîne fixe : sur MySQL/MariaDB les deux sont identiques, la
+   détection échoue et le type retombe sur `BINARY(16)`. Tenir le choix du ticket
+   demandait donc un type maison, `App\Doctrine\UuidCharType`, enregistré **sous
+   le nom `uuid`** dans `config/packages/doctrine.yaml`. Les entités écrivent
+   `type: 'uuid'` comme d'habitude et la valeur PHP reste un
+   `Symfony\Component\Uid\Uuid` : seule la colonne change.
+2. **Les repos devaient passer en `leftJoin`.** `ScheduledWorkoutRepository`
+   faisait cinq `join('s.workout')` **internes** : une séance sans source aurait
+   simplement **disparu** du calendrier, de l'ICS et du profil au lieu de s'y
+   afficher. Un bug silencieux, pas une erreur — c'est le piège du `SET NULL`.
+3. **Le snapshot `title` se pose au `prePersist`**, pas à l'appel. Aucun appelant
+   (pose au calendrier, `PlanScheduler`, tests) n'a eu à changer, et l'affichage
+   passe partout par `ScheduledWorkout::getDisplayTitle()` : titre vivant tant
+   qu'il existe, snapshot ensuite, « Séance libre » en dernier recours.
+
+Deux ajouts hors liste, jugés dans l'esprit du ticket :
+`tests/Controller/ScheduledWorkoutSourcelessTest.php` (8 tests, dont **la
+non-régression qui garde le `SET NULL`** — supprimer une séance de bibliothèque
+laisse debout ses séances datées ; KL-09 l'étendra au réalisé), et le rendu de
+`/schedule/{id}` sans source, réduit au hero + date + statut, dont KL-07 fera la
+vraie page.
+
+**Nettoyage préalable, dev seulement** : la base de dev portait encore la table
+`logged_set` de la branche abandonnée `feature/live-session-tracking` (migration
+`Version20260727180000`, « migrated, not available » — son fichier n'est sur
+aucune branche livrée). Table sauvegardée puis supprimée, ligne retirée de
+`doctrine_migration_versions`. **La prod n'est pas concernée** : cette migration
+n'y a jamais été déployée.
 
 ### KL-03 — Service `LogMetrics`
 

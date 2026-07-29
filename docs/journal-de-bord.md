@@ -2113,3 +2113,86 @@ révisée et non oubliée), `CLAUDE.md` (§3, nouvelle puce et ses quatre coroll
 
 **Prochain ticket : KL-02** — les entités du réalisé et la migration de
 `ScheduledWorkout`, le plus sensible du lot 1.
+
+---
+
+## Kadens Live KL-02 — le modèle du réalisé en base (29/07/2026)
+
+Le ticket le plus sensible du lot 1 : deux tables neuves, quatre colonnes sur
+`ScheduledWorkout`, et **un changement de clé étrangère qui protège des données
+qui n'existent pas encore**.
+
+### Ce qui est en base
+
+`logged_exercise` (un exercice réellement fait) et `logged_set` (une série
+réellement faite) pendent de `ScheduledWorkout`, qui gagne `uuid`, `title`,
+`started_at` et `ended_at`. Pas d'entité conteneur : la séance datée portait déjà
+l'owner, la date, le statut et la note d'écart. Le prescrit n'est pas touché —
+`workout`, `prescribed_exercise` et `prescribed_set` sortent du ticket inchangés.
+
+Les liens sont volontairement **faibles là où le réalisé doit survivre** :
+`exercise` et `source_prescribed_exercise` en `SET NULL`, avec `exercise_name` en
+snapshot. Nettoyer la bibliothèque ou retoucher un programme ne rend jamais
+illisible une séance faite.
+
+### Le changement qui portait le risque
+
+`ScheduledWorkout.workout` passe de `CASCADE` à `SET NULL`. Le commentaire du code
+disait *« la séance datée n'a pas de sens sans sa séance source »* : vrai tant
+qu'elle ne portait qu'un statut, faux dès qu'elle porte le réalisé. En l'état,
+supprimer une séance de la bibliothèque aurait effacé une séance réellement faite.
+
+Le piège n'était pas la migration, qui est mécanique. Il était **dans les
+requêtes** : `ScheduledWorkoutRepository` faisait cinq `join('s.workout')`
+internes. Une séance sans source n'aurait pas planté, elle aurait **disparu** —
+du calendrier, du flux ICS, du profil. Un bug silencieux vaut toujours plus cher
+qu'une erreur. Tous passés en `leftJoin`.
+
+Corollaire tenu partout ailleurs : `getDisplayTitle()` (titre vivant → snapshot →
+« Séance libre ») est le seul chemin d'affichage du titre d'une séance datée. Le
+calendrier, la page `/schedule/{id}`, l'aperçu au survol, la fiche athlète du
+coach, l'ICS et l'export y passent. Le snapshot lui-même se pose au `prePersist` :
+aucun appelant n'a eu à changer.
+
+### `char(36)` a demandé un type maison
+
+Le ticket voulait `char(36)` « avec le type Doctrine `uuid` de symfony/uid ». Les
+deux ne vont pas ensemble : ce type choisit sa colonne en comparant
+`getGuidTypeDeclarationSQL()` à `CHAR(36)` pour deviner si la plateforme a un GUID
+natif. Sur MySQL/MariaDB les deux sont identiques, la détection échoue, et il
+retombe sur `BINARY(16)`.
+
+D'où `App\Doctrine\UuidCharType`, enregistré **sous le nom `uuid`** dans
+`config/packages/doctrine.yaml`. Les entités écrivent `type: 'uuid'` comme
+d'habitude, la valeur PHP reste un `Symfony\Component\Uid\Uuid`, seule la colonne
+change. Le motif du choix tient : un uuid de séance datée se lit dans un `SELECT`,
+se recopie dans une URL d'API, se compare à l'œil avec ce que le mobile a envoyé.
+
+### La migration, en deux temps
+
+`uuid` est ajouté **nullable**, peuplé par `UUID()` (évalué par ligne sous
+MariaDB), `title` recopié depuis `workout`, et seulement ensuite le `NOT NULL` et
+l'index unique. L'ordre inverse aurait échoué sur toutes les lignes en base.
+Jouée, annulée, rejouée sur la base de dev peuplée (44 séances datées réelles), et
+la chaîne complète des 17 migrations rejouée sur une base vierge.
+
+### Piège d'environnement
+
+La base de dev portait encore la table `logged_set` de la branche abandonnée
+`feature/live-session-tracking` (`Version20260727180000`, statut « migrated, not
+available » : son fichier n'est sur aucune branche livrée). Elle entrait en
+collision avec la table du même nom, de forme différente. Sauvegardée, supprimée,
+ligne retirée de `doctrine_migration_versions`. La prod ne l'a jamais eue.
+
+### Fichiers touchés
+
+`src/Entity/` (`LoggedExercise`, `LoggedSet`, `ScheduledWorkout`),
+`src/Repository/` (deux repos neufs, `findByUuid`, cinq `leftJoin`),
+`src/Doctrine/UuidCharType.php`, `migrations/Version20260729120000.php`,
+`config/packages/doctrine.yaml`, les consommateurs d'une séance datée
+(`CalendarController`, `ScheduledWorkoutController`, `IcsCalendarBuilder`,
+`ProfileStats`, `_cal_event`, `scheduled_workout/show`, `coach/athlete`), et
+`tests/Controller/ScheduledWorkoutSourcelessTest.php`.
+
+**Prochain ticket : KL-03** — `LogMetrics`, le pendant réalisé de
+`WorkoutMetrics`.

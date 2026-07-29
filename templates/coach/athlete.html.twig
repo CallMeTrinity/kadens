@@ -236,7 +236,7 @@
                     {% for scheduled in upcoming %}
                         <li class="kd-coachitem">
                             <span class="kd-coachitem__date">{{ scheduled.scheduledDate|date('d/m') }}</span>
-                            <span class="kd-coachitem__name">{{ scheduled.workout ? scheduled.workout.title : 'Séance supprimée' }}</span>
+                            <span class="kd-coachitem__name">{{ scheduled.displayTitle }}</span>
                             <span class="kd-badge kd-badge--{{ scheduled.status.value }}">{{ scheduled.status.label }}</span>
                         </li>
                     {% endfor %}

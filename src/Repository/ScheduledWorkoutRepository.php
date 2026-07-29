@@ -8,6 +8,7 @@ use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * @extends ServiceEntityRepository<ScheduledWorkout>
@@ -20,10 +21,24 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     }
 
     /**
+     * Retrouve une séance datée par son identifiant client. Base de l'idempotence
+     * de `PUT /api/schedule/{uuid}` : une écriture rejouée retombe sur la même
+     * ligne au lieu d'en créer une seconde.
+     */
+    public function findByUuid(Uuid $uuid): ?ScheduledWorkout
+    {
+        return $this->findOneBy(['uuid' => $uuid]);
+    }
+
+    /**
      * Séances planifiées d'un utilisateur dans une fenêtre de dates (bornes
      * incluses). Sert au rendu d'une grille de calendrier : on charge d'un coup
      * tout ce que couvre le mois affiché (débords des semaines compris) et on
      * jointe la séance pour éviter N requêtes au rendu.
+     *
+     * `leftJoin` et non `join` : une séance datée peut n'avoir aucune source
+     * (séance libre, ou séance de bibliothèque supprimée depuis). Une jointure
+     * interne la ferait disparaître du calendrier au lieu de la montrer.
      *
      * @return list<ScheduledWorkout>
      */
@@ -31,7 +46,7 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('s')
             ->addSelect('w')
-            ->join('s.workout', 'w')
+            ->leftJoin('s.workout', 'w')
             ->andWhere('s.owner = :owner')
             ->andWhere('s.scheduledDate BETWEEN :start AND :end')
             ->setParameter('owner', $owner)
@@ -98,7 +113,7 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('s')
             ->addSelect('w', 'b', 'pe', 'e')
-            ->join('s.workout', 'w')
+            ->leftJoin('s.workout', 'w')
             ->leftJoin('w.blocks', 'b')
             ->leftJoin('b.prescribedExercises', 'pe')
             ->leftJoin('pe.exercise', 'e')
@@ -122,7 +137,7 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('s')
             ->addSelect('w', 'b', 'pe', 'e')
-            ->join('s.workout', 'w')
+            ->leftJoin('s.workout', 'w')
             ->leftJoin('w.blocks', 'b')
             ->leftJoin('b.prescribedExercises', 'pe')
             ->leftJoin('pe.exercise', 'e')
@@ -145,7 +160,7 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('s')
             ->addSelect('w', 'b', 'pe', 'e')
-            ->join('s.workout', 'w')
+            ->leftJoin('s.workout', 'w')
             ->leftJoin('w.blocks', 'b')
             ->leftJoin('b.prescribedExercises', 'pe')
             ->leftJoin('pe.exercise', 'e')
@@ -213,7 +228,7 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('s')
             ->addSelect('w')
-            ->join('s.workout', 'w')
+            ->leftJoin('s.workout', 'w')
             ->andWhere('s.sourcePlanTemplate = :template')
             ->andWhere('s.owner = :owner')
             ->setParameter('template', $template)

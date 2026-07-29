@@ -1,0 +1,36 @@
+{# Barre d'actions + date du hero de /schedule/{id}. Fragment partagé par les
+   deux rendus de la page : celui qui a une séance source (bloc `actions` de
+   `_workout_read`) et celui d'une séance sans source, qui n'a pas de programme
+   à afficher mais garde exactement le même en-tête.
+
+   Attend :
+     - scheduled : ScheduledWorkout
+     - workout   : Workout|null (la source, si elle existe) #}
+{% set workout = workout|default(null) %}
+
+<div class="kd-wk__bar">
+    <a href="{{ path('app_calendar_index') }}" class="kd-wk__back">
+        {{ ux_icon('lucide:arrow-left') }} Calendrier
+    </a>
+
+    <div class="kd-wk__baractions">
+        {{ include('components/_scheduled_badge.html.twig', {scheduled: scheduled}) }}
+        {% if workout and is_granted('WORKOUT_EDIT', workout) %}
+            <a href="{{ path('app_workout_edit', {id: workout.id}) }}"
+               class="kd-btn kd-btn--sm kd-btn--onink">
+                {{ ux_icon('lucide:square-pen') }} Éditer
+            </a>
+        {% endif %}
+    </div>
+</div>
+
+{# Noms français en dur, comme le calendrier : twig/intl-extra n'est
+   pas installé et l'app est monolingue. #}
+{% set dayNames = {1: 'Lundi', 2: 'Mardi', 3: 'Mercredi', 4: 'Jeudi', 5: 'Vendredi', 6: 'Samedi', 7: 'Dimanche'} %}
+{% set monthNames = {1: 'janvier', 2: 'février', 3: 'mars', 4: 'avril', 5: 'mai', 6: 'juin',
+                     7: 'juillet', 8: 'août', 9: 'septembre', 10: 'octobre', 11: 'novembre', 12: 'décembre'} %}
+{% set d = scheduled.scheduledDate %}
+<p class="kd-wk__date">
+    {{ ux_icon('lucide:calendar-days') }}
+    {{ dayNames[d|date('N')] }} {{ d|date('j') }} {{ monthNames[d|date('n')] }} {{ d|date('Y') }}
+</p>

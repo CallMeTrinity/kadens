@@ -136,11 +136,14 @@ final class ScheduledWorkoutController extends AbstractController
 
         $workout = $scheduled->getWorkout();
 
+        // Séance libre, ou séance de bibliothèque supprimée depuis : il n'y a pas
+        // de prescrit à rendre, la page se réduit à sa date, son statut et son
+        // titre (snapshot). Le contexte de lecture passe donc à null.
         return $this->render('scheduled_workout/show.html.twig', [
             'scheduled' => $scheduled,
-            'flat' => $planFlattener->flattenWorkout($workout),
-            'summary' => $metrics->summary($workout),
-            'blockStats' => $metrics->blockBreakdown($workout),
+            'flat' => null === $workout ? null : $planFlattener->flattenWorkout($workout),
+            'summary' => null === $workout ? null : $metrics->summary($workout),
+            'blockStats' => null === $workout ? [] : $metrics->blockBreakdown($workout),
         ]);
     }
 
@@ -280,9 +283,12 @@ final class ScheduledWorkoutController extends AbstractController
         $overdue = ScheduledStatus::PLANNED === $scheduled->getStatus()
             && $scheduled->getScheduledDate() < $today;
 
+        $workout = $scheduled->getWorkout();
+
         return $this->render('calendar/stream/cal_event.stream.html.twig', [
             'scheduled' => $scheduled,
-            'fw' => $planFlattener->flattenWorkout($scheduled->getWorkout()),
+            // null pour une séance sans source : la pastille retombe sur son titre.
+            'fw' => null === $workout ? null : $planFlattener->flattenWorkout($workout),
             'statuses' => ScheduledStatus::cases(),
             'detailed' => (bool) $request->getPayload()->getInt('detailed'),
             'overdue' => $overdue,

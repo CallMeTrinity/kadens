@@ -85,12 +85,16 @@ final class CalendarController extends AbstractController
 
         // Aperçu au survol : une mise à plat par séance distincte du mois,
         // indexée par id de Workout (source unique PlanFlattener, cf. plans).
+        // Une séance datée sans source (séance libre) n'a rien à aplatir : la
+        // pastille retombe sur son titre.
         $flattened = [];
         foreach ($weeks as $week) {
             foreach ($week as $cell) {
                 foreach ($cell['scheduled'] as $scheduled) {
                     $workout = $scheduled->getWorkout();
-                    $flattened[$workout->getId()] ??= $planFlattener->flattenWorkout($workout);
+                    if (null !== $workout) {
+                        $flattened[$workout->getId()] ??= $planFlattener->flattenWorkout($workout);
+                    }
                 }
             }
         }
@@ -191,7 +195,9 @@ final class CalendarController extends AbstractController
         foreach ($scheduledWorkoutRepository->findByOwnerBetween($user, $monday, $sunday) as $scheduled) {
             $byDate[$scheduled->getScheduledDate()->format('Y-m-d')][] = $scheduled;
             $workout = $scheduled->getWorkout();
-            $flattened[$workout->getId()] ??= $planFlattener->flattenWorkout($workout);
+            if (null !== $workout) {
+                $flattened[$workout->getId()] ??= $planFlattener->flattenWorkout($workout);
+            }
         }
 
         $goalsByDate = $this->indexGoalsByDate($goalRepository->findByOwnerBetween($user, $monday, $sunday));
@@ -204,7 +210,7 @@ final class CalendarController extends AbstractController
             $key = $cursor->format('Y-m-d');
             $scheduled = $byDate[$key] ?? [];
             foreach ($scheduled as $s) {
-                $totalMinutes += (int) $s->getWorkout()->getEstimatedDurationMinutes();
+                $totalMinutes += (int) $s->getWorkout()?->getEstimatedDurationMinutes();
             }
             $days[] = [
                 'date' => $cursor,

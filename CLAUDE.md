@@ -311,9 +311,28 @@ changement de mot de passe, création de compte par `app:user:create`).
 désormais série par série en muscu, via une app Android (Expo) et une API à token.
 La règle a été révisée avant tout code (ticket KL-01, livré le 29/07/2026) : voir la
 puce dédiée en §3, le cadrage complet et les 51 tickets dans
-[`docs/feature-live-tracking.md`](./docs/feature-live-tracking.md). **Aucun code
-livré à ce stade** ; prochain ticket KL-02 (entités du réalisé et migration de
-`ScheduledWorkout`, qui porte le passage en `SET NULL`).
+[`docs/feature-live-tracking.md`](./docs/feature-live-tracking.md). **KL-02 livré le
+29/07/2026** : le modèle du réalisé est en base. Prochain ticket KL-03 (`LogMetrics`).
+Ce que KL-02 pose et qu'il ne faut pas casser :
+
+- **`LoggedExercise` / `LoggedSet` pendent de `ScheduledWorkout`**, jamais du
+  prescrit. `exercise` et `sourcePrescribedExercise` sont en `SET NULL` avec
+  `exerciseName` en snapshot : nettoyer la bibliothèque ou retoucher un programme
+  ne rend jamais illisible une séance faite.
+- **`ScheduledWorkout.workout` est en `SET NULL`, donc nullable en pratique.** Toute
+  requête sur une séance datée se joint en **`leftJoin`** (les cinq `join` internes
+  de `ScheduledWorkoutRepository` auraient fait *disparaître* une séance sans source
+  du calendrier, de l'ICS et du profil — un bug silencieux, pas une erreur), et tout
+  affichage de son titre passe par **`ScheduledWorkout::getDisplayTitle()`** (titre
+  vivant → snapshot `title` → « Séance libre »), jamais par `workout.title`. Le
+  snapshot se pose au `prePersist`, aucun appelant n'a à y penser.
+- **Le type Doctrine `uuid` est redéfini par `App\Doctrine\UuidCharType`**
+  (`config/packages/doctrine.yaml`) pour stocker en `CHAR(36)`. Celui de
+  `symfony/uid` retombe sur `BINARY(16)` sur MySQL/MariaDB : sa détection de « GUID
+  natif » y est fausse. Les entités écrivent `type: 'uuid'` comme d'habitude.
+- Les uuid (`ScheduledWorkout`, `LoggedSet`) sont générés au **constructeur** quand
+  le serveur crée, et fournis par le client mobile sinon. C'est la clé d'idempotence
+  de `PUT /api/schedule/{uuid}`.
 
 Dernier lot (pages d'erreur) : 404, 403 et 5xx ont enfin une page à l'identité,
 dans `templates/bundles/TwigBundle/Exception/`. Quatre templates minces
