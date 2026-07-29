@@ -17,7 +17,8 @@ périmètre :
 Webapp de **planification** d'entraînements sportifs (muscu, course/trail, vélo,
 natation, mobilité). L'objectif est l'amont : bibliothèque d'exercices → séances
 → plans multi-semaines → calendrier daté → boucle prévu vs réalisé. **Pas de
-tracking détaillé** (Strava couvre déjà ça).
+tracking cardio** (Strava couvre déjà ça) ; le réalisé de la muscu, lui, se logue
+série par série — règle révisée, cf. §3.
 
 ---
 
@@ -112,7 +113,39 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
 - **Pages de consultation auto-suffisantes** : aucun AJAX post-chargement. C'est
   la condition du cache offline (Phase 9).
 - **Template vs instance datée** : `PlanTemplate` (sans dates) ≠ `ScheduledWorkout`
-  (daté). `ScheduledWorkout.workout` est une **référence vivante**.
+  (daté). `ScheduledWorkout.workout` est une **référence vivante**, mais la clé
+  étrangère est en **`SET NULL`**, pas en `CASCADE` (voir la puce suivante).
+- **Le réalisé se logue en muscu, jamais en cardio (règle révisée le 29/07/2026).**
+  L'ancienne formulation — *« aucun log détaillé de séries réalisées, Strava fait le
+  suivi »* — était mal calibrée : Strava enregistre une activité « musculation » avec
+  une durée et un chrono, et rien d'autre (ni série, ni charge, ni exercice). La
+  frontière juste n'est pas « pas de tracking » mais **« pas de tracking cardio »**.
+  Une séance de force écrit donc son réalisé série par série sur la **séance datée** ;
+  une sortie course, vélo ou natation se contente du `ScheduledStatus`. Cadrage
+  complet, schéma et tickets : [`docs/feature-live-tracking.md`](./docs/feature-live-tracking.md).
+  Ce qui en découle et qu'on ne rediscute pas :
+  - **Le prescrit ne bouge jamais, le réalisé vit à côté.** Une séance en cours
+    n'écrit **jamais** dans `Workout`, `PrescribedExercise` ni `PrescribedSet` : elle
+    écrit des `LoggedExercise` / `LoggedSet` portés par `ScheduledWorkout`. C'est la
+    déclinaison directe de la décision « préserver le réalisé » déjà tenue par
+    `PlanScheduler`. Il n'y a **pas** d'entité conteneur `WorkoutLog` : la séance
+    datée portait déjà l'owner, la date, le `status` et `completionNotes`.
+  - **`ScheduledWorkout.workout` passe de `CASCADE` à `SET NULL`.** Le commentaire du
+    code qui disait « la séance datée n'a pas de sens sans sa séance source » devient
+    **faux** dès qu'elle porte le réalisé : en l'état, supprimer une séance de la
+    bibliothèque effacerait une séance réellement faite. Le snapshot `title` prend le
+    relais pour l'affichage, et **toute vue d'une séance datée doit gérer
+    `workout === null`** (calendrier, `/schedule/{id}`, export, ICS). Corollaire :
+    une **séance libre** n'est rien d'autre qu'une séance datée sans source.
+  - **Le mobile est la seule source d'écriture du réalisé** ; le web l'affiche et le
+    supprime, il ne l'édite pas. Les identifiants (`uuid` sur `ScheduledWorkout` et
+    `LoggedSet`) sont générés par le **client**, c'est ce qui rend
+    `PUT /api/schedule/{uuid}` idempotent.
+  - **Le réalisé n'entre jamais dans `PlanFlattener`** — donc jamais dans l'export
+    Excel, le flux ICS ni la page publique. Même garde que le bloc-notes privé.
+  - **Le réalisé ne s'écrit qu'avec l'attribut `LOG`** (propriétaire seul), jamais
+    avec `EDIT`, que le coach possède. Le coach lit le réalisé de son athlète, il ne
+    l'écrit pas.
 - **Progression = fork à la pose (règle ajustée).** Poser une séance dans un plan en
   crée une **copie privée** (`Workout.planLocal = true`), portée par le `PlanItem`.
   Éditer une séance placée (progression) ne touche ni la séance de bibliothèque ni
@@ -273,6 +306,14 @@ séries détaillées, **relation coach ↔ athlète** (page unique `/coaching` p
 deux sens, fiche de travail par athlète sous `/coach`, `ROLE_COACH`) — cf. §3 pour
 la règle de propriété — et **paramètres de compte** (`/profile/settings` :
 changement de mot de passe, création de compte par `app:user:create`).
+
+**Chantier ouvert — Kadens Live (suivi de séance en direct).** Le réalisé se logue
+désormais série par série en muscu, via une app Android (Expo) et une API à token.
+La règle a été révisée avant tout code (ticket KL-01, livré le 29/07/2026) : voir la
+puce dédiée en §3, le cadrage complet et les 51 tickets dans
+[`docs/feature-live-tracking.md`](./docs/feature-live-tracking.md). **Aucun code
+livré à ce stade** ; prochain ticket KL-02 (entités du réalisé et migration de
+`ScheduledWorkout`, qui porte le passage en `SET NULL`).
 
 Dernier lot (pages d'erreur) : 404, 403 et 5xx ont enfin une page à l'identité,
 dans `templates/bundles/TwigBundle/Exception/`. Quatre templates minces

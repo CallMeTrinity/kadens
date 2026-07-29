@@ -6,10 +6,12 @@
 
 ---
 
-> **État (2026-07-26)** : **Lot A livré** (`ProgressionAggregator`, bloc
+> **État (2026-07-29)** : **Lot A livré** (`ProgressionAggregator`, bloc
 > « Progression prévue » sur `plan_template/show`, contrôleur Stimulus
-> `progression`, `ProgressionAggregatorTest`). **Lot B non fait** — décision
-> requise (§3 / §6) avant de coder.
+> `progression`, `ProgressionAggregatorTest`). **Lot B tranché** (KL-01) : la
+> décision qui bloquait §3 est prise, le réalisé se lit sur `LoggedSet` et le lot B
+> est absorbé par [`docs/feature-live-tracking.md`](./feature-live-tracking.md)
+> (tickets KL-49 à KL-51). Plus rien à arbitrer ici.
 
 ## 0. Résumé et recommandation
 
@@ -18,10 +20,12 @@ Un plan fait monter la charge / descendre l'allure semaine après semaine, mais 
 ne visualise cette trajectoire. Le profil stocke squat/bench/5K comme des valeurs
 figées, sans historique.
 
-**La tension** (à garder en tête en permanence) : la règle verrouillée est **« pas
-de tracking détaillé, Strava le fait »** (`CLAUDE.md §1`, `ROADMAP.md §1.5`). Toute
-la feature doit vivre entre « logguer chaque série » (interdit) et « ne rien voir
-évoluer » (le problème actuel).
+**La tension** (résolue depuis, voir §3) : la règle verrouillée était **« pas de
+tracking détaillé, Strava le fait »** (`CLAUDE.md §3`, `ROADMAP.md §1.5`), ce qui
+plaçait la feature entre « logguer chaque série » (interdit) et « ne rien voir
+évoluer » (le problème actuel). **Depuis le 29/07/2026, la règle est reformulée en
+« pas de tracking cardio »** : logguer une série de muscu est désormais autorisé, et
+même prévu. La tension qui a dicté le découpage en deux lots n'existe plus.
 
 **Reco** : livrer la feature **en deux temps nettement séparés**.
 
@@ -31,12 +35,12 @@ la feature doit vivre entre « logguer chaque série » (interdit) et « ne rien
    `PrescribedExercise` (charges/allures). On lit cette rampe existante et on la
    trace. C'est de la pure lecture agrégée. **C'est le vrai cœur de la valeur et
    ça ne demande aucune décision d'archi.**
-2. **Lot B — progression RÉALISÉE (optionnel, DÉCISION REQUISE).** Comparer le
-   prévu au *réalisé chiffré* suppose de capter une valeur de réalisé. Ça touche la
-   règle « pas de tracking ». Plusieurs options, **à trancher avec l'utilisateur
-   avant de coder** (§3). Ne pas démarrer le lot B sans arbitrage explicite.
+2. **Lot B — progression RÉALISÉE (TRANCHÉ le 29/07/2026, ne plus arbitrer).** La
+   source du réalisé est `LoggedSet`, et le lot est absorbé par
+   [`docs/feature-live-tracking.md`](./feature-live-tracking.md). Détail en §3.
 
-Faire le lot A d'abord. Il est safe, utile seul, et sert de socle visuel au lot B.
+Le lot A a été livré d'abord, et il sert de socle visuel au lot B : la courbe du
+réalisé se superpose à celle du prévu, dans le même bloc (ticket KL-49).
 
 ---
 
@@ -123,41 +127,42 @@ de semaines, mais chaque case = une séance avec blocs/exercices.
 
 ---
 
-## 3. Lot B — Progression RÉALISÉE (DÉCISION REQUISE avant de coder)
+## 3. Lot B — Progression RÉALISÉE (TRANCHÉ le 29/07/2026)
 
-Comparer prévu vs réalisé chiffré suppose de stocker un réalisé. C'est l'entorse
-potentielle à la règle « pas de tracking ». **Poser la question à l'utilisateur** et
-choisir UNE option. Ne pas cumuler.
+**La décision est prise, il n'y a plus rien à arbitrer ici.** La règle « pas de
+tracking détaillé » a été reformulée en **« pas de tracking cardio »**
+(`ROADMAP.md §1.5`, `CLAUDE.md §3`) : ce qui rendait ce lot ambigu a disparu.
 
-### Option 1 — Rien de neuf, on reste au binaire (défend la règle à la lettre)
-On ne trace jamais de réalisé chiffré. La « progression » reste 100 % prévue (lot A)
-+ l'observance déjà existante (`done/(done+missed)`). **Avantage** : zéro entorse,
-zéro migration. **Inconvénient** : ne répond pas à « ai-je vraiment progressé ».
+**La source du réalisé est `LoggedSet`.** Le réalisé s'écrit série par série dans
+`LoggedExercise` / `LoggedSet`, portés par la **séance datée** (`ScheduledWorkout`),
+et il est alimenté par l'app mobile. Le modèle, l'API et les écrans sont spécifiés
+dans [`docs/feature-live-tracking.md`](./feature-live-tracking.md) — ce fichier-ci ne
+redécrit rien.
 
-### Option 2 — Réalisé « léger » au niveau de la séance datée (compromis recommandé si lot B)
-Ajouter sur `ScheduledWorkout` un petit jeu de champs de résultat **agrégés**, pas
-série par série : ex. `actualLoadNote` structuré, ou mieux, une poignée de valeurs
-optionnelles réutilisant les unités normalisées (ex. « charge top set réalisée » sur
-l'exercice clé). **Reste « léger »** = une valeur, pas un journal.
-- **Migration** : colonnes nullable sur `ScheduledWorkout` (ou une petite table
-  `WorkoutResult` liée 1-1, à trancher).
-- **Philosophie** : c'est la zone grise. À valider explicitement comme « écart léger
-  chiffré », dans l'esprit du `completionNotes` déjà accepté, pas comme du tracking
-  Strava.
+Ce que devient concrètement le lot B, en trois tickets de cette autre spec :
 
-### Option 3 — Snapshots datés de records au profil (orthogonal, athlète-friendly)
-Une table `PerformanceLog` (ou `BodyMetric`) : `{owner, date, metric, valueKg|seconds|…}`
-pour historiser squat/bench/5K/poids de corps dans le temps. Découplé des séances
-(donc **pas** du tracking de séance). Alimente une courbe de PR au profil et
-recalcule DOTS/IMC à la date. **Migration** : nouvelle table. **Avantage** : très
-lisible, ne touche pas la boucle séance. **Inconvénient** : saisie manuelle
-supplémentaire.
+| Ce que voulait le lot B | Où c'est traité |
+|---|---|
+| La courbe du réalisé superposée à la progression prévue de `plan_template/show` | **KL-49** (dépend de KL-05 et KL-07) |
+| La trajectoire réelle d'un exercice, tous plans confondus | **KL-50** (dépend de KL-04, `PerformanceHistory`) |
+| Le tri de la bibliothèque par usage réel | **KL-51** |
 
-### Recommandation lot B
-Si l'utilisateur veut du réalisé : **Option 3** (records datés au profil) d'abord —
-c'est le plus utile, le moins ambigu vis-à-vis de la règle, et visuellement fort.
-Réserver l'Option 2 (réalisé par séance) à un besoin explicite et l'assumer comme
-extension de `completionNotes`.
+**Les trois options d'origine sont caduques**, et il est utile de savoir pourquoi
+plutôt que de les voir réapparaître :
+
+- **Option 1 (rester au binaire)** — écartée : elle ne répondait pas à « ai-je
+  vraiment progressé », qui est le besoin même de la feature.
+- **Option 2 (réalisé « léger » agrégé sur `ScheduledWorkout`)** — dépassée par plus
+  précis. L'intuition était bonne (le réalisé se porte bien sur la séance datée),
+  mais on garde la série entière plutôt qu'une valeur résumée : agréger reste
+  possible après coup, le contraire non.
+- **Option 3 (snapshots datés de records au profil)** — devenue redondante. Un record
+  se **dérive** des `LoggedSet` (`PerformanceHistory`, KL-04) au lieu de se ressaisir
+  à la main, ce qui supprime la saisie supplémentaire qui était son seul défaut.
+
+**Ce qui ne change pas** : le lot A reste la progression **prévue**, il garde son
+titre et sa lecture propre. Le réalisé s'y **superpose**, il ne le remplace pas —
+sans la rampe prévue, on ne sait plus si un écart est un dépassement ou un retard.
 
 ---
 
@@ -191,12 +196,16 @@ extension de `completionNotes`.
 
 ---
 
-## 6. Décisions à faire trancher par l'utilisateur (avant lot B)
+## 6. Décisions — toutes tranchées (29/07/2026)
 
-1. Fait-on le lot B, ou le lot A suffit-il ? (Le lot A seul est déjà une vraie
-   valeur.)
-2. Si lot B : Option 1 / 2 / 3 ? (Reco : 3.)
-3. Portée de la vue prévue : par plan seulement, ou aussi transversale sur le
-   calendrier (tous plans confondus dans le temps) ?
-4. Métriques prioritaires à tracer : charge (tonnage / top set), volume (séries),
-   allure/distance, intensité (zone/RPE) ? Ordre de priorité.
+1. ~~Fait-on le lot B, ou le lot A suffit-il ?~~ **Oui, le lot B se fait**, sous la
+   forme des tickets KL-49 à KL-51 de `feature-live-tracking.md`.
+2. ~~Si lot B : Option 1 / 2 / 3 ?~~ **Aucune des trois** : le réalisé vient des
+   `LoggedSet` écrits par l'app mobile (cf. §3).
+3. ~~Portée de la vue prévue : par plan, ou transversale sur le calendrier ?~~
+   **Les deux**, et la coupure suit l'entité : par plan sur `plan_template/show`
+   (KL-49), transversale par exercice sur `/exercise/{id}` (KL-50).
+4. ~~Métriques prioritaires ?~~ **Charge d'abord** (top set et tonnage), c'est ce que
+   `PerformanceHistory` expose (KL-04) et ce que l'app affiche en séance. Le volume
+   en séries suit. L'allure et la distance ne sont **pas** au programme : c'est du
+   cardio, donc hors périmètre du réalisé (§3).

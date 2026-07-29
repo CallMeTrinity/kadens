@@ -50,7 +50,9 @@ Socle Symfony en place (Docker, MariaDB, CI/CD). Design tokens posés.
   `sourcePlanTemplate` SET NULL (supprimer un plan garde le planning matérialisé,
   oublie juste la provenance).
 - **Phase 7 — prévu vs réalisé : faite.** Boucle sur la prévision, pas de tracking
-  détaillé. Depuis chaque case du calendrier : formulaire de statut (`PLANNED`/`DONE`/
+  détaillé *(règle révisée le 29/07/2026 en « pas de tracking **cardio** » — le
+  réalisé de la muscu se logue depuis, hors de cette phase : voir l'entrée
+  « Kadens Live » en fin de journal)*. Depuis chaque case du calendrier : formulaire de statut (`PLANNED`/`DONE`/
   `MISSED` via `<select>`) + `completionNotes` (écart léger), posté vers
   `ScheduledWorkoutController::updateStatus` (`POST /schedule/{id}/status`, CSRF,
   redirect vers le mois — pas de Turbo Stream, cohérent avec le reste du calendrier).
@@ -1182,6 +1184,11 @@ CLAUDE.md §3), le champ « Lieu » (inexistant sur `Workout`), et la comparaiso
 avec une séance précédente (aucun historique modélisé). Écartés plutôt
 qu'improvisés.
 
+> *Note du 29/07/2026 : deux des trois écartés reviennent par la porte du chantier
+> Kadens Live. La règle invoquée ici a été révisée (« pas de tracking **cardio** »),
+> « Démarrer la séance » devient l'app mobile, et la comparaison avec une séance
+> précédente devient `PerformanceHistory`. Seul le champ « Lieu » reste sans support.*
+
 **Découpe de `components.css` abandonnée.** Elle était au plan (4 400 lignes → 6
 fichiers). À l'exécution, aucun découpage contigu ne donnait des fichiers aux noms
 honnêtes : l'ordre source entremêle composants transverses et CSS de vue, et un
@@ -2042,3 +2049,67 @@ qui répond et on ne teste rien.
   donner d'autre.
 - Aucune nouvelle icône : `search`, `lock`, `zap`, `home`, `calendar-days`,
   `log-in`, `rotate-cw` étaient déjà figées en local.
+
+---
+
+## Chantier ouvert — Kadens Live : le réalisé se logue (29/07/2026)
+
+**KL-01, lot 0 du chantier.** Ce lot ne livre aucune ligne de code : il **révise une
+règle verrouillée** avant que quoi que ce soit s'écrive dessus. Une session de dev
+qui lirait `CLAUDE.md` sans cette mise à jour appliquerait une règle abrogée — d'où
+un ticket à part, en tête du découpage.
+
+Cadrage complet, modèle de données et 51 tickets :
+[`docs/feature-live-tracking.md`](./feature-live-tracking.md).
+
+### La règle qui change
+
+`ROADMAP.md §1.5` et `CLAUDE.md §3` disaient *« aucun log détaillé de séries
+réalisées, Strava fait le suivi »*. C'était **mal calibré** : Strava enregistre une
+activité « musculation » avec une durée et un chrono, et rien d'autre — ni série, ni
+charge, ni exercice. La frontière défendue n'existait donc que pour le cardio. Elle
+devient :
+
+> **Le réalisé se logue en muscu, jamais en cardio.** Une séance de force écrit son
+> réalisé série par série sur la séance datée, parce que rien d'autre ne le fait. Une
+> sortie course, vélo ou natation ne se logue pas ici : Strava la couvre, et Kadens
+> se contente du `ScheduledStatus`.
+
+Ce n'est pas un assouplissement de confort : c'est reconnaître qu'on avait interdit
+un besoin réel en croyant éviter un doublon qui n'en était pas un.
+
+### Ce que la révision entraîne, et qui est écrit noir sur blanc
+
+- **Le prescrit ne bouge jamais, le réalisé vit à côté** (`LoggedExercise` /
+  `LoggedSet` sur la séance datée). C'est la déclinaison de « préserver le réalisé »
+  déjà tenue par `PlanScheduler`.
+- **`ScheduledWorkout.workout` passera de `CASCADE` à `SET NULL`** (KL-02). Le
+  commentaire du code — *« la séance datée n'a pas de sens sans sa séance source »* —
+  devient faux le jour où elle porte le réalisé : en l'état, supprimer une séance de
+  bibliothèque effacerait une séance réellement faite. C'est la conséquence la plus
+  dangereuse du chantier, donc celle qui est notée en premier.
+- **Le réalisé n'entre jamais dans `PlanFlattener`** : même garde que le bloc-notes
+  privé, et pour la même raison — c'est ce qui l'empêche de fuiter dans l'export
+  Excel, l'ICS et la page publique sans avoir à y penser à chaque vue.
+- **`LOG` (propriétaire seul) et non `EDIT`** (que le coach possède) pour toute
+  écriture du réalisé.
+
+### Effet de bord : le lot B de la progression est tranché
+
+`docs/feature-progression.md §3` attendait un arbitrage depuis le 26/07 (trois
+options : rester au binaire, un réalisé « léger » agrégé, ou des records saisis à la
+main au profil). La révision le règle sans avoir à choisir entre elles : **le réalisé
+se lit sur `LoggedSet`**, et le lot B devient les tickets KL-49 à KL-51. L'option
+« records au profil » tombe en particulier d'elle-même — un record se **dérive** des
+séries loguées (`PerformanceHistory`) au lieu de se ressaisir, ce qui supprime la
+saisie manuelle qui était son seul vrai défaut.
+
+### Fichiers touchés
+
+`ROADMAP.md` (§1.5 reformulé, résumé de tête, §2.3 étendu, Phase 7 point 4 amendé
+plutôt que réécrit — l'ancienne phrase reste barrée, pour qu'on voie qu'elle a été
+révisée et non oubliée), `CLAUDE.md` (§3, nouvelle puce et ses quatre corollaires),
+`docs/feature-progression.md` (§0, §3, §6), et cette entrée.
+
+**Prochain ticket : KL-02** — les entités du réalisé et la migration de
+`ScheduledWorkout`, le plus sensible du lot 1.

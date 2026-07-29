@@ -6,7 +6,7 @@ Document autosuffisant. Il contient tout le nécessaire pour construire l'applic
 
 ## 0. Vision du projet
 
-Webapp de **planification** d'entraînements (pas de suivi détaillé : Strava couvre déjà le tracking). L'objectif est l'amont : concevoir une bibliothèque d'exercices, composer des séances, bâtir des plans multi-semaines réutilisables, les poser sur un calendrier, et boucler sur le prévu vs réalisé.
+Webapp de **planification** d'entraînements (pas de suivi cardio détaillé : Strava couvre déjà ça ; le réalisé de la muscu, lui, se logue — cf. §1.5). L'objectif est l'amont : concevoir une bibliothèque d'exercices, composer des séances, bâtir des plans multi-semaines réutilisables, les poser sur un calendrier, et boucler sur le prévu vs réalisé.
 
 Activités à couvrir dès la conception : muscu/salle, course/trail, vélo, natation, renforcement, mobilité/échauffement.
 
@@ -53,9 +53,12 @@ Ces choix conditionnent tout le reste. Ils ne se rediscutent pas en cours de rou
 - `ScheduledWorkout` = instance **datée** posée sur le calendrier, née d'un template ou d'une séance isolée.
 - Instancier un plan = boucler sur le template et créer N `ScheduledWorkout`. Le template reste intact.
 
-### 1.5 Prévu vs réalisé (pas de tracking)
+### 1.5 Prévu vs réalisé (pas de tracking **cardio**)
 - `ScheduledWorkout` porte un `status` (prévu/fait/manqué) et un champ de notes/écart léger.
-- **Aucun log détaillé de séries réalisées.** Strava fait le suivi. Ici on boucle sur la prévision : a-t-on tenu le plan ?
+- **Le réalisé se logue en muscu, jamais en cardio.** Une séance de force écrit son réalisé série par série sur la séance datée, parce que rien d'autre ne le fait. Une sortie course, vélo ou natation ne se logue pas ici : Strava la couvre, et Kadens se contente du `ScheduledStatus`.
+- **Le prescrit ne bouge jamais, le réalisé vit à côté.** Le réalisé s'écrit dans `LoggedExercise` / `LoggedSet`, portés par la séance datée. Jamais dans `Workout`, `PrescribedExercise` ni `PrescribedSet`.
+
+> **Révision de règle (29/07/2026).** Cette section disait auparavant *« Aucun log détaillé de séries réalisées. Strava fait le suivi. »* C'était mal calibré : Strava enregistre une activité « musculation » avec une durée et un chrono, et rien d'autre — ni série, ni charge, ni exercice. La frontière juste n'est pas « pas de tracking » mais « pas de tracking cardio », où Strava fait effectivement le travail. Cadrage complet et découpage en tickets dans [`docs/feature-live-tracking.md`](./docs/feature-live-tracking.md).
 
 ### 1.6 IA hors application
 - Aucune IA intégrée à l'app. Aucune dépendance API en prod, aucun coût token.
@@ -221,6 +224,8 @@ PlanTemplate (N) >──< (N) Goal       « ce plan prépare cette échéance »
 - `createdAt`, `updatedAt`
 
 > **Décision figée : référence vivante.** `ScheduledWorkout.workout` pointe vers le `Workout` vivant ; toute modification ultérieure de la séance se répercute sur les instances planifiées. Simplicité maximale. Si un besoin d'historique fidèle (garder la séance telle qu'elle était le jour prévu) apparaît plus tard, on ajoutera un mécanisme de snapshot à ce moment-là, pas avant.
+
+> **Extension (29/07/2026, cf. §1.5).** La séance datée devient le point où le prévu et le réalisé se rencontrent : elle gagne `uuid`, `title` (snapshot / titre d'une séance libre), `startedAt`, `endedAt` et une collection `loggedExercises`. Deux conséquences à ne pas manquer : `workout` devient **nullable en usage courant** (une séance libre n'a pas de source) et sa clé étrangère passe de `CASCADE` à **`SET NULL`** — supprimer une séance de la bibliothèque ne doit plus effacer une séance réellement faite, `title` prenant le relais à l'affichage. Le schéma complet de `LoggedExercise` / `LoggedSet` est dans [`docs/feature-live-tracking.md`](./docs/feature-live-tracking.md) §2.
 
 ---
 
@@ -468,13 +473,13 @@ globale (`owner` null). Ignore les doublons par `name`, idempotente.
 
 ### Phase 7 — Prévu vs réalisé
 
-**But :** boucler sur la prévision, sans tracking détaillé.
+**But :** boucler sur la prévision, sans tracking cardio.
 
 Étapes :
 1. Ajouter l'usage de `status` sur `ScheduledWorkout` : cocher fait / manqué depuis le calendrier ou la vue jour.
 2. Ajouter la saisie de `completionNotes` (écart léger, ressenti court).
 3. Vue de synthèse : sur une période ou un plan instancié, proportion de séances tenues vs manquées.
-4. **Ne pas** ajouter de log de séries réalisées. La frontière est nette : c'est de la prévision, pas du suivi.
+4. **Ne pas** ajouter de log de séries réalisées **dans cette phase**. ~~La frontière est nette : c'est de la prévision, pas du suivi.~~ **Amendé le 29/07/2026** (cf. §1.5) : le log série par série existe désormais, mais en muscu seulement, et il vit hors de cette phase — il est décrit et découpé dans [`docs/feature-live-tracking.md`](./docs/feature-live-tracking.md). Le cardio, lui, reste au `ScheduledStatus`.
 
 **Jalon :** je vois ce que j'ai tenu de mon plan.
 

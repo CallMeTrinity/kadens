@@ -1,6 +1,6 @@
 # Kadens
 
-Webapp de **planification** d'entraînements sportifs (muscu, course/trail, vélo, natation, mobilité). Pas de tracking détaillé — Strava couvre déjà ce besoin. L'objectif est l'amont : bâtir une bibliothèque d'exercices, composer des séances, construire des plans multi-semaines réutilisables, les poser sur un calendrier, et comparer prévu vs réalisé.
+Webapp de **planification** d'entraînements sportifs (muscu, course/trail, vélo, natation, mobilité). Pas de tracking cardio — Strava couvre déjà ce besoin ; le réalisé de la muscu, lui, se logue série par série (cf. `ROADMAP.md` §1.5). L'objectif est l'amont : bâtir une bibliothèque d'exercices, composer des séances, construire des plans multi-semaines réutilisables, les poser sur un calendrier, et comparer prévu vs réalisé.
 
 Le détail complet des décisions d'architecture, du modèle de données et des phases de développement vit dans [`ROADMAP.md`](./ROADMAP.md) — c'est la référence à jour, ce README ne fait qu'orienter.
 
