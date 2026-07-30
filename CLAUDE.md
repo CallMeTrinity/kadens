@@ -315,8 +315,26 @@ puce dédiée en §3, le cadrage complet et les 51 tickets dans
 29/07/2026** : le modèle du réalisé est en base. **KL-03 livré le 30/07/2026** :
 `LogMetrics`, le résumé du réalisé. **KL-04 livré le 30/07/2026** :
 `PerformanceHistory`, la dernière perf et le record. **KL-05 livré le
-30/07/2026** : `LogComparator`, l'écart prévu vs réalisé. Prochain ticket KL-06
-(attribut `LOG` sur `ScheduledWorkoutVoter`).
+30/07/2026** : `LogComparator`, l'écart prévu vs réalisé. **KL-06 livré le
+30/07/2026** : l'attribut `LOG`, la garde d'écriture du réalisé. Prochain ticket
+KL-07 (affichage du réalisé sur `/schedule/{id}`).
+
+Ce que KL-06 pose et qu'il ne faut pas casser :
+
+- **`ScheduledWorkoutVoter` distingue programmer et consigner.** `EDIT` =
+  programmer (déplacer, basculer prévu/fait/manqué, noter un écart léger,
+  retirer) : ouvert au **coach accepté**, c'est son travail. `LOG` = écrire le
+  réalisé série par série : **propriétaire seul**. `VIEW` ne change pas, le coach
+  lit le réalisé de son athlète. Tout point d'écriture du réalisé, web comme API,
+  teste `LOG` — jamais `EDIT`, qui suffirait syntaxiquement et donnerait la main
+  au coach.
+- **Sur `LOG`, la branche coach s'arrête avant d'interroger `CoachingResolver`.**
+  Ce n'est pas une optimisation, c'est ce qui rend le refus structurel : tant que
+  le code passe par la branche partagée, il existe un endroit où ajouter « sauf
+  si… ». Un test le garde avec `expects(never())` sur `CoachingRepository`.
+- **Un test de voter a besoin d'un id sur ses `User` de fixture** (posé par
+  réflexion) : `CoachingResolver` refuse une entité non persistée, donc sans id la
+  branche coach n'est jamais atteinte et le test passe pour la mauvaise raison.
 
 Ce que KL-05 pose et qu'il ne faut pas casser :
 

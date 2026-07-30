@@ -2462,3 +2462,70 @@ l'`Exercise` quand la source a disparu).
 
 **Prochain ticket : KL-06** — l'attribut `LOG` sur `ScheduledWorkoutVoter` : le
 coach lit le réalisé de son athlète, il ne l'écrit pas.
+
+---
+
+## Kadens Live KL-06 — l'attribut `LOG`, la garde d'écriture du réalisé (30/07/2026)
+
+Petit ticket, mais c'est celui qui empêche une régression de sécurité silencieuse.
+Depuis KL-02, la séance datée porte le réalisé. Or `ScheduledWorkoutVoter`
+accordait `EDIT` au coach accepté : sans rien changer au voter, le premier
+endpoint d'écriture du réalisé aurait hérité de ce droit, et un coach aurait pu
+déclarer ce que son athlète a soulevé.
+
+### Deux natures d'écriture, une seule fermée au coach
+
+Le voter ne distingue plus « lire » et « écrire » mais **trois** choses, parce
+qu'« écrire sur une séance datée » recouvre deux gestes qui n'appartiennent pas à
+la même personne :
+
+- `EDIT` = **programmer**. Déplacer une date, basculer prévu/fait/manqué, noter un
+  écart léger, retirer du calendrier. C'est le travail du coach, il le garde. Le
+  commentaire du voter qui parlait de séparer `EDIT` de `STATUS` est donc devenu
+  faux dans son diagnostic : ce n'est pas le **statut** qu'il fallait extraire
+  (marquer une séance faite reste de la programmation), c'est le **contenu du
+  réalisé**.
+- `LOG` = **consigner ce qui a été fait**. Créer, modifier, supprimer le réalisé
+  série par série. Propriétaire seul.
+- `VIEW` ne bouge pas : le coach lit tout, réalisé compris. C'est déjà ce que
+  KL-45 attend, et ça reste vrai sans une ligne de plus.
+
+### La branche coach s'arrête avant la question
+
+Sur `LOG`, le voter rend `false` **sans interroger `CoachingResolver`**. Ce n'est
+pas une optimisation (une requête COUNT mémoïsée ne coûte rien) : c'est ce qui
+rend le refus structurel. Tant que le code passe par la branche partagée, il
+existe un endroit où ajouter « sauf si… ». Un test le garde avec
+`expects(self::never())` sur le repository : si quelqu'un fait un jour redescendre
+`LOG` dans la branche coach, ce test tombe même si la décision finale reste un
+refus.
+
+### Une garde qui précède ses appelants
+
+Aucun point d'écriture du réalisé n'existe encore : la suppression depuis
+`/schedule/{id}` arrive avec KL-07, le `PUT` idempotent avec KL-16. La case
+« tout point d'écriture teste `LOG` » est donc cochée par constat, pas par
+migration d'appelants. C'était l'ordre voulu par le découpage — la garde d'abord,
+ce qui l'utilise ensuite — et c'est aussi pourquoi la distinction doit vivre dans
+le commentaire du voter : elle sera lue plusieurs semaines avant d'avoir un seul
+appelant.
+
+### Fichiers touchés
+
+`src/Security/Voter/ScheduledWorkoutVoter.php` (constante `LOG`, `supports`,
+sortie anticipée, et le commentaire de classe réécrit — l'ancien documentait une
+décision qu'on vient d'annuler),
+`tests/Security/ScheduledWorkoutVoterTest.php` (neuf, 6 tests : le propriétaire a
+les quatre attributs, le coach en a trois, le tiers et l'anonyme aucun, `LOG`
+n'interroge jamais la relation, et `LOG` ne s'abstient pas sur un `ScheduledWorkout`).
+Test unitaire : le seul fait qui vienne de la base est la relation de coaching, et
+`CoachingResolver` l'isole déjà derrière une méthode — le double porte donc sur
+`CoachingRepository`, le résolveur reste le vrai. Conséquence à retenir pour tout
+test de voter à venir : `CoachingResolver` refuse une entité **non persistée** (pas
+de clé de cache fiable), donc les `User` de fixture ont besoin d'un id posé par
+réflexion, sinon la branche coach n'est jamais atteinte et les tests passent pour
+la mauvaise raison.
+
+**Prochain ticket : KL-07** — l'affichage du réalisé sur `/schedule/{id}` :
+colonne « Réalisé » dans `_workout_sets_table`, onglet par défaut selon le statut,
+et suppression du réalisé (premier appelant de `LOG`).

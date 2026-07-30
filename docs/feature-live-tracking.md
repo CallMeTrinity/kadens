@@ -7,12 +7,13 @@
 
 ---
 
-> **État (2026-07-30)** : cadrage validé, **KL-01 à KL-05 livrés** (règle révisée
+> **État (2026-07-30)** : cadrage validé, **KL-01 à KL-06 livrés** (règle révisée
 > partout, le modèle du réalisé en base — `LoggedExercise` / `LoggedSet`,
 > `ScheduledWorkout` étendue et sa FK `workout` passée en `SET NULL` — puis
 > `LogMetrics`, le résumé du réalisé, `PerformanceHistory`, la dernière perf
-> et le record, et `LogComparator`, l'écart prévu vs réalisé).
-> Prochain ticket : **KL-06** (garde d'écriture `LOG` sur `ScheduledWorkoutVoter`).
+> et le record, `LogComparator`, l'écart prévu vs réalisé, et l'attribut `LOG`
+> qui ferme l'écriture du réalisé au coach).
+> Prochain ticket : **KL-07** (affichage du réalisé sur `/schedule/{id}`).
 
 ---
 
@@ -641,11 +642,21 @@ voter accorde aussi `EDIT` au coach accepté, et `EDIT` ne doit pas devenir un
 droit d'écrire le réalisé de son athlète.
 
 **Fini quand** :
-- [ ] Nouvel attribut `LOG` : accordé **au seul propriétaire**, jamais au coach
-- [ ] `EDIT` conserve son sens actuel (déplacer, marquer fait, retirer) et reste
+- [x] Nouvel attribut `LOG` : accordé **au seul propriétaire**, jamais au coach
+- [x] `EDIT` conserve son sens actuel (déplacer, marquer fait, retirer) et reste
       ouvert au coach
-- [ ] Tout point d'écriture du réalisé, web comme API, teste `LOG` et non `EDIT`
-- [ ] Le commentaire du voter explique la distinction, sinon elle se perdra
+- [x] Tout point d'écriture du réalisé, web comme API, teste `LOG` et non `EDIT`
+      (aucun n'existe encore : la garde précède ses appelants, KL-07 et KL-16)
+- [x] Le commentaire du voter explique la distinction, sinon elle se perdra
+
+**Livré le 30/07/2026.** Ce que le voter dit désormais, en une phrase : `EDIT`
+c'est **programmer** (dates, statut, retrait — le travail du coach), `LOG` c'est
+**consigner ce qui a été fait** (le propriétaire seul). Sur `LOG`, la branche
+coach s'arrête avant même d'interroger `CoachingResolver` : un test le vérifie
+avec `expects(never())`, pour qu'aucun « et si le coach était aussi… » ne se
+glisse plus tard dans la branche partagée. Livré avec
+`tests/Security/ScheduledWorkoutVoterTest.php` (6 tests), qui coche la quatrième
+case de KL-09.
 
 ### KL-07 — Affichage du réalisé sur `/schedule/{id}`
 
@@ -703,8 +714,8 @@ requête supplémentaire ni risque de N+1 à traiter.
       et **un test qui compte les requêtes de `bulkFor`** (livré avec KL-04)
 - [x] `LogComparatorTest` : tenu, dépassé, allégé, sauté, hors programme,
       exercice prescrit supprimé après coup (livré avec KL-05)
-- [ ] `ScheduledWorkoutVoterTest` étendu : le coach a `VIEW` et `EDIT`, **jamais
-      `LOG`**
+- [x] `ScheduledWorkoutVoterTest` : le coach a `VIEW` et `EDIT`, **jamais `LOG`**
+      (livré avec KL-06 — le fichier n'existait pas, il est créé)
 - [ ] **Un test de non-régression sur la suppression** : supprimer un `Workout`
       de la bibliothèque laisse debout ses séances datées et leur réalisé.
       C'est le test qui garde le `SET NULL` de §2.3 point 1
