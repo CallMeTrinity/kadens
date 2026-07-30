@@ -7,10 +7,11 @@
 
 ---
 
-> **État (2026-07-29)** : cadrage validé, **KL-01 et KL-02 livrés** (règle révisée
-> partout, puis le modèle du réalisé en base : `LoggedExercise` / `LoggedSet`,
-> `ScheduledWorkout` étendue et sa FK `workout` passée en `SET NULL`).
-> Prochain ticket : **KL-03** (`LogMetrics`).
+> **État (2026-07-30)** : cadrage validé, **KL-01 à KL-03 livrés** (règle révisée
+> partout, le modèle du réalisé en base — `LoggedExercise` / `LoggedSet`,
+> `ScheduledWorkout` étendue et sa FK `workout` passée en `SET NULL` — puis
+> `LogMetrics`, le résumé du réalisé).
+> Prochain ticket : **KL-04** (`PerformanceHistory`).
 
 ---
 
@@ -480,12 +481,43 @@ séries de travail (échauffement exclu, comme partout), durée réelle
 (`endedAt - startedAt`), répartition par `TargetRegion`.
 
 **Fini quand** :
-- [ ] `summary(ScheduledWorkout): array` avec la même forme que
+- [x] `summary(ScheduledWorkout): array` avec la même forme que
       `WorkoutMetrics::summary()` (pour que les composants Twig de KPI se
       réutilisent tels quels)
-- [ ] Renvoie `null` si la séance datée n'a aucun `LoggedExercise`
-- [ ] `SetType::WARMUP` exclu du volume de travail
-- [ ] Aucune duplication de `WorkoutMetrics` : ce qui est commun se factorise
+- [x] Renvoie `null` si la séance datée n'a aucun `LoggedExercise`
+- [x] `SetType::WARMUP` exclu du volume de travail
+- [x] Aucune duplication de `WorkoutMetrics` : ce qui est commun se factorise
+
+**Livré le 30/07/2026.** Quatre décisions prises en cours de route :
+
+1. **Ce qui est commun, c'est la ventilation par région, et elle seule.** Le
+   `regionShares()` privé de `WorkoutMetrics` est devenu le service
+   `RegionBreakdown::shares()`, consommé par les deux : le prescrit et le réalisé
+   comptent leurs séries par zone différemment, mais les regroupent et en tirent
+   des parts à l'identique. Le reste ne se factorise pas — le RPE du prescrit est
+   porté par l'**exercice** et doit être pondéré à la main par ses séries, celui
+   du réalisé est porté par la **série**, donc déjà pondéré. Fusionner les deux
+   boucles aurait produit un service paramétré plus long que les deux réunis.
+2. **La forme est identique, deux clés valent 0.** Le réalisé est **plat** : il
+   ne porte ni blocs (`blockCount`) ni liaisons de superset (`supersets`,
+   `circuits`), qui n'appartiennent qu'à l'intention. Elles restent présentes
+   pour que le bandeau de KPI se rende tel quel (KL-07), à charge pour la vue de
+   ne pas afficher un « 0 enchaînement » qui ne veut rien dire.
+3. **Le volume du réalisé ne filtre pas sur `ActivityType::GYM`**, contrairement
+   au prescrit. Un `LoggedExercise` dont l'`Exercise` a été supprimé (SET NULL)
+   n'a plus d'activité du tout : l'écarter ferait disparaître le tonnage d'une
+   séance réellement faite, exactement ce que le snapshot `exerciseName` est là
+   pour empêcher. Seule la ventilation par région dépend encore de la définition
+   en bibliothèque, faute de zones ciblées ailleurs.
+4. **Trois clés en plus, propres au fait accompli** : `durationSeconds` (null
+   tant qu'une borne manque — une durée « jusqu'à maintenant » bougerait à chaque
+   rafraîchissement, et une fin antérieure au début est ramenée à 0), `skipped`
+   (les exercices sautés sont comptés à part et n'apportent aucun volume, même
+   s'ils portent des séries abandonnées) et `loggedAt` (fin d'exécution, sinon
+   dernière série complétée : le réalisé peut être synchronisé sans bornes).
+
+Livré avec `tests/Service/LogMetricsTest.php` (11 tests), qui coche la première
+case de KL-09.
 
 ### KL-04 — Service `PerformanceHistory`
 
@@ -583,7 +615,8 @@ requête supplémentaire ni risque de N+1 à traiter.
 **Où** : `tests/`
 
 **Fini quand** :
-- [ ] `LogMetricsTest` : tonnage, exclusion de l'échauffement, séance sans réalisé
+- [x] `LogMetricsTest` : tonnage, exclusion de l'échauffement, séance sans réalisé
+      (livré avec KL-03)
 - [ ] `PerformanceHistoryTest` : record, dernière perf, absence d'historique,
       et **un test qui compte les requêtes de `bulkFor`**
 - [ ] `LogComparatorTest` : tenu, dépassé, allégé, sauté, hors programme,

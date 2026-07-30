@@ -14,6 +14,7 @@ use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
 use App\Enum\SetType;
 use App\Service\PlanFlattener;
+use App\Service\RegionBreakdown;
 use App\Service\SupersetGrouper;
 use App\Service\UnitFormatter;
 use App\Service\WorkoutEstimator;
@@ -27,7 +28,7 @@ final class PlanFlattenerTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->flattener = new PlanFlattener(new UnitFormatter(), new WorkoutMetrics(new WorkoutEstimator(), new SupersetGrouper()), new SupersetGrouper());
+        $this->flattener = new PlanFlattener(new UnitFormatter(), new WorkoutMetrics(new WorkoutEstimator(), new SupersetGrouper(), new RegionBreakdown()), new SupersetGrouper());
     }
 
     #[DataProvider('summaryCases')]

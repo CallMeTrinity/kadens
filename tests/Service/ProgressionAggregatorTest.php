@@ -12,6 +12,7 @@ use App\Enum\ActivityType;
 use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
 use App\Service\ProgressionAggregator;
+use App\Service\RegionBreakdown;
 use App\Service\SupersetGrouper;
 use App\Service\UnitFormatter;
 use App\Service\WorkoutEstimator;
@@ -24,7 +25,7 @@ final class ProgressionAggregatorTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->aggregator = new ProgressionAggregator(new UnitFormatter(), new WorkoutMetrics(new WorkoutEstimator(), new SupersetGrouper()));
+        $this->aggregator = new ProgressionAggregator(new UnitFormatter(), new WorkoutMetrics(new WorkoutEstimator(), new SupersetGrouper(), new RegionBreakdown()));
     }
 
     public function testWeightRampAcrossWeeksIsTraced(): void

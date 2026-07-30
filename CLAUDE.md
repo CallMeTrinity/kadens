@@ -312,7 +312,29 @@ désormais série par série en muscu, via une app Android (Expo) et une API à 
 La règle a été révisée avant tout code (ticket KL-01, livré le 29/07/2026) : voir la
 puce dédiée en §3, le cadrage complet et les 51 tickets dans
 [`docs/feature-live-tracking.md`](./docs/feature-live-tracking.md). **KL-02 livré le
-29/07/2026** : le modèle du réalisé est en base. Prochain ticket KL-03 (`LogMetrics`).
+29/07/2026** : le modèle du réalisé est en base. **KL-03 livré le 30/07/2026** :
+`LogMetrics`, le résumé du réalisé. Prochain ticket KL-04 (`PerformanceHistory`).
+
+Ce que KL-03 pose et qu'il ne faut pas casser :
+
+- **`LogMetrics::summary()` rend la MÊME forme que `WorkoutMetrics::summary()`**,
+  pour que le bandeau de KPI de `_workout_read` se rende tel quel sur du réalisé
+  (KL-07). Mais **le réalisé est plat** : `blockCount`, `supersets` et `circuits`
+  valent 0 — un superset est une intention, pas un fait qu'on observe après coup.
+  Trois clés s'ajoutent : `durationSeconds` (null tant qu'une borne manque),
+  `skipped`, `loggedAt`. Et `summary()` rend **`null`** quand il n'y a aucun
+  `LoggedExercise` : une séance juste cochée « faite » n'a pas de bandeau.
+- **Ce qui se factorise entre prescrit et réalisé, c'est `RegionBreakdown`, et
+  lui seul.** Le `regionShares()` privé de `WorkoutMetrics` en est extrait et
+  sert aux deux. Le reste ne se factorise pas : le RPE du prescrit est porté par
+  l'**exercice** (pondération manuelle par les séries), celui du réalisé par la
+  **série** (déjà pondéré), et le prescrit multiplie par les tours de bloc que
+  le réalisé n'a pas.
+- **Le volume du réalisé ne filtre PAS sur `ActivityType::GYM`**, contrairement au
+  prescrit : un `LoggedExercise` dont l'`Exercise` a été supprimé n'a plus
+  d'activité du tout, et le filtrer effacerait le tonnage d'une séance réellement
+  faite. Seule la ventilation par région dépend encore de la bibliothèque.
+
 Ce que KL-02 pose et qu'il ne faut pas casser :
 
 - **`LoggedExercise` / `LoggedSet` pendent de `ScheduledWorkout`**, jamais du

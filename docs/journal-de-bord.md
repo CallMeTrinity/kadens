@@ -2196,3 +2196,88 @@ ligne retirée de `doctrine_migration_versions`. La prod ne l'a jamais eue.
 
 **Prochain ticket : KL-03** — `LogMetrics`, le pendant réalisé de
 `WorkoutMetrics`.
+
+---
+
+## Kadens Live KL-03 — `LogMetrics`, le résumé du réalisé (30/07/2026)
+
+Le pendant réalisé de `WorkoutMetrics` : tonnage effectif, séries de travail,
+durée réelle, répartition par région. Un ticket court, dont l'essentiel de la
+réflexion a porté sur **ce qui se factorise et ce qui ne se factorise pas**.
+
+### La seule chose vraiment commune, c'est la ventilation par région
+
+Le ticket demandait « aucune duplication ». À l'examen, le prescrit et le réalisé
+ne partagent qu'un bout de calcul : une fois qu'on a des **séries par zone**, le
+regroupement en `TargetRegion` et le calcul des parts sont identiques. Le
+`regionShares()` privé de `WorkoutMetrics` est donc devenu le service
+`RegionBreakdown::shares()`, injecté dans les deux.
+
+Le reste ne se factorise pas, et c'est structurel :
+
+- **le RPE du prescrit est porté par l'exercice** (« 4 séries à RPE 9 »), il faut
+  donc le pondérer à la main par le nombre de séries, sinon un exercice de 2
+  séries pèse autant qu'un de 6 ;
+- **celui du réalisé est porté par la série**, la moyenne simple est déjà la
+  moyenne pondérée ;
+- le prescrit multiplie tout par les **tours de bloc**, le réalisé n'a pas de
+  blocs — ce qui a été fait a été fait.
+
+Fusionner les deux boucles derrière un service paramétré aurait donné plus de
+lignes que les deux réunis, pour un résultat moins lisible. La duplication qu'on
+évite est celle du *calcul*, pas celle de la *forme*.
+
+### La forme est identique, deux clés valent 0
+
+`LogMetrics::summary()` rend toutes les clés de `WorkoutMetrics::summary()` :
+c'est la condition pour que le bandeau de KPI de `_workout_read` se rende tel quel
+sur du réalisé (KL-07). Mais **le réalisé est plat** : il ne porte ni blocs
+(`blockCount`) ni liaisons de superset (`supersets`, `circuits`). Ces trois clés
+valent 0, et la vue devra ne pas afficher un « 0 enchaînement » qui ne veut rien
+dire — un superset est une intention, pas un fait qu'on observe après coup.
+
+Trois clés s'ajoutent en revanche, propres au fait accompli : `durationSeconds`,
+`skipped`, `loggedAt`.
+
+### `null` quand il n'y a rien, plutôt que des zéros
+
+`summary()` rend `null` dès qu'il n'y a aucun `LoggedExercise`. Une séance
+simplement cochée « faite » n'a pas de bandeau à montrer, et l'appelant n'a pas à
+distinguer « zéro série » de « pas de réalisé » — un `{% if summary %}` suffit.
+
+### Le volume du réalisé ne filtre pas sur l'activité
+
+`WorkoutMetrics::volume()` écarte tout ce qui n'est pas `ActivityType::GYM`. Le
+réalisé ne peut pas se le permettre : un `LoggedExercise` dont l'`Exercise` a été
+supprimé de la bibliothèque n'a **plus d'activité du tout** (SET NULL), et le
+filtrer ferait disparaître le tonnage d'une séance réellement faite — exactement
+ce que le snapshot `exerciseName` est là pour empêcher. La règle du projet garantit
+déjà qu'on ne logue que de la muscu. Seule la ventilation par région dépend encore
+de la définition en bibliothèque, faute de zones ciblées ailleurs : un exercice
+orphelin garde son tonnage et perd sa région.
+
+### Trois détails qui auraient produit des valeurs fausses
+
+- **`durationSeconds` est `null` tant qu'une borne manque.** Une séance
+  synchronisée en cours d'exécution n'a pas de fin ; afficher « depuis le début
+  jusqu'à maintenant » donnerait une durée qui bouge à chaque rafraîchissement.
+  Et une fin antérieure au début (horloge du téléphone rattrapée entre deux
+  écritures) est ramenée à 0, jamais rendue négative.
+- **Un exercice sauté ne compte pas comme un exercice fait.** Il peut porter des
+  séries saisies puis abandonnées : elles n'entrent ni dans le tonnage ni dans les
+  séries de travail. Le compteur `skipped` les expose à part, KL-05 en fera un écart.
+- **L'échauffement ne devient jamais le record.** `topLift` ne regarde que les
+  séries de travail, et un test le vérifie avec un échauffement plus lourd que le
+  travail — le cas absurde en salle, mais exactement ce qu'un mauvais filtre
+  laisserait passer.
+
+### Fichiers touchés
+
+`src/Service/LogMetrics.php` (neuf), `src/Service/RegionBreakdown.php` (neuf,
+extrait de `WorkoutMetrics`), `src/Service/WorkoutMetrics.php` (consomme le
+service extrait, un paramètre de constructeur en plus),
+`tests/Service/LogMetricsTest.php` (11 tests, coche la première case de KL-09) et
+les trois tests qui instanciaient `WorkoutMetrics` à la main.
+
+**Prochain ticket : KL-04** — `PerformanceHistory` (dernière performance et
+record), le service qui donne sa valeur à l'app en séance.

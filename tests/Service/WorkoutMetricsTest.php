@@ -13,6 +13,7 @@ use App\Enum\PrescriptionType;
 use App\Enum\SetType;
 use App\Enum\TargetArea;
 use App\Enum\TargetRegion;
+use App\Service\RegionBreakdown;
 use App\Service\SupersetGrouper;
 use App\Service\WorkoutEstimator;
 use App\Service\WorkoutMetrics;
@@ -24,7 +25,7 @@ final class WorkoutMetricsTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->metrics = new WorkoutMetrics(new WorkoutEstimator(), new SupersetGrouper());
+        $this->metrics = new WorkoutMetrics(new WorkoutEstimator(), new SupersetGrouper(), new RegionBreakdown());
     }
 
     public function testDistinctActivitiesInOrderOfAppearance(): void
