@@ -314,8 +314,39 @@ puce dédiée en §3, le cadrage complet et les 51 tickets dans
 [`docs/feature-live-tracking.md`](./docs/feature-live-tracking.md). **KL-02 livré le
 29/07/2026** : le modèle du réalisé est en base. **KL-03 livré le 30/07/2026** :
 `LogMetrics`, le résumé du réalisé. **KL-04 livré le 30/07/2026** :
-`PerformanceHistory`, la dernière perf et le record. Prochain ticket KL-05
-(`LogComparator`).
+`PerformanceHistory`, la dernière perf et le record. **KL-05 livré le
+30/07/2026** : `LogComparator`, l'écart prévu vs réalisé. Prochain ticket KL-06
+(attribut `LOG` sur `ScheduledWorkoutVoter`).
+
+Ce que KL-05 pose et qu'il ne faut pas casser :
+
+- **Le comparateur ne remet rien à plat : il consomme `PlanFlattener`.** Pour
+  cela `FlatSetLine` expose désormais `reps` et `durationSeconds` **bruts** à
+  côté de son `effort` formaté — sans eux, aligner le réalisé aurait demandé de
+  re-dériver les séries prescrites, donc de dupliquer `setLines`. Le réalisé sort
+  sous la **même forme** qu'une série prescrite (`type`, `typeLabel`, `effort`,
+  `weightKg`, + `rpe` et l'entité), pour que la colonne « Réalisé » de KL-07 se
+  rende avec le fragment de la colonne « Prévu ».
+- **L'appariement des exercices tient en deux passes, jamais une.**
+  `sourcePrescribedExercise` d'abord pour **tous** les logs, l'`Exercise` ensuite
+  pour ce qui reste, « hors programme » en dernier. Fusionner les passes ferait
+  voler la ligne d'un log par un autre, et l'ordre de la collection déciderait du
+  résultat. Comparaison par **identité d'objet**, identifiant en repli.
+- **Les séries s'apparient par rang, échauffement et travail dans deux files
+  séparées.** Un échauffement prescrit mais non logué décalerait sinon toutes les
+  séries de travail d'un cran, et une séance tenue se lirait « allégée ».
+- **L'écart se lit sur le premier axe où les deux côtés parlent et divergent** :
+  tonnage, charge, répétitions, durée, séries. Un axe muet d'un côté ne tranche
+  **jamais** (sinon une série au poids du corps serait « allégée »), et le
+  tonnage passe avant la charge (6 × 82,5 kg pour 8 × 80 kg prévus, c'est plus
+  lourd mais moins de travail). Même cascade à l'échelle de la série et à celle
+  de l'exercice.
+- **Six états dans `LogDeviation`, pas cinq.** `NOT_LOGGED` (un trou) n'est pas
+  `SKIPPED` (une déclaration de l'athlète) — le modèle distingue déjà les deux.
+  `HELD` sert aussi de « rien à signaler » quand l'écart n'est pas mesurable
+  (prescrit sans séries à apparier : cardio, AMRAP, for time).
+- **Pas de réalisé = tableau vide**, comme `LogMetrics::summary()` rend `null` :
+  la colonne « Réalisé » n'apparaît pas plutôt que d'apparaître vide.
 
 Ce que KL-04 pose et qu'il ne faut pas casser :
 

@@ -2364,3 +2364,101 @@ indispensable, et le compte de requêtes de `bulkFor`).
 
 **Prochain ticket : KL-05** — `LogComparator`, l'alignement du prescrit et du
 réalisé série par série.
+
+---
+
+## Kadens Live KL-05 — `LogComparator`, l'écart prévu vs réalisé (30/07/2026)
+
+Le service qui fait exister la boucle « prévu vs réalisé » autrement que dans une
+case à cocher : il aligne le programme et ce qui a été fait, série par série, et
+nomme l'écart. C'est ce que KL-07 affichera en colonne à côté du prescrit.
+
+### Ce qu'il ne fait pas : remettre à plat
+
+Le prescrit arrive par `PlanFlattener`, jamais relu ici. Deux lectures du
+programme finiraient par diverger, et c'est la même mise à plat qui rend la page,
+l'export et l'API.
+
+Une clé manquait pour ça : `setLines` donnait `effort` (« 8 reps ») mais pas les
+valeurs qui le composent. Comparer une chaîne formatée à une autre n'aurait
+mesuré aucun écart, et re-dériver les séries prescrites dans le comparateur, ce
+serait dupliquer `setLines` — exactement ce que le ticket interdit. `FlatSetLine`
+expose donc désormais `reps` et `durationSeconds` **bruts** à côté de son
+`effort`. C'est déjà le principe du reste du fichier : la valeur brute est
+conservée, le formatage vient en plus.
+
+Dans l'autre sens, le réalisé sort sous la **même forme** qu'une série prescrite
+(`type`, `typeLabel`, `effort`, `weightKg`, plus `rpe` et l'entité). La colonne
+« Réalisé » se rendra avec le fragment de la colonne « Prévu » : le composant se
+paramètre, il ne se duplique pas.
+
+### Deux passes pour apparier les exercices
+
+Le ticket donne l'ordre : `sourcePrescribedExercise`, puis l'`Exercise`, puis
+« hors programme ». Ce qu'il ne dit pas, c'est qu'il faut **deux passes
+distinctes**, pas une cascade par log.
+
+Une séance à deux lignes du même exercice (lourd puis léger) le montre : si
+chaque log résout sa cascade à son tour, un log apparié par son exercice prend la
+première ligne libre — y compris celle qu'un autre revendique explicitement par
+sa source. L'ordre de la collection déciderait alors du résultat. La passe 1
+traite donc **tous** les liens explicites, la passe 2 ramasse le reste. Un test
+le garde, avec le log de la seconde ligne placé en premier.
+
+L'appariement compare par **identité d'objet**, l'identifiant en repli : Doctrine
+ne rend qu'une instance par entité, proxy compris, et une entité pas encore
+persistée ne doit jamais se confondre avec une autre par son id nul.
+
+### Deux files de séries, pas une
+
+C'est la décision qui évite le faux positif le plus visible. Un échauffement est
+souvent prescrit et rarement logué. Apparier les séries par rang, toutes natures
+confondues, décalerait alors tout d'un cran : la première série de travail
+réalisée se retrouverait en face de l'échauffement prescrit, et une séance tenue
+à la perfection se lirait « allégée » de bout en bout.
+
+L'échauffement et le travail ont donc chacun leur file. La ligne d'échauffement
+reste affichée, simplement « non réalisée ».
+
+### Nommer l'écart : le premier axe qui parle
+
+L'écart se lit sur le premier axe où **les deux côtés parlent et divergent** :
+tonnage, charge, répétitions, durée, nombre de séries.
+
+Deux règles dans cette phrase. « Les deux côtés parlent » d'abord : un axe muet
+d'un côté ne tranche jamais, sinon une série au poids du corps face à une série
+chargée serait « allégée » alors qu'il manque juste une valeur. Et l'ordre
+ensuite : le tonnage passe avant la charge, parce que 6 × 82,5 kg là où 8 × 80 kg
+étaient prévus, c'est plus lourd mais moins de travail — donc allégé.
+
+La même cascade sert aux deux échelles : une série contre une série, puis les
+totaux de l'exercice (efforts sommés, charge prise au plus lourd comme
+`getTopWeightKg`, échauffement exclu du volume comme partout).
+
+### Six états, pas cinq
+
+Le ticket en listait cinq. Le modèle en impose un sixième : `LoggedExercise`
+distingue déjà l'exercice **volontairement sauté** (`skipped`, une déclaration de
+l'athlète) de l'exercice **jamais logué** (un trou). Les confondre ferait dire à
+l'app que quelqu'un a déclaré quelque chose qu'il n'a pas déclaré. D'où
+`NOT_LOGGED` à côté de `SKIPPED` dans `App\Enum\LogDeviation`.
+
+`HELD` porte deux sens, assumés : « tenu » et « rien à signaler ». C'est ce qu'on
+rend quand l'écart n'est pas **mesurable** — un `DISTANCE_PACE` ou un AMRAP n'a
+pas de séries à apparier, l'exercice a été fait, on ne prétend pas mesurer ce
+qu'on ne sait pas comparer.
+
+Et comme `LogMetrics::summary()` rend `null` sans réalisé, `compare()` rend un
+tableau **vide** : la colonne « Réalisé » n'apparaîtra pas, plutôt que
+d'apparaître vide.
+
+### Fichiers touchés
+
+`src/Enum/LogDeviation.php` (neuf), `src/Service/LogComparator.php` (neuf),
+`src/Service/PlanFlattener.php` (`reps` et `durationSeconds` sur `FlatSetLine`),
+`tests/Service/LogComparatorTest.php` (16 tests — dont le décalage
+d'échauffement, la priorité du lien explicite, la séance libre et le repli sur
+l'`Exercise` quand la source a disparu).
+
+**Prochain ticket : KL-06** — l'attribut `LOG` sur `ScheduledWorkoutVoter` : le
+coach lit le réalisé de son athlète, il ne l'écrit pas.

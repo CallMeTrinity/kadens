@@ -24,7 +24,7 @@ use App\Enum\SetType;
  * quelles pour l'export ; un champ `summary` lisible est ajouté pour l'affichage.
  *
  * @phpstan-type FlatSetGroup array{type: \App\Enum\SetType, typeLabel: string|null, count: int, detail: string, effort: string, firstIndex: int, lastIndex: int, weightKg: float|null}
- * @phpstan-type FlatSetLine array{type: \App\Enum\SetType, typeLabel: string|null, index: int, effort: string, weightKg: float|null}
+ * @phpstan-type FlatSetLine array{type: \App\Enum\SetType, typeLabel: string|null, index: int, effort: string, weightKg: float|null, reps: int|null, durationSeconds: int|null}
  * @phpstan-type FlatPrescribed array{prescribed: PrescribedExercise, exercise: \App\Entity\Exercise|null, type: PrescriptionType|null, summary: string, values: string, sets: list<FlatSetGroup>|null, setLines: list<FlatSetLine>|null, rest: ?int, notes: ?string, topWeightKg: ?float, groupLabel: string|null}
  * @phpstan-type FlatSegment array{label: string|null, kind: 'single'|'superset'|'circuit', exercises: list<FlatPrescribed>}
  * @phpstan-type FlatBlock array{block: Block, exercises: list<FlatPrescribed>, segments: list<FlatSegment>}
@@ -347,6 +347,12 @@ final class PlanFlattener
      * Réservée aux deux types de force, seuls à décrire des séries. Le `sets` d'un
      * DISTANCE_PACE compte des intervalles, pas des séries : il ne se déroule pas.
      *
+     * Chaque ligne porte `effort` (la chaîne lisible) ET les valeurs brutes qui
+     * la composent (`reps`, `durationSeconds`, `weightKg`) : c'est ce qui permet
+     * à LogComparator d'aligner le réalisé sur le prescrit série par série sans
+     * remettre à plat de son côté. Même principe que partout ailleurs ici — la
+     * valeur brute est conservée, le formatage vient en plus.
+     *
      * @return list<FlatSetLine>|null null quand il n'y a rien à dérouler
      */
     private function setLines(PrescribedExercise $pe): ?array
@@ -366,6 +372,8 @@ final class PlanFlattener
                     'index' => ++$index,
                     'effort' => $this->detailedSetEffort($pe, $set),
                     'weightKg' => $set->getWeightKg(),
+                    'reps' => $set->getReps(),
+                    'durationSeconds' => $set->getDurationSeconds(),
                 ];
             }
 
@@ -391,6 +399,8 @@ final class PlanFlattener
                 'index' => $index,
                 'effort' => $effort,
                 'weightKg' => $pe->getWeightKg(),
+                'reps' => $pe->getReps(),
+                'durationSeconds' => $pe->getDurationSeconds(),
             ];
         }
 

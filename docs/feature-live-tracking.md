@@ -7,12 +7,12 @@
 
 ---
 
-> **État (2026-07-30)** : cadrage validé, **KL-01 à KL-04 livrés** (règle révisée
+> **État (2026-07-30)** : cadrage validé, **KL-01 à KL-05 livrés** (règle révisée
 > partout, le modèle du réalisé en base — `LoggedExercise` / `LoggedSet`,
 > `ScheduledWorkout` étendue et sa FK `workout` passée en `SET NULL` — puis
-> `LogMetrics`, le résumé du réalisé, et `PerformanceHistory`, la dernière perf
-> et le record).
-> Prochain ticket : **KL-05** (`LogComparator`).
+> `LogMetrics`, le résumé du réalisé, `PerformanceHistory`, la dernière perf
+> et le record, et `LogComparator`, l'écart prévu vs réalisé).
+> Prochain ticket : **KL-06** (garde d'écriture `LOG` sur `ScheduledWorkoutVoter`).
 
 ---
 
@@ -583,11 +583,53 @@ historique n'appartient qu'à celui qui l'a fait (KL-50 en dépend).
 série, pour produire l'écart affichable.
 
 **Fini quand** :
-- [ ] `compare(ScheduledWorkout): array` avec, par exercice : prescrit, réalisé,
+- [x] `compare(ScheduledWorkout): array` avec, par exercice : prescrit, réalisé,
       état (`tenu`, `dépassé`, `allégé`, `sauté`, `hors programme`)
-- [ ] L'appariement se fait sur `sourcePrescribedExercise` quand il est présent,
+- [x] L'appariement se fait sur `sourcePrescribedExercise` quand il est présent,
       sur l'`Exercise` sinon, et tombe en « hors programme » en dernier recours
-- [ ] Consomme `PlanFlattener`, ne remet pas à plat lui-même
+- [x] Consomme `PlanFlattener`, ne remet pas à plat lui-même
+
+**Livré le 30/07/2026.** Cinq décisions prises en cours de route :
+
+1. **Six états, pas cinq** (`App\Enum\LogDeviation`). Le modèle distingue déjà
+   l'exercice **volontairement sauté** (`LoggedExercise.skipped`, une
+   déclaration) de l'exercice **jamais logué** (un trou) : les confondre ferait
+   dire à l'app que l'athlète a déclaré quelque chose qu'il n'a pas déclaré.
+   D'où `NOT_LOGGED` en plus des cinq du ticket. `HELD` est aussi la valeur
+   « rien à signaler » quand l'écart n'est **pas mesurable** (prescrit sans
+   séries à apparier : cardio, AMRAP, for time) — on ne prétend jamais mesurer
+   ce qu'on ne sait pas comparer.
+2. **L'appariement des exercices se fait en deux passes, pas en une.**
+   `sourcePrescribedExercise` d'abord pour **tous** les logs, l'`Exercise`
+   ensuite pour ce qui reste. Séparer les passes n'est pas cosmétique : sinon un
+   log apparié par son exercice vole la ligne qu'un autre revendique par sa
+   source, et l'ordre de la collection décide du résultat (testé sur une séance
+   à deux lignes du même exercice). L'appariement se fait par **identité
+   d'objet**, avec l'identifiant en repli — Doctrine ne rend qu'une instance par
+   entité, proxy compris.
+3. **Les séries s'apparient par rang, échauffement et travail dans deux files
+   séparées.** C'est la décision qui évite le faux positif le plus visible : un
+   échauffement prescrit mais non logué (le cas courant) décalerait toutes les
+   séries de travail d'un cran, et une séance tenue se lirait « allégée » de bout
+   en bout. La ligne d'échauffement reste affichée, simplement « non réalisée ».
+4. **L'écart se lit sur le premier axe où les deux côtés parlent et divergent** :
+   tonnage, charge, répétitions, durée, nombre de séries. Un axe muet d'un côté
+   ne tranche **jamais** — comparer une charge à une absence de charge dirait
+   « allégé » d'une série au poids du corps. Le tonnage passe en premier parce
+   que c'est la grandeur du projet : 6 × 82,5 kg là où 8 × 80 kg étaient prévus,
+   c'est plus lourd mais moins de travail, donc allégé. La même cascade sert aux
+   deux échelles — une série contre une série, puis les totaux de l'exercice
+   (efforts sommés, charge prise au plus lourd, échauffement exclu comme partout).
+5. **`PlanFlattener` gagne deux clés, il n'est pas contourné.** `FlatSetLine`
+   expose désormais `reps` et `durationSeconds` bruts à côté de son `effort`
+   formaté : sans eux le comparateur aurait dû re-dériver les séries prescrites,
+   c'est-à-dire dupliquer `setLines`, exactement ce que le ticket interdit. Le
+   réalisé sort sous la **même forme** qu'une série prescrite (`type`,
+   `typeLabel`, `effort`, `weightKg`, + `rpe`), pour que la colonne « Réalisé »
+   de KL-07 se rende avec le fragment de la colonne « Prévu ».
+
+Livré avec `tests/Service/LogComparatorTest.php` (16 tests), qui coche la
+troisième case de KL-09.
 
 ### KL-06 — Garde d'écriture sur `ScheduledWorkoutVoter`
 
@@ -659,8 +701,8 @@ requête supplémentaire ni risque de N+1 à traiter.
       (livré avec KL-03)
 - [x] `PerformanceHistoryTest` : record, dernière perf, absence d'historique,
       et **un test qui compte les requêtes de `bulkFor`** (livré avec KL-04)
-- [ ] `LogComparatorTest` : tenu, dépassé, allégé, sauté, hors programme,
-      exercice prescrit supprimé après coup
+- [x] `LogComparatorTest` : tenu, dépassé, allégé, sauté, hors programme,
+      exercice prescrit supprimé après coup (livré avec KL-05)
 - [ ] `ScheduledWorkoutVoterTest` étendu : le coach a `VIEW` et `EDIT`, **jamais
       `LOG`**
 - [ ] **Un test de non-régression sur la suppression** : supprimer un `Workout`
