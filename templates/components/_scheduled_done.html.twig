@@ -1,7 +1,13 @@
-{# ============================ PRÉVU VS RÉALISÉ ============================
+{# ========================== BOUCLER LA SÉANCE ==========================
    En bas de séance, à l'endroit où on arrive après avoir lu le programme.
    Le bouton bascule entre « prévue » et « faite » ; « manquée » reste au
    cycle rapide du calendrier, qui boucle sur les trois états.
+
+   Ce sont les gestes de **programmation** (attribut EDIT), que le coach fait
+   aussi : cocher, noter un écart léger, déplacer, retirer. Le réalisé série par
+   série, lui, vit dans le panneau « Réalisé » (`_log_panel`, attribut LOG) — d'où
+   le titre, qui ne dit plus « Réalisé » : deux sections de ce nom sur la même
+   page, l'une fermée au coach et l'autre pas, ne pourraient que se confondre.
 
    Fragment isolé parce qu'il est **cible d'un Turbo Stream** : le contrôleur
    re-rend cette section (et la pastille du hero) après un changement de statut,
@@ -9,7 +15,7 @@
    qui dépend du statut (libellé du bouton, statut posté, note) vit ici. #}
 {% set isDone = scheduled.status.value == 'done' %}
 <section id="schedule-done" class="kd-done" aria-labelledby="done-title">
-    <h2 class="kd-done__title" id="done-title">Réalisé</h2>
+    <h2 class="kd-done__title" id="done-title">Boucler la séance</h2>
 
     <form method="post" action="{{ path('app_scheduled_workout_status', {id: scheduled.id}) }}" class="kd-done__form">
         <input type="hidden" name="_token" value="{{ csrf_token('status' ~ scheduled.id) }}">

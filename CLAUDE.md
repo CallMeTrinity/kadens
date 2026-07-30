@@ -316,8 +316,69 @@ puce dédiée en §3, le cadrage complet et les 51 tickets dans
 `LogMetrics`, le résumé du réalisé. **KL-04 livré le 30/07/2026** :
 `PerformanceHistory`, la dernière perf et le record. **KL-05 livré le
 30/07/2026** : `LogComparator`, l'écart prévu vs réalisé. **KL-06 livré le
-30/07/2026** : l'attribut `LOG`, la garde d'écriture du réalisé. Prochain ticket
-KL-07 (affichage du réalisé sur `/schedule/{id}`).
+30/07/2026** : l'attribut `LOG`, la garde d'écriture du réalisé. **KL-07 livré le
+30/07/2026** : l'affichage du réalisé sur `/schedule/{id}`. Prochain ticket
+KL-08 (séance datée sans source au calendrier).
+
+Ce que KL-07 pose et qu'il ne faut pas casser :
+
+- **La comparaison est une COLONNE, pas un onglet du réalisé seul.** Le panneau
+  « Réalisé » de `/schedule/{id}` rend **le même programme** que le panneau
+  « Programme » — mêmes blocs, mêmes supersets, même `_workout_program` — avec une
+  colonne de plus dans chaque tableau de séries. Les deux panneaux ne diffèrent
+  pas par leur contenu mais par un paramètre (`comparedById` rempli ou vide) :
+  deux lectures du même programme, l'intention et le fait. C'est ce qui réconcilie
+  les deux règles de `docs/feature-live-tracking.md` §0.7 — « comparaison en
+  place » interdit un onglet qu'il faudrait **quitter** pour comparer, pas un
+  onglet tout court — et l'onglet d'ouverture peut donc dépendre du statut
+  (`DONE` → `realise`, sinon `programme`).
+- **Le serveur nomme l'onglet d'ouverture, le contrôleur `tabs` ne le devine
+  pas** (`data-tabs-default-value`, valeur Stimulus `default`, repli sur le
+  premier panneau). C'est ce qui rend le choix testable sans navigateur.
+- **`merge` est `array_merge()`, qui RENUMÉROTE les clés entières.** L'index
+  `comparedById` est donc keyé **`'p' ~ id`**. Sans le préfixe, un
+  `PrescribedExercise` d'id 42 atterrit à l'index 0 et l'appariement se fait au
+  hasard de l'ordre de la collection : un bug silencieux, pas une erreur. Le
+  `statsByIndex` de `_workout_read` s'en sort **par chance** (clés déjà 0..n-1) —
+  ne pas en déduire que le motif est sûr.
+- **La portée est la garde anti-fuite, pas une condition d'affichage.**
+  `comparison` / `logSummary` / `defaultTab` sont trois paramètres **optionnels**
+  de `_workout_read`, et `ScheduledWorkoutController::show()` est le seul appelant
+  qui les passe. `workout/show` et `public_share` rendent le même composant sans
+  eux : ils sont structurellement incapables d'afficher un réalisé, et le réalisé
+  n'entre toujours pas dans `PlanFlattener` (donc ni export Excel, ni ICS, ni page
+  publique). Un test l'exige sur les cinq consommateurs.
+- **Le bandeau de KPI est extrait en `components/_workout_kpis.html.twig`** et
+  sert le prescrit comme le réalisé : c'est ce que la forme identique de
+  `LogMetrics::summary()` et `WorkoutMetrics::summary()` (KL-03) existait pour
+  permettre. Une seule tuile diffère, et elle ne peut pas ne pas différer : le
+  prescrit annonce ses **enchaînements** (une intention), le réalisé sa **durée
+  réelle** (un fait) — le réalisé rend `supersets`/`circuits` à 0, afficher
+  « séance à plat » sur une séance faite en supersets serait faux.
+- **L'écart se lit à l'encre ; le rouge ne sort que sur `SKIPPED`.** `HELD` ne
+  s'affiche jamais : « tenu » se lit déjà dans les deux colonnes, une pastille
+  par ligne noierait celles qui ont quelque chose à dire. Dans un tableau l'écart
+  se réduit au pictogramme (`dev.mark`), le libellé restant au `title`/`aria-label`.
+- **Le prescrit s'atténue, le NOM jamais.** `kd-exrow--logged` porte l'encre
+  faible sur les *paramètres* prescrits ; le nom de l'exercice n'est pas un
+  paramètre. Piège de cascade : `.kd-setrow--normal td` remet l'encre pleine sur
+  toutes ses cellules, d'où la reprise explicite de `.kd-setrow__planned` —
+  sans elle, la série de travail serait la seule dont le prescrit ne s'atténue pas.
+- **Supprimer le réalisé teste `LOG` et ne touche pas au planning.**
+  `startedAt`/`endedAt` repassent à null (elles ne mesuraient que ce réalisé),
+  mais **ni le statut ni `completionNotes`** : effacer le détail des séries
+  n'annule pas le fait que la séance a été faite, et ces deux champs relèvent de
+  la programmation, donc du coach.
+- **`_scheduled_done` s'intitule « Boucler la séance ».** Deux sections
+  « Réalisé » sur la même page, l'une fermée au coach (`LOG`) et l'autre pas
+  (`EDIT`), ne pouvaient que se confondre.
+- **Une séance sans bloc mais avec du réalisé n'est pas « encore vide ».** La
+  garde de l'état vide compte les deux côtés (`flat.blocks is empty and not
+  has_log`), sinon une séance entièrement faite hors programme s'annoncerait vide.
+- **Une séance `MISSED` porte une marque en clair dans le hero**
+  (`kd-wk__missed`), pas seulement une pastille : une date passée sans réalisé se
+  lit sinon exactement comme une séance à venir. Le token `--color-status-missed`
+  est un token de statut dédié, il ne consomme pas le rouge de §5 règle 2.
 
 Ce que KL-06 pose et qu'il ne faut pas casser :
 

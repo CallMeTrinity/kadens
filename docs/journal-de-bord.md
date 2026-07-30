@@ -2529,3 +2529,162 @@ la mauvaise raison.
 **Prochain ticket : KL-07** — l'affichage du réalisé sur `/schedule/{id}` :
 colonne « Réalisé » dans `_workout_sets_table`, onglet par défaut selon le statut,
 et suppression du réalisé (premier appelant de `LOG`).
+
+---
+
+## Kadens Live KL-07 — l'affichage du réalisé sur `/schedule/{id}` (30/07/2026)
+
+Le premier ticket du chantier qui se voit. Tout le reste — le modèle, les trois
+services, la garde — était en place ; il ne restait qu'à le rendre. Et le rendre
+sans dupliquer un seul composant, ce qui était la vraie contrainte.
+
+### Les deux règles de §0.7 qui semblaient se contredire
+
+Le cadrage dit deux choses qui, lues vite, s'annulent : *« la comparaison se lit
+en place, jamais dans un onglet séparé »* et *« l'onglet par défaut dépend du
+statut : `PLANNED` ouvre sur le programme, `DONE` sur le réalisé »*. La première
+interdit l'onglet, la seconde en suppose un.
+
+La lecture qui les tient toutes les deux : **ce que §0.7 interdit, c'est un onglet
+du réalisé SEUL**, qu'il faudrait quitter pour retrouver le prescrit et comparer.
+Le panneau « Réalisé » livré ici ne fait pas ça. Il rend **le même programme** —
+mêmes blocs, mêmes supersets, même `_workout_program` — avec une colonne de plus
+dans chaque tableau de séries. On ne le quitte jamais pour comparer : les deux
+valeurs sont côte à côte sur la même ligne.
+
+Conséquence utile : les deux panneaux ne diffèrent pas par leur contenu mais par
+un **paramètre** (`comparedById` rempli ou vide). Deux lectures du même programme,
+l'intention et le fait — et c'est pour ça que le statut peut décider de celle qui
+s'ouvre sans qu'on ait rien à choisir à la place de l'utilisateur.
+
+### Le composant se paramètre, il ne se duplique pas
+
+Quatre composants existants ont reçu un paramètre optionnel, aucun n'a été copié :
+
+- `_workout_sets_table` prend `compared` (`list<ComparedLine>`) et bascule en
+  Série / Prévu / Réalisé. Les lignes viennent alors de `compared` et non de
+  `lines` : l'appariement en porte parfois **davantage** (une série faite en trop
+  s'ajoute à la suite) et il tient son propre rang. Deux colonnes disparaissent —
+  la charge rejoint sa cellule d'effort (« 8 × 80 kg » se lit d'un bloc, et c'est
+  ce qu'on compare), le « % du max » cède sa largeur. Une macro `value()` locale
+  rend une valeur de série, prescrite **ou** réalisée : c'est la forme identique
+  que KL-05 avait posée exprès qui rend les deux colonnes interchangeables.
+- `_workout_exrow` prend `compared` (`ComparedExercise`), pose la pastille d'écart
+  et l'atténuation.
+- `_workout_program` prend `comparedById` et le distribue.
+- `_workout_read` prend `comparison` / `logSummary` / `defaultTab`, et accueille le
+  panneau.
+
+Deux composants sont neufs : `_log_panel` (le contenu du panneau) et `_log_exrow`
+(un exercice réalisé **sans** prescrit en face — hors programme, ou toute une
+séance libre). Ce dernier n'est pas un doublon de `_workout_exrow` : là-bas la
+ligne part du prescrit et le réalisé s'y ajoute, ici il n'y a que le réalisé et le
+nom vient de son snapshot. Le tableau, lui, est le même composant — `compared`
+sans aucune ligne prescrite fait tomber la colonne « Prévu » de lui-même.
+
+Et le bandeau de KPI est **extrait** en `_workout_kpis`, pour servir le prescrit
+comme le réalisé. C'est exactement ce que la forme identique de
+`LogMetrics::summary()` et `WorkoutMetrics::summary()` (KL-03) existait pour
+permettre. Une seule tuile diffère, et elle ne peut pas ne pas différer : le
+prescrit annonce ses **enchaînements** (une intention), le réalisé sa **durée
+réelle** (un fait). Le réalisé rend `supersets`/`circuits` à 0 — afficher
+« séance à plat » sur une séance justement faite en supersets serait faux.
+
+### Le piège qui a coûté une heure : `merge` renumérote
+
+`comparedById` ne fonctionnait pas. Les entrées étaient là, l'appariement rendait
+`null`. La cause : le filtre Twig **`merge` est `array_merge()`**, qui
+**renumérote les clés entières**. Un `PrescribedExercise` d'id 42 atterrissait à
+l'index 0, et l'appariement se faisait au hasard de l'ordre de la collection.
+
+Les clés sont donc préfixées : `'p' ~ id`. Et le détail qui explique pourquoi
+personne ne s'était fait prendre avant : le `statsByIndex` de `_workout_read`
+utilise le même motif depuis des mois et marche — **par chance**, ses clés étant
+déjà `0..n-1`, la renumérotation les reproduit à l'identique. Un bug silencieux
+dormait dans un motif qu'on croyait éprouvé.
+
+### L'écart se lit à l'encre
+
+Un écart n'est pas un échec : soulever plus lourd, ou moins, c'est de
+l'information. Les pastilles `kd-dev` restent donc en niveaux de gris, et la seule
+sortie de rouge est `--skipped`, la seule ligne où l'athlète déclare avoir renoncé
+à ce qui était prévu (§5 règle 2).
+
+Deux choix de lecture qui vont avec :
+
+- **`HELD` n'affiche rien du tout.** « Tenu » se lit déjà dans le tableau, les
+  deux colonnes y portent les mêmes valeurs. Une pastille sur chaque ligne d'une
+  séance parfaitement tenue noierait les trois lignes qui, elles, ont quelque
+  chose à dire.
+- **Dans une cellule, l'écart se réduit au pictogramme** (`dev.mark`), le libellé
+  restant au `title`/`aria-label`. Un libellé par ligne masquerait les valeurs
+  qu'on est venu comparer.
+
+Et le prescrit s'atténue **sans disparaître** : sans lui, on ne sait plus si la
+séance a été tenue. Piège de cascade rencontré au passage — `.kd-setrow--normal td`
+remet l'encre pleine sur toutes ses cellules, d'où la reprise explicite de
+`.kd-setrow__planned` : sans elle, la série de travail aurait été la seule dont le
+prescrit ne s'atténue pas, c'est-à-dire précisément la ligne qu'on regarde. Le
+**nom** de l'exercice, lui, ne s'atténue jamais : ce n'est pas un paramètre, c'est
+le sujet de la ligne.
+
+### La portée comme garde anti-fuite
+
+Le réalisé ne doit jamais atteindre la page de bibliothèque, la page publique,
+l'export Excel ni le flux ICS. La garde n'est pas une condition d'affichage : les
+trois entrées du réalisé sont des paramètres **optionnels** de `_workout_read`, et
+`ScheduledWorkoutController::show()` est le seul appelant qui les passe.
+`workout/show` et `public_share` rendent le même composant sans eux — ils sont
+structurellement incapables d'afficher un réalisé. Le réalisé n'entre toujours pas
+dans `PlanFlattener` : il est lu par `LogComparator` et `LogMetrics`, appelés dans
+ce contrôleur et nulle part ailleurs.
+
+`testLogNeverLeaksThroughPlanFlattener` le vérifie en interrogeant les cinq
+consommateurs sur une séance portant une charge de **123,5 kg prescrite nulle
+part** : la valeur ne peut venir que du réalisé, là où un tonnage agrégé aurait pu
+coïncider par hasard. Ce test coche la troisième case restante de KL-09.
+
+### Les à-côtés
+
+- **Le contrôleur `tabs` reçoit son onglet d'ouverture du serveur**
+  (`data-tabs-default-value`, valeur Stimulus `default`, repli sur le premier
+  panneau). Il ne le devine pas : c'est ce qui rend le choix testable sans
+  navigateur, le test gardant ce que le serveur annonce.
+- **Supprimer le réalisé teste `LOG`** — premier appelant de la garde de KL-06 — et
+  ne touche pas au planning. `startedAt`/`endedAt` repassent à null (elles ne
+  mesuraient que ce réalisé), mais **ni le statut ni `completionNotes`** : effacer
+  le détail des séries n'annule pas le fait que la séance a été faite, et ces deux
+  champs relèvent de la programmation, donc du coach.
+- **`_scheduled_done` s'intitule « Boucler la séance ».** Deux sections
+  « Réalisé » sur la même page, l'une fermée au coach et l'autre pas, ne pouvaient
+  que se confondre.
+- **Une séance sans bloc mais avec du réalisé n'est pas « encore vide ».** La garde
+  de l'état vide compte les deux côtés, sinon une séance entièrement faite hors
+  programme s'annoncerait vide.
+- **Une séance `MISSED` porte une marque en clair dans le hero.** Une pastille se
+  survole, elle ne se lit pas, et une date passée sans réalisé a exactement
+  l'allure d'une séance à venir. Le token `--color-status-missed` est un token de
+  statut dédié : l'employer ne consomme pas le rouge de §5 règle 2.
+- **L'en-tête d'une ligne comparée dit « 3 prévues », pas « 3 séries ».** Le
+  tableau en dessous peut avoir plus de lignes que le prescrit ; un compte nu
+  au-dessus de quatre lignes se lirait comme une erreur.
+- Deux icônes Lucide importées en local : `minus`, `timer`.
+
+### Fichiers touchés
+
+Neufs : `templates/components/_workout_kpis.html.twig`,
+`templates/components/_log_deviation.html.twig`,
+`templates/components/_log_panel.html.twig`,
+`templates/components/_log_exrow.html.twig`,
+`tests/Controller/ScheduledWorkoutLogTest.php` (11 tests).
+Modifiés : `src/Controller/ScheduledWorkoutController.php` (`show()` étendu,
+`defaultTab()`, `deleteLog()`), `assets/controllers/tabs_controller.js` (valeur
+`default`), `templates/components/_workout_read.html.twig`,
+`_workout_program.html.twig`, `_workout_exrow.html.twig`,
+`_workout_sets_table.html.twig`, `_scheduled_done.html.twig`,
+`templates/scheduled_workout/show.html.twig`, `_hero_actions.html.twig`,
+`assets/styles/components.css`.
+
+**Prochain ticket : KL-08** — la séance datée sans source au calendrier : la
+pastille retombe sur son `title`, marque « hors plan » codée par le rang dans
+l'échelle de gris.

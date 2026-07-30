@@ -1,7 +1,20 @@
 {# Une ligne d'exercice en lecture (nom, valeurs, RPE, repos, tableau de séries,
    notes). Extrait de `_workout_program` pour être rendu à l'identique qu'il soit
-   isolé ou membre d'un superset. Attend `ex` = entrée FlatPrescribed. #}
-<li class="kd-exrow">
+   isolé ou membre d'un superset.
+
+   Attendus :
+     ex        entrée FlatPrescribed (requis)
+     compared  entrée ComparedExercise|null de LogComparator (optionnel)
+
+   Avec `compared`, la ligne montre le réalisé **à côté** du prescrit : le tableau
+   de séries passe en mode comparaison et l'écart se pose en pastille. Le prescrit
+   passe alors en encre atténuée (`kd-exrow--logged`) mais ne disparaît jamais —
+   sans lui, on ne saurait plus si la séance a été tenue. Le NOM, lui, ne
+   s'atténue pas : ce n'est pas un paramètre, c'est le sujet. #}
+{% import 'components/_log_deviation.html.twig' as dev %}
+{% set compared = compared|default(null) %}
+
+<li class="kd-exrow{{ compared ? ' kd-exrow--logged' }}">
     <div class="kd-exrow__head">
         {% if ex.groupLabel %}<span class="kd-exrow__rank">{{ ex.groupLabel }}</span>{% endif %}
         <span class="kd-exrow__name">{{ ex.exercise ? ex.exercise.name : '—' }}</span>
@@ -9,9 +22,16 @@
         {# Dès qu'il y a un tableau de séries dessous, l'en-tête n'en donne que le
            compte : répéter « 3 × 15 @ 130 kg » juste au-dessus des trois lignes
            qui le disent serait redondant. Sinon (course, vélo, AMRAP…), `values`
-           et non `summary` : le RPE a sa propre colonne juste à droite. #}
+           et non `summary` : le RPE a sa propre colonne juste à droite.
+
+           En mode comparaison le compte se qualifie (« 3 prévues ») : le tableau
+           en dessous peut avoir PLUS de lignes que le prescrit — une série faite
+           en plus s'y ajoute — et un « 3 séries » nu au-dessus de quatre lignes
+           se lirait comme une erreur. #}
         {% if ex.setLines %}
-            <span class="kd-exrow__flag">{{ ex.setLines|length }} série{{ ex.setLines|length > 1 ? 's' }}</span>
+            <span class="kd-exrow__flag">
+                {{- ex.setLines|length }} {{ compared ? 'prévue' : 'série' }}{{ ex.setLines|length > 1 ? 's' -}}
+            </span>
         {% elseif ex.values %}
             <span class="kd-exrow__val">{{ ex.values }}</span>
         {% endif %}
@@ -22,13 +42,27 @@
         {% if ex.rest %}
             <span class="kd-exrow__rest">repos {{ ex.rest }} s</span>
         {% endif %}
+
+        {# L'écart en dernier : il conclut la ligne, il ne l'annonce pas. Rien du
+           tout quand la séance a été tenue (cf. `_log_deviation`). #}
+        {% if compared %}{{ dev.chip(compared.status) }}{% endif %}
     </div>
 
-    {% if ex.setLines %}
+    {% if compared and compared.lines is not empty %}
+        {% include 'components/_workout_sets_table.html.twig' with {
+            compared: compared.lines
+        } only %}
+    {% elseif ex.setLines %}
         {% include 'components/_workout_sets_table.html.twig' with {
             lines: ex.setLines, topWeightKg: ex.topWeightKg, type: ex.type
         } only %}
     {% endif %}
 
     {% if ex.notes %}<p class="kd-exrow__notes">{{ ex.notes|nl2br }}</p>{% endif %}
+
+    {# Note écrite à la salle, portée par le réalisé. Distincte de `ex.notes`, qui
+       est une consigne du programme : celle-ci raconte ce qui s'est passé. #}
+    {% if compared and compared.logged and compared.logged.notes %}
+        <p class="kd-exrow__lognotes">{{ compared.logged.notes|nl2br }}</p>
+    {% endif %}
 </li>

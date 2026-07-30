@@ -11,51 +11,147 @@
    quel que soit le mode de saisie — la vue condensée (groupes) reste celle des
    contextes compacts, résumé et aperçu au survol.
 
-   Attendus : lines (list<FlatSetLine>), topWeightKg (?float), type (?PrescriptionType). #}
+   Attendus :
+     lines        list<FlatSetLine>        le prescrit déroulé (optionnel)
+     topWeightKg  ?float                   (optionnel)
+     type         ?PrescriptionType        (optionnel)
+     compared     list<ComparedLine>|null  l'appariement prévu/réalisé (optionnel)
+
+   ---- Deux modes, un seul composant ----
+
+   Sans `compared`, le tableau détaille le prescrit : Type / Série / Reps /
+   Charge / % du max. C'est le mode de la bibliothèque et de la page publique.
+
+   Avec `compared` (LogComparator), il devient la comparaison **en place** :
+   Série / Prévu / Réalisé. Le réalisé est une colonne de plus dans le tableau
+   existant, jamais un second tableau ailleurs — sinon comparer redemanderait un
+   aller-retour, ce que ce ticket existe pour éviter. Les lignes viennent alors de
+   `compared` et non de `lines` : l'appariement en porte parfois davantage (une
+   série réalisée en trop s'ajoute à la suite) et il tient son propre rang.
+
+   Deux colonnes disparaissent dans ce mode, et c'est assumé : la charge rejoint
+   sa cellule d'effort (« 8 × 80 kg » se lit d'un bloc, et c'est ce qu'on compare)
+   et le « % du max » cède sa largeur — au téléphone, la largeur est ce qui manque.
+
+   La colonne « Prévu » elle-même tombe quand rien n'était prescrit en face :
+   séance libre, exercice ajouté à la volée. Une colonne de tirets ne dit rien. #}
 {% import 'components/_set_type.html.twig' as settype %}
+{% import 'components/_log_deviation.html.twig' as dev %}
 
-{# Deux colonnes ne s'affichent que si elles ont quelque chose à dire — une
-   colonne vide coûte de la largeur, et la largeur est ce qui manque au
-   téléphone. Le « % du max » n'aurait que des 100 % à charge constante, et la
-   colonne « Type » que des cases vides si aucune série n'est qualifiée (mode
-   simple : toutes les séries sont ordinaires). #}
-{% set show_percent = topWeightKg is not null and topWeightKg > 0
-    and lines|filter(l => l.weightKg is null or l.weightKg != topWeightKg)|length > 0 %}
-{% set show_type = lines|filter(l => l.type.value != 'normal')|length > 0 %}
+{% set lines = lines|default([]) %}
+{% set topWeightKg = topWeightKg|default(null) %}
+{% set type = type|default(null) %}
+{% set compared = compared|default(null) %}
 
-<div class="kd-settable__wrap">
-    <table class="kd-settable">
-        <thead>
-            <tr>
-                {% if show_type %}<th scope="col" class="kd-settable__c-type">Type</th>{% endif %}
-                <th scope="col" class="kd-settable__c-num">Série</th>
-                <th scope="col">{{ type is not null and type.value == 'sets_time' ? 'Durée' : 'Reps' }}</th>
-                <th scope="col" class="kd-settable__c-num">Charge</th>
-                {% if show_percent %}<th scope="col" class="kd-settable__c-num">% du max</th>{% endif %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for l in lines %}
-                {# Une série de travail ordinaire est la référence : on la marque
-                   d'un filet et d'un fond, le reste s'efface autour. #}
-                <tr class="kd-setrow kd-setrow--{{ l.type.value }}">
-                    {% if show_type %}<td class="kd-settable__c-type">{{ settype.slot(l.type) }}</td>{% endif %}
-                    <td class="kd-settable__c-num kd-setrow__rank">{{ '%02d'|format(l.index) }}</td>
-                    {# `effort` seul : la charge a sa propre colonne. #}
-                    <td class="kd-setrow__detail">
-                        {{ l.effort }}
-                        {% if l.typeLabel %}<span class="kd-setrow__tag">· {{ l.typeLabel|lower }}</span>{% endif %}
-                    </td>
-                    <td class="kd-settable__c-num">
-                        {{- l.weightKg is not null ? l.weightKg|number_format(l.weightKg == l.weightKg|round ? 0 : 1, ',', ' ') ~ ' kg' : '—' -}}
-                    </td>
-                    {% if show_percent %}
-                        <td class="kd-settable__c-num kd-setrow__pct">
-                            {{- l.weightKg is not null ? (l.weightKg / topWeightKg * 100)|round ~ ' %' : '—' -}}
-                        </td>
-                    {% endif %}
+{# Une valeur de série, prescrite ou réalisée : LogComparator rend les deux sous
+   la même forme (`type`, `effort`, `weightKg`), le réalisé y ajoute son RPE.
+   C'est ce qui permet aux deux colonnes de se rendre avec le même fragment. #}
+{% macro value(line) %}
+    {%- import 'components/_set_type.html.twig' as settype -%}
+    <span class="kd-setcell">
+        {{- settype.badge(line.type) -}}
+        <span class="kd-setcell__effort">{{ line.effort }}</span>
+        {%- if line.weightKg is not null %}
+            <span class="kd-setcell__load">{{ line.weightKg|number_format(line.weightKg == line.weightKg|round ? 0 : 1, ',', ' ') }} kg</span>
+        {%- endif %}
+        {%- if line.rpe|default(null) is not null %}
+            <span class="kd-setcell__rpe">RPE {{ line.rpe }}</span>
+        {%- endif %}
+    </span>
+{% endmacro %}
+{% import _self as cell %}
+
+{% if compared is not null %}
+
+    {# Y a-t-il un prescrit en face, ne serait-ce qu'une ligne ? #}
+    {% set show_planned = compared|filter(l => l.planned is not null)|length > 0 %}
+
+    <div class="kd-settable__wrap kd-settable__wrap--compared">
+        <table class="kd-settable kd-settable--compared">
+            <thead>
+                <tr>
+                    <th scope="col" class="kd-settable__c-num">Série</th>
+                    {% if show_planned %}<th scope="col">Prévu</th>{% endif %}
+                    <th scope="col">Réalisé</th>
                 </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+            </thead>
+            <tbody>
+                {% for l in compared %}
+                    {# Le type qui qualifie la ligne est celui de ce qui a été FAIT
+                       quand il existe : c'est lui qui décrit la série telle
+                       qu'elle a eu lieu (un échauffement resté un échauffement,
+                       une série passée à l'échec). #}
+                    {% set ref = l.logged ?? l.planned %}
+                    <tr class="kd-setrow kd-setrow--{{ ref.type.value }}">
+                        <td class="kd-settable__c-num kd-setrow__rank">{{ '%02d'|format(l.index) }}</td>
+
+                        {% if show_planned %}
+                            {# Encre atténuée, mais présent : sans le prescrit on
+                               ne sait plus si la séance a été tenue. #}
+                            <td class="kd-setrow__planned">
+                                {{- l.planned ? cell.value(l.planned) : '—' -}}
+                            </td>
+                        {% endif %}
+
+                        <td class="kd-setrow__logged">
+                            {%- if l.logged -%}
+                                {{ cell.value(l.logged) }}{{ dev.mark(l.status) }}
+                            {%- else -%}
+                                <span class="kd-setrow__hole">—</span>{{ dev.mark(l.status) }}
+                            {%- endif -%}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+{% else %}
+
+    {# Deux colonnes ne s'affichent que si elles ont quelque chose à dire — une
+       colonne vide coûte de la largeur, et la largeur est ce qui manque au
+       téléphone. Le « % du max » n'aurait que des 100 % à charge constante, et la
+       colonne « Type » que des cases vides si aucune série n'est qualifiée (mode
+       simple : toutes les séries sont ordinaires). #}
+    {% set show_percent = topWeightKg is not null and topWeightKg > 0
+        and lines|filter(l => l.weightKg is null or l.weightKg != topWeightKg)|length > 0 %}
+    {% set show_type = lines|filter(l => l.type.value != 'normal')|length > 0 %}
+
+    <div class="kd-settable__wrap">
+        <table class="kd-settable">
+            <thead>
+                <tr>
+                    {% if show_type %}<th scope="col" class="kd-settable__c-type">Type</th>{% endif %}
+                    <th scope="col" class="kd-settable__c-num">Série</th>
+                    <th scope="col">{{ type is not null and type.value == 'sets_time' ? 'Durée' : 'Reps' }}</th>
+                    <th scope="col" class="kd-settable__c-num">Charge</th>
+                    {% if show_percent %}<th scope="col" class="kd-settable__c-num">% du max</th>{% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for l in lines %}
+                    {# Une série de travail ordinaire est la référence : on la marque
+                       d'un filet et d'un fond, le reste s'efface autour. #}
+                    <tr class="kd-setrow kd-setrow--{{ l.type.value }}">
+                        {% if show_type %}<td class="kd-settable__c-type">{{ settype.slot(l.type) }}</td>{% endif %}
+                        <td class="kd-settable__c-num kd-setrow__rank">{{ '%02d'|format(l.index) }}</td>
+                        {# `effort` seul : la charge a sa propre colonne. #}
+                        <td class="kd-setrow__detail">
+                            {{ l.effort }}
+                            {% if l.typeLabel %}<span class="kd-setrow__tag">· {{ l.typeLabel|lower }}</span>{% endif %}
+                        </td>
+                        <td class="kd-settable__c-num">
+                            {{- l.weightKg is not null ? l.weightKg|number_format(l.weightKg == l.weightKg|round ? 0 : 1, ',', ' ') ~ ' kg' : '—' -}}
+                        </td>
+                        {% if show_percent %}
+                            <td class="kd-settable__c-num kd-setrow__pct">
+                                {{- l.weightKg is not null ? (l.weightKg / topWeightKg * 100)|round ~ ' %' : '—' -}}
+                            </td>
+                        {% endif %}
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+{% endif %}

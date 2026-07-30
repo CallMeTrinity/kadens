@@ -7,13 +7,14 @@
 
 ---
 
-> **État (2026-07-30)** : cadrage validé, **KL-01 à KL-06 livrés** (règle révisée
+> **État (2026-07-30)** : cadrage validé, **KL-01 à KL-07 livrés** (règle révisée
 > partout, le modèle du réalisé en base — `LoggedExercise` / `LoggedSet`,
 > `ScheduledWorkout` étendue et sa FK `workout` passée en `SET NULL` — puis
 > `LogMetrics`, le résumé du réalisé, `PerformanceHistory`, la dernière perf
-> et le record, `LogComparator`, l'écart prévu vs réalisé, et l'attribut `LOG`
-> qui ferme l'écriture du réalisé au coach).
-> Prochain ticket : **KL-07** (affichage du réalisé sur `/schedule/{id}`).
+> et le record, `LogComparator`, l'écart prévu vs réalisé, l'attribut `LOG`
+> qui ferme l'écriture du réalisé au coach, et **l'affichage du réalisé sur
+> `/schedule/{id}`** : la comparaison en place dans le tableau de séries).
+> Prochain ticket : **KL-08** (séance datée sans source au calendrier).
 
 ---
 
@@ -667,26 +668,77 @@ réalisé ». Elle affiche maintenant le réalisé quand il existe. Depuis la fu
 (§2.1), l'entité de la page correspond enfin à sa fonction.
 
 **Fini quand** :
-- [ ] **Comparaison en place, pas d'onglet dédié** (§0.7) : `_workout_sets_table`
+- [x] **Comparaison en place, pas d'onglet dédié** (§0.7) : `_workout_sets_table`
       gagne une colonne « Réalisé » quand `LogComparator` a quelque chose à dire.
       Le composant se paramètre, il ne se duplique pas
-- [ ] Le prescrit passe en encre atténuée dès qu'un réalisé existe, **sans
+- [x] Le prescrit passe en encre atténuée dès qu'un réalisé existe, **sans
       disparaître**
-- [ ] **L'onglet par défaut dépend du statut** : `PLANNED` ouvre sur le
+- [x] **L'onglet par défaut dépend du statut** : `PLANNED` ouvre sur le
       programme, `DONE` sur le réalisé
-- [ ] Une séance `MISSED` porte une marque explicite, sinon elle se confond avec
+- [x] Une séance `MISSED` porte une marque explicite, sinon elle se confond avec
       une séance à venir
-- [ ] La page se rend correctement pour une séance datée **sans `workout`**
+- [x] La page se rend correctement pour une séance datée **sans `workout`**
       (séance libre) : pas de colonne « Prévu », seulement le réalisé et le
       `title`
-- [ ] L'écart se lit à l'encre ; **le rouge ne sort que sur un exercice sauté**,
+- [x] L'écart se lit à l'encre ; **le rouge ne sort que sur un exercice sauté**,
       conformément à la règle 2 du design system
-- [ ] Bandeau de KPI du réalisé (`LogMetrics`) réutilisant le composant existant
-- [ ] Suppression du réalisé possible depuis cette page (avec confirmation), sans
+- [x] Bandeau de KPI du réalisé (`LogMetrics`) réutilisant le composant existant
+- [x] Suppression du réalisé possible depuis cette page (avec confirmation), sans
       supprimer la séance datée elle-même
-- [ ] Le réalisé **n'entre jamais** dans `PlanFlattener`, donc jamais dans
+- [x] Le réalisé **n'entre jamais** dans `PlanFlattener`, donc jamais dans
       l'export Excel, le flux ICS ni la page publique. Vérifier explicitement.
-- [ ] Aucun AJAX post-chargement (règle des pages auto-suffisantes)
+- [x] Aucun AJAX post-chargement (règle des pages auto-suffisantes)
+
+**Comment les deux règles de §0.7 se conjuguent.** « Comparaison en place » et
+« onglet par défaut selon le statut » se contredisent en apparence : la première
+interdit l'onglet, la seconde en suppose un. La lecture qui les tient toutes les
+deux est celle-ci — **ce que §0.7 interdit, c'est un onglet du réalisé SEUL**,
+qu'il faudrait quitter pour retrouver le prescrit. Le panneau « Réalisé » livré
+ici ne fait pas ça : il rend **le même programme**, les mêmes blocs, les mêmes
+supersets, avec une colonne de plus dans chaque tableau. On ne le quitte jamais
+pour comparer. Les deux panneaux ne diffèrent donc pas par leur contenu mais par
+leur paramètre (`comparedById` rempli ou vide) : deux lectures du même programme,
+l'intention et le fait, et le statut décide de celle qui s'ouvre.
+
+**Ce que le ticket a posé et qu'il ne faut pas casser** :
+
+- **`merge` est `array_merge`, qui renumérote les clés entières.** L'index
+  `comparedById` est donc keyé `'p' ~ id`. Sans le préfixe, un `PrescribedExercise`
+  d'id 42 atterrit à l'index 0 et l'appariement se fait au hasard de l'ordre de la
+  collection — un bug silencieux, pas une erreur. (Le `statsByIndex` de
+  `_workout_read` s'en sort par chance : ses clés sont déjà 0..n-1.)
+- **Le bandeau de KPI est extrait en `components/_workout_kpis.html.twig`** et
+  sert le prescrit comme le réalisé — c'est ce que la forme identique de
+  `LogMetrics::summary()` et `WorkoutMetrics::summary()` (KL-03) existait pour
+  permettre. Une seule tuile diffère, et elle ne peut pas ne pas différer : le
+  prescrit annonce ses enchaînements (une intention), le réalisé sa durée réelle
+  (un fait). Le réalisé rend `supersets`/`circuits` à 0, afficher « séance à plat »
+  sur une séance faite en supersets serait faux.
+- **Le contrôleur `tabs` reçoit son onglet d'ouverture du serveur**
+  (`data-tabs-default-value`), il ne le devine pas. C'est ce qui rend le choix
+  testable sans navigateur : le test garde ce que le serveur annonce.
+- **La suppression du réalisé teste `LOG`, jamais `EDIT`**, et remet
+  `startedAt`/`endedAt` à null (elles ne mesuraient que ce réalisé) mais **ne
+  touche ni le statut ni `completionNotes`** : effacer le détail des séries
+  n'annule pas le fait que la séance a été faite, et ces deux champs relèvent de
+  la programmation, donc du coach.
+- **`_scheduled_done` s'intitule désormais « Boucler la séance ».** Deux sections
+  « Réalisé » sur la même page, l'une fermée au coach (`LOG`) et l'autre pas
+  (`EDIT`), ne pouvaient que se confondre.
+- **La portée est la garde anti-fuite, pas une condition d'affichage.** `comparison`
+  / `logSummary` / `defaultTab` sont trois paramètres **optionnels** de
+  `_workout_read`, et `ScheduledWorkoutController::show()` est le seul appelant qui
+  les passe. `workout/show` et `public_share` rendent le même composant sans eux et
+  sont donc structurellement incapables d'afficher un réalisé.
+- **Une séance sans bloc mais avec du réalisé n'est pas « encore vide ».** La garde
+  de l'état vide compte les deux côtés (`flat.blocks is empty and not has_log`),
+  sinon une séance entièrement faite hors programme s'annoncerait vide.
+
+Livré avec `tests/Controller/ScheduledWorkoutLogTest.php` (11 tests), dont
+`testLogNeverLeaksThroughPlanFlattener` — qui interroge les cinq consommateurs de
+la mise à plat sur une séance portant une charge (123,5 kg) prescrite nulle part,
+donc impossible à produire autrement que par le réalisé. Il coche la troisième
+case de KL-09.
 
 ### KL-08 — Séance datée sans source au calendrier
 
@@ -721,7 +773,8 @@ requête supplémentaire ni risque de N+1 à traiter.
       C'est le test qui garde le `SET NULL` de §2.3 point 1
 - [ ] Un test sur une séance datée sans `workout` : elle se rend, s'affiche au
       calendrier et n'entre pas dans l'export
-- [ ] Un test qui **échoue** si le réalisé fuite dans `PlanFlattener`
+- [x] Un test qui **échoue** si le réalisé fuite dans `PlanFlattener` (livré avec
+      KL-07, `ScheduledWorkoutLogTest::testLogNeverLeaksThroughPlanFlattener`)
 
 ---
 

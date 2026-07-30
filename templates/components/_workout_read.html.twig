@@ -7,10 +7,19 @@
      flat        sortie de PlanFlattener::flattenWorkout   (requis)
      summary     sortie de WorkoutMetrics::summary         (optionnel)
      blockStats  sortie de WorkoutMetrics::blockBreakdown  (optionnel)
+     scheduled   ScheduledWorkout                         (optionnel)
+     comparison  sortie de LogComparator::compare         (optionnel)
+     logSummary  sortie de LogMetrics::summary            (optionnel)
+     defaultTab  nom du panneau ouvert à l'arrivée         (optionnel)
 
    Les métriques sont optionnelles : sans elles, la page reste valide et rend
    le seul programme. C'est ce qui permet de réutiliser ce composant partout
    sans obliger chaque appelant à instancier WorkoutMetrics.
+
+   **Le réalisé n'arrive que par `comparison`, et seule /schedule/{id} le passe.**
+   La bibliothèque (`workout/show`) et la page publique n'ont pas de date, donc
+   pas de réalisé : elles ne passent rien et rendent exactement ce qu'elles
+   rendaient. C'est la portée qui garde la règle, pas une condition d'affichage.
 
    Le bloc `actions` accueille la barre d'actions du propriétaire, posée dans le
    hero. La page publique l'ignore et n'affiche donc rien — d'où un `embed`
@@ -19,6 +28,10 @@
 {% set workout = flat.workout %}
 {% set summary = summary|default(null) %}
 {% set blockStats = blockStats|default([]) %}
+{% set scheduled = scheduled|default(null) %}
+{% set comparison = comparison|default([]) %}
+{% set logSummary = logSummary|default(null) %}
+{% set defaultTab = defaultTab|default('') %}
 
 {# Statistiques indexées par position de bloc, pour retrouver celles d'un bloc
    pendant la boucle de rendu (les deux listes suivent le même ordre). #}
@@ -71,72 +84,52 @@
         </div>
     </header>
 
-    {% if flat.blocks is empty %}
+    {% set has_analysis = summary and summary.workingSets > 0 %}
+    {% set has_log = comparison is not empty %}
+
+    {# `has_log` entre dans la garde : une séance sans bloc mais avec du réalisé
+       n'est pas « encore vide », elle a été faite hors programme. Le vide, ici,
+       c'est le vide du prescrit ET du réalisé. #}
+    {% if flat.blocks is empty and not has_log %}
         <div class="kd-card kd-empty">
             {{ ux_icon('lucide:clipboard-list') }}
             <div>Cette séance est encore vide.</div>
         </div>
     {% else %}
 
-        {# ------------------------------------------------------- Bandeau KPI #}
+        {# ------------------------------------------------------- Bandeau KPI
+           Le prescrit ici, au-dessus des onglets : il décrit l'intention de la
+           séance, comme le hero. Celui du réalisé vit DANS son panneau — deux
+           bandeaux empilés ne se distingueraient plus l'un de l'autre. #}
         {% if summary and summary.workingSets > 0 %}
-            <dl class="kd-wk__kpis">
-                <div class="kd-wk__kpi">
-                    <dt>Volume total</dt>
-                    <dd>{{ summary.tonnageKg|round|number_format(0, ',', ' ') }}<span class="kd-wk__unit"> kg</span></dd>
-                    <p class="kd-wk__kpimeta">{{ summary.workingSets }} série{{ summary.workingSets > 1 ? 's' }} de travail</p>
-                </div>
-
-                <div class="kd-wk__kpi">
-                    <dt>Enchaînements</dt>
-                    <dd>{{ summary.supersets + summary.circuits }}</dd>
-                    <p class="kd-wk__kpimeta">
-                        {%- if summary.supersets %}{{ summary.supersets }} superset{{ summary.supersets > 1 ? 's' }}{% endif -%}
-                        {%- if summary.supersets and summary.circuits %} · {% endif -%}
-                        {%- if summary.circuits %}{{ summary.circuits }} circuit{{ summary.circuits > 1 ? 's' }}{% endif -%}
-                        {%- if not summary.supersets and not summary.circuits %}Séance à plat{% endif -%}
-                    </p>
-                </div>
-
-                {% if summary.averageRpe is not null %}
-                    <div class="kd-wk__kpi kd-wk__kpi--accent">
-                        <dt>Intensité moyenne</dt>
-                        <dd>RPE {{ summary.averageRpe|number_format(1, ',', ' ') }}</dd>
-                        {# Jauge de 10 crans : le RPE se lit sur 1..10, une jauge
-                           à cette échelle évite toute conversion mentale. #}
-                        <p class="kd-wk__gauge" role="img"
-                           aria-label="RPE moyen {{ summary.averageRpe|number_format(1, ',', ' ') }} sur 10">
-                            {% for i in 1..10 %}
-                                <span class="kd-wk__gaugetick{{ i <= summary.averageRpe|round ? ' is-on' }}"></span>
-                            {% endfor %}
-                        </p>
-                    </div>
-                {% endif %}
-
-                {% if summary.topLift %}
-                    <div class="kd-wk__kpi">
-                        <dt>Charge la plus lourde</dt>
-                        <dd>{{ summary.topLift.weightKg|round|number_format(0, ',', ' ') }}<span class="kd-wk__unit"> kg</span></dd>
-                        <p class="kd-wk__kpimeta">{{ summary.topLift.exercise }}</p>
-                    </div>
-                {% endif %}
-            </dl>
+            {{ include('components/_workout_kpis.html.twig', {summary: summary}, with_context = false) }}
         {% endif %}
 
         {# ------------------------------------------------------------ Onglets
-           Sans JS, les deux panneaux s'affichent à la suite avec leur titre :
-           la page reste complète et imprimable. Le contrôleur `tabs` ne fait que
-           masquer l'un des deux et poser la sémantique ARIA. #}
-        {% set has_analysis = summary and summary.workingSets > 0 %}
-        <div class="kd-wk__tabs" data-controller="tabs">
-            {% if has_analysis %}
+           Sans JS, les panneaux s'affichent à la suite avec leur titre : la page
+           reste complète et imprimable. Le contrôleur `tabs` ne fait que masquer
+           tout sauf un, poser la sémantique ARIA et ouvrir sur `defaultTab`.
+
+           Le panneau « Réalisé » n'est pas un onglet dédié au réalisé seul : il
+           rend le même programme avec une colonne de plus (cf. `_log_panel`).
+           C'est l'onglet d'OUVERTURE qui dépend du statut — on l'a faite, on lit
+           ce qu'on a fait ; elle est à venir, on lit ce qu'on va faire. #}
+        <div class="kd-wk__tabs" data-controller="tabs" data-tabs-default-value="{{ defaultTab }}">
+            {% if has_analysis or has_log %}
                 <div class="kd-wk__tablist" data-tabs-target="list" hidden>
                     <button type="button" class="kd-wk__tab" data-tabs-target="tab" data-tabs-panel-param="programme">
                         {{ ux_icon('lucide:list') }} Programme
                     </button>
-                    <button type="button" class="kd-wk__tab" data-tabs-target="tab" data-tabs-panel-param="analyse">
-                        {{ ux_icon('lucide:chart-column') }} Analyse
-                    </button>
+                    {% if has_log %}
+                        <button type="button" class="kd-wk__tab" data-tabs-target="tab" data-tabs-panel-param="realise">
+                            {{ ux_icon('lucide:circle-check') }} Réalisé
+                        </button>
+                    {% endif %}
+                    {% if has_analysis %}
+                        <button type="button" class="kd-wk__tab" data-tabs-target="tab" data-tabs-panel-param="analyse">
+                            {{ ux_icon('lucide:chart-column') }} Analyse
+                        </button>
+                    {% endif %}
                 </div>
             {% endif %}
 
@@ -147,6 +140,17 @@
                     blocks: flat.blocks, statsByIndex: statsByIndex
                 } only %}
             </section>
+
+            {% if has_log %}
+                <section class="kd-wk__panel" data-tabs-target="panel" data-tabs-name="realise"
+                         aria-labelledby="wk-panel-realise">
+                    <h2 class="kd-wk__paneltitle" id="wk-panel-realise" data-tabs-target="panelTitle">Réalisé</h2>
+                    {{ include('components/_log_panel.html.twig', {
+                        scheduled: scheduled, flat: flat,
+                        comparison: comparison, logSummary: logSummary
+                    }, with_context = false) }}
+                </section>
+            {% endif %}
 
             {% if has_analysis %}
                 <section class="kd-wk__panel" data-tabs-target="panel" data-tabs-name="analyse"

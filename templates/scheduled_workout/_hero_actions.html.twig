@@ -34,3 +34,15 @@
     {{ ux_icon('lucide:calendar-days') }}
     {{ dayNames[d|date('N')] }} {{ d|date('j') }} {{ monthNames[d|date('n')] }} {{ d|date('Y') }}
 </p>
+
+{# Une séance manquée doit se voir, pas se déduire. La pastille de statut est un
+   repère de survol ; sans une marque en clair, une date passée sans réalisé se
+   lit exactement comme une séance à venir. Le token de statut `missed` est un
+   token dédié : il ne consomme pas le rouge de la règle 2 (actions, intensité,
+   échec), qui reste disponible pour l'exercice sauté du réalisé. #}
+{% if scheduled.status.value == 'missed' %}
+    <p class="kd-wk__missed">
+        {{ ux_icon('lucide:calendar-off') }}
+        Séance manquée
+    </p>
+{% endif %}

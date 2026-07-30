@@ -1832,6 +1832,32 @@ a.kd-scope--link:hover {
     height: 14px;
 }
 
+/* Marque d'une séance manquée, dans le hero. Une pastille de statut se survole,
+   elle ne se lit pas : sans cette ligne en clair, une date passée sans réalisé a
+   exactement l'allure d'une séance à venir. Token de statut dédié, donc hors du
+   budget « une seule couleur » (§5 règle 2) — le rouge d'accent reste disponible
+   pour l'exercice sauté du réalisé. */
+.kd-wk__missed {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    margin: var(--kd-space-5) 0 0;
+    padding: var(--kd-space-2) var(--kd-space-4);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-status-missed);
+    border: 1px solid color-mix(in srgb, var(--color-status-missed) 50%, transparent);
+    background: color-mix(in srgb, var(--color-status-missed) 14%, transparent);
+}
+
+.kd-wk__missed svg {
+    width: 14px;
+    height: 14px;
+}
+
 /* ----------------------------------------------------------------------------
    Prévu vs réalisé — bas de la page d'une séance datée
    Une seule action décisive (la bascule « fait »), les gestes de planning en
@@ -2534,6 +2560,209 @@ a.kd-scope--link:hover {
 .kd-setrow__pct {
     color: var(--color-text-faint);
     font-size: 11px;
+}
+
+/* ----------------------------------------------------------------------------
+   Séance datée — le RÉALISÉ à côté du PRÉVU (KL-07)
+
+   Deux principes tiennent tout ce bloc :
+
+   1. **Le prescrit s'atténue, il ne disparaît pas.** Dès qu'un réalisé existe,
+      les paramètres prescrits passent à l'encre faible : ils cessent d'être ce
+      qu'on lit en premier sans cesser d'être lisibles. Sans eux, on ne sait plus
+      si la séance a été tenue. Le NOM de l'exercice ne s'atténue jamais — ce
+      n'est pas un paramètre, c'est le sujet de la ligne.
+   2. **L'écart se lit à l'encre.** Dépasser ou alléger, c'est de l'information,
+      pas un échec : les pastilles restent en niveaux de gris. Une seule sortie de
+      rouge, `--skipped`, la seule ligne où l'athlète déclare avoir renoncé.
+   ---------------------------------------------------------------------------- */
+
+/* ---- Pastille d'écart (ligne d'exercice) ---- */
+.kd-dev {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-1);
+    padding: 2px var(--kd-space-2);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    white-space: nowrap;
+    color: var(--color-text);
+    border: 1px solid var(--color-border-strong);
+}
+
+.kd-dev svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* Un trou dans le réalisé et un exercice hors programme sont des faits neutres :
+   ils s'annoncent plus discrètement qu'un écart de charge, qui est le sujet. */
+.kd-dev--not_logged,
+.kd-dev--unplanned {
+    color: var(--color-text-secondary);
+    border-color: var(--color-border);
+}
+
+/* La seule sortie de rouge du réalisé. */
+.kd-dev--skipped {
+    color: var(--color-primary);
+    border-color: color-mix(in srgb, var(--color-primary) 45%, transparent);
+    background: color-mix(in srgb, var(--color-primary) 8%, transparent);
+}
+
+/* ---- Marque d'écart (cellule de série) ---- */
+/* Le pictogramme seul : dans un tableau, un libellé par ligne noierait les
+   valeurs qu'on est venu comparer. Le libellé reste au title/aria-label. */
+.kd-dev__mark {
+    display: inline-flex;
+    margin-left: var(--kd-space-2);
+    vertical-align: middle;
+    color: var(--color-text-secondary);
+}
+
+.kd-dev__mark svg {
+    width: 13px;
+    height: 13px;
+}
+
+.kd-dev__mark--skipped {
+    color: var(--color-primary);
+}
+
+/* ---- Ligne d'exercice en mode réalisé ---- */
+.kd-exrow--logged .kd-exrow__val,
+.kd-exrow--logged .kd-exrow__flag,
+.kd-exrow--logged .kd-exrow__rpe,
+.kd-exrow--logged .kd-exrow__rest {
+    color: var(--color-text-faint);
+}
+
+.kd-exrow--logged .kd-exrow__flag {
+    border-color: var(--color-border);
+}
+
+/* Note écrite à la salle. Filet à l'encre, là où la consigne du programme
+   (`kd-exrow__notes`) porte le filet rouge : l'une prescrit, l'autre raconte. */
+.kd-exrow__lognotes {
+    margin: var(--kd-space-3) 0 0;
+    padding-left: var(--kd-space-5);
+    border-left: 2px solid var(--color-border-strong);
+    font-size: 14px;
+    line-height: 1.45;
+    color: var(--color-text-secondary);
+    max-width: 68ch;
+}
+
+/* ---- Tableau en mode comparaison ---- */
+/* Trois colonnes seulement, mais deux d'entre elles portent une valeur composée
+   (effort + charge + RPE) : le plafond de largeur monte, le minimum reste bas
+   pour que les colonnes se compriment au lieu de faire défiler (cf. le tableau
+   de séries — un défilement imbriqué dans une page qui ne défile pas n'a aucun
+   repère visuel). */
+.kd-settable__wrap--compared {
+    max-width: 42rem;
+}
+
+.kd-settable--compared {
+    min-width: 22rem;
+}
+
+/* La colonne « Prévu » atténuée, la colonne « Réalisé » à pleine encre : c'est
+   la hiérarchie de lecture de la page une fois la séance faite. */
+.kd-setrow__planned {
+    color: var(--color-text-faint);
+}
+
+.kd-setrow--normal .kd-setrow__planned {
+    /* `.kd-setrow--normal td` remet l'encre pleine sur toutes ses cellules : sans
+       cette reprise, la série de travail — justement la ligne qu'on regarde —
+       serait la seule dont le prescrit ne s'atténue pas. */
+    color: var(--color-text-faint);
+}
+
+.kd-setrow__logged {
+    color: var(--color-text);
+}
+
+/* Un trou : la série prévue n'a pas été loguée. Le tiret suffit, il ne prend pas
+   plus de place que la valeur qu'il remplace. */
+.kd-setrow__hole {
+    color: var(--color-text-faint);
+}
+
+/* Une valeur de série : l'effort porte la lecture, la charge la précise, le RPE
+   la nuance. Trois poids décroissants dans une seule cellule. */
+.kd-setcell {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    flex-wrap: wrap;
+}
+
+.kd-setcell__load {
+    font-variant-numeric: tabular-nums;
+}
+
+.kd-setcell__rpe {
+    font-size: 11px;
+    color: var(--color-text-faint);
+}
+
+/* ---- Le panneau « Réalisé » ---- */
+/* Quand la séance a réellement été faite (bornes du mobile ou dernière série
+   complétée). Un repère de contexte, pas une donnée : discret. */
+.kd-logmeta {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    margin: calc(-1 * var(--kd-space-6)) 0 var(--kd-space-9);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-secondary);
+}
+
+.kd-logmeta svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Ce qui a été fait sans avoir été prévu : à la suite du programme, jamais
+   mélangé dedans — l'ordre du programme est une intention, on ne l'y insère pas
+   après coup. Sur une séance libre, c'est toute la séance. */
+.kd-logextra {
+    margin-top: var(--kd-space-10);
+    border-top: 1px solid var(--color-border);
+}
+
+.kd-logextra__title {
+    margin: var(--kd-space-7) 0 0;
+    font-family: var(--font-display);
+    font-weight: var(--kd-weight-bold);
+    font-size: 15px;
+    letter-spacing: var(--kd-tracking-action);
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+}
+
+/* Suppression du réalisé : une action destructive, donc en retrait et jamais
+   confondue avec « Retirer du planning » — elle laisse la séance debout. */
+.kd-logdel {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--kd-space-4);
+    margin-top: var(--kd-space-10);
+    padding-top: var(--kd-space-7);
+    border-top: 1px solid var(--color-border);
+}
+
+.kd-logdel__hint {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-faint);
 }
 
 /* ----------------------------------------------------------------------------

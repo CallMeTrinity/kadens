@@ -10,16 +10,22 @@
        `flat` est **null** quand la séance datée n'a pas de source : séance libre,
        ou séance de bibliothèque supprimée depuis (la FK est en SET NULL, une
        séance réellement faite ne disparaît pas avec sa source). Il n'y a alors
-       aucun programme à rendre, seulement le titre snapshot, la date et le statut. #}
+       aucun programme à rendre, seulement le titre snapshot, la date, le statut —
+       et le réalisé, qui est tout entier « hors programme ». #}
     {% if flat %}
         {# Même composant de lecture que la page de bibliothèque et la page
            publique, en `embed` pour pouvoir remplir le bloc `actions` du hero.
 
            `only` isole le composant : ce que le bloc `actions` utilise doit être
-           passé ici explicitement, la portée du template appelant n'y entre pas. #}
+           passé ici explicitement, la portée du template appelant n'y entre pas.
+
+           `comparison` / `logSummary` / `defaultTab` sont les trois paramètres du
+           réalisé, et cette page est la SEULE à les passer : la bibliothèque et la
+           page publique rendent le même composant à l'identique sans eux. #}
         {% embed 'components/_workout_read.html.twig' with {
             flat: flat, summary: summary, blockStats: blockStats,
-            scheduled: scheduled
+            scheduled: scheduled,
+            comparison: comparison, logSummary: logSummary, defaultTab: defaultTab
         } only %}
             {% block actions %}
                 {{ include('scheduled_workout/_hero_actions.html.twig', {
@@ -44,15 +50,31 @@
                 </div>
             </header>
 
-            <div class="kd-card kd-empty">
-                {{ ux_icon('lucide:clipboard-list') }}
-                <div>Cette séance n'a pas de programme prévu.</div>
-            </div>
+            {# Sans source, il n'y a rien à comparer : pas de colonne « Prévu »,
+               seulement le réalisé — le tableau la fait tomber de lui-même quand
+               aucune ligne n'a de prescrit en face. Pas d'onglets non plus, il n'y
+               a qu'une lecture possible. #}
+            {% if comparison is not empty %}
+                <section class="kd-wk__panel" aria-labelledby="wk-panel-realise">
+                    <h2 class="kd-wk__paneltitle" id="wk-panel-realise">Réalisé</h2>
+                    {{ include('components/_log_panel.html.twig', {
+                        scheduled: scheduled, flat: null,
+                        comparison: comparison, logSummary: logSummary
+                    }, with_context = false) }}
+                </section>
+            {% else %}
+                <div class="kd-card kd-empty">
+                    {{ ux_icon('lucide:clipboard-list') }}
+                    <div>Cette séance n'a pas de programme prévu.</div>
+                </div>
+            {% endif %}
         </article>
     {% endif %}
 
-    {# Boucle prévu vs réalisé. Sortie en composant : c'est la cible du Turbo
-       Stream renvoyé par le changement de statut. #}
+    {# Boucler la séance : programmer, pas consigner. Bascule de statut, note
+       d'écart léger, déplacement, retrait — tout ce que le coach fait aussi.
+       Sortie en composant : c'est la cible du Turbo Stream renvoyé par le
+       changement de statut. #}
     {% if is_granted('SCHEDULED_WORKOUT_EDIT', scheduled) %}
         {{ include('components/_scheduled_done.html.twig', {scheduled: scheduled}) }}
     {% endif %}

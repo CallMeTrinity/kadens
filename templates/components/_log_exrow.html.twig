@@ -1,0 +1,32 @@
+{# Une ligne d'exercice RÉALISÉ sans prescrit en face. Pendant de
+   `_workout_exrow`, pour les deux cas où il n'y a rien à comparer :
+
+   - l'exercice **hors programme**, ajouté à la volée pendant la séance ;
+   - toute une **séance libre**, qui n'a pas de source du tout.
+
+   La différence avec `_workout_exrow` n'est pas cosmétique : là-bas la ligne part
+   du prescrit (nom de bibliothèque, RPE prescrit, consigne, repos) et le réalisé
+   s'y ajoute ; ici il n'y a que le réalisé, et le nom vient de son **snapshot**
+   (`LoggedExercise.exerciseName`), qui survit à la suppression de l'exercice en
+   bibliothèque. Le tableau, lui, est le même composant : `compared` sans aucune
+   ligne prescrite y fait tomber la colonne « Prévu » d'elle-même.
+
+   Attend `entry` = entrée ComparedExercise de LogComparator. #}
+{% import 'components/_log_deviation.html.twig' as dev %}
+
+<li class="kd-exrow kd-exrow--logged">
+    <div class="kd-exrow__head">
+        <span class="kd-exrow__name">{{ entry.name }}</span>
+        {{ dev.chip(entry.status) }}
+    </div>
+
+    {% if entry.lines is not empty %}
+        {% include 'components/_workout_sets_table.html.twig' with {
+            compared: entry.lines
+        } only %}
+    {% endif %}
+
+    {% if entry.logged and entry.logged.notes %}
+        <p class="kd-exrow__lognotes">{{ entry.logged.notes|nl2br }}</p>
+    {% endif %}
+</li>

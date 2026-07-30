@@ -3,10 +3,21 @@
    Un <details open> natif plutôt qu'un contrôleur Stimulus : on gagne
    gratuitement le clavier, l'état sans JS et l'ouverture forcée à l'impression.
 
-   Attendus : blocks (flat.blocks), statsByIndex (WorkoutMetrics::blockBreakdown
-   indexé par position, optionnel). #}
+   Attendus :
+     blocks        flat.blocks (requis)
+     statsByIndex  WorkoutMetrics::blockBreakdown indexé par position (optionnel)
+     comparedById  ComparedExercise indexé par `'p' ~ id` de PrescribedExercise
+                   (optionnel, construit par `_log_panel`)
+
+   `comparedById` fait basculer les lignes en mode comparaison : le même panneau,
+   les mêmes blocs, les mêmes supersets — une colonne « Réalisé » de plus dans
+   chaque tableau de séries. L'appariement se fait par id de ligne prescrite
+   parce que c'est le seul repère stable : le réalisé est plat, il ne connaît ni
+   les blocs ni les groupes. Le préfixe `p` de la clé n'est pas décoratif, il
+   échappe à la renumérotation d'`array_merge` — voir `_log_panel`. #}
 {% import 'components/_set_type.html.twig' as settype %}
 
+{% set comparedById = comparedById|default({}) %}
 {% set role_icon = {'warmup': 'lucide:flame', 'main': 'lucide:activity', 'cooldown': 'lucide:wind'} %}
 
 <ol class="kd-blocks">
@@ -56,13 +67,17 @@
                                     </p>
                                     <ol class="kd-exlist kd-exlist--nested">
                                         {% for ex in segment.exercises %}
-                                            {% include 'components/_workout_exrow.html.twig' with { ex: ex } only %}
+                                            {% include 'components/_workout_exrow.html.twig' with {
+                                                ex: ex, compared: comparedById['p' ~ ex.prescribed.id]|default(null)
+                                            } only %}
                                         {% endfor %}
                                     </ol>
                                 </li>
                             {% else %}
                                 {% for ex in segment.exercises %}
-                                    {% include 'components/_workout_exrow.html.twig' with { ex: ex } only %}
+                                    {% include 'components/_workout_exrow.html.twig' with {
+                                        ex: ex, compared: comparedById['p' ~ ex.prescribed.id]|default(null)
+                                    } only %}
                                 {% endfor %}
                             {% endif %}
                         {% endfor %}
