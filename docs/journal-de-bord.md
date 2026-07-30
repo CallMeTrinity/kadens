@@ -2281,3 +2281,86 @@ les trois tests qui instanciaient `WorkoutMetrics` à la main.
 
 **Prochain ticket : KL-04** — `PerformanceHistory` (dernière performance et
 record), le service qui donne sa valeur à l'app en séance.
+
+---
+
+## Kadens Live KL-04 — `PerformanceHistory`, la dernière perf et le record (30/07/2026)
+
+« La dernière fois, j'avais fait quoi ? » et « c'est quoi mon record ? » — les
+deux questions qu'on se pose entre deux séries. Ce ticket, c'est ce qui donne sa
+valeur à l'app en séance, et c'est le premier du chantier dont l'essentiel se
+joue **dans le SQL** plutôt que dans une boucle PHP.
+
+### La contrainte qui décide de tout : deux requêtes
+
+Le bootstrap mobile (KL-14) appelle `bulkFor()` sur la **bibliothèque entière**.
+Un N+1 le rendrait inutilisable, et charger tout l'historique pour le trier en
+mémoire vieillirait mal : l'historique d'un exercice grossit sans limite, sa
+dernière séance non.
+
+D'où deux lectures, une chacune, portées par `LoggedSetRepository` :
+
+- `findLastWorkingSetsForExercises()` — les séries de travail de la séance la
+  plus récente de chaque exercice, bornée par une **sous-requête corrélée** sur
+  `MAX(s2.scheduledDate)` ;
+- `findBestWorkingSetsForExercises()` — les séries portant la charge maximale,
+  bornée de la même façon sur `MAX(ls2.weightKg)`.
+
+Les deux partagent un socle de filtres (`workingSetRows()`) et **le même**
+`FROM ... WHERE` corrélé (`correlatedFrom()`), écrit une seule fois : les deux
+bornes ne peuvent pas diverger de périmètre. Projection scalaire, aucune entité
+hydratée. Et un test **compte les requêtes** via `doctrine.debug_data_holder` :
+la contrainte est gardée, pas seulement écrite. Vérifié en la cassant — deux
+appels successifs font bien échouer le test à 4.
+
+Effet de bord voulu : `lastPerformance()` et `bestSet()` n'appellent chacun
+**qu'une** des deux requêtes. L'unitaire ne paie pas le prix du bulk.
+
+### Même périmètre que `LogMetrics`, à la ligne près
+
+Échauffement exclu (un échauffement lourd n'est pas un record — le test le
+vérifie avec 3 × 200 kg d'échauffement contre 5 × 140 kg de travail), exercice
+`skipped` exclu même s'il porte des séries abandonnées, et **aucun filtre sur le
+statut** de la séance datée : le réalisé est un fait dès qu'il est écrit, une
+séance encore `PLANNED` en cours de synchro compte déjà.
+
+Corollaire assumé : les rangs `firstIndex`/`lastIndex` du condensé sont ceux des
+séries **de travail**. Comme l'échauffement n'est jamais remonté, il ne peut pas
+décaler la numérotation d'une lecture à l'autre.
+
+### Ce qui départage deux records, et ce qui n'en est pas un
+
+La requête ramène toutes les séries à la charge maximale ; à charge égale,
+6 × 60 kg vaut mieux que 3 × 60 kg, et à égalité parfaite c'est la plus récente
+qui reste. Une série sans charge (poids du corps, gainage) ne produit **aucun**
+record — il n'y a pas de record sans kilos — mais elle a bien une dernière
+performance, lue en durée. Le réalisé n'a pas de `PrescriptionType` pour trancher
+entre reps et durée : il porte ses valeurs, on lit celle qui est renseignée.
+
+Deux séances le même jour (matin et soir) sont départagées à l'identifiant : la
+sous-requête ne borne que la date, l'ordre de la requête fait le reste et le
+service ne garde que la première séance rencontrée par exercice.
+
+### Rien à dire n'est pas un zéro
+
+Un exercice sans historique est **absent** de `bulkFor()`, pas présent à null —
+même logique que `LogMetrics::summary()` qui rend `null`. KL-50 le dit déjà
+autrement : « un exercice sans historique n'affiche rien, pas un graphique
+vide ». Et transporter des entrées vides jusqu'au téléphone n'ajouterait que du
+volume au bootstrap.
+
+Le condensé des séries, lui, est calqué sur `PlanFlattener::detailedSetGroups` —
+mêmes clés, même principe de fusion des séries consécutives identiques — pour que
+le prescrit et le réalisé se rendent avec les mêmes composants (KL-07).
+
+### Fichiers touchés
+
+`src/Service/PerformanceHistory.php` (neuf),
+`src/Repository/LoggedSetRepository.php` (les deux lectures),
+`tests/Service/PerformanceHistoryTest.php` (12 tests, en `KernelTestCase` : les
+règles vivent dans le SQL, un double en mémoire n'en garderait aucune — dont
+l'isolation par propriétaire, qu'un exercice de la bibliothèque globale rend
+indispensable, et le compte de requêtes de `bulkFor`).
+
+**Prochain ticket : KL-05** — `LogComparator`, l'alignement du prescrit et du
+réalisé série par série.

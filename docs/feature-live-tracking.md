@@ -7,11 +7,12 @@
 
 ---
 
-> **État (2026-07-30)** : cadrage validé, **KL-01 à KL-03 livrés** (règle révisée
+> **État (2026-07-30)** : cadrage validé, **KL-01 à KL-04 livrés** (règle révisée
 > partout, le modèle du réalisé en base — `LoggedExercise` / `LoggedSet`,
 > `ScheduledWorkout` étendue et sa FK `workout` passée en `SET NULL` — puis
-> `LogMetrics`, le résumé du réalisé).
-> Prochain ticket : **KL-04** (`PerformanceHistory`).
+> `LogMetrics`, le résumé du réalisé, et `PerformanceHistory`, la dernière perf
+> et le record).
+> Prochain ticket : **KL-05** (`LogComparator`).
 
 ---
 
@@ -527,13 +528,52 @@ case de KL-09.
 le record. C'est le service qui donne sa valeur à l'app en séance.
 
 **Fini quand** :
-- [ ] `lastPerformance(User, Exercise): ?array` (date, séries de travail
+- [x] `lastPerformance(User, Exercise): ?array` (date, séries de travail
       condensées à la manière de `detailedSetGroups`)
-- [ ] `bestSet(User, Exercise): ?array` (charge max sur une série de travail)
-- [ ] `bulkFor(User, Exercise[]): array` indexé par id d'exercice, **en deux
+- [x] `bestSet(User, Exercise): ?array` (charge max sur une série de travail)
+- [x] `bulkFor(User, Exercise[]): array` indexé par id d'exercice, **en deux
       requêtes maximum** : le bootstrap l'appelle sur toute la bibliothèque, un
       N+1 le rendrait inutilisable
-- [ ] L'échauffement n'entre jamais dans un record
+- [x] L'échauffement n'entre jamais dans un record
+
+**Livré le 30/07/2026.** Quatre décisions prises en cours de route :
+
+1. **Les deux bornes se lisent par sous-requête corrélée, pas en PHP.** Les deux
+   lectures (`findLastWorkingSetsForExercises`, `findBestWorkingSetsForExercises`
+   sur `LoggedSetRepository`) partagent un socle de filtres et se bornent chacune
+   par une sous-requête corrélée sur `le.exercise` — `MAX(scheduledDate)` pour la
+   dernière séance, `MAX(weightKg)` pour le record. Remonter l'historique pour le
+   trier en mémoire aurait tenu aussi, mais l'historique d'un exercice grossit
+   sans limite là où sa dernière séance, non. Le `FROM ... WHERE` corrélé est
+   écrit **une seule fois** (`correlatedFrom()`) : les deux bornes ne peuvent pas
+   diverger de périmètre. Projection scalaire, aucune entité hydratée, et un test
+   compte les requêtes (`doctrine.debug_data_holder`) — la contrainte des deux
+   requêtes est gardée, pas seulement écrite.
+2. **Même périmètre que `LogMetrics`, à la ligne près** : échauffement exclu,
+   exercice `skipped` exclu, et **aucun filtre sur le statut** de la séance
+   datée. Le réalisé est un fait dès qu'il est écrit : une séance encore
+   `PLANNED` en cours de synchro compte déjà. Corollaire assumé : les rangs
+   `firstIndex`/`lastIndex` du condensé sont ceux des séries **de travail**,
+   l'échauffement n'étant jamais remonté il ne peut pas décaler la numérotation
+   d'une lecture à l'autre.
+3. **Le record se départage aux répétitions, puis à la date.** La requête ramène
+   toutes les séries portant la charge maximale ; à charge égale, 6 × 60 kg vaut
+   mieux que 3 × 60 kg, et à égalité parfaite c'est la plus récente qui reste.
+   Une série sans charge (poids du corps, gainage) ne produit **aucun** record —
+   mais elle a bien une dernière performance, lue en durée : le réalisé n'a pas
+   de `PrescriptionType` pour trancher entre reps et durée, il porte ses valeurs
+   et on lit celle qui est renseignée.
+4. **Un exercice sans historique est absent de `bulkFor`**, pas présent à null.
+   « Rien à dire » n'est pas un zéro (même logique que `LogMetrics::summary()`
+   qui rend `null`), et transporter des entrées vides jusqu'au téléphone n'aurait
+   ajouté que du volume au bootstrap. `lastPerformance` et `bestSet` n'appellent
+   chacun **qu'une** des deux requêtes : l'unitaire ne paie pas le prix du bulk.
+
+Livré avec `tests/Service/PerformanceHistoryTest.php` (12 tests, en
+`KernelTestCase` : les règles vivent dans le SQL, un double en mémoire n'en
+garderait aucune). L'isolation par propriétaire y est testée explicitement — un
+exercice de la bibliothèque globale est pratiqué par tout le monde, son
+historique n'appartient qu'à celui qui l'a fait (KL-50 en dépend).
 
 ### KL-05 — Service `LogComparator`
 
@@ -617,8 +657,8 @@ requête supplémentaire ni risque de N+1 à traiter.
 **Fini quand** :
 - [x] `LogMetricsTest` : tonnage, exclusion de l'échauffement, séance sans réalisé
       (livré avec KL-03)
-- [ ] `PerformanceHistoryTest` : record, dernière perf, absence d'historique,
-      et **un test qui compte les requêtes de `bulkFor`**
+- [x] `PerformanceHistoryTest` : record, dernière perf, absence d'historique,
+      et **un test qui compte les requêtes de `bulkFor`** (livré avec KL-04)
 - [ ] `LogComparatorTest` : tenu, dépassé, allégé, sauté, hors programme,
       exercice prescrit supprimé après coup
 - [ ] `ScheduledWorkoutVoterTest` étendu : le coach a `VIEW` et `EDIT`, **jamais

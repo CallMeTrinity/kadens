@@ -313,7 +313,31 @@ La règle a été révisée avant tout code (ticket KL-01, livré le 29/07/2026)
 puce dédiée en §3, le cadrage complet et les 51 tickets dans
 [`docs/feature-live-tracking.md`](./docs/feature-live-tracking.md). **KL-02 livré le
 29/07/2026** : le modèle du réalisé est en base. **KL-03 livré le 30/07/2026** :
-`LogMetrics`, le résumé du réalisé. Prochain ticket KL-04 (`PerformanceHistory`).
+`LogMetrics`, le résumé du réalisé. **KL-04 livré le 30/07/2026** :
+`PerformanceHistory`, la dernière perf et le record. Prochain ticket KL-05
+(`LogComparator`).
+
+Ce que KL-04 pose et qu'il ne faut pas casser :
+
+- **`bulkFor()` tient en DEUX requêtes, quel que soit le nombre d'exercices.**
+  Le bootstrap mobile (KL-14) l'appelle sur toute la bibliothèque. Les deux
+  lectures vivent sur `LoggedSetRepository`, en projection scalaire, chacune
+  bornée par une **sous-requête corrélée** sur `le.exercise` (`MAX(scheduledDate)`
+  pour la dernière séance, `MAX(weightKg)` pour le record) dont le `FROM/WHERE`
+  est écrit une seule fois (`correlatedFrom()`) — les deux bornes ne peuvent pas
+  diverger de périmètre. Un test compte les requêtes ; ne pas le contourner en
+  rajoutant une lecture « juste une de plus ». `lastPerformance` / `bestSet`
+  n'appellent chacun qu'une des deux.
+- **Même périmètre que `LogMetrics`** : échauffement exclu (jamais un record),
+  exercice `skipped` exclu, et **aucun filtre sur le statut** de la séance datée
+  — le réalisé est un fait dès qu'il est écrit. Conséquence : les rangs
+  `firstIndex`/`lastIndex` du condensé sont ceux des séries **de travail**.
+- **L'historique est scopé au propriétaire**, jamais à l'exercice seul : un
+  exercice de la bibliothèque globale est pratiqué par tout le monde. C'est la
+  garde que KL-50 exige, testée explicitement.
+- **Un exercice sans historique est absent de `bulkFor()`**, pas présent à null
+  (même logique que `LogMetrics::summary()` qui rend `null`). Et pas de record
+  sans kilos : une série au poids du corps a une dernière perf, pas de record.
 
 Ce que KL-03 pose et qu'il ne faut pas casser :
 
