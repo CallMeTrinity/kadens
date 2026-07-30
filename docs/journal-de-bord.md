@@ -2688,3 +2688,74 @@ Modifiés : `src/Controller/ScheduledWorkoutController.php` (`show()` étendu,
 **Prochain ticket : KL-08** — la séance datée sans source au calendrier : la
 pastille retombe sur son `title`, marque « hors plan » codée par le rang dans
 l'échelle de gris.
+
+---
+
+## Kadens Live KL-08 — la séance sans source au calendrier (30/07/2026)
+
+Une séance vierge est une séance datée avec `workout = null`. Le calendrier la
+requêtait déjà : le `leftJoin` du repository et `getDisplayTitle()` datent de
+KL-02, le lien vers `/schedule/{id}` de la couche mobile. Il ne restait donc de ce
+ticket qu'une chose — **la marque visuelle** — et une décision de vocabulaire.
+
+### Ce qui a été fait
+
+- **Un composant, `templates/components/_freeform_mark.html.twig`.** Il se pose à
+  deux endroits du même fichier : la ligne méta de la pastille (où il n'y avait
+  rien, faute de programme à annoncer) et sa modale rapide, où il prend la place
+  du lien « Voir la séance » qui n'a plus de cible. Une seule définition du signe
+  et du mot, servie aussi par le Turbo Stream de statut.
+- **Une classe, `.kd-freeform`** : contour pointillé au rang le plus clair de
+  l'échelle catégorielle (`--color-cat-4`), libellé mono à l'encre faible, icône
+  `lucide:circle-dashed` (importée en local).
+- **Un maillon de compression rétabli sur `.kd-calevent__meta`** (`min-width: 0`),
+  découvert en regardant le rendu réel : le chip débordait de la case.
+- **La pastille de calendrier réagencée** : contenu sur toute la case, cycle de
+  statut et œil en rangée dessous, à parts égales. Retour à la ligne sous 560px.
+- **Deux tests** ajoutés à `ScheduledWorkoutSourcelessTest` (10 tests au total).
+
+### Décisions
+
+- **Le libellé dit « Libre », pas « Hors plan ».** Le ticket écrivait « hors
+  plan », mais une séance posée à la main depuis la bibliothèque est elle aussi
+  hors d'un plan — et elle a un programme : le mot aurait nommé une autre
+  distinction que celle qu'on marque. « Libre » reprend le vocabulaire déjà en
+  place (`getDisplayTitle()` retombe sur « Séance libre », l'eyebrow de
+  `/schedule/{id}` dit la même chose). Un premier essai plus explicite
+  (« Sans programme ») a été abandonné à la vue du rendu : trop long pour une case
+  de calendrier, il se faisait couper au milieu d'un mot. La place disponible fait
+  partie des contraintes du libellé, pas seulement l'exactitude.
+- **La marque ne touche pas au filet de gauche.** C'était le réflexe tentant — une
+  bordure en pointillé pour dire « pas de contenu » — mais ce filet porte le
+  statut, et `is-overdue` s'y exprime déjà en pointillé rouge. Une deuxième
+  grammaire au même endroit aurait rendu les deux illisibles. La catégorie se dit
+  donc à côté du titre, pas sur le bord.
+- **Contour plutôt que couleur de texte.** L'échelle catégorielle ne porte jamais
+  de texte (design-system §5) : `--color-cat-4` est un gris de remplissage, pas un
+  gris lisible. Le libellé reste à `--color-text-faint`.
+- **La marque a fait apparaître un défaut plus ancien que KL-08.** En regardant le
+  rendu, le chip débordait de la case et se faisait couper au milieu d'un mot —
+  et surtout, il ne restait qu'une quarantaine de pixels au titre, qui s'élidait
+  dès trois mots. Cause : sur ordinateur une colonne de calendrier est **plus
+  étroite que l'écran d'un téléphone**, et la pastille y tenait trois zones en
+  ligne. D'où le réagencement — contenu sur toute la case, actions en rangée
+  dessous — qui n'était pas au ticket mais que la marque a rendu impossible à
+  ignorer. La ligne reste la bonne forme sous 560px, où l'agenda vertical rend la
+  pleine largeur : empiler y allongerait une vue qui ne fait que défiler.
+- **Le compte du test se fait sur `.kd-calevent__open`, pas sur `.kd-calevent`.**
+  La modale vit **à l'intérieur** de la pastille et porte la sienne : compter au
+  conteneur donne deux marques par séance et fait échouer le test pour une raison
+  qui n'existe pas.
+
+### Fichiers touchés
+
+Neuf : `templates/components/_freeform_mark.html.twig`,
+`assets/icons/lucide/circle-dashed.svg`.
+Modifiés : `templates/components/_cal_event.html.twig`,
+`assets/styles/components.css`,
+`tests/Controller/ScheduledWorkoutSourcelessTest.php`.
+
+**Le lot 1 de Kadens Live est clos**, KL-09 compris : ses deux dernières cases
+(non-régression de la suppression, séance datée sans `workout`) étaient déjà
+couvertes par les tests écrits chemin faisant. Prochain ticket : **KL-10**, le
+lot 2 — `ApiToken`, authenticator et firewall `api` stateless.

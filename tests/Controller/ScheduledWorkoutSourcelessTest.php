@@ -19,8 +19,9 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  * qui garde debout une séance réellement faite quand on nettoie la bibliothèque
  * (cf. docs/feature-live-tracking.md §2.3 point 1).
  *
- * Ces tests gardent la règle, pas la mise en forme : la marque visuelle de la
- * pastille (KL-08) et l'affichage du réalisé (KL-07) viendront s'y ajouter.
+ * Ces tests gardent la règle et, depuis KL-08, le seul point de mise en forme qui
+ * en découle : la marque « sans programme » de la pastille. L'affichage du
+ * réalisé, lui, vit dans ScheduledWorkoutLogTest (KL-07).
  */
 final class ScheduledWorkoutSourcelessTest extends WebTestCase
 {
@@ -122,6 +123,62 @@ final class ScheduledWorkoutSourcelessTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertStringContainsString('Séance improvisée', $crawler->html());
+    }
+
+    /**
+     * La marque « sans programme » ne se pose que sur les séances qui n'ont pas
+     * de source, et sur les deux vues. Le test cadre un mois qui contient les
+     * deux cas : sans le second, la marque pourrait être posée sur tout le monde
+     * et le test passerait quand même.
+     */
+    public function testOnlySourcelessSessionsCarryTheFreeformMark(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $workout = $this->createWorkout($user, 'Sortie longue');
+        // Deux dates de la même semaine ISO (9→15 mars) : la vue semaine et la
+        // vue mois cadrent alors toutes les deux les deux séances.
+        $this->createScheduled($user, $workout, new \DateTimeImmutable('2026-03-14'));
+        $this->createFree($user, 'Séance improvisée', new \DateTimeImmutable('2026-03-15'));
+
+        $this->client->loginUser($user);
+
+        foreach (['/calendar/2026/3', '/calendar/week/2026-03-15'] as $url) {
+            $crawler = $this->client->request('GET', $url);
+
+            self::assertResponseIsSuccessful();
+            // Deux séances affichées, une seule marquée. Le compte se fait sur la
+            // zone centrale de la pastille : la modale, qui vit à l'intérieur du
+            // même `.kd-calevent`, porte la sienne et la doublerait.
+            self::assertCount(2, $crawler->filter('.kd-calevent'), $url);
+            self::assertCount(1, $crawler->filter('.kd-calevent__open .kd-freeform'), $url);
+            self::assertCount(1, $crawler->filter('.kd-modal__meta .kd-freeform'), $url);
+            self::assertSelectorTextContains('.kd-freeform', 'Libre');
+        }
+    }
+
+    /**
+     * Le flux Turbo qui re-rend la pastille après un changement de statut passe
+     * par le même composant : la marque doit survivre au cycle, sinon elle
+     * disparaîtrait au premier clic sur « fait ».
+     */
+    public function testFreeformMarkSurvivesTheStatusStream(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $scheduled = $this->createFree($user, 'Séance improvisée', new \DateTimeImmutable('2026-03-15'));
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/calendar/2026/3');
+
+        $this->client->request(
+            'POST',
+            '/schedule/'.$scheduled->getId().'/cycle-status',
+            ['_token' => $crawler->filter('.kd-calevent__statusform input[name="_token"]')->attr('value')],
+            [],
+            ['HTTP_ACCEPT' => 'text/vnd.turbo-stream.html']
+        );
+
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('kd-freeform', $this->client->getResponse()->getContent());
     }
 
     /** La page datée se rend : date, statut, titre — mais pas de programme. */

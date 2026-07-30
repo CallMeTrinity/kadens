@@ -7,14 +7,16 @@
 
 ---
 
-> **État (2026-07-30)** : cadrage validé, **KL-01 à KL-07 livrés** (règle révisée
+> **État (2026-07-30)** : cadrage validé, **KL-01 à KL-08 livrés** (règle révisée
 > partout, le modèle du réalisé en base — `LoggedExercise` / `LoggedSet`,
 > `ScheduledWorkout` étendue et sa FK `workout` passée en `SET NULL` — puis
 > `LogMetrics`, le résumé du réalisé, `PerformanceHistory`, la dernière perf
 > et le record, `LogComparator`, l'écart prévu vs réalisé, l'attribut `LOG`
-> qui ferme l'écriture du réalisé au coach, et **l'affichage du réalisé sur
-> `/schedule/{id}`** : la comparaison en place dans le tableau de séries).
-> Prochain ticket : **KL-08** (séance datée sans source au calendrier).
+> qui ferme l'écriture du réalisé au coach, **l'affichage du réalisé sur
+> `/schedule/{id}`** — la comparaison en place dans le tableau de séries — et la
+> **marque « Libre »** au calendrier). **Le lot 1 est clos**, KL-09
+> compris : ses deux dernières cases étaient déjà couvertes par les tests écrits
+> chemin faisant. Prochain ticket : **KL-10** (le lot 2, l'API).
 
 ---
 
@@ -750,10 +752,47 @@ C'est tout ce qui reste de ce ticket depuis la fusion (§2.1), et il n'y a ni
 requête supplémentaire ni risque de N+1 à traiter.
 
 **Fini quand** :
-- [ ] La pastille retombe sur `title` quand `workout` est null, sans planter
-- [ ] Marque visuelle « hors plan », codée par le rang dans l'échelle de gris,
+- [x] La pastille retombe sur `title` quand `workout` est null, sans planter
+- [x] Marque visuelle « hors plan », codée par le rang dans l'échelle de gris,
       jamais par une teinte inventée
-- [ ] Le clic mène à `/schedule/{id}`, comme toutes les autres pastilles
+- [x] Le clic mène à `/schedule/{id}`, comme toutes les autres pastilles
+
+**Livré le 30/07/2026.** Les deux cases extrêmes l'étaient déjà : `displayTitle`
+et le `leftJoin` viennent de KL-02, le lien vers `/schedule/{id}` de la couche
+mobile. Il ne restait que la marque — et une décision de vocabulaire.
+
+- **Le libellé dit « Libre », pas « Hors plan ».** Une séance posée à la main
+  depuis la bibliothèque est elle aussi hors d'un plan, et elle a pourtant un
+  programme : « hors plan » aurait nommé une autre distinction que celle qu'on
+  marque. « Libre » reprend le mot que l'app emploie déjà pour cette chose —
+  `getDisplayTitle()` retombe sur « Séance libre », l'eyebrow de `/schedule/{id}`
+  dit la même. Il est aussi court **par nécessité** : un premier essai
+  (« Sans programme ») imposait sa largeur à la pastille et se faisait couper au
+  milieu d'un mot dans une case de calendrier.
+- **La marque est un composant, `components/_freeform_mark.html.twig`**, parce
+  qu'elle se pose à deux endroits du même fichier : la pastille et sa modale
+  rapide — où elle prend la place du lien « Voir la séance », qui n'a plus de
+  cible. Une seule définition du signe et du mot.
+- **Contour au rang le plus clair de l'échelle catégorielle (`--color-cat-4`),
+  texte à l'encre faible.** C'est une catégorie de séance, pas un statut : le
+  filet gauche de la pastille continue de porter prévu / fait / manqué, et il ne
+  fallait surtout pas y toucher — `is-overdue` s'y exprime déjà en pointillé
+  rouge. L'échelle catégorielle ne porte jamais de texte (design-system §5), d'où
+  le contour plutôt qu'une couleur de libellé.
+- **La marque passe par le Turbo Stream de statut**, qui re-rend la pastille par
+  le même composant : sans ce chemin, elle disparaîtrait au premier clic sur
+  « fait ». Un test le garde.
+- **La pastille ne se comprime que si tous ses maillons portent `min-width: 0`.**
+  `.kd-calevent__open` l'avait, mais ses enfants en colonne gardaient
+  `min-width: auto` et lui réimposaient la largeur de leur contenu : le chip
+  débordait de la case, où l'`overflow: hidden` de la pastille le coupait au
+  milieu d'un mot. Corrigé sur `.kd-calevent__meta`, donc pour tout ce qu'on
+  ajoutera dans cette méta — pas seulement pour cette marque.
+
+Livré dans `tests/Controller/ScheduledWorkoutSourcelessTest.php` (10 tests), dont
+`testOnlySourcelessSessionsCarryTheFreeformMark` — qui cadre un mois **contenant
+les deux cas** : sans la séance avec source, une marque posée sur tout le monde
+passerait le test.
 
 ### KL-09 — Tests du lot 1
 
@@ -768,11 +807,14 @@ requête supplémentaire ni risque de N+1 à traiter.
       exercice prescrit supprimé après coup (livré avec KL-05)
 - [x] `ScheduledWorkoutVoterTest` : le coach a `VIEW` et `EDIT`, **jamais `LOG`**
       (livré avec KL-06 — le fichier n'existait pas, il est créé)
-- [ ] **Un test de non-régression sur la suppression** : supprimer un `Workout`
+- [x] **Un test de non-régression sur la suppression** : supprimer un `Workout`
       de la bibliothèque laisse debout ses séances datées et leur réalisé.
       C'est le test qui garde le `SET NULL` de §2.3 point 1
-- [ ] Un test sur une séance datée sans `workout` : elle se rend, s'affiche au
-      calendrier et n'entre pas dans l'export
+      (`ScheduledWorkoutSourcelessTest::testDeletingLibraryWorkoutKeepsItsDatedSessions`,
+      livré avec KL-02)
+- [x] Un test sur une séance datée sans `workout` : elle se rend, s'affiche au
+      calendrier et n'entre pas dans l'export (même fichier — les deux vues, la
+      page datée, l'export et le flux ICS ; la marque s'y est ajoutée en KL-08)
 - [x] Un test qui **échoue** si le réalisé fuite dans `PlanFlattener` (livré avec
       KL-07, `ScheduledWorkoutLogTest::testLogNeverLeaksThroughPlanFlattener`)
 

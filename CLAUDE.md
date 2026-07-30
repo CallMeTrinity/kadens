@@ -317,8 +317,47 @@ puce dédiée en §3, le cadrage complet et les 51 tickets dans
 `PerformanceHistory`, la dernière perf et le record. **KL-05 livré le
 30/07/2026** : `LogComparator`, l'écart prévu vs réalisé. **KL-06 livré le
 30/07/2026** : l'attribut `LOG`, la garde d'écriture du réalisé. **KL-07 livré le
-30/07/2026** : l'affichage du réalisé sur `/schedule/{id}`. Prochain ticket
-KL-08 (séance datée sans source au calendrier).
+30/07/2026** : l'affichage du réalisé sur `/schedule/{id}`. **KL-08 livré le
+30/07/2026** : la séance sans source au calendrier — **le lot 1 est clos**,
+KL-09 compris. Prochain ticket KL-10 (le lot 2, l'API : `ApiToken`,
+authenticator, firewall `api` stateless).
+
+Ce que KL-08 pose et qu'il ne faut pas casser :
+
+- **La marque d'une séance sans source dit « Libre », pas « hors plan ».** Une
+  séance posée à la main depuis la bibliothèque est elle aussi hors d'un plan et a
+  pourtant un programme. « Libre » reprend le mot déjà employé par
+  `getDisplayTitle()` (« Séance libre ») et par l'eyebrow de `/schedule/{id}` : un
+  seul vocabulaire pour une seule chose. Il est court **par nécessité** — une case
+  de calendrier fait quelques dizaines de pixels, un libellé plus long se faisait
+  couper net. Le composant `components/_freeform_mark.html.twig` en est la seule
+  définition : il sert la pastille **et** sa modale, où il remplace le lien « Voir
+  la séance » devenu sans cible.
+- **La pastille de calendrier empile le contenu et ses actions.** Le contenu
+  prend la case entière, le cycle de statut et l'œil passent en rangée dessous, à
+  parts égales. Contre-intuitif mais mesuré : sur ordinateur une colonne de
+  calendrier fait ~150px, **moins que l'écran d'un téléphone**, et trois zones
+  côte à côte ne laissaient au titre qu'une quarantaine de pixels. Sous 560px,
+  où l'agenda vertical rend la pleine largeur, une surcharge repasse en ligne —
+  empiler y allongerait une vue qui ne fait que défiler. L'ordre du DOM suit la
+  disposition par défaut (contenu, puis actions) ; c'est la ligne qui déplace le
+  bouton de statut par `order`, et elle vit **après** le composant dans la feuille
+  (une `@media` n'ajoute aucune spécificité, cf. §5).
+- **La pastille ne se comprime que si TOUS ses maillons portent `min-width: 0`.**
+  `.kd-calevent__open` l'avait déjà, mais ses enfants en colonne gardaient
+  `min-width: auto` et lui réimposaient la largeur de leur contenu : un chip
+  insécable dans `.kd-calevent__meta` débordait de la case, où l'`overflow: hidden`
+  de la pastille le coupait au milieu d'un mot. La règle vaut pour tout ce qu'on
+  ajoutera dans cette méta.
+- **La marque ne touche jamais au filet gauche de la pastille**, qui porte le
+  statut et où `is-overdue` s'exprime déjà en pointillé rouge. Elle se dit à côté
+  du titre, en contour au rang le plus clair de l'échelle catégorielle
+  (`--color-cat-4`), libellé à l'encre faible — l'échelle catégorielle ne porte
+  jamais de texte (§5).
+- **Elle passe par le Turbo Stream de statut**, qui re-rend la pastille par le
+  même composant : sans ce chemin, elle disparaîtrait au premier clic sur « fait ».
+- **Compter la marque dans un test se fait sur `.kd-calevent__open`**, pas sur
+  `.kd-calevent` : la modale vit à l'intérieur de la pastille et porte la sienne.
 
 Ce que KL-07 pose et qu'il ne faut pas casser :
 

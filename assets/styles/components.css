@@ -3944,11 +3944,16 @@ a.kd-planday__item:hover svg {
        la feuille, écraserait une surcharge écrite ici). */
 }
 
-/* Pastille de séance datée — deux zones cliquables distinctes.
-   Gauche = cycle rapide du statut (prévu → fait → manqué) ; droite = ouvre la
-   modale. Filet gauche = statut (prévu / fait / manqué). */
+/* Pastille de séance datée — le contenu sur toute la case, les deux actions en
+   rangée dessous (cycle rapide du statut | voir la séance). Sur ordinateur une
+   colonne de calendrier fait ~150px, soit moins que l'écran d'un téléphone :
+   trois zones côte à côte ne laissaient au titre qu'une quarantaine de pixels.
+   Sous 560px l'agenda vertical rend la pleine largeur, et la ligne y redevient
+   la bonne forme (surcharge en fin de composant).
+   Filet gauche = statut (prévu / fait / manqué). */
 .kd-calevent {
     display: flex;
+    flex-wrap: wrap;
     align-items: stretch;
     width: 100%;
     font-family: var(--font-body);
@@ -3981,18 +3986,23 @@ a.kd-planday__item:hover svg {
 }
 
 /* Le formulaire de cycle enveloppe le bouton toggle : il ne prend pas de place
-   propre, le bouton porte tout. */
+   propre, le bouton porte tout. Les deux actions se partagent la rangée basse à
+   parts égales (`flex: 1 1 0`), d'où deux cibles larges au lieu de deux colonnes
+   de 26px. */
 .kd-calevent__statusform {
     display: flex;
+    flex: 1 1 0;
+    min-width: 0;
+    border-top: 1px solid var(--color-divider);
 }
 
-/* Zone gauche : bouton de cycle du statut. L'icône est teintée par le statut. */
+/* Bouton de cycle du statut. L'icône est teintée par le statut. */
 .kd-calevent__toggle {
-    flex: 0 0 auto;
+    flex: 1 1 auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0 var(--kd-space-2);
+    padding: var(--kd-space-1) var(--kd-space-2);
     border: 0;
     border-right: 1px solid var(--color-divider);
     background: transparent;
@@ -4018,9 +4028,10 @@ a.kd-planday__item:hover svg {
     color: var(--color-status-missed);
 }
 
-/* Zone droite : ouvre la modale. Colonne = titre + méta (activités / durée). */
+/* Le contenu : titre + méta (activités / durée). Prend la case entière, la
+   rangée d'actions passant dessous. */
 .kd-calevent__open {
-    flex: 1 1 auto;
+    flex: 1 1 100%;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -4044,17 +4055,19 @@ a.kd-planday__item:hover svg {
     text-decoration: none;
 }
 
-/* Zone droite : voir la séance en entier. Symétrique du bouton de statut, filet
-   de séparation du même côté. Discret au repos — c'est un repère, pas une action
-   primaire — mais toujours visible : au doigt il n'y a pas de survol pour le
-   révéler, et c'est justement là qu'il sert le plus. */
+/* Voir la séance en entier. Seconde moitié de la rangée d'actions. Discret au
+   repos — c'est un repère, pas une action primaire — mais toujours visible : au
+   doigt il n'y a pas de survol pour le révéler, et c'est justement là qu'il sert
+   le plus. Le filet de séparation est porté par le bouton de statut : en poser
+   un ici aussi doublerait le trait. */
 .kd-calevent__eye {
-    flex: 0 0 auto;
+    flex: 1 1 0;
+    min-width: 0;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 0 var(--kd-space-2);
-    border-left: 1px solid var(--color-divider);
+    padding: var(--kd-space-1) var(--kd-space-2);
+    border-top: 1px solid var(--color-divider);
     color: var(--color-text-placeholder);
     transition: background-color .12s ease, color .12s ease;
 }
@@ -4089,6 +4102,12 @@ a.kd-planday__item:hover svg {
     flex-wrap: wrap;
     align-items: center;
     gap: var(--kd-space-2);
+    /* Maillon manquant de la chaîne de compression : `__open` a beau porter
+       min-width: 0, ses enfants en colonne gardent min-width: auto et lui
+       imposent la largeur de leur contenu. Sans ça, un contenu de méta
+       insécable (un chip) déborde de la case au lieu de la remplir. */
+    min-width: 0;
+    max-width: 100%;
     font-family: var(--font-mono);
     font-size: 10px;
     color: var(--color-text-faint);
@@ -4155,6 +4174,36 @@ a.kd-planday__item:hover svg {
     height: 11px;
 }
 
+/* Marque d'une séance datée sans source (`components/_freeform_mark`) : séance
+   libre, ou séance de bibliothèque supprimée. Contour au rang le plus clair de
+   l'échelle catégorielle — c'est une catégorie de séance, pas un statut : le
+   filet gauche de la pastille continue de dire prévu / fait / manqué. Pointillé
+   parce qu'il n'y a rien derrière, texte à l'encre faible (l'échelle
+   catégorielle ne porte jamais de texte, cf. design-system). */
+.kd-freeform {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    /* La case de calendrier est étroite et la pastille clippe (overflow: hidden) :
+       sans ces deux-là, le chip impose sa largeur à toute la chaîne et se fait
+       couper net au bord de la case au lieu de rentrer. */
+    min-width: 0;
+    max-width: 100%;
+    padding: 0 var(--kd-space-2);
+    border: 1px dashed var(--color-cat-4);
+    border-radius: var(--kd-radius-pill);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-text-faint);
+    white-space: nowrap;
+}
+
+.kd-freeform svg {
+    flex: 0 0 auto;
+    width: 11px;
+    height: 11px;
+}
+
 /* Variante détaillée (vue semaine) : la pastille respire un peu plus. */
 .kd-calevent--detailed .kd-calevent__open {
     padding: var(--kd-space-3) var(--kd-space-4);
@@ -4163,6 +4212,42 @@ a.kd-planday__item:hover svg {
 
 .kd-calevent--detailed .kd-calevent__title {
     white-space: normal;
+}
+
+/* Téléphone : l'agenda vertical rend la pleine largeur, et la ligne y redevient
+   la bonne forme — trois zones tiennent, et empiler ferait défiler plus long une
+   vue qui ne fait que défiler. Retour à la disposition d'origine : contenu au
+   centre, statut à gauche, œil à droite, filets verticaux.
+
+   Cette surcharge vit APRÈS la définition du composant : une @media n'ajoute
+   aucune spécificité, groupée en tête de feuille elle serait purement
+   décorative (cf. design-system §5). `order` est le seul écart entre ordre du
+   DOM et ordre visuel, et il ne déplace qu'un élément. */
+@media (max-width: 560px) {
+    .kd-calevent {
+        flex-wrap: nowrap;
+    }
+
+    .kd-calevent__open {
+        flex: 1 1 auto;
+    }
+
+    .kd-calevent__statusform {
+        order: -1;
+        flex: 0 0 auto;
+        border-top: 0;
+    }
+
+    .kd-calevent__toggle {
+        padding-block: 0;
+    }
+
+    .kd-calevent__eye {
+        flex: 0 0 auto;
+        padding-block: 0;
+        border-top: 0;
+        border-left: 1px solid var(--color-divider);
+    }
 }
 
 /* ----------------------------------------------------------------------------
