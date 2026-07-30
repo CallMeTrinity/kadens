@@ -16,7 +16,10 @@
 > `/schedule/{id}`** — la comparaison en place dans le tableau de séries — et la
 > **marque « Libre »** au calendrier). **Le lot 1 est clos**, KL-09
 > compris : ses deux dernières cases étaient déjà couvertes par les tests écrits
-> chemin faisant. Prochain ticket : **KL-10** (le lot 2, l'API).
+> chemin faisant. **KL-10 livré** : le lot 2 est ouvert — `ApiToken` (secret
+> opaque stocké **haché**, expiration glissante de 90 jours),
+> `ApiTokenAuthenticator` et le pare-feu `api` **stateless**, déclaré avant
+> `main`. Prochain ticket : **KL-11** (les endpoints d'authentification).
 
 ---
 
@@ -829,17 +832,27 @@ passerait le test.
 **Quoi** : un firewall `api` **stateless** sur `^/api`, distinct de `main`.
 
 **Fini quand** :
-- [ ] Entité `ApiToken` : `owner`, `tokenHash` (hash SHA-256, **jamais le token
-      en clair**), `deviceName`, `createdAt`, `lastUsedAt`, `expiresAt`
-- [ ] Authenticator custom lisant `Authorization: Bearer <token>`
-- [ ] Firewall `api` avec `stateless: true`, **placé avant `main`** dans
+- [x] Entité `ApiToken` : `owner`, `tokenHash` (hash SHA-256, **jamais le token
+      en clair** — le constructeur prend le secret et le hache sur place, il n'y a
+      pas de chemin où il puisse être écrit), `deviceName`, `createdAt`,
+      `lastUsedAt`, `expiresAt`
+- [x] Authenticator custom lisant `Authorization: Bearer <token>`, qui sert aussi
+      d'`entry_point` (401 `application/problem+json`, jamais une redirection vers
+      le formulaire web)
+- [x] Firewall `api` avec `stateless: true`, **placé avant `main`** dans
       `security.yaml` (l'ordre des firewalls décide, le premier motif qui
       correspond gagne)
-- [ ] `access_control` : `^/api/auth` public, tout le reste `ROLE_USER`
-- [ ] Expiration glissante : `lastUsedAt` rafraîchi, `expiresAt` repoussé de
-      90 jours à chaque usage
-- [ ] Aucune session créée sur `^/api` (vérifié par un test sur l'absence de
-      `Set-Cookie`)
+- [x] `access_control` : `^/api/auth` public, tout le reste `ROLE_USER`
+- [x] Expiration glissante : `lastUsedAt` rafraîchi, `expiresAt` repoussé de
+      90 jours à chaque usage (`ApiToken::touch()`, appelé par l'authenticator)
+- [x] Aucune session créée sur `^/api` (vérifié par un test sur l'absence de
+      `Set-Cookie`), **et** un test qui vérifie qu'une session `main` active
+      n'authentifie pas l'API — c'est le piège ci-dessous
+
+`GET /api/ping` est ajouté au passage : le routage s'exécute avant le contrôle
+d'accès, donc sans une route sur `^/api` le pare-feu n'est pas testable. Sonde
+authentifiée, muette sur l'identité (c'est `GET /api/me`, KL-11, qui la porte) ;
+le client mobile s'en sert pour vérifier l'URL de serveur portée par le QR.
 
 **Piège** : le firewall `main` a `lazy: true` et un `remember_me` à dix ans. Si
 `^/api` tombait dedans, une requête mobile serait authentifiée par cookie et le

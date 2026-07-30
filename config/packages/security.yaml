@@ -16,6 +16,18 @@ security:
             # Ensure dev tools and static assets are always allowed
             pattern: ^/(_profiler|_wdt|assets|build)/
             security: false
+        # L'API mobile, AVANT `main` : l'ordre des pare-feux n'est pas cosmétique,
+        # le premier motif qui correspond gagne. Sous `main`, une requête d'API
+        # serait authentifiée par le cookie `remember_me` (dix ans) et le jeton
+        # deviendrait décoratif — révoquer un appareil n'aurait plus d'effet.
+        # `stateless: true` : aucune session n'est ouverte, donc aucun Set-Cookie.
+        api:
+            pattern: ^/api
+            stateless: true
+            provider: app_user_provider
+            custom_authenticators:
+                - App\Security\ApiTokenAuthenticator
+            entry_point: App\Security\ApiTokenAuthenticator
         main:
             lazy: true
             provider: app_user_provider
@@ -40,6 +52,11 @@ security:
 
     # Note: Only the *first* matching rule is applied
     access_control:
+        # ^/api/auth (connexion, appairage) avant ^/api : c'est là qu'on obtient
+        # un jeton, exiger d'en avoir un serait circulaire. Tout le reste de
+        # l'API demande un utilisateur, donc un Bearer valide.
+        - { path: ^/api/auth, roles: PUBLIC_ACCESS }
+        - { path: ^/api, roles: ROLE_USER }
         - { path: ^/exercise, roles: ROLE_USER }
         - { path: ^/workout, roles: ROLE_USER }
         - { path: ^/plan-template, roles: ROLE_USER }

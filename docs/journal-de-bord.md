@@ -2759,3 +2759,90 @@ Modifiés : `templates/components/_cal_event.html.twig`,
 (non-régression de la suppression, séance datée sans `workout`) étaient déjà
 couvertes par les tests écrits chemin faisant. Prochain ticket : **KL-10**, le
 lot 2 — `ApiToken`, authenticator et firewall `api` stateless.
+
+---
+
+## Kadens Live KL-10 — `ApiToken`, authenticator, firewall (30/07/2026)
+
+Le premier ticket du lot 2, et le seul du lot dont l'erreur serait invisible : une
+API qui marche alors que son jeton ne sert à rien.
+
+### L'ordre des pare-feux est la substance du ticket
+
+`main` porte `lazy: true`, un `form_login` et un `remember_me` de **dix ans**. Un
+pare-feu Symfony se choisit au premier motif qui correspond : sans un `api`
+déclaré **avant**, `^/api` serait tombé dans `main` et une requête mobile aurait
+été authentifiée par cookie. Tout aurait fonctionné en apparence — l'app aurait
+reçu ses réponses — mais le jeton serait devenu décoratif, et surtout **révoquer
+un appareil depuis `/profile/settings` (KL-12) n'aurait eu aucun effet**. C'est
+une panne de sécurité qui ne se manifeste par aucun symptôme fonctionnel, d'où
+le test qui la garde : un utilisateur connecté sur le web reçoit 401 sur
+`/api/ping`.
+
+`stateless: true` complète la même idée par l'autre bout : aucune session ouverte,
+donc aucun `Set-Cookie`, donc pas de CSRF à gérer côté API. Un test l'affirme sur
+la réponse plutôt que sur la configuration — c'est l'absence d'en-tête qui compte,
+pas la ligne de YAML qui devait la produire.
+
+### Le secret n'existe qu'une fois
+
+La base ne stocke que l'empreinte SHA-256 (`token_hash`, CHAR(64) unique). Le
+constructeur d'`ApiToken` prend le secret **en clair et le hache sur place** :
+il n'y a donc aucun chemin de code où le secret puisse être écrit par distraction,
+et aucun appelant n'a de raison de le garder après la réponse qui le renvoie.
+Corollaire assumé : un jeton perdu ne se retrouve pas, il se remplace.
+
+SHA-256 nu, pas bcrypt ni argon. Ce n'est pas un mot de passe : le secret fait
+256 bits d'aléa tirés par `random_bytes`, il n'y a pas de dictionnaire à ralentir
+— et l'authentification doit tenir en **une lecture indexée** à chaque requête de
+l'API. Ralentir volontairement cette lecture n'achèterait rien.
+
+### L'expiration glissante vit dans l'entité, pas dans l'authenticator
+
+`touch()` note `lastUsedAt` et repousse `expiresAt` de 90 jours. Les deux gestes
+sont un seul fait — « ce jeton a servi » — et les séparer laisserait exister un
+état où l'un est écrit sans l'autre. L'authenticator appelle `touch()` puis
+`flush()` juste après avoir validé le jeton : à ce stade de la requête rien
+d'autre n'est en attente, la persistance ne peut pas emporter autre chose.
+
+Effet voulu : un téléphone dont on se sert ne se déconnecte **jamais**, un
+téléphone oublié se périme tout seul en trois mois. C'est ce qui rend l'appairage
+par QR (§0.6) un geste trimestriel plutôt qu'hebdomadaire.
+
+### Une seule réponse pour trois échecs
+
+Jeton vide, inconnu ou périmé sortent le **même** 401 avec le même texte.
+Distinguer « inconnu » de « périmé » confirmerait l'existence d'un jeton à qui le
+devine. La réponse est déjà à la forme RFC 9457 (`application/problem+json`) que
+KL-13 généralisera : ça ne coûte rien maintenant, et ça évite que les deux seules
+erreurs existantes de l'API soient les deux seules à ne pas suivre la règle.
+
+`supports()` rend `false` quand il n'y a pas d'en-tête `Bearer` — la requête
+poursuit en anonyme, `access_control` la refuse, et le refus appelle `start()`.
+C'est ce qui laisse `^/api/auth` public sans une exception écrite dans
+l'authenticator : la porte d'entrée de l'API n'a pas à connaître la liste de ce
+qui ne demande pas de jeton.
+
+### `/api/ping`, la sonde
+
+Un ticket de pare-feu ne peut pas se tester sans une route derrière lui : le
+routage s'exécute **avant** le contrôle d'accès, donc une URL inexistante rend 404
+sans jamais réveiller le pare-feu. Plutôt qu'une route de test, `GET /api/ping`
+— authentifiée, muette sur l'identité. Le client mobile en a l'usage : le QR
+d'appairage porte l'URL du serveur (§0.6), il faut pouvoir vérifier qu'elle mène
+bien à un Kadens et que le jeton y est encore valide. `GET /api/me` (KL-11)
+portera l'identité, les rôles et le dernier bootstrap.
+
+### Fichiers touchés
+
+Neufs : `src/Entity/ApiToken.php`, `src/Repository/ApiTokenRepository.php`
+(`findOneByPlainToken`, plus `findForOwner` que KL-12 consommera),
+`src/Security/ApiTokenAuthenticator.php`, `src/Controller/Api/PingController.php`,
+`migrations/Version20260730140000.php`,
+`tests/Controller/ApiAuthenticationTest.php` (8 tests).
+Modifié : `config/packages/security.yaml` (pare-feu `api` avant `main`, deux
+règles d'`access_control` en tête — `^/api/auth` public avant `^/api`, sans quoi
+obtenir un jeton demanderait d'en avoir un).
+
+**Prochain ticket : KL-11** — les endpoints d'authentification :
+`POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/me`.

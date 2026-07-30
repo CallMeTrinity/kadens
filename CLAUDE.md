@@ -319,8 +319,45 @@ puce dédiée en §3, le cadrage complet et les 51 tickets dans
 30/07/2026** : l'attribut `LOG`, la garde d'écriture du réalisé. **KL-07 livré le
 30/07/2026** : l'affichage du réalisé sur `/schedule/{id}`. **KL-08 livré le
 30/07/2026** : la séance sans source au calendrier — **le lot 1 est clos**,
-KL-09 compris. Prochain ticket KL-10 (le lot 2, l'API : `ApiToken`,
-authenticator, firewall `api` stateless).
+KL-09 compris. **KL-10 livré le 30/07/2026** : le pare-feu `api`, le jeton
+porteur — le lot 2 est ouvert. Prochain ticket KL-11 (les endpoints
+d'authentification : `POST /api/auth/login`, `logout`, `GET /api/me`).
+
+Ce que KL-10 pose et qu'il ne faut pas casser :
+
+- **Le pare-feu `api` est déclaré AVANT `main`, et ce n'est pas cosmétique.** Un
+  pare-feu Symfony se choisit au premier motif qui correspond. Sous `main`, une
+  requête d'API serait authentifiée par le cookie `remember_me` (dix ans) : tout
+  fonctionnerait en apparence, mais le jeton deviendrait décoratif et révoquer un
+  appareil (KL-12) n'aurait plus aucun effet. Panne sans symptôme, d'où le test
+  qui l'exige (`ApiAuthenticationTest::testSessionCookieDoesNotAuthenticateTheApi`).
+- **`stateless: true` → aucun `Set-Cookie` sur `^/api`**, donc aucune session et
+  aucun CSRF à gérer côté API. Le test l'affirme sur la réponse, pas sur la
+  configuration.
+- **La base ne stocke jamais le secret, seulement son empreinte SHA-256.** Le
+  constructeur d'`ApiToken` prend le clair et le hache sur place : il n'existe pas
+  de chemin où le secret puisse être persisté par distraction. Il n'est rendu
+  qu'une fois, par ce qui l'émet (KL-11, KL-46) ; perdu, il se remplace, il ne se
+  retrouve pas. SHA-256 nu et non bcrypt/argon : 256 bits d'aléa, pas de
+  dictionnaire à ralentir, et l'authentification doit tenir en **une lecture
+  indexée** par requête.
+- **L'expiration glissante vit dans l'entité** (`ApiToken::touch()` : `lastUsedAt`
+  + `expiresAt` repoussé de 90 jours). Un seul fait, donc un seul geste — les
+  séparer laisserait exister un état où l'un est écrit sans l'autre. L'appelant
+  est l'authenticator, et lui seul : `lastUsedAt` doit rester la date d'un usage
+  réel, c'est ce que KL-12 affichera pour décider d'une révocation.
+- **Jeton vide, inconnu ou périmé rendent le MÊME 401.** Distinguer les cas
+  confirmerait l'existence d'un jeton à qui le devine. Réponse déjà à la forme
+  RFC 9457 que KL-13 généralisera.
+- **`supports()` rend `false` sans en-tête `Bearer`** : la requête poursuit en
+  anonyme, `access_control` la refuse, le refus appelle `start()`. C'est ce qui
+  laisse `^/api/auth` public sans écrire une liste d'exceptions dans
+  l'authenticator.
+- **`GET /api/ping` existe parce que le routage précède le contrôle d'accès** :
+  sans route sur `^/api`, une URL inexistante rend 404 sans jamais réveiller le
+  pare-feu, donc rien n'est testable. Sonde authentifiée et muette sur l'identité
+  (c'est `GET /api/me` qui la portera) ; le mobile s'en sert pour valider l'URL de
+  serveur portée par le QR d'appairage.
 
 Ce que KL-08 pose et qu'il ne faut pas casser :
 
