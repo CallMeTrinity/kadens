@@ -7,7 +7,7 @@
 
 ---
 
-> **État (2026-07-30)** : cadrage validé, **KL-01 à KL-08 livrés** (règle révisée
+> **État (2026-07-31)** : cadrage validé, **KL-01 à KL-08 livrés** (règle révisée
 > partout, le modèle du réalisé en base — `LoggedExercise` / `LoggedSet`,
 > `ScheduledWorkout` étendue et sa FK `workout` passée en `SET NULL` — puis
 > `LogMetrics`, le résumé du réalisé, `PerformanceHistory`, la dernière perf
@@ -19,7 +19,10 @@
 > chemin faisant. **KL-10 livré** : le lot 2 est ouvert — `ApiToken` (secret
 > opaque stocké **haché**, expiration glissante de 90 jours),
 > `ApiTokenAuthenticator` et le pare-feu `api` **stateless**, déclaré avant
-> `main`. Prochain ticket : **KL-11** (les endpoints d'authentification).
+> `main`. **KL-11 livré** : `POST /api/auth/login`, `POST /api/auth/logout`,
+> `GET /api/me` — le mot de passe en repli, le secret rendu une seule fois, un
+> 401 qui ne dit pas si le compte existe. Prochain ticket : **KL-46**
+> (l'appairage par QR, le chemin nominal) ou **KL-12** (la révocation d'appareil).
 
 ---
 
@@ -866,14 +869,52 @@ token deviendrait décoratif. L'ordre dans `security.yaml` n'est pas cosmétique
 reste comme repli, et parce que les tests fonctionnels de l'API en ont besoin.
 
 **Fini quand** :
-- [ ] `POST /api/auth/login` : `{email, password, deviceName}` → `{token, user}`.
-      Le token en clair n'est renvoyé **qu'ici et à l'appairage**, une seule fois
-- [ ] `POST /api/auth/logout` : révoque le token courant
-- [ ] `GET /api/me` : identité, rôles, date du dernier bootstrap
-- [ ] Pas de parcours d'inscription (les comptes se créent en console, règle
+- [x] `POST /api/auth/login` : `{email, password, deviceName}` → `{token, user}`.
+      Le token en clair n'est renvoyé **qu'ici et à l'appairage**, une seule fois.
+      **201** et non 200 : l'appel enregistre un appareil, il ne fait pas que lire
+- [x] `POST /api/auth/logout` : révoque le token courant (**204**), et lui seul —
+      les autres appareils du compte restent connectés
+- [x] `GET /api/me` : identité, rôles, et l'appareil courant (nom, dernier usage,
+      échéance, **date du dernier bootstrap**)
+- [x] Pas de parcours d'inscription (les comptes se créent en console, règle
       verrouillée). Le mot de passe oublié reste hors périmètre
-- [ ] Réponse 401 uniforme, sans distinguer « email inconnu » de « mot de passe
-      faux »
+- [x] Réponse 401 uniforme, sans distinguer « email inconnu » de « mot de passe
+      faux » — **corps identique au caractère près**, et hachage à vide sur un
+      compte inexistant pour que le *temps* de réponse ne le trahisse pas non plus
+
+Ce que le ticket pose, et qu'il ne faut pas casser :
+
+- **`api_token.last_bootstrap_at` ne double pas `last_used_at`.** La seconde
+  bouge à chaque requête (l'authenticator la repousse), la première ne bougera
+  qu'au `GET /api/bootstrap` — **KL-14 en est le seul écrivain**, et un appel qui
+  ne rend pas le jeu complet ne doit pas laisser croire que l'appareil est à jour.
+  C'est la différence entre « ce téléphone répond » et « ce téléphone travaille
+  sur des données à jour », et c'est ce que KL-12 affichera.
+- **Le jeton validé est publié sur la requête** (`ApiTokenAuthenticator::REQUEST_ATTRIBUTE`),
+  pas relu depuis l'en-tête par le contrôleur. `logout` révoque *celui qu'on
+  présente* et `/api/me` décrit l'appareil courant sans qu'aucun second endroit
+  n'ait à savoir ce que vaut un `Bearer`. Le préfixe `_` le tient hors des
+  arguments de contrôleur résolus par nom.
+- **`logout` vit sous `^/api/auth`, donc publique pour `access_control` : la
+  garde est dans le contrôleur, et elle porte sur le jeton, pas sur
+  l'utilisateur.** C'est le jeton qui est l'objet de l'action — sans lui, il n'y a
+  rien à révoquer, quand bien même on saurait qui appelle.
+- **Contrat client : ne pas envoyer d'`Authorization` sur `/api/auth/login`.**
+  L'authenticator se déclenche sur la seule présence d'un `Bearer`, quel que soit
+  l'`access_control` de la route — KL-10 a volontairement refusé d'écrire une
+  liste d'exceptions de routes dans l'authenticator, et logout a besoin de
+  l'en-tête. Un jeton périmé présenté à la connexion la fait donc échouer **avant**
+  le contrôleur. Le flux de reconnexion est : 401 → effacer le jeton local →
+  login sans en-tête. Un test fige ce comportement plutôt que de le subir.
+- **La borne du `VARCHAR(100)` se refuse dans le contrôleur.** Un `deviceName`
+  trop long rend 400, jamais une erreur SQL en 500 : le nom vient du client, il
+  n'a pas à atteindre la base pour être jugé.
+- **Piège de test** : `loginUser()` pose le jeton dans le `token_storage` du
+  conteneur *en plus* du cookie. Tant que le noyau n'a pas redémarré, ce jeton
+  résiduel traverse n'importe quel pare-feu, **stateless compris** — un test
+  « la session web n'authentifie pas l'API » passerait alors pour la mauvaise
+  raison. Il faut une requête web intercalée pour purger le conteneur ; ce qui
+  reste ensuite, le seul cookie, est bien ce qu'on prétend tester.
 
 ### KL-46 — Appairage : entité `PairingCode` et endpoints
 

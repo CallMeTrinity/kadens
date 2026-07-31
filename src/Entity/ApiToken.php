@@ -60,6 +60,16 @@ class ApiToken
     private \DateTimeImmutable $expiresAt;
 
     /**
+     * Date de la dernière hydratation complète de cet appareil (`GET /api/bootstrap`,
+     * KL-14, seul écrivain). Distincte de `lastUsedAt`, qui bouge à *chaque* appel :
+     * un téléphone peut pinguer tous les jours sans jamais resynchroniser. C'est
+     * donc celle-ci qui dit « cet appareil travaille sur des données de trois
+     * semaines », et c'est elle que `GET /api/me` et la liste de KL-12 affichent.
+     */
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $lastBootstrapAt = null;
+
+    /**
      * Le secret en clair entre ici et n'en ressort pas : il est haché sur place.
      * Aucun appelant n'a donc de raison de le conserver au-delà de la réponse
      * qui le renvoie.
@@ -129,6 +139,23 @@ class ApiToken
     public function getExpiresAt(): \DateTimeImmutable
     {
         return $this->expiresAt;
+    }
+
+    public function getLastBootstrapAt(): ?\DateTimeImmutable
+    {
+        return $this->lastBootstrapAt;
+    }
+
+    /**
+     * Note une hydratation complète. Appelé par `GET /api/bootstrap` (KL-14) et
+     * par lui seul : un appel qui ne rend pas le jeu complet ne doit pas laisser
+     * croire que l'appareil est à jour.
+     */
+    public function markBootstrapped(?\DateTimeImmutable $now = null): static
+    {
+        $this->lastBootstrapAt = $now ?? new \DateTimeImmutable();
+
+        return $this;
     }
 
     public function isExpired(?\DateTimeImmutable $now = null): bool

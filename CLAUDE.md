@@ -320,8 +320,44 @@ puce dédiée en §3, le cadrage complet et les 51 tickets dans
 30/07/2026** : l'affichage du réalisé sur `/schedule/{id}`. **KL-08 livré le
 30/07/2026** : la séance sans source au calendrier — **le lot 1 est clos**,
 KL-09 compris. **KL-10 livré le 30/07/2026** : le pare-feu `api`, le jeton
-porteur — le lot 2 est ouvert. Prochain ticket KL-11 (les endpoints
-d'authentification : `POST /api/auth/login`, `logout`, `GET /api/me`).
+porteur — le lot 2 est ouvert. **KL-11 livré le 31/07/2026** : les endpoints
+d'authentification (`POST /api/auth/login`, `POST /api/auth/logout`,
+`GET /api/me`). Prochain ticket KL-46 (l'appairage par QR) ou KL-12 (la
+révocation d'appareil dans `/profile/settings`).
+
+Ce que KL-11 pose et qu'il ne faut pas casser :
+
+- **Le 401 de connexion est uniforme par son texte ET par son temps.** Message
+  identique au caractère près pour « email inconnu » et « mot de passe faux », et
+  **hachage à vide** sur un compte inexistant : sans lui la réponse partirait sans
+  rien avoir calculé, donc plus vite, et le temps redeviendrait l'oracle que le
+  message refuse d'être. Le test compare les deux corps, pas seulement les statuts.
+- **Le jeton validé se publie sur la requête** (`ApiTokenAuthenticator::REQUEST_ATTRIBUTE`),
+  il ne se relit jamais depuis l'en-tête ailleurs. `logout` révoque *celui qu'on
+  présente* et `/api/me` décrit l'appareil courant sans créer un second endroit qui
+  décide de ce que vaut un `Bearer` — deux endroits finiraient par diverger.
+- **`logout` se garde sur le jeton, pas sur l'utilisateur.** La route est sous
+  `^/api/auth`, donc publique pour `access_control` : la garde vit dans le
+  contrôleur, et sans jeton il n'y a rien à révoquer, quand bien même on saurait
+  qui appelle. Révoquer **supprime** la ligne, et un seul appareil part — « tout
+  révoquer » restera un geste explicite (KL-12).
+- **Contrat client : pas d'en-tête `Authorization` sur `/api/auth/login`.**
+  L'authenticator se déclenche sur la seule présence d'un `Bearer`, quelle que
+  soit la route ; un jeton périmé y ferait échouer la requête **avant** le
+  contrôleur. Ne pas « corriger » ça en listant des routes dans `supports()` :
+  KL-10 l'a refusé, et `logout` a besoin de l'en-tête. Le flux de reconnexion est
+  401 → effacer le jeton local → login sans en-tête, et un test le fige.
+- **`ApiToken.lastBootstrapAt` ne double pas `lastUsedAt`.** La seconde bouge à
+  chaque requête (même un `ping`), la première ne bougera qu'au
+  `GET /api/bootstrap` — **KL-14 en est le seul appelant**. C'est ce qui distingue
+  « ce téléphone répond » de « ce téléphone est à jour », et ce que KL-12 affichera.
+- **Les bornes de colonne se refusent dans le contrôleur** (`deviceName` ≤ 100) :
+  une valeur venue du client rend 400, jamais une erreur SQL en 500.
+- **Piège de test** : `loginUser()` pose le jeton dans le `token_storage` du
+  conteneur *en plus* du cookie ; tant que le noyau n'a pas redémarré il traverse
+  n'importe quel pare-feu, **`stateless` compris**. Tout test qui prouve qu'un
+  cookie **ne** suffit **pas** doit intercaler une requête après `loginUser()`,
+  sinon il teste le contraire de ce qu'il annonce.
 
 Ce que KL-10 pose et qu'il ne faut pas casser :
 

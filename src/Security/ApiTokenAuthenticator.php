@@ -24,13 +24,23 @@ use Symfony\Component\Security\Http\EntryPoint\AuthenticationEntryPointInterface
  * dans `main`, son `remember_me` à dix ans authentifierait la requête par cookie.
  * Le jeton deviendrait décoratif et la révocation d'un appareil, sans effet.
  *
- * Trois responsabilités, pas une de plus : lire l'en-tête, valider le jeton,
- * repousser son échéance. L'émission vit ailleurs (KL-11, KL-46), la mise en
- * forme normalisée des erreurs arrivera en KL-13.
+ * Quatre responsabilités, pas une de plus : lire l'en-tête, valider le jeton,
+ * repousser son échéance, et le publier sur la requête (cf. REQUEST_ATTRIBUTE).
+ * L'émission vit ailleurs (KL-11, KL-46), la mise en forme normalisée des
+ * erreurs arrivera en KL-13.
  */
 final class ApiTokenAuthenticator extends AbstractAuthenticator implements AuthenticationEntryPointInterface
 {
     private const string SCHEME = 'Bearer ';
+
+    /**
+     * Attribut de requête où atterrit le jeton validé. C'est ce qui permet à
+     * `POST /api/auth/logout` de révoquer **celui qu'on présente** et à
+     * `GET /api/me` de décrire l'appareil courant, sans relire l'en-tête ailleurs :
+     * la lecture et la validation du Bearer restent l'affaire de cette classe.
+     * Le préfixe `_` le tient hors des arguments de contrôleur résolus par nom.
+     */
+    public const string REQUEST_ATTRIBUTE = '_api_token';
 
     public function __construct(
         private readonly ApiTokenRepository $apiTokens,
@@ -70,6 +80,8 @@ final class ApiTokenAuthenticator extends AbstractAuthenticator implements Authe
         // d'autre n'est encore en attente à ce stade de la requête.
         $apiToken->touch();
         $this->em->flush();
+
+        $request->attributes->set(self::REQUEST_ATTRIBUTE, $apiToken);
 
         $owner = $apiToken->getOwner();
 

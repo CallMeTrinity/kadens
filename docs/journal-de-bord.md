@@ -2846,3 +2846,121 @@ obtenir un jeton demanderait d'en avoir un).
 
 **Prochain ticket : KL-11** — les endpoints d'authentification :
 `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/me`.
+
+---
+
+## Kadens Live KL-11 — Endpoints d'authentification (31/07/2026)
+
+KL-10 a posé la serrure ; celui-ci pose la clé. Trois routes, et rien d'autre :
+pas d'inscription (les comptes se créent en console, règle verrouillée), pas de
+mot de passe oublié. Le chemin nominal d'un appairage reste le QR (KL-46) — le
+mot de passe est un **repli**, et de toute façon le seul moyen d'écrire un test
+fonctionnel de l'API.
+
+### Un 401 qui ne dit rien, ni par son texte ni par son temps
+
+La consigne du ticket était « ne pas distinguer email inconnu de mot de passe
+faux ». Le message uniforme ne suffit pas : sur un compte inexistant, la réponse
+part **sans avoir haché quoi que ce soit**, donc bien plus vite qu'une
+vérification de mot de passe réelle. Le temps de réponse redevient l'oracle que
+le message refusait d'être. D'où le hachage à vide (`hashPassword(new User(), …)`)
+sur la branche « utilisateur inconnu » — trois lignes qui achètent l'uniformité
+qu'on prétendait avoir.
+
+Le test correspondant compare les deux corps **au caractère près**, pas seulement
+les statuts : c'est ce qui empêchera d'y ajouter plus tard un `detail` plus
+« utile » d'un côté seulement.
+
+### Le jeton validé se publie sur la requête
+
+`logout` doit révoquer *celui qu'on présente*, `/api/me` doit décrire l'appareil
+courant. Les deux ont donc besoin de l'`ApiToken`, que le jeton de sécurité ne
+porte pas (`SelfValidatingPassport` ne transporte que l'utilisateur). Trois
+options : relire l'en-tête dans le contrôleur, un badge sur mesure, ou un attribut
+de requête.
+
+C'est l'attribut (`ApiTokenAuthenticator::REQUEST_ATTRIBUTE`, `_api_token`). La
+raison n'est pas la brièveté : relire l'en-tête ailleurs créerait un **second
+endroit qui décide de ce que vaut un `Bearer`**, et deux endroits finissent
+toujours par diverger. L'authenticator reste la seule autorité ; il valide, puis
+il dit ce qu'il a validé. Le préfixe `_` tient l'attribut hors des arguments de
+contrôleur résolus par nom.
+
+### `logout` se garde sur le jeton, pas sur l'utilisateur
+
+La route vit sous `^/api/auth`, donc publique pour `access_control` (c'est la
+règle qui laisse `login` accessible sans jeton). La garde est donc dans le
+contrôleur — et elle porte sur **le jeton**, pas sur `getUser()`. Ce n'est pas un
+raccourci : sans jeton il n'y a rien à révoquer, quand bien même on saurait qui
+appelle. Révoquer, c'est supprimer la ligne, pas la marquer périmée : une ligne
+morte qu'on garde n'est qu'une ligne à purger plus tard. Et un seul appareil part
+— « tout révoquer » est un geste explicite, il vivra dans `/profile/settings`
+(KL-12).
+
+### Le contrat client qu'on assume au lieu de le contourner
+
+L'authenticator se déclenche sur la **seule présence** d'un `Bearer`, quel que
+soit l'`access_control` de la route. Conséquence : un jeton périmé présenté à
+`POST /api/auth/login` fait échouer la requête *avant* le contrôleur — exactement
+le cas où le client voudrait se reconnecter.
+
+La correction évidente aurait été de faire rendre `false` à `supports()` sur
+`^/api/auth`. Elle a été écartée : KL-10 a refusé d'écrire une liste de routes
+dans l'authenticator, et `logout` a besoin de l'en-tête — l'exception ne serait
+donc pas une ligne mais une liste à tenir à jour. Le flux côté mobile est de
+toute façon le flux standard : 401 → effacer le jeton local → login sans en-tête.
+Le comportement est donc **figé par un test** plutôt que subi, et écrit noir sur
+blanc dans le contrôleur pour KL-25.
+
+### `last_bootstrap_at`, et pourquoi `last_used_at` ne suffisait pas
+
+`GET /api/me` doit rendre « la date du dernier bootstrap ». Rien ne la portait :
+`lastUsedAt` bouge à **chaque** requête, l'authenticator la repoussant y compris
+sur un `ping`. Un téléphone peut donc répondre tous les jours en travaillant sur
+des données de trois semaines, et les deux faits doivent se distinguer — c'est
+précisément ce que KL-12 affichera pour décider d'une révocation.
+
+D'où une colonne nullable et une méthode `markBootstrapped()` dont **KL-14 sera le
+seul appelant** : un endpoint qui ne rend pas le jeu complet n'a pas à laisser
+croire que l'appareil est à jour. Nullable et sans défaut : un appareil qui vient
+de s'appairer n'a pas encore synchronisé, et « jamais » n'est pas une date.
+
+### 201, 204, et le reste
+
+`login` rend **201** : l'appel enregistre un appareil, que `/profile/settings`
+listera et pourra révoquer — ce n'est pas une lecture. `logout` rend **204** :
+il n'y a rien à dire. Les erreurs du contrôleur sont déjà à la forme RFC 9457,
+comme celles de l'authenticator, pour que KL-13 n'ait qu'à les remonter dans un
+listener au lieu de les convertir.
+
+La borne du `VARCHAR(100)` de `deviceName` se refuse **dans le contrôleur** : le
+nom vient du client, il n'a pas à atteindre la base pour être jugé, et une chaîne
+trop longue doit rendre 400, pas une erreur SQL en 500.
+
+### Le piège de test, qui n'en était pas un de production
+
+Un test « une session web n'authentifie pas `/api/me` » passait au vert… en
+répondant **200**. Cause : `loginUser()` pose le jeton dans le `token_storage` du
+conteneur *en plus* du cookie de session, et tant que le noyau n'a pas redémarré
+ce jeton résiduel traverse n'importe quel pare-feu, `stateless` compris. Le trou
+était dans le test, pas dans l'application.
+
+Le test équivalent de KL-10 échappait à ça par accident : il intercalait trois
+requêtes web avant d'appeler l'API, ce qui purgeait le conteneur. La leçon vaut
+pour tout test qui veut prouver qu'un cookie **ne** suffit **pas** — il faut au
+moins une requête entre `loginUser()` et l'assertion, sinon on teste le contraire
+de ce qu'on croit.
+
+### Fichiers touchés
+
+Neufs : `src/Controller/Api/AuthController.php`,
+`migrations/Version20260731100000.php`,
+`tests/Controller/ApiAuthEndpointsTest.php` (19 tests).
+Modifiés : `src/Entity/ApiToken.php` (`lastBootstrapAt` + `markBootstrapped()`),
+`src/Security/ApiTokenAuthenticator.php` (publication du jeton validé sur la
+requête).
+
+**Prochain ticket : KL-46** — l'appairage par QR (`PairingCode`,
+`POST /pairing/code`, `POST /api/auth/pair`), qui réutilise le geste d'émission
+posé ici ; ou **KL-12**, la liste et la révocation d'appareils dans
+`/profile/settings`, que `findForOwner` et `lastBootstrapAt` attendent déjà.
