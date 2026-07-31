@@ -2,17 +2,20 @@
 
 namespace App\Controller;
 
+use App\Entity\PairingCode;
 use App\Entity\User;
 use App\Form\ChangePasswordType;
 use App\Form\ProfileType;
 use App\Repository\CoachingRepository;
 use App\Repository\GoalRepository;
+use App\Repository\PairingCodeRepository;
 use App\Service\HeartRateZones;
 use App\Service\ProfileStats;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Form\FormError;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
@@ -119,6 +122,54 @@ final class ProfileController extends AbstractController
 
         return $this->render('profile/settings.html.twig', [
             'form' => $form,
+        ]);
+    }
+
+    /**
+     * Émet un code d'appairage et rend la charge utile du QR (§0.6). C'est le
+     * seul chemin qui en crée : un code est **lié à la session desktop qui l'a
+     * produit**, donc à un utilisateur déjà authentifié — c'est ce qui interdit
+     * de s'appairer au compte d'un autre.
+     *
+     * Sous le pare-feu `main`, et hors `^/profile` : `security.yaml` couvre
+     * `^/pairing` explicitement. Le CSRF est vérifié à la main comme partout
+     * ailleurs dans le projet, la requête ne passant pas par un `FormType`.
+     *
+     * La charge utile **ne contient jamais de jeton** (§0.6 règle 1) : le
+     * téléphone ne repartira avec un `ApiToken` qu'après avoir échangé ce code
+     * sur `POST /api/auth/pair`. Elle porte en revanche l'URL du serveur, ce qui
+     * dispense de la saisir sur le téléphone — et règle au passage la saisie de
+     * l'IP LAN en développement.
+     */
+    #[Route('/pairing/code', name: 'app_pairing_code', methods: ['POST'])]
+    public function pairingCode(
+        Request $request,
+        PairingCodeRepository $pairingCodes,
+        EntityManagerInterface $entityManager,
+    ): JsonResponse {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if (!$this->isCsrfTokenValid('pairing_code', $request->getPayload()->getString('_token'))) {
+            throw $this->createAccessDeniedException('Jeton CSRF invalide.');
+        }
+
+        // Un écran, un code : régénérer invalide le précédent, qui resterait
+        // sinon échangeable deux minutes sur un poste qu'on vient de quitter.
+        $pairingCodes->deleteUnusedFor($user);
+
+        $code = PairingCode::generateCode();
+        $pairingCode = new PairingCode($user, $code);
+
+        $entityManager->persist($pairingCode);
+        $entityManager->flush();
+
+        return $this->json([
+            // Base du serveur, pas d'un endpoint : le mobile la garde comme
+            // « URL de serveur » et la valide par `GET /api/ping` (KL-10).
+            'url' => $request->getSchemeAndHttpHost().$request->getBaseUrl(),
+            'code' => $code,
+            'exp' => $pairingCode->getExpiresAt()->format(\DateTimeInterface::ATOM),
         ]);
     }
 }

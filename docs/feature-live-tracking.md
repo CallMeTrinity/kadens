@@ -21,8 +21,12 @@
 > `ApiTokenAuthenticator` et le pare-feu `api` **stateless**, déclaré avant
 > `main`. **KL-11 livré** : `POST /api/auth/login`, `POST /api/auth/logout`,
 > `GET /api/me` — le mot de passe en repli, le secret rendu une seule fois, un
-> 401 qui ne dit pas si le compte existe. Prochain ticket : **KL-46**
-> (l'appairage par QR, le chemin nominal) ou **KL-12** (la révocation d'appareil).
+> 401 qui ne dit pas si le compte existe. **KL-46 livré** : l'appairage par QR,
+> le chemin nominal — `PairingCode` (code de 8 caractères stocké **haché**,
+> usage unique garanti par la base, TTL 2 minutes), `POST /pairing/code` côté
+> desktop, `POST /api/auth/pair` côté téléphone, limiteur de débit et commande
+> de purge. Prochain ticket : **KL-47** (la page QR sur le desktop) ou **KL-12**
+> (la révocation d'appareil).
 
 ---
 
@@ -924,24 +928,68 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
 émet un code à usage unique ; le téléphone l'échange contre un `ApiToken`.
 
 **Fini quand** :
-- [ ] Entité `PairingCode` : `owner`, `codeHash`, `createdAt`, `expiresAt`
+- [x] Entité `PairingCode` : `owner`, `codeHash`, `createdAt`, `expiresAt`
       (2 minutes), `usedAt` nullable, `consumedByDevice` nullable
-- [ ] Le code fait 8 caractères en alphabet **sans ambiguïté** (ni `O`/`0`, ni
+- [x] Le code fait 8 caractères en alphabet **sans ambiguïté** (ni `O`/`0`, ni
       `I`/`1`/`l`), pour rester saisissable à la main en repli
-- [ ] `POST /pairing/code` (firewall `main`, utilisateur authentifié) émet un
+- [x] `POST /pairing/code` (firewall `main`, utilisateur authentifié) émet un
       code et renvoie la charge utile du QR :
       `{"url": "<base API>", "code": "<code>", "exp": "<ISO8601>"}`
-- [ ] **Le QR ne contient jamais de token**, seulement ce code (§0.6 règle 1)
-- [ ] `POST /api/auth/pair` : `{code, deviceName}` → `{token, user}`
-- [ ] **Consommation atomique** : `UPDATE pairing_code SET used_at = NOW()
+- [x] **Le QR ne contient jamais de token**, seulement ce code (§0.6 règle 1)
+- [x] `POST /api/auth/pair` : `{code, deviceName}` → `{token, user}`
+- [x] **Consommation atomique** : `UPDATE pairing_code SET used_at = NOW()
       WHERE id = ? AND used_at IS NULL`, puis vérification des lignes affectées.
       Une lecture suivie d'une écriture laisserait passer deux scans simultanés
-- [ ] Un code expiré, déjà utilisé ou inconnu renvoie la **même** erreur 400
-- [ ] Limiteur de débit sur `POST /api/auth/pair` (10 essais par IP et par
+- [x] Un code expiré, déjà utilisé ou inconnu renvoie la **même** erreur 400
+- [x] Limiteur de débit sur `POST /api/auth/pair` (10 essais par IP et par
       minute), sinon les 8 caractères se cassent par force brute
-- [ ] Purge des codes expirés par une commande console, appelable en cron
-- [ ] Le code est lié à son émetteur : le token créé appartient à l'utilisateur
+- [x] Purge des codes expirés par une commande console, appelable en cron
+      (`app:pairing:purge`)
+- [x] Le code est lié à son émetteur : le token créé appartient à l'utilisateur
       de la session desktop, jamais à un autre
+
+Ce que le ticket pose, et qu'il ne faut pas casser :
+
+- **L'usage unique est une garantie de la base, pas une intention du code PHP.**
+  `PairingCodeRepository::consume()` écrit
+  `UPDATE ... WHERE id = ? AND used_at IS NULL AND expires_at > ?` et lit le
+  nombre de lignes affectées. Deux scans simultanés du même QR verraient tous
+  les deux `used_at IS NULL` si on lisait avant d'écrire, et repartiraient tous
+  les deux avec un jeton. L'échéance est **dans le même `WHERE`** pour la même
+  raison : elle ne peut pas être vraie au moment du test et fausse au moment de
+  l'écriture. L'entité est relue (`refresh`) après coup — ce que le contrôleur
+  rend doit être ce que la base a écrit.
+- **Le compte vient du code, jamais de la requête.** `pair()` appelle
+  `issue($pairingCode->getOwner(), …)`. C'est la seule différence de fond avec
+  `login()`, qui lit le compte dans le corps : le téléphone ne choisit pas à qui
+  il se rattache, et un code deviné n'ouvre que le compte de son émetteur.
+- **Inconnu, expiré, déjà utilisé : la même réponse, au caractère près.** Même
+  raisonnement que le 401 uniforme de KL-11 — distinguer dirait à qui devine un
+  code s'il a visé juste. 400 et non 401 : le client n'a pas à réessayer, il doit
+  en demander un autre au desktop. Un test compare les trois corps.
+- **Le limiteur de débit est une pièce du modèle de sécurité, pas un confort.**
+  Huit caractères sur un alphabet de 32, c'est 40 bits : assez pour ne pas se
+  deviner, pas assez pour encaisser une force brute non bridée. La clé est l'IP
+  parce qu'à ce stade l'appelant n'a pas d'identité — c'est ce qu'il vient
+  chercher. Le 429 est rendu **avant** toute lecture de la base, et il ne
+  consomme donc pas non plus un code valide.
+- **Un écran, un code.** Émettre invalide les codes non consommés du même
+  utilisateur (`deleteUnusedFor`), sinon un code affiché sur un poste qu'on
+  vient de quitter resterait échangeable deux minutes. Les codes **consommés**
+  survivent : `consumedByDevice` est la trace que KL-47 affiche en confirmation,
+  et c'est un snapshot, pas une relation vers l'`ApiToken` — celui-ci se révoque
+  (KL-12) et emporterait la trace avec lui.
+- **`PairingCode::hash()` normalise avant de hacher** (`trim` + majuscules) : le
+  repli clavier de §0.6 règle 4 se tape comme il vient, et sans ça l'erreur
+  uniforme rendrait la panne indéchiffrable.
+- **`^/pairing` est déclaré dans `access_control`**, `/pairing/code` ne vivant
+  pas sous `^/profile`. Le CSRF est vérifié à la main (`pairing_code`), comme
+  partout ailleurs dans le projet où la requête ne passe pas par un `FormType`.
+- **Piège de test** : le compteur du limiteur vit dans un pool de cache **sur
+  disque**, qu'il faut vider au `setUp` — sinon l'ordre des tests devient
+  significatif. Le passer en `ArrayAdapter` ne marche pas : le
+  `services_resetter` le remet à zéro entre deux requêtes du même test, et le
+  quota ne compte plus rien.
 
 ### KL-47 — Page QR d'appairage sur le desktop
 

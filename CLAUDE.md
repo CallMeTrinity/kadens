@@ -322,8 +322,52 @@ puce dédiée en §3, le cadrage complet et les 51 tickets dans
 KL-09 compris. **KL-10 livré le 30/07/2026** : le pare-feu `api`, le jeton
 porteur — le lot 2 est ouvert. **KL-11 livré le 31/07/2026** : les endpoints
 d'authentification (`POST /api/auth/login`, `POST /api/auth/logout`,
-`GET /api/me`). Prochain ticket KL-46 (l'appairage par QR) ou KL-12 (la
-révocation d'appareil dans `/profile/settings`).
+`GET /api/me`). **KL-46 livré le 31/07/2026** : l'appairage par QR
+(`PairingCode`, `POST /pairing/code`, `POST /api/auth/pair`). Prochain ticket
+KL-47 (la page QR sur le desktop) ou KL-12 (la révocation d'appareil dans
+`/profile/settings`).
+
+Ce que KL-46 pose et qu'il ne faut pas casser :
+
+- **Le QR ne porte jamais de jeton, seulement un code de 8 caractères à usage
+  unique, TTL 2 minutes.** C'est toute la raison d'être de `PairingCode` :
+  afficher le secret d'`ApiToken` à l'écran ferait d'une photo de cet écran un
+  accès permanent. Le code est stocké **haché** (SHA-256), comme le jeton, avec
+  une nuance assumée — 8 caractères sur 32 symboles, c'est 40 bits : ce qui
+  protège, c'est la fenêtre courte, l'usage unique et le limiteur de débit, pas
+  l'entropie. L'alphabet exclut `O`/`0` et `I`/`1`/`l`, le code devant rester
+  saisissable à la main en repli.
+- **L'usage unique est une garantie de la base**, pas une intention du code PHP.
+  `PairingCodeRepository::consume()` écrit
+  `UPDATE … WHERE id = ? AND used_at IS NULL AND expires_at > ?` et lit les
+  lignes affectées ; deux scans simultanés du même QR passeraient tous les deux
+  si on lisait avant d'écrire. L'échéance vit dans le **même** `WHERE`, pour la
+  même raison. Corollaire : `PairingCode` n'a **pas** de setter pour `usedAt`, et
+  l'entité est relue (`refresh`) après l'`UPDATE`.
+- **Le compte vient du code, jamais de la requête.** `pair()` émet pour
+  `$pairingCode->getOwner()` — seule différence de fond avec `login()`, qui lit
+  le compte dans le corps. Un code deviné n'ouvre que le compte de son émetteur,
+  et ni un champ du corps ni une session web ouverte ailleurs n'y changent rien.
+- **Inconnu, expiré, déjà utilisé rendent le MÊME 400** (pas 401 : le client doit
+  demander un autre code, pas réessayer). Même raisonnement que le 401 uniforme
+  de KL-11. Le **429** du limiteur (10/min par IP) se rend **avant** toute
+  lecture de la base, pour qu'un quota épuisé ne consomme pas non plus un code
+  valide.
+- **Un écran, un code** : émettre invalide les codes non consommés du même
+  utilisateur. Les codes **consommés** survivent jusqu'à l'échéance —
+  `consumedByDevice` est un **snapshot** du nom d'appareil (pas une relation vers
+  l'`ApiToken`, qui se révoque en KL-12), c'est la confirmation visuelle de
+  KL-47. `app:pairing:purge` nettoie sur la seule borne de l'échéance.
+- **`PairingCode::hash()` normalise avant de hacher** (`trim` + majuscules) :
+  sans ça le repli clavier ne retomberait pas sur la même empreinte, et l'erreur
+  uniforme rendrait la panne indéchiffrable.
+- **`^/pairing` a sa règle dans `access_control`** (`/pairing/code` ne vit pas
+  sous `^/profile`), et le CSRF y est vérifié à la main comme partout où la
+  requête ne passe pas par un `FormType`.
+- **Piège de test** : le compteur du limiteur vit dans un pool de cache **sur
+  disque**, à vider au `setUp`. Le passer en `ArrayAdapter` en test ne marche pas
+  — le `services_resetter` le remet à zéro entre deux requêtes du même test, et
+  le quota ne compte plus rien.
 
 Ce que KL-11 pose et qu'il ne faut pas casser :
 

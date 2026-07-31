@@ -64,6 +64,9 @@ security:
         - { path: ^/schedule, roles: ROLE_USER }
         - { path: ^/goal, roles: ROLE_USER }
         - { path: ^/profile, roles: ROLE_USER }
+        # Émission d'un code d'appairage : un code est lié à la session desktop
+        # qui l'a produit (§0.6 règle 3), donc à un utilisateur authentifié.
+        - { path: ^/pairing, roles: ROLE_USER }
         - { path: ^/export, roles: ROLE_USER }
         # ^/coaching (hub relation) avant ^/coach (espace coach) : sans cet ordre,
         # la règle ROLE_COACH capterait /coaching, qui doit rester ouvert à tout

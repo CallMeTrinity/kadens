@@ -2964,3 +2964,122 @@ requête).
 `POST /pairing/code`, `POST /api/auth/pair`), qui réutilise le geste d'émission
 posé ici ; ou **KL-12**, la liste et la révocation d'appareils dans
 `/profile/settings`, que `findForOwner` et `lastBootstrapAt` attendent déjà.
+
+---
+
+## Kadens Live KL-46 — L'appairage par QR (31/07/2026)
+
+KL-11 a posé la clé de repli ; celui-ci pose le chemin nominal. **On ne tape pas
+son mot de passe sur le téléphone** : le desktop, où la session est de fait
+permanente, affiche un code à usage unique, l'app le scanne, l'échange contre un
+`ApiToken`. Deux endpoints, une entité, une commande.
+
+### Ce que le QR porte, et surtout ce qu'il ne porte pas
+
+Le QR ne contient **jamais** de jeton, seulement un code de huit caractères de
+TTL deux minutes. C'est toute la raison d'être d'une table de plus : afficher le
+secret d'`ApiToken` à l'écran ferait d'une photo de cet écran un accès permanent
+au compte. Il porte en revanche l'**URL du serveur**, ce qui dispense de la
+saisir sur le téléphone — et règle au passage la saisie de l'IP LAN en
+développement.
+
+Le code est stocké **haché**, comme le jeton. Avec une nuance assumée : huit
+caractères sur un alphabet de 32, c'est 40 bits, pas 256. Une empreinte volée
+est cassable hors ligne. Ce qui la rend sans intérêt, c'est la fenêtre de deux
+minutes et l'usage unique ; ce qui protège l'entrée en ligne, c'est le limiteur
+de débit — il n'est pas un confort ici, c'est une pièce du modèle de sécurité.
+
+L'alphabet exclut `O`/`0` et `I`/`1`/`l` : le code doit rester **saisissable à
+la main** quand la caméra refuse, et une confusion de caractère y coûterait un
+aller-retour. Il en reste 32, ce qui tombe bien.
+
+### L'usage unique est une garantie de la base
+
+Le point structurant du ticket tient en une requête :
+
+```sql
+UPDATE pairing_code SET used_at = ?, consumed_by_device = ?
+WHERE id = ? AND used_at IS NULL AND expires_at > ?
+```
+
+Lire puis écrire laisserait passer deux scans simultanés du même QR : les deux
+lectures verraient `used_at IS NULL` avant que l'une des deux n'écrive, et deux
+téléphones repartiraient avec un jeton. Ici c'est la base qui tranche, et le
+nombre de lignes affectées dit qui a gagné. L'échéance est dans le **même**
+`WHERE` pour exactement la même raison : elle ne peut pas être vraie au moment
+du test et fausse au moment de l'écriture.
+
+Conséquence de forme : `PairingCode` n'a pas de setter pour `usedAt`. La
+consommation ne passe pas par l'ORM, et l'entité est relue (`refresh`) après
+coup — ce que le contrôleur rend doit être ce que la base a écrit, pas ce que le
+PHP croit avoir écrit.
+
+### Le compte vient du code, jamais de la requête
+
+`pair()` appelle `issue($pairingCode->getOwner(), …)`. C'est la seule différence
+de fond avec `login()`, qui lit le compte dans le corps de la requête : le
+téléphone ne choisit pas à qui il se rattache. Un code deviné n'ouvre donc que le
+compte de son émetteur, et un `email` glissé dans le corps de `pair` ne sert à
+rien — un test le vérifie, session web ouverte sur un *autre* compte comprise.
+
+### Une seule erreur pour trois cas
+
+Inconnu, expiré, déjà utilisé : même réponse, au caractère près. Même
+raisonnement que le 401 uniforme de KL-11 — distinguer dirait à qui devine un
+code s'il a visé juste. **400 et non 401** : le client n'a pas à réessayer avec
+le même code, il doit en demander un autre au desktop.
+
+Le 429 du limiteur, lui, se rend **avant** toute lecture de la base. Ce n'est pas
+une micro-optimisation : un quota épuisé ne doit pas non plus consommer un code
+valide présenté au même moment.
+
+### Un écran, un code
+
+Émettre un code invalide les codes non consommés du même utilisateur. Sans ça,
+un code affiché sur un poste qu'on vient de quitter resterait échangeable deux
+minutes après qu'on en a demandé un autre ailleurs.
+
+Les codes **consommés** survivent, eux, jusqu'à leur échéance :
+`consumedByDevice` est la trace que KL-47 affichera en confirmation (« quel
+téléphone vient de se connecter »). C'est un snapshot du nom, pas une relation
+vers l'`ApiToken` créé — celui-ci se révoque (KL-12) et emporterait la trace avec
+lui. Passé l'échéance, plus rien ne distingue un code utilisé d'un code mort :
+`app:pairing:purge` les retire tous, sur une seule borne.
+
+### Deux détails qui auraient coûté cher
+
+`PairingCode::hash()` normalise avant de hacher (`trim`, majuscules). Le repli
+clavier se tape comme il vient ; sans cette normalisation le code affiché et le
+code saisi ne donneraient pas la même empreinte, et l'erreur uniforme rendrait la
+panne indéchiffrable.
+
+`/pairing/code` ne vit pas sous `^/profile`, donc `access_control` a une règle
+`^/pairing` en propre. Le CSRF est vérifié à la main, comme partout ailleurs
+dans le projet où la requête ne passe pas par un `FormType`.
+
+### Le piège de test
+
+Le compteur du limiteur vit dans un pool de cache **sur disque**, qui persiste
+entre deux exécutions : sans un vidage au `setUp`, un test qui épuise le quota
+fait échouer les suivants et l'ordre des tests devient significatif. Le réflexe
+— passer le pool en `ArrayAdapter` pour l'environnement de test — ne marche
+**pas** : le `services_resetter` le remet à zéro entre deux requêtes du *même*
+test, et le quota ne compte plus rien. Les deux tests de débit passaient alors
+au vert pour la mauvaise raison, en 400 au lieu de 429.
+
+### Fichiers touchés
+
+Neufs : `src/Entity/PairingCode.php`, `src/Repository/PairingCodeRepository.php`,
+`src/Command/PurgePairingCodesCommand.php`,
+`config/packages/rate_limiter.yaml`, `migrations/Version20260731140000.php`,
+`tests/Controller/ApiPairingTest.php` (22 tests),
+`tests/Command/PurgePairingCodesCommandTest.php`.
+Modifiés : `src/Controller/Api/AuthController.php` (`POST /api/auth/pair`),
+`src/Controller/ProfileController.php` (`POST /pairing/code`),
+`config/packages/security.yaml` (`^/pairing`), `composer.json`
+(`symfony/rate-limiter`).
+
+**Prochain ticket : KL-47** — la page QR sur le desktop (`endroid/qr-code` en
+SVG inline, code en toutes lettres sous le QR, compte à rebours et régénération
+en un clic), qui consomme la charge utile posée ici ; ou **KL-12**, la liste et
+la révocation d'appareils, où l'appairage devient visible et réversible.

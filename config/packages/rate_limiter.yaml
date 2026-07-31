@@ -1,0 +1,15 @@
+framework:
+    rate_limiter:
+        # `POST /api/auth/pair` (KL-46). Un code d'appairage fait 8 caractères
+        # sur un alphabet de 32, soit 40 bits : c'est assez pour ne pas se
+        # deviner, pas assez pour encaisser une force brute en ligne. Le
+        # limiteur est donc une pièce du modèle de sécurité, pas un confort.
+        #
+        # La clé est l'IP : à ce stade l'appelant n'a **pas** d'identité — c'est
+        # justement ce qu'il vient chercher. Limiter par code essayé ne servirait
+        # à rien (il suffirait d'en changer), limiter par utilisateur est
+        # impossible.
+        api_pairing:
+            policy: 'fixed_window'
+            limit: 10
+            interval: '1 minute'

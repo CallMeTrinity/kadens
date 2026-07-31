@@ -3,27 +3,34 @@
 namespace App\Controller\Api;
 
 use App\Entity\ApiToken;
+use App\Entity\PairingCode;
 use App\Entity\User;
+use App\Repository\PairingCodeRepository;
 use App\Repository\UserRepository;
 use App\Security\ApiTokenAuthenticator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * L'authentification de l'app mobile : obtenir un jeton, le rendre, dire qui on
- * est. Trois routes, et rien d'autre — **pas de parcours d'inscription** (les
+ * est. Quatre routes, et rien d'autre — **pas de parcours d'inscription** (les
  * comptes se créent en console, règle verrouillée de CLAUDE.md §3) et pas de mot
  * de passe oublié.
  *
- * Le chemin nominal d'un appairage est le QR (KL-46) : le mot de passe reste le
- * repli quand la caméra refuse, et il est de toute façon nécessaire aux tests
- * fonctionnels de l'API. Les deux chemins convergent sur le même geste — émettre
- * un `ApiToken` et rendre son secret **une seule fois** (`issue()` ci-dessous).
+ * Le chemin nominal d'un appairage est le QR (`pair`, KL-46) : le mot de passe
+ * (`login`, KL-11) reste le repli quand la caméra refuse, et il est de toute
+ * façon nécessaire aux tests fonctionnels de l'API. Les deux chemins convergent
+ * sur le même geste — émettre un `ApiToken` et rendre son secret **une seule
+ * fois** (`issue()` ci-dessous). Ils diffèrent sur un point qui compte : `login`
+ * lit le compte dans la requête, `pair` le lit dans le code consommé. Le
+ * téléphone ne choisit jamais le compte auquel il se rattache.
  *
  * Contrat client à respecter : sur `/api/auth/login`, **ne pas envoyer**
  * d'en-tête `Authorization`. L'authenticator se déclenche sur la seule présence
@@ -88,6 +95,68 @@ final class AuthController extends AbstractController
         }
 
         return $this->issue($user, $deviceName);
+    }
+
+    /**
+     * Appairage : le chemin nominal (§0.6). Le téléphone présente le code lu sur
+     * le QR du desktop et repart avec un jeton — celui de l'utilisateur qui a
+     * émis le code, jamais d'un autre.
+     *
+     * Trois choses portent le ticket ici :
+     *
+     * - **Consommation atomique**, déléguée à `PairingCodeRepository::consume()` :
+     *   deux scans simultanés du même QR ne peuvent pas réussir tous les deux.
+     * - **Une seule erreur** pour « inconnu », « expiré » et « déjà utilisé ».
+     *   Les distinguer dirait à qui devine un code s'il a visé juste — même
+     *   raisonnement que le 401 uniforme de la connexion.
+     * - **Limiteur de débit par IP** : 8 caractères sur 32 symboles, c'est 40
+     *   bits. Assez pour ne pas se deviner, pas assez pour encaisser une force
+     *   brute non bridée. Le limiteur est ici une pièce du modèle de sécurité.
+     *
+     * Le 429 est rendu **avant** toute lecture de la base : un quota épuisé n'a
+     * pas à consommer une requête SQL de plus.
+     */
+    #[Route('/api/auth/pair', name: 'api_auth_pair', methods: ['POST'])]
+    public function pair(
+        Request $request,
+        PairingCodeRepository $pairingCodes,
+        #[Target('apiPairingLimiter')] RateLimiterFactoryInterface $limiter,
+    ): JsonResponse {
+        $quota = $limiter->create($request->getClientIp())->consume();
+
+        if (!$quota->isAccepted()) {
+            $response = $this->problem(Response::HTTP_TOO_MANY_REQUESTS, 'Too Many Requests', 'Trop de tentatives d\'appairage. Réessayez dans un instant.');
+            $response->headers->set('Retry-After', (string) max(1, $quota->getRetryAfter()->getTimestamp() - time()));
+
+            return $response;
+        }
+
+        $payload = $this->decode($request);
+
+        if ($payload instanceof JsonResponse) {
+            return $payload;
+        }
+
+        $code = $this->text($payload, 'code');
+        $deviceName = $this->text($payload, 'deviceName');
+
+        if (null === $code || null === $deviceName) {
+            return $this->problem(Response::HTTP_BAD_REQUEST, 'Bad Request', 'Les champs code et deviceName sont requis.');
+        }
+
+        if (mb_strlen($deviceName) > self::DEVICE_NAME_MAX) {
+            return $this->problem(Response::HTTP_BAD_REQUEST, 'Bad Request', \sprintf('Le nom d\'appareil ne peut pas dépasser %d caractères.', self::DEVICE_NAME_MAX));
+        }
+
+        $pairingCode = $pairingCodes->consume($code, $deviceName);
+
+        if (!$pairingCode instanceof PairingCode) {
+            return $this->invalidPairingCode();
+        }
+
+        // L'owner vient du code, pas de la requête : c'est la garde du §0.6
+        // règle 3. Le téléphone ne choisit pas le compte auquel il se rattache.
+        return $this->issue($pairingCode->getOwner(), $deviceName);
     }
 
     /**
@@ -243,6 +312,16 @@ final class AuthController extends AbstractController
     private function invalidCredentials(): JsonResponse
     {
         return $this->problem(Response::HTTP_UNAUTHORIZED, 'Unauthorized', 'Identifiants invalides.');
+    }
+
+    /**
+     * Une seule réponse pour « code inconnu », « code expiré » et « code déjà
+     * utilisé ». 400 et non 401 : le client n'a pas à réessayer avec le même
+     * code, il doit en demander un autre au desktop.
+     */
+    private function invalidPairingCode(): JsonResponse
+    {
+        return $this->problem(Response::HTTP_BAD_REQUEST, 'Bad Request', 'Code d\'appairage invalide ou expiré.');
     }
 
     /**
