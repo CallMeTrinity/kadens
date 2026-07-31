@@ -46,4 +46,25 @@ class ApiTokenRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * « Tout révoquer » (KL-12) : une seule requête, et surtout **sans passer par
+     * les entités chargées**. Le geste se fait quand on ne sait plus ce qui est
+     * connecté ; il ne doit donc dépendre d'aucun état lu au préalable, ni d'une
+     * liste affichée quelques secondes plus tôt.
+     *
+     * `ApiToken` ne porte aucune association sortante : rien à cascader, une
+     * suppression en masse ne saute donc aucun `onDelete`.
+     *
+     * @return int le nombre d'appareils révoqués
+     */
+    public function deleteForOwner(User $owner): int
+    {
+        return (int) $this->createQueryBuilder('t')
+            ->delete()
+            ->andWhere('t.owner = :owner')
+            ->setParameter('owner', $owner)
+            ->getQuery()
+            ->execute();
+    }
 }

@@ -28,8 +28,11 @@
 > de purge. **KL-47 livré** : la page QR sur le desktop — section « Connecter un
 > téléphone » dans `/profile/settings`, QR dessiné **côté serveur** en SVG inline
 > (`endroid/qr-code`), code de secours en toutes lettres, décompte et
-> confirmation d'appairage. Prochain ticket : **KL-12** (la révocation
-> d'appareil), qui manque encore pour que l'appairage soit réversible.
+> confirmation d'appairage. **KL-12 livré** : la gestion des appareils —
+> section « Appareils connectés » dans `/profile/settings`, révocation par
+> appareil et « tout révoquer », le jeton **supprimé** et non marqué.
+> L'appairage est désormais réversible. Prochain ticket : **KL-13** (erreurs
+> normalisées RFC 9457 et limiteur sur la connexion).
 
 ---
 
@@ -1065,11 +1068,57 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
 **Où** : `src/Controller/ProfileController.php`, `templates/profile/`
 
 **Quoi** : un token qu'on ne peut pas révoquer depuis l'app web est un trou.
+L'échéance d'un `ApiToken` glisse à chaque usage (KL-10) : un téléphone qui s'en
+sert ne s'éteint jamais tout seul.
 
 **Fini quand** :
-- [ ] Liste des appareils connectés (nom, dernière utilisation, expiration)
-- [ ] Bouton de révocation par appareil, et « tout révoquer »
-- [ ] Rendu dans l'identité Presse, cohérent avec le reste de la page
+- [x] Liste des appareils connectés (nom, dernière utilisation, expiration —
+      plus « appairé le » et `lastBootstrapAt`, la dernière synchro, qui
+      distingue « ce téléphone répond » de « ce téléphone est à jour »)
+- [x] Bouton de révocation par appareil, et « tout révoquer »
+- [x] Rendu dans l'identité Presse, cohérent avec le reste de la page
+
+Ce que le ticket pose, et qu'il ne faut pas casser :
+
+- **Révoquer, c'est supprimer la ligne**, comme `POST /api/auth/logout` (KL-11).
+  Un jeton marqué « révoqué » obligerait chaque lecture à s'en souvenir —
+  l'authenticator, la liste, `GET /api/me`, et tout ce qui viendra ensuite ; un
+  oubli à un seul de ces endroits rouvre l'accès sans bruit. L'absence, elle, ne
+  s'oublie pas. Corollaire : `ApiTokenRepository::deleteForOwner()` écrit un
+  `DELETE` DQL et **ne passe pas par les entités chargées** — « tout révoquer »
+  se fait quand on ne sait plus ce qui est connecté, il ne doit dépendre d'aucun
+  état lu au préalable.
+- **Un jeton qui n'est pas le sien rend 404, pas 403**, comme
+  `GET /pairing/{id}/status` (KL-47). La garde de propriété passe **avant** la
+  vérification CSRF : elle ne fait que lire un `owner`, et aucune écriture n'a
+  lieu tant que le jeton CSRF n'est pas validé.
+- **La réponse est un Turbo Stream ciblé sur `#devices-panel`**, repli par
+  redirection sans JS. `/profile/settings` porte trois choses indépendantes (un
+  QR éventuellement affiché, une saisie de mot de passe, cette liste) : révoquer
+  un vieux téléphone pendant qu'on en appaire un nouveau est un geste normal, il
+  n'a pas à effacer les deux autres. Le panneau **entier** est remplacé, pas la
+  ligne : « tout révoquer » vide la liste, et le bouton global disparaît dès
+  qu'il ne reste qu'un appareil.
+- **Pas de flash dans la branche stream** : rien ne le rechargerait, il resterait
+  en session et surgirait à la navigation suivante. La ligne qui disparaît est la
+  confirmation.
+- **Un jeton échu garde sa ligne**, atténuée et jamais rouge : il n'authentifie
+  plus mais il se révoque, donc il s'affiche — une expiration est une réponse
+  normale du système (§5 règle 2, même raisonnement qu'un code d'appairage échu).
+- **« Tout révoquer » ne touche pas aux codes d'appairage non consommés.** Un
+  code n'est pas un accès mais une invitation de deux minutes, affichée sur
+  l'écran de celui-là même qui révoque : il ne peut pas être parti avec le
+  téléphone perdu. Il n'apparaît qu'à partir de **deux** appareils — avec un
+  seul, il doublerait le bouton d'à côté.
+- **La liste ne se rafraîchit pas au moment où un appairage se confirme.** Le
+  sondage de KL-47 observe un **code**, pas un compte ; lui faire réécrire ce
+  panneau créerait un second endroit qui décide de ce que la liste contient. Le
+  nouvel appareil y apparaît au chargement suivant, la confirmation « Pixel 8 est
+  connecté » faisant foi sur le moment.
+- **Le test qui porte le ticket est `testRevokingADeviceEndsItsApiAccess`** :
+  sans lui, la page ne prouverait qu'une ligne retirée d'un tableau. Ce qui
+  compte, c'est que le secret qui ouvrait `GET /api/ping` juste avant rende 401
+  juste après.
 
 ### KL-13 — Erreurs normalisées et limitation de débit
 

@@ -328,9 +328,36 @@ porteur — le lot 2 est ouvert. **KL-11 livré le 31/07/2026** : les endpoints
 d'authentification (`POST /api/auth/login`, `POST /api/auth/logout`,
 `GET /api/me`). **KL-46 livré le 31/07/2026** : l'appairage par QR
 (`PairingCode`, `POST /pairing/code`, `POST /api/auth/pair`). **KL-47 livré le
-31/07/2026** : la page QR sur le desktop. Prochain ticket KL-12 (la révocation
-d'appareil dans `/profile/settings`) — sans lui, un appairage n'est pas
-réversible.
+31/07/2026** : la page QR sur le desktop. **KL-12 livré le 31/07/2026** : la
+gestion des appareils dans `/profile/settings` — l'appairage est réversible.
+Prochain ticket KL-13 (erreurs normalisées RFC 9457 + limiteur sur la connexion).
+
+Ce que KL-12 pose et qu'il ne faut pas casser :
+
+- **Révoquer, c'est supprimer la ligne**, comme `POST /api/auth/logout` (KL-11).
+  Un jeton marqué « révoqué » obligerait chaque lecture à s'en souvenir
+  (authenticator, liste, `GET /api/me`, la suite) ; un oubli à un seul endroit
+  rouvre l'accès sans bruit. Corollaire : `ApiTokenRepository::deleteForOwner()`
+  écrit un `DELETE` DQL et **ne passe pas par les entités chargées** — « tout
+  révoquer » se fait quand on ne sait plus ce qui est connecté, il ne doit
+  dépendre d'aucun état lu au préalable.
+- **Un jeton qui n'est pas le sien rend 404, pas 403** (même règle que
+  `GET /pairing/{id}/status`), et la garde de propriété passe **avant** le CSRF :
+  elle ne fait que lire un `owner`, aucune écriture n'a lieu avant validation.
+- **La réponse est un Turbo Stream ciblé sur `#devices-panel`**, repli par
+  redirection sans JS. La page porte trois choses indépendantes (un QR
+  éventuellement affiché, une saisie de mot de passe, la liste) : révoquer un
+  vieux téléphone pendant qu'on en appaire un nouveau ne doit effacer ni l'un ni
+  l'autre. Le panneau **entier** est remplacé, pas la ligne — « tout révoquer »
+  vide la liste et le bouton global disparaît sous deux appareils. Et **pas de
+  flash dans la branche stream** : rien ne le rechargerait, il surgirait à la
+  navigation suivante.
+- **Un jeton échu garde sa ligne**, atténuée et jamais rouge : il n'authentifie
+  plus mais il se révoque, donc il s'affiche (§5 règle 2).
+- **« Tout révoquer » ne touche pas aux codes d'appairage non consommés** : un
+  code n'est pas un accès mais une invitation de deux minutes affichée sur
+  l'écran de celui qui révoque. Et la liste **ne se rafraîchit pas** quand un
+  appairage se confirme — le sondage de KL-47 observe un code, pas un compte.
 
 Ce que KL-47 pose et qu'il ne faut pas casser :
 

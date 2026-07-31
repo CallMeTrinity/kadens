@@ -3183,3 +3183,105 @@ Modifiés : `src/Controller/ProfileController.php` (`POST /pairing/code` en HTML
 seule case de KL-47 que ce lot ne pouvait pas cocher, et surtout ce qui manque
 pour qu'un appairage soit **réversible** : un jeton qu'on ne peut pas révoquer
 depuis le web est un trou.
+
+---
+
+## Kadens Live KL-12 — La gestion des appareils (31/07/2026)
+
+KL-46 et KL-47 avaient fait de l'appairage un geste d'une seconde ; il restait à
+sens unique. Un `ApiToken` repousse son échéance de 90 jours **à chaque usage**
+(KL-10) : un téléphone qui s'en sert ne se déconnecte donc jamais tout seul, et
+il n'existait aucun endroit pour lui retirer la main. Ce lot ferme la boucle avec
+une section « Appareils connectés » dans `/profile/settings`, une révocation par
+appareil et un « tout révoquer ».
+
+### Révoquer, c'est supprimer la ligne
+
+Le même choix qu'au `POST /api/auth/logout` de KL-11, et pour la même raison : un
+jeton marqué « révoqué » obligerait chaque lecture à s'en souvenir — l'authenticator
+d'abord, mais aussi la liste, `GET /api/me`, et tout ce qui viendra après. Un
+oubli à un seul de ces endroits rouvre l'accès sans bruit. L'absence, elle, ne
+s'oublie pas.
+
+Corollaire pour « tout révoquer » : `ApiTokenRepository::deleteForOwner()` écrit
+un `DELETE` DQL et **ne passe pas par les entités chargées**. C'est le geste qu'on
+fait quand on ne sait plus ce qui est connecté ; il n'a pas à dépendre d'un état
+lu au préalable, ni de la liste que la page affichait dix secondes plus tôt.
+`ApiToken` ne porte aucune association sortante, une suppression en masse ne
+saute donc aucun `onDelete`.
+
+### Le refus qui ne confirme rien
+
+Un jeton qui n'est pas le sien rend **404, pas 403** — exactement la règle posée
+par `GET /pairing/{id}/status` en KL-47. Distinguer « pas à toi » de « n'existe
+pas » transforme la route en oracle pour qui essaie des identifiants.
+
+La garde de propriété passe **avant** la vérification CSRF, et c'est délibéré :
+elle ne fait que lire un `owner`, aucune écriture n'a lieu avant que le jeton CSRF
+soit validé. Un tiers ne lit de toute façon pas la réponse d'une requête
+cross-origin ; l'utilisateur légitime, lui, mérite le bon message.
+
+### Un Turbo Stream, parce que la page porte trois choses indépendantes
+
+`/profile/settings` affiche désormais un QR éventuellement à l'écran, une saisie de
+mot de passe et cette liste. Révoquer un vieux téléphone pendant qu'on en appaire
+un nouveau est un geste **normal** : il n'a pas à effacer le code affiché ni la
+saisie en cours. La révocation rend donc un stream ciblé sur `#devices-panel`,
+avec repli par redirection sans JS — même construction qu'en KL-47.
+
+Le panneau **entier** est remplacé, pas la seule ligne retirée : « tout révoquer »
+vide la liste, et le bouton global disparaît dès qu'il ne reste qu'un appareil.
+Une cible par ligne aurait obligé à décrire ces deux effets de bord ailleurs.
+
+Et **pas de flash dans la branche stream** : il n'y a aucun rechargement pour
+l'afficher, il resterait en session et surgirait à la navigation suivante, à
+contretemps. La ligne qui disparaît est la confirmation.
+
+### Ce que la liste montre, et ce que ça coûte de le montrer
+
+Quatre dates par appareil : appairé, dernier usage, dernière synchro, expiration.
+La troisième est celle que `ApiToken.lastBootstrapAt` existait pour porter (KL-11)
+— elle affichera « jamais » tant que `GET /api/bootstrap` (KL-14) n'existe pas,
+et c'est correct : aucun appareil n'a encore jamais synchronisé. C'est elle qui
+distingue « ce téléphone répond » de « ce téléphone est à jour ».
+
+Un jeton échu garde sa ligne : il n'authentifie plus, mais il se révoque, donc il
+s'affiche. Atténué et **jamais rouge** — une expiration est une réponse normale du
+système, pas un échec (§5 règle 2, même raisonnement que le code d'appairage
+expiré de KL-47).
+
+« Tout révoquer » n'apparaît qu'à partir de deux appareils. Avec un seul, il ne
+serait qu'un second bouton pour le geste d'à côté.
+
+### Ce que le lot ne fait pas
+
+Il ne touche **pas** aux codes d'appairage non consommés. Un code n'est pas un
+accès mais une invitation de deux minutes, affichée sur l'écran de celui-là même
+qui révoque : il ne peut pas être parti avec le téléphone perdu. Mélanger les deux
+durées de vie aurait donné à « tout révoquer » un effet que son libellé ne promet
+pas.
+
+Il ne rafraîchit pas non plus la liste au moment où un appairage se confirme : le
+sondage de KL-47 observe **un code**, pas un compte, et lui faire réécrire le
+panneau des appareils créerait un second endroit qui décide de ce que cette liste
+contient. Le nouvel appareil y apparaît au chargement suivant ; sur le moment,
+c'est la confirmation « Pixel 8 est connecté » qui fait foi.
+
+### Fichiers touchés
+
+Neufs : `templates/profile/_devices.html.twig`,
+`templates/profile/stream/devices.stream.html.twig`,
+`tests/Controller/DeviceRevocationTest.php` (7 tests),
+`assets/icons/lucide/tablet-smartphone.svg`.
+Modifiés : `src/Controller/ProfileController.php` (constructeur + les deux
+révocations), `src/Repository/ApiTokenRepository.php` (`deleteForOwner()`),
+`templates/profile/settings.html.twig`, `assets/styles/components.css` (section
+`kd-devices`).
+
+Le test qui porte le lot est `testRevokingADeviceEndsItsApiAccess` : sans lui, la
+page ne prouverait qu'une ligne retirée d'un tableau. Ce qui compte, c'est que le
+secret présenté juste avant rende 401 juste après.
+
+**Prochain ticket : KL-13** — les réponses d'erreur normalisées (RFC 9457) et le
+limiteur de débit sur la connexion. Le lot 2 a désormais son socle
+d'authentification complet et réversible.
