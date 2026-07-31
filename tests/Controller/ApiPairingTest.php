@@ -51,7 +51,7 @@ final class ApiPairingTest extends WebTestCase
 
     // --- Émission du code (desktop) -----------------------------------------
 
-    public function testAnAuthenticatedUserIssuesACodeAndTheQrPayload(): void
+    public function testAnAuthenticatedUserIssuesACode(): void
     {
         $user = $this->createUser('athlete@example.com');
         $this->client->loginUser($user);
@@ -59,12 +59,7 @@ final class ApiPairingTest extends WebTestCase
         $this->issueCode();
 
         self::assertResponseIsSuccessful();
-        $payload = $this->json();
-
-        self::assertSame(PairingCode::LENGTH, \strlen($payload['code']));
-        // L'URL du serveur voyage avec le code : zéro saisie sur le téléphone.
-        self::assertSame('http://localhost', $payload['url']);
-        self::assertNotFalse(\DateTimeImmutable::createFromFormat(\DateTimeInterface::ATOM, $payload['exp']));
+        self::assertSame(PairingCode::LENGTH, \strlen($this->issuedCode()));
 
         $codes = $this->em->getRepository(PairingCode::class)->findAll();
         self::assertCount(1, $codes);
@@ -72,17 +67,16 @@ final class ApiPairingTest extends WebTestCase
     }
 
     /**
-     * Le QR ne porte que le code (§0.6 règle 1). S'il portait un jeton, une photo
-     * de l'écran vaudrait un accès permanent au compte.
+     * L'écran d'émission ne fabrique aucun accès (§0.6 règle 1) : le téléphone ne
+     * repartira avec un `ApiToken` qu'après avoir échangé le code. Le contenu du
+     * QR lui-même est couvert par `PairingPageTest` (KL-47).
      */
-    public function testTheQrPayloadCarriesNoToken(): void
+    public function testIssuingACodeCreatesNoToken(): void
     {
         $this->client->loginUser($this->createUser('athlete@example.com'));
 
         $this->issueCode();
 
-        $payload = $this->json();
-        self::assertArrayNotHasKey('token', $payload);
         self::assertSame([], $this->em->getRepository(ApiToken::class)->findAll());
     }
 
@@ -95,7 +89,7 @@ final class ApiPairingTest extends WebTestCase
         $this->client->loginUser($this->createUser('athlete@example.com'));
 
         $this->issueCode();
-        $code = $this->json()['code'];
+        $code = $this->issuedCode();
 
         $stored = $this->em->getConnection()->fetchOne('SELECT code_hash FROM pairing_code');
         self::assertNotSame($code, $stored);
@@ -113,7 +107,7 @@ final class ApiPairingTest extends WebTestCase
         // Un seul tirage ne prouverait rien sur un alphabet de 32 symboles.
         for ($i = 0; $i < 40; ++$i) {
             $this->issueCode();
-            self::assertMatchesRegularExpression('/^[2-9A-HJ-NP-Z]{8}$/', $this->json()['code']);
+            self::assertMatchesRegularExpression('/^[2-9A-HJ-NP-Z]{8}$/', $this->issuedCode());
         }
     }
 
@@ -126,10 +120,10 @@ final class ApiPairingTest extends WebTestCase
         $this->client->loginUser($this->createUser('athlete@example.com'));
 
         $this->issueCode();
-        $first = $this->json()['code'];
+        $first = $this->issuedCode();
 
         $this->issueCode();
-        self::assertNotSame($first, $this->json()['code']);
+        self::assertNotSame($first, $this->issuedCode());
         self::assertCount(1, $this->em->getRepository(PairingCode::class)->findAll());
 
         $this->pair($first);
@@ -380,12 +374,12 @@ final class ApiPairingTest extends WebTestCase
         $this->client->loginUser($owner);
         $this->issueCode();
 
-        return $this->json()['code'];
+        return $this->issuedCode();
     }
 
     /**
      * Émet un code par le vrai endpoint, CSRF compris. Le jeton est posé
-     * directement dans la session : le formulaire qui le rendra vit en KL-47, et
+     * directement dans la session plutôt que lu dans le formulaire de la page :
      * un test qui contournerait la garde CSRF ne prouverait pas qu'elle existe
      * (c'est ce que `testIssuingACodeRequiresAValidCsrfToken` vérifie de l'autre
      * côté).
@@ -401,6 +395,16 @@ final class ApiPairingTest extends WebTestCase
         $session->save();
 
         $this->client->request('POST', '/pairing/code', ['_token' => 'jeton-csrf-de-test']);
+    }
+
+    /**
+     * Le code en clair tel que le desktop l'affiche (KL-47). C'est le seul
+     * endroit où il existe sous cette forme : la base n'en a que l'empreinte, et
+     * l'émission ne le rend plus en JSON depuis que le panneau existe.
+     */
+    private function issuedCode(): string
+    {
+        return trim($this->client->getCrawler()->filter('.kd-pairing__code')->text());
     }
 
     /**

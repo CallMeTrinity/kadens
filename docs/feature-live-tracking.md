@@ -25,8 +25,11 @@
 > le chemin nominal — `PairingCode` (code de 8 caractères stocké **haché**,
 > usage unique garanti par la base, TTL 2 minutes), `POST /pairing/code` côté
 > desktop, `POST /api/auth/pair` côté téléphone, limiteur de débit et commande
-> de purge. Prochain ticket : **KL-47** (la page QR sur le desktop) ou **KL-12**
-> (la révocation d'appareil).
+> de purge. **KL-47 livré** : la page QR sur le desktop — section « Connecter un
+> téléphone » dans `/profile/settings`, QR dessiné **côté serveur** en SVG inline
+> (`endroid/qr-code`), code de secours en toutes lettres, décompte et
+> confirmation d'appairage. Prochain ticket : **KL-12** (la révocation
+> d'appareil), qui manque encore pour que l'appairage soit réversible.
 
 ---
 
@@ -933,8 +936,11 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
 - [x] Le code fait 8 caractères en alphabet **sans ambiguïté** (ni `O`/`0`, ni
       `I`/`1`/`l`), pour rester saisissable à la main en repli
 - [x] `POST /pairing/code` (firewall `main`, utilisateur authentifié) émet un
-      code et renvoie la charge utile du QR :
-      `{"url": "<base API>", "code": "<code>", "exp": "<ISO8601>"}`
+      code et rend la charge utile du QR :
+      `{"url": "<base API>", "code": "<code>", "exp": "<ISO8601>"}`.
+      **Précision apportée par KL-47** : cette charge utile est ce que le QR
+      *encode*, pas ce que la réponse HTTP rend — le ticket la rendait en JSON
+      faute d'écran pour l'afficher, l'endpoint rend désormais le panneau
 - [x] **Le QR ne contient jamais de token**, seulement ce code (§0.6 règle 1)
 - [x] `POST /api/auth/pair` : `{code, deviceName}` → `{token, user}`
 - [x] **Consommation atomique** : `UPDATE pairing_code SET used_at = NOW()
@@ -993,19 +999,66 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
 
 ### KL-47 — Page QR d'appairage sur le desktop
 
-**Où** : `templates/profile/`, `src/Controller/ProfileController.php`
+**Où** : `templates/profile/`, `src/Controller/ProfileController.php`,
+`src/Service/PairingQr.php`, `assets/controllers/pairing_controller.js`
 
 **Fini quand** :
-- [ ] Une section « Connecter un téléphone » dans `/profile/settings`
-- [ ] Le QR est généré **côté serveur** (`endroid/qr-code`, rendu SVG inline) :
+- [x] Une section « Connecter un téléphone » dans `/profile/settings`
+- [x] Le QR est généré **côté serveur** (`endroid/qr-code`, rendu SVG inline) :
       pas de dépendance JavaScript à faire passer par l'importmap, et ça marche
       sans JS
-- [ ] Le code de 8 caractères est affiché **en toutes lettres sous le QR**, en
+- [x] Le code de 8 caractères est affiché **en toutes lettres sous le QR**, en
       IBM Plex Mono, comme repli si la caméra refuse
-- [ ] Compte à rebours visible et **régénération en un clic** à l'expiration
-- [ ] L'appareil appairé apparaît dans la liste de KL-12, avec confirmation
-      visuelle sur le desktop
-- [ ] Rendu à l'identité Presse, cohérent avec le reste de la page
+- [x] Compte à rebours visible et **régénération en un clic** à l'expiration
+- [x] Confirmation visuelle sur le desktop : le nom de l'appareil qui vient de
+      consommer le code (`consumedByDevice`), via `GET /pairing/{id}/status`.
+      **La liste des appareils reste à KL-12** — elle n'existe pas encore, c'est
+      la seule case du ticket que ce lot ne pouvait pas couvrir
+- [x] Rendu à l'identité Presse, cohérent avec le reste de la page
+
+Ce que le ticket pose, et qu'il ne faut pas casser :
+
+- **L'état par défaut de la page est *sans* code.** Émettre est une écriture, pas
+  un effet de bord de l'affichage : générer un code à chaque ouverture des
+  paramètres en gâcherait un à chaque fois et invaliderait celui qu'un autre
+  onglet montre (« un écran, un code », KL-46). D'où un bouton « Afficher le
+  QR », et un panneau qui a deux états.
+- **`POST /pairing/code` ne redirige pas après son écriture.** Le code en clair
+  n'existe que dans la réponse qui l'émet et sur l'écran qui l'affiche — la base
+  n'en a que l'empreinte. Rediriger obligerait à le faire vivre ailleurs, en
+  session, c'est-à-dire à créer un second endroit où un secret de deux minutes
+  traîne. Le repli sans JS rend donc la page entière en réponse au POST ; avec
+  Turbo, seul `#pairing-panel` est remplacé (le formulaire de mot de passe de la
+  même page ne doit pas perdre sa saisie).
+- **L'endpoint ne rend plus de JSON.** La charge utile `{url, code, exp}` de
+  KL-46 n'a jamais eu de consommateur HTTP : c'est ce que le **QR** encode, et
+  KL-48 la lit en scannant. La rendre aussi en réponse aurait laissé deux
+  représentations d'une même chose à tenir d'accord.
+- **Le contenu du QR se teste sans décodeur.** `PairingQr::payload()` est le
+  contrat avec le mobile, `svg()` n'en est qu'un dessin — et un dessin
+  déterministe : le test régénère le SVG attendu à partir de la charge utile
+  attendue et le cherche dans la page. Ce qui est figé, c'est ce qui est encodé,
+  pas la façon dont c'est peint.
+- **Le décompte est un confort, l'échéance est l'information.** Le serveur écrit
+  « Valable jusqu'à 14:32 » ; le contrôleur Stimulus `pairing` remplace ce texte
+  par « Expire dans 1:47 ». Sans JS il ne manque donc rien — c'est la même règle
+  que les `<details>` rendus ouverts côté serveur.
+- **Le sondage de `GET /pairing/{id}/status` est borné par ce qu'il observe** :
+  il s'arrête au code consommé, à l'échéance, ou sur une réponse non-`ok` (un
+  code régénéré ailleurs a été supprimé, réessayer n'empilerait que des 404). Ce
+  n'est pas l'AJAX post-chargement que le projet refuse sur ses pages de
+  consultation : il n'y a rien à mettre en cache offline dans un secret qui
+  périme en deux minutes.
+- **L'état d'un code qui n'est pas le sien rend 404, pas 403** : un refus qui
+  distingue « pas à toi » de « n'existe pas » confirme l'existence à qui essaie
+  des identifiants.
+- **Ni la confirmation ni l'expiration ne sortent le rouge.** Un code consommé
+  est un succès, un code échu une réponse normale du système — même raisonnement
+  que les pages 404/403, qui restent à l'encre (§5 règle 2 du `CLAUDE.md`).
+- **La marge blanche du QR est dans l'image, pas dans le CSS.** C'est la « quiet
+  zone » de la norme : sans elle un décodeur ne trouve pas les motifs de
+  repérage, et du `padding` autour ne la remplace pas — la caméra ne voit que
+  l'image.
 
 ### KL-12 — Gestion des appareils dans `/profile/settings`
 

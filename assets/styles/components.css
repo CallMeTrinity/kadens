@@ -8861,3 +8861,150 @@ a.kd-coachitem__name:hover {
         width: 100%;
     }
 }
+
+/* ============================================================================
+   APPAIRAGE D'UN TÉLÉPHONE — section « Connecter un téléphone » (KL-47)
+   ========================================================================== */
+.kd-pairing {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-8);
+}
+
+.kd-pairing__lead {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--color-text-secondary);
+    max-width: 62ch;
+}
+
+.kd-pairing__live {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--kd-space-10);
+}
+
+/* Le cadre du QR est blanc, et il le reste : la « quiet zone » du motif fait
+   partie de l'image que la caméra lit, un fond teinté autour ne la remplace pas
+   et un fond teinté dessous la casserait. */
+.kd-pairing__qr {
+    flex: none;
+    padding: var(--kd-space-3);
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border-strong);
+}
+
+.kd-pairing__qr svg {
+    display: block;
+    width: 240px;
+    height: auto;
+    max-width: 100%;
+}
+
+.kd-pairing__aside {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-5);
+    min-width: 0;
+}
+
+.kd-pairing__steps {
+    margin: 0;
+    padding-left: var(--kd-space-8);
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+}
+
+.kd-pairing__label {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-text-faint);
+}
+
+/* Le code de secours se recopie à la main : mono, large interlettrage, et un
+   cadre qui le désigne comme une valeur à saisir plutôt qu'une phrase à lire.
+   `user-select: all` en fait une sélection d'un seul geste. */
+.kd-pairing__code {
+    margin: 0;
+    padding: var(--kd-space-4) var(--kd-space-6);
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    font-family: var(--font-mono);
+    font-size: 22px;
+    font-weight: var(--kd-weight-medium);
+    letter-spacing: .22em;
+    color: var(--color-text);
+    user-select: all;
+    overflow-wrap: anywhere;
+}
+
+.kd-pairing__timer {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--color-text-soft);
+}
+
+/* Confirmation et expiration restent à l'encre : un code consommé est un succès,
+   un code échu une réponse normale du système. Ni l'un ni l'autre n'est un échec,
+   et le rouge ne sort que pour ça (§5 règle 2). */
+.kd-pairing__done,
+.kd-pairing__expired {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--kd-space-4);
+    margin: 0;
+    padding: var(--kd-space-5) var(--kd-space-6);
+    border-left: 2px solid var(--color-cat-1);
+    background: var(--color-surface-subtle);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+}
+
+.kd-pairing__expired {
+    border-left-color: var(--color-cat-3);
+    color: var(--color-text-soft);
+}
+
+.kd-pairing__done svg,
+.kd-pairing__expired svg {
+    flex: none;
+    width: 17px;
+    height: 17px;
+    margin-top: 2px;
+}
+
+.kd-pairing__done strong {
+    color: var(--color-text);
+    font-weight: var(--kd-weight-semibold);
+}
+
+.kd-pairing__acts {
+    display: flex;
+    gap: var(--kd-space-5);
+}
+
+/* Doit rester APRÈS les règles de base ci-dessus : une @media n'ajoute aucune
+   spécificité (cf. docs/design-system.md §5). */
+@media (max-width: 560px) {
+    .kd-pairing__live {
+        flex-direction: column;
+        gap: var(--kd-space-7);
+    }
+
+    .kd-pairing__qr {
+        align-self: center;
+    }
+
+    .kd-pairing__form,
+    .kd-pairing__acts,
+    .kd-pairing .kd-btn {
+        width: 100%;
+    }
+}

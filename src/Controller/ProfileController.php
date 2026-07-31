@@ -10,6 +10,7 @@ use App\Repository\CoachingRepository;
 use App\Repository\GoalRepository;
 use App\Repository\PairingCodeRepository;
 use App\Service\HeartRateZones;
+use App\Service\PairingQr;
 use App\Service\ProfileStats;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,6 +21,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\UX\Turbo\TurboBundle;
 
 /**
  * Page profil : remplace l'ancienne page d'accueil ET la synthèse. Combine les
@@ -126,27 +128,29 @@ final class ProfileController extends AbstractController
     }
 
     /**
-     * Émet un code d'appairage et rend la charge utile du QR (§0.6). C'est le
-     * seul chemin qui en crée : un code est **lié à la session desktop qui l'a
-     * produit**, donc à un utilisateur déjà authentifié — c'est ce qui interdit
-     * de s'appairer au compte d'un autre.
+     * Émet un code d'appairage et rend le panneau qui l'affiche (§0.6, KL-47).
+     * C'est le seul chemin qui en crée : un code est **lié à la session desktop
+     * qui l'a produit**, donc à un utilisateur déjà authentifié — c'est ce qui
+     * interdit de s'appairer au compte d'un autre.
      *
      * Sous le pare-feu `main`, et hors `^/profile` : `security.yaml` couvre
      * `^/pairing` explicitement. Le CSRF est vérifié à la main comme partout
      * ailleurs dans le projet, la requête ne passant pas par un `FormType`.
      *
-     * La charge utile **ne contient jamais de jeton** (§0.6 règle 1) : le
-     * téléphone ne repartira avec un `ApiToken` qu'après avoir échangé ce code
-     * sur `POST /api/auth/pair`. Elle porte en revanche l'URL du serveur, ce qui
-     * dispense de la saisir sur le téléphone — et règle au passage la saisie de
-     * l'IP LAN en développement.
+     * **Une écriture, donc un POST — et pas de redirection après.** Le code en
+     * clair n'existe que dans la réponse qui l'émet et sur l'écran qui l'affiche
+     * (la base n'en a que l'empreinte) : rediriger obligerait à le faire vivre
+     * ailleurs, en session, c'est-à-dire à créer un second endroit où un secret
+     * de deux minutes traîne. Le repli sans JS rend donc la page entière en
+     * réponse au POST ; avec Turbo, seul le panneau est remplacé.
      */
     #[Route('/pairing/code', name: 'app_pairing_code', methods: ['POST'])]
     public function pairingCode(
         Request $request,
         PairingCodeRepository $pairingCodes,
         EntityManagerInterface $entityManager,
-    ): JsonResponse {
+        PairingQr $pairingQr,
+    ): Response {
         /** @var User $user */
         $user = $this->getUser();
 
@@ -164,12 +168,56 @@ final class ProfileController extends AbstractController
         $entityManager->persist($pairingCode);
         $entityManager->flush();
 
+        $payload = $pairingQr->payload(
+            $pairingCode,
+            $code,
+            $request->getSchemeAndHttpHost().$request->getBaseUrl(),
+        );
+
+        $context = [
+            'pairing' => $pairingCode,
+            'pairingCode' => $code,
+            'pairingQr' => $pairingQr->svg($payload),
+        ];
+
+        if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
+            $request->setRequestFormat(TurboBundle::STREAM_FORMAT);
+
+            return $this->render('profile/stream/pairing.stream.html.twig', $context);
+        }
+
+        return $this->render('profile/settings.html.twig', $context + [
+            'form' => $this->createForm(ChangePasswordType::class)->createView(),
+        ]);
+    }
+
+    /**
+     * L'état d'un code émis, pour la confirmation visuelle du desktop : « ce
+     * téléphone-là vient de se connecter ». C'est ce que le snapshot
+     * `consumedByDevice` de KL-46 existait pour permettre.
+     *
+     * Interrogée en boucle par le contrôleur Stimulus `pairing`, mais **bornée
+     * par nature** : elle n'a plus rien à dire dès que le code est consommé ou
+     * échu, et la fenêtre entière dure deux minutes. Ce n'est donc pas l'AJAX
+     * post-chargement que le projet refuse sur ses pages de consultation — il
+     * n'y a rien à mettre en cache offline dans un secret qui périme.
+     *
+     * La garde est le propriétaire, et un code qui n'est pas le sien rend
+     * **404** : un 403 confirmerait qu'il existe.
+     */
+    #[Route('/pairing/{id}/status', name: 'app_pairing_status', methods: ['GET'])]
+    public function pairingStatus(PairingCode $pairingCode): JsonResponse
+    {
+        if ($pairingCode->getOwner() !== $this->getUser()) {
+            throw $this->createNotFoundException();
+        }
+
         return $this->json([
-            // Base du serveur, pas d'un endpoint : le mobile la garde comme
-            // « URL de serveur » et la valide par `GET /api/ping` (KL-10).
-            'url' => $request->getSchemeAndHttpHost().$request->getBaseUrl(),
-            'code' => $code,
-            'exp' => $pairingCode->getExpiresAt()->format(\DateTimeInterface::ATOM),
+            'used' => $pairingCode->isUsed(),
+            // Le nom vient du téléphone : il est rendu tel quel dans du texte,
+            // jamais dans du HTML assemblé côté client.
+            'device' => $pairingCode->getConsumedByDevice(),
+            'expired' => $pairingCode->isExpired(),
         ]);
     }
 }

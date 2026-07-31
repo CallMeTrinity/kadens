@@ -39,6 +39,10 @@
             </dl>
         </section>
 
+        {# Hors du formulaire de mot de passe : son bouton d'émission poste
+           ailleurs, et un <form> ne s'imbrique pas. #}
+        {{ include('profile/_pairing.html.twig') }}
+
         {{ form_start(form, {attr: {class: 'kd-editform'}}) }}
             <section class="kd-card kd-formsection">
                 <header class="kd-formsection__head">

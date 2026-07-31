@@ -34,6 +34,10 @@ série par série — règle révisée, cf. §3.
   `assets/icons/lucide/` (`php bin/console ux:icons:import lucide:<nom>`) : pas de
   fetch réseau en prod/offline. Toute nouvelle icône doit être importée localement.
 - **Doctrine ORM** + **MariaDB 10.4** (même version dev et prod).
+- **`endroid/qr-code`** pour le QR d'appairage (KL-47), en **writer SVG** :
+  aucune extension PHP requise (`ext-gd` ne sert qu'aux writers image), donc
+  rien à demander au mutualisé, et le QR est dessiné côté serveur — pas de
+  bibliothèque JavaScript dans l'importmap.
 - **Docker** en dev uniquement. Prod = **hébergement mutualisé Infomaniak**
   (`kadens.antoninpamart.fr`), pas de conteneurs, pas de root.
 - CI/CD GitHub Actions, déploiement manuel validé (rsync + migrations + cache).
@@ -323,9 +327,50 @@ KL-09 compris. **KL-10 livré le 30/07/2026** : le pare-feu `api`, le jeton
 porteur — le lot 2 est ouvert. **KL-11 livré le 31/07/2026** : les endpoints
 d'authentification (`POST /api/auth/login`, `POST /api/auth/logout`,
 `GET /api/me`). **KL-46 livré le 31/07/2026** : l'appairage par QR
-(`PairingCode`, `POST /pairing/code`, `POST /api/auth/pair`). Prochain ticket
-KL-47 (la page QR sur le desktop) ou KL-12 (la révocation d'appareil dans
-`/profile/settings`).
+(`PairingCode`, `POST /pairing/code`, `POST /api/auth/pair`). **KL-47 livré le
+31/07/2026** : la page QR sur le desktop. Prochain ticket KL-12 (la révocation
+d'appareil dans `/profile/settings`) — sans lui, un appairage n'est pas
+réversible.
+
+Ce que KL-47 pose et qu'il ne faut pas casser :
+
+- **L'état par défaut de `/profile/settings` est *sans* code.** Émettre est une
+  écriture, pas un effet de bord de l'affichage : en générer un à chaque
+  ouverture de la page en gâcherait un à chaque fois et invaliderait celui qu'un
+  autre onglet montre (« un écran, un code », KL-46). D'où un bouton « Afficher
+  le QR » et un panneau à deux états.
+- **`POST /pairing/code` rend du HTML et ne redirige pas.** Le code en clair
+  n'existe que dans la réponse qui l'émet et sur l'écran qui l'affiche (la base
+  n'en a que l'empreinte) : rediriger obligerait à le faire vivre en session,
+  c'est-à-dire à créer un second endroit où un secret de deux minutes traîne. Le
+  repli sans JS rend la page entière en réponse au POST ; avec Turbo, seul
+  `#pairing-panel` est remplacé — le formulaire de mot de passe de la même page
+  ne doit pas perdre sa saisie.
+- **L'endpoint ne rend plus de JSON.** La charge utile `{url, code, exp}` de
+  KL-46 est ce que le **QR encode**, pas ce que la réponse rend : elle n'a jamais
+  eu de consommateur HTTP, KL-48 la lit en scannant. Deux représentations d'une
+  même chose auraient fini par diverger.
+- **Le contenu du QR se teste sans décodeur.** `PairingQr::payload()` est le
+  contrat avec le mobile, `svg()` n'en est qu'un dessin — déterministe : le test
+  régénère le SVG attendu depuis la charge utile attendue et le cherche dans la
+  page. Ce qui est figé, c'est ce qui est encodé, pas la façon de le peindre.
+- **Le décompte est un confort, l'échéance est l'information.** Le serveur écrit
+  « Valable jusqu'à 14:32 », le contrôleur Stimulus `pairing` le remplace par
+  « Expire dans 1:47 ». Même règle que les `<details>` rendus ouverts côté
+  serveur : sans JS, rien ne manque.
+- **Le sondage de `GET /pairing/{id}/status` est borné par ce qu'il observe** :
+  arrêt au code consommé, à l'échéance, ou sur une réponse non-`ok` (un code
+  régénéré ailleurs a été supprimé). Ce n'est pas l'AJAX post-chargement refusé
+  sur les pages de consultation — il n'y a rien à cacher hors ligne dans un
+  secret qui périme en deux minutes. L'état d'un code qui n'est pas le sien rend
+  **404**, pas 403 : distinguer confirmerait son existence.
+- **Ni la confirmation ni l'expiration ne sortent le rouge** (§5 règle 2) : un
+  code consommé est un succès, un code échu une réponse normale du système —
+  même raisonnement que les pages 404/403.
+- **La marge blanche du QR est dans l'image, pas dans le CSS** : c'est la « quiet
+  zone » de la norme, sans laquelle un décodeur ne trouve pas les motifs de
+  repérage. Pour la même raison le motif reste noir sur blanc — une cible optique
+  avant d'être un élément de l'identité.
 
 Ce que KL-46 pose et qu'il ne faut pas casser :
 

@@ -1,0 +1,11 @@
+{# Le formulaire d'émission d'un code d'appairage. Deux appelants (l'état
+   « aucun code » et la régénération), donc une seule définition : le jeton CSRF
+   est vérifié à la main côté contrôleur, un oubli ici rendrait un 403.
+
+   Paramètres : label, icon, variant (classe de bouton). #}
+<form method="post" action="{{ path('app_pairing_code') }}" class="kd-pairing__form">
+    <input type="hidden" name="_token" value="{{ csrf_token('pairing_code') }}">
+    <button type="submit" class="kd-btn {{ variant|default('kd-btn--primary') }}">
+        {{ ux_icon(icon|default('lucide:qr-code')) }} {{ label }}
+    </button>
+</form>

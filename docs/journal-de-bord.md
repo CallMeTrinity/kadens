@@ -3083,3 +3083,103 @@ Modifiés : `src/Controller/Api/AuthController.php` (`POST /api/auth/pair`),
 SVG inline, code en toutes lettres sous le QR, compte à rebours et régénération
 en un clic), qui consomme la charge utile posée ici ; ou **KL-12**, la liste et
 la révocation d'appareils, où l'appairage devient visible et réversible.
+
+---
+
+## Kadens Live KL-47 — La page QR sur le desktop (31/07/2026)
+
+KL-46 avait posé le mécanisme sans son écran : un endpoint qui émettait un code
+et le rendait en JSON, faute d'un endroit où le montrer. Ce lot lui donne cet
+endroit — une section « Connecter un téléphone » dans `/profile/settings` — et,
+ce faisant, corrige la nature de la charge utile.
+
+### La charge utile n'était pas une réponse, c'était le contenu du QR
+
+`{url, code, exp}` n'a jamais eu de consommateur HTTP. Personne n'appelle
+`POST /pairing/code` pour lire du JSON : le desktop veut un dessin à montrer, et
+le téléphone (KL-48) lit ce dessin. Le trio est donc ce que le **QR encode**, et
+l'endpoint rend désormais du HTML. Garder les deux représentations aurait laissé
+deux façons de dire la même chose, à tenir d'accord pour toujours, dont une sans
+appelant.
+
+Conséquence dans les tests : `ApiPairingTest` lit le code émis dans la page au
+lieu du JSON. Ce n'est pas un contournement, c'est le vrai chemin — le code en
+clair n'existe qu'à l'écran.
+
+### Ce qui se teste, c'est ce qui est encodé
+
+Un QR est une image, et on n'installe pas un décodeur pour vérifier une image.
+Mais `svg()` est **déterministe** : à charge utile égale, dessin égal. Le test
+reconstruit donc la charge utile attendue — l'URL du serveur, le code lu à
+l'écran, l'échéance lue en base — la fait dessiner par le même service, et
+cherche ce SVG dans la page. Ce qui est figé, c'est le contrat avec le mobile,
+pas la façon de le peindre.
+
+D'où la coupure du service en deux gestes : `payload()` est le contrat,
+`svg()` n'en est qu'une lecture optique. Ils ont deux publics, ils méritaient
+deux méthodes.
+
+### Émettre est une écriture, l'afficher ne l'est pas
+
+L'état par défaut de la page est **sans code**. C'était tentant d'en générer un
+au chargement — la page aurait été plus courte à écrire, et le QR déjà là. Mais
+ouvrir ses paramètres pour changer son mot de passe aurait alors gâché un code à
+chaque fois, et surtout invalidé celui qu'un autre onglet affiche : « un écran,
+un code » est une garantie de KL-46, pas une préférence.
+
+Corollaire moins évident : le POST **ne redirige pas**. Le code en clair n'existe
+que dans la réponse qui l'émet ; rediriger obligerait à le stocker en session,
+donc à créer un second endroit où un secret de deux minutes traîne. Le repli sans
+JS rend la page entière en réponse au POST, et Turbo ne remplace que
+`#pairing-panel` — sinon le formulaire de mot de passe de la même page perdrait
+sa saisie.
+
+### Le décompte est un confort, l'échéance est l'information
+
+Le serveur écrit « Valable jusqu'à 14:32 ». Le contrôleur Stimulus remplace ce
+texte par « Expire dans 1:47 ». Sans JS il ne manque donc rien, et le QR — dessiné
+côté serveur — s'affiche de toute façon : aucune bibliothèque JavaScript n'entre
+dans l'importmap pour ça.
+
+Le même contrôleur sonde `GET /pairing/{id}/status` toutes les deux secondes pour
+afficher **quel** téléphone vient de se connecter. C'est ce que le snapshot
+`consumedByDevice` de KL-46 gardait en réserve. Le sondage est borné par ce qu'il
+observe : il s'arrête au code consommé, à l'échéance, ou sur une réponse non-`ok`
+— un code régénéré ailleurs a été supprimé, et réessayer n'empilerait que des
+404. Ce n'est pas l'AJAX post-chargement que le projet refuse sur ses pages de
+consultation : il n'y a rien à mettre en cache offline dans un secret qui périme.
+
+L'état d'un code qui n'est pas le sien rend **404**, pas 403 : un refus qui
+distingue « pas à toi » de « n'existe pas » confirme l'existence à qui essaie des
+identifiants.
+
+### Deux détails de rendu qui ont une raison
+
+La marge blanche autour du motif est **dans l'image**, pas dans le CSS : c'est la
+« quiet zone » de la norme, sans laquelle un décodeur ne trouve pas les motifs de
+repérage. Du `padding` autour ne la remplace pas, la caméra ne voit que l'image.
+Pour la même raison le QR reste noir sur blanc : c'est une cible optique avant
+d'être un élément de l'identité, et son contraste ne se négocie pas.
+
+Ni la confirmation d'appairage ni l'expiration ne sortent le rouge. Un code
+consommé est un succès, un code échu une réponse normale du système — même
+raisonnement que les pages 404 et 403, qui restent à l'encre.
+
+### Fichiers touchés
+
+Neufs : `src/Service/PairingQr.php`,
+`assets/controllers/pairing_controller.js`,
+`templates/profile/_pairing.html.twig`,
+`templates/profile/_pairing_form.html.twig`,
+`templates/profile/stream/pairing.stream.html.twig`,
+`tests/Controller/PairingPageTest.php` (8 tests).
+Modifiés : `src/Controller/ProfileController.php` (`POST /pairing/code` en HTML,
+`GET /pairing/{id}/status`), `templates/profile/settings.html.twig`,
+`assets/styles/components.css` (section `kd-pairing`),
+`tests/Controller/ApiPairingTest.php` (le code se lit à l'écran),
+`composer.json` (`endroid/qr-code`).
+
+**Prochain ticket : KL-12** — la liste et la révocation d'appareils. C'est la
+seule case de KL-47 que ce lot ne pouvait pas cocher, et surtout ce qui manque
+pour qu'un appairage soit **réversible** : un jeton qu'on ne peut pas révoquer
+depuis le web est un trou.

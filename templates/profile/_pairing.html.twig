@@ -1,0 +1,75 @@
+{# Section « Connecter un téléphone » de /profile/settings (KL-47).
+
+   Deux états, et l'état par défaut est **sans code** : émettre est une écriture,
+   pas un effet de bord de l'affichage d'une page. Générer un code à chaque
+   ouverture des paramètres en gâcherait un à chaque fois — et invaliderait
+   celui qu'un autre onglet vient d'afficher (« un écran, un code », KL-46).
+
+   Contexte : pairing (PairingCode|null), pairingCode (le code en clair),
+   pairingQr (le SVG). Les trois vont ensemble : le code en clair n'existe que
+   dans la réponse qui l'émet. #}
+{% set pairing = pairing|default(null) %}
+<section class="kd-card kd-formsection" id="pairing-panel">
+    <header class="kd-formsection__head">
+        <span class="kd-formsection__icon">{{ ux_icon('lucide:smartphone') }}</span>
+        <div>
+            <h2 class="kd-formsection__title">Connecter un téléphone</h2>
+            <p class="kd-formsection__hint">L'app Kadens se connecte en scannant un QR, pas en tapant un mot de passe. Le QR ne contient aucun accès : juste un code à usage unique, valable deux minutes, et l'adresse du serveur.</p>
+        </div>
+    </header>
+
+    {% if pairing is null %}
+        <div class="kd-pairing">
+            <p class="kd-pairing__lead">Ouvre l'app sur ton téléphone, va sur l'écran de connexion, puis affiche le code ici.</p>
+            {{ include('profile/_pairing_form.html.twig', {label: 'Afficher le QR', icon: 'lucide:qr-code'}) }}
+        </div>
+    {% else %}
+        {# `expiresAt` part en ISO 8601 avec son décalage : le décompte se calcule
+           dans le fuseau du navigateur, qui n'est pas forcément celui du serveur. #}
+        <div class="kd-pairing"
+             data-controller="pairing"
+             data-pairing-expires-at-value="{{ pairing.expiresAt|date('c') }}"
+             data-pairing-status-url-value="{{ path('app_pairing_status', {id: pairing.id}) }}">
+
+            <div class="kd-pairing__live" data-pairing-target="live">
+                <div class="kd-pairing__qr">{{ pairingQr|raw }}</div>
+
+                <div class="kd-pairing__aside">
+                    <ol class="kd-pairing__steps">
+                        <li>Ouvre l'app Kadens sur ton téléphone.</li>
+                        <li>Choisis « Scanner un QR », et vise cet écran.</li>
+                    </ol>
+
+                    <p class="kd-pairing__label">Si la caméra refuse, tape ce code</p>
+                    <p class="kd-pairing__code">{{ pairingCode }}</p>
+
+                    {# Repli sans JS : l'heure d'échéance, en clair. Le contrôleur
+                       Stimulus la remplace par un décompte, qui n'apporte que du
+                       confort — l'information, elle, est déjà là. #}
+                    <p class="kd-pairing__timer" data-pairing-target="countdown" role="status">
+                        Valable jusqu'à {{ pairing.expiresAt|date('H:i') }}
+                    </p>
+                </div>
+            </div>
+
+            {# Confirmation visuelle de l'appairage : le snapshot du nom d'appareil
+               écrit par `POST /api/auth/pair`. Rendu vide, rempli par le polling. #}
+            <p class="kd-pairing__done" data-pairing-target="paired" role="status" hidden>
+                {{ ux_icon('lucide:circle-check') }}
+                <span><strong data-pairing-target="device"></strong> est connecté. Le code vient d'être consommé, il ne vaut plus rien.</span>
+            </p>
+
+            <p class="kd-pairing__expired" data-pairing-target="expired" role="status" hidden>
+                {{ ux_icon('lucide:clock') }} Ce code a expiré. Demandes-en un nouveau.
+            </p>
+
+            <div class="kd-pairing__acts">
+                {{ include('profile/_pairing_form.html.twig', {
+                    label: 'Nouveau code',
+                    icon: 'lucide:rotate-cw',
+                    variant: 'kd-btn--ghost',
+                }) }}
+            </div>
+        </div>
+    {% endif %}
+</section>
