@@ -31,6 +31,14 @@ final class ApiAuthEndpointsTest extends WebTestCase
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine.orm.entity_manager');
 
+        // La connexion est limitée à 5 tentatives par IP et par minute (KL-13),
+        // et le compteur vit dans un pool de cache **sur disque** : sans ce
+        // vidage, un test qui épuise le quota ferait échouer les suivants et
+        // l'ordre des tests deviendrait significatif. Le passer en mémoire ne
+        // marcherait pas — un `ArrayAdapter` est remis à zéro entre deux requêtes
+        // du même test par le `services_resetter`.
+        static::getContainer()->get('cache.rate_limiter')->clear();
+
         foreach ($this->em->getRepository(ApiToken::class)->findAll() as $token) {
             $this->em->remove($token);
         }
@@ -231,6 +239,62 @@ final class ApiAuthEndpointsTest extends WebTestCase
         );
 
         self::assertResponseStatusCodeSame(401);
+        self::assertSame([], $this->em->getRepository(ApiToken::class)->findAll());
+    }
+
+    /**
+     * Le mot de passe est le seul secret de l'API choisi par un humain : c'est
+     * celui qu'on essaie en boucle. Cinq tentatives par IP et par minute, plus
+     * serré que l'appairage, dont le code se retape après une faute de frappe.
+     */
+    public function testLoginIsRateLimitedByIp(): void
+    {
+        $this->createUser('athlete@example.com');
+
+        for ($i = 0; $i < 5; ++$i) {
+            $this->post('/api/auth/login', [
+                'email' => 'athlete@example.com',
+                'password' => 'mauvais-mot-de-passe',
+                'deviceName' => 'Pixel 8',
+            ]);
+            self::assertResponseStatusCodeSame(401);
+        }
+
+        $this->post('/api/auth/login', [
+            'email' => 'athlete@example.com',
+            'password' => 'mauvais-mot-de-passe',
+            'deviceName' => 'Pixel 8',
+        ]);
+
+        self::assertResponseStatusCodeSame(429);
+        self::assertResponseHeaderSame('Content-Type', 'application/problem+json');
+        self::assertTrue($this->client->getResponse()->headers->has('Retry-After'));
+    }
+
+    /**
+     * Le quota se refuse **avant** de regarder le compte : une fois épuisé, le
+     * bon mot de passe ne passe pas davantage, et aucun jeton n'est émis. C'est
+     * ce qui fait du limiteur une garde et pas un ralentisseur.
+     */
+    public function testAThrottledLoginIssuesNoTokenEvenWithTheRightPassword(): void
+    {
+        $this->createUser('athlete@example.com');
+
+        for ($i = 0; $i < 5; ++$i) {
+            $this->post('/api/auth/login', [
+                'email' => 'athlete@example.com',
+                'password' => 'mauvais-mot-de-passe',
+                'deviceName' => 'Pixel 8',
+            ]);
+        }
+
+        $this->post('/api/auth/login', [
+            'email' => 'athlete@example.com',
+            'password' => 'password',
+            'deviceName' => 'Pixel 8',
+        ]);
+
+        self::assertResponseStatusCodeSame(429);
         self::assertSame([], $this->em->getRepository(ApiToken::class)->findAll());
     }
 

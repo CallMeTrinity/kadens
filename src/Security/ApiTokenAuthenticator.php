@@ -3,6 +3,7 @@
 namespace App\Security;
 
 use App\Entity\User;
+use App\Http\ApiProblem;
 use App\Repository\ApiTokenRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -26,8 +27,8 @@ use Symfony\Component\Security\Http\EntryPoint\AuthenticationEntryPointInterface
  *
  * Quatre responsabilités, pas une de plus : lire l'en-tête, valider le jeton,
  * repousser son échéance, et le publier sur la requête (cf. REQUEST_ATTRIBUTE).
- * L'émission vit ailleurs (KL-11, KL-46), la mise en forme normalisée des
- * erreurs arrivera en KL-13.
+ * L'émission vit ailleurs (KL-11, KL-46), et la forme des réponses d'erreur dans
+ * `ApiProblem` (KL-13).
  */
 final class ApiTokenAuthenticator extends AbstractAuthenticator implements AuthenticationEntryPointInterface
 {
@@ -114,19 +115,13 @@ final class ApiTokenAuthenticator extends AbstractAuthenticator implements Authe
 
     private function unauthorized(string $detail): JsonResponse
     {
-        // Forme RFC 9457, que KL-13 généralisera à toutes les erreurs de l'API.
-        return new JsonResponse(
-            [
-                'type' => 'about:blank',
-                'title' => 'Unauthorized',
-                'status' => Response::HTTP_UNAUTHORIZED,
-                'detail' => $detail,
-            ],
+        // Forme RFC 9457, celle de toute l'API (`ApiProblem`, KL-13). Le refus
+        // se formule ici et pas dans `ApiExceptionListener` : à ce stade, ce
+        // n'est pas une exception qui remonte, c'est une décision.
+        return ApiProblem::response(
             Response::HTTP_UNAUTHORIZED,
-            [
-                'Content-Type' => 'application/problem+json',
-                'WWW-Authenticate' => 'Bearer',
-            ],
+            $detail,
+            headers: ['WWW-Authenticate' => 'Bearer'],
         );
     }
 }

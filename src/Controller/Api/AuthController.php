@@ -5,6 +5,7 @@ namespace App\Controller\Api;
 use App\Entity\ApiToken;
 use App\Entity\PairingCode;
 use App\Entity\User;
+use App\Http\ApiProblem;
 use App\Repository\PairingCodeRepository;
 use App\Repository\UserRepository;
 use App\Security\ApiTokenAuthenticator;
@@ -53,13 +54,27 @@ final class AuthController extends AbstractController
     /**
      * Connexion par mot de passe. Rend le secret en clair : c'est le seul endroit
      * avec l'appairage (KL-46), et il ne sera plus jamais lisible ensuite.
+     *
+     * Limitée à 5 tentatives par IP et par minute (KL-13) : c'est le repli, donc
+     * la seule porte de l'API qui accepte un secret choisi par un humain. Le 429
+     * se rend **avant** le décodage du corps, pour la même raison qu'en
+     * appairage — un quota épuisé n'a pas à coûter une lecture de plus, ni à
+     * laisser le hachage à vide ci-dessous mesurer le temps d'une réponse qui ne
+     * regardera aucun compte.
      */
     #[Route('/api/auth/login', name: 'api_auth_login', methods: ['POST'])]
     public function login(
         Request $request,
         UserRepository $users,
         UserPasswordHasherInterface $hasher,
+        #[Target('apiLoginLimiter')] RateLimiterFactoryInterface $limiter,
     ): JsonResponse {
+        $throttled = $this->throttle($limiter, $request);
+
+        if ($throttled instanceof JsonResponse) {
+            return $throttled;
+        }
+
         $payload = $this->decode($request);
 
         if ($payload instanceof JsonResponse) {
@@ -71,11 +86,11 @@ final class AuthController extends AbstractController
         $deviceName = $this->text($payload, 'deviceName');
 
         if (null === $email || null === $password || null === $deviceName) {
-            return $this->problem(Response::HTTP_BAD_REQUEST, 'Bad Request', 'Les champs email, password et deviceName sont requis.');
+            return $this->problem(Response::HTTP_BAD_REQUEST, 'Les champs email, password et deviceName sont requis.');
         }
 
         if (mb_strlen($deviceName) > self::DEVICE_NAME_MAX) {
-            return $this->problem(Response::HTTP_BAD_REQUEST, 'Bad Request', \sprintf('Le nom d\'appareil ne peut pas dépasser %d caractères.', self::DEVICE_NAME_MAX));
+            return $this->problem(Response::HTTP_BAD_REQUEST, \sprintf('Le nom d\'appareil ne peut pas dépasser %d caractères.', self::DEVICE_NAME_MAX));
         }
 
         $user = $users->findOneBy(['email' => $email]);
@@ -122,13 +137,10 @@ final class AuthController extends AbstractController
         PairingCodeRepository $pairingCodes,
         #[Target('apiPairingLimiter')] RateLimiterFactoryInterface $limiter,
     ): JsonResponse {
-        $quota = $limiter->create($request->getClientIp())->consume();
+        $throttled = $this->throttle($limiter, $request, 'Trop de tentatives d\'appairage. Réessayez dans un instant.');
 
-        if (!$quota->isAccepted()) {
-            $response = $this->problem(Response::HTTP_TOO_MANY_REQUESTS, 'Too Many Requests', 'Trop de tentatives d\'appairage. Réessayez dans un instant.');
-            $response->headers->set('Retry-After', (string) max(1, $quota->getRetryAfter()->getTimestamp() - time()));
-
-            return $response;
+        if ($throttled instanceof JsonResponse) {
+            return $throttled;
         }
 
         $payload = $this->decode($request);
@@ -141,11 +153,11 @@ final class AuthController extends AbstractController
         $deviceName = $this->text($payload, 'deviceName');
 
         if (null === $code || null === $deviceName) {
-            return $this->problem(Response::HTTP_BAD_REQUEST, 'Bad Request', 'Les champs code et deviceName sont requis.');
+            return $this->problem(Response::HTTP_BAD_REQUEST, 'Les champs code et deviceName sont requis.');
         }
 
         if (mb_strlen($deviceName) > self::DEVICE_NAME_MAX) {
-            return $this->problem(Response::HTTP_BAD_REQUEST, 'Bad Request', \sprintf('Le nom d\'appareil ne peut pas dépasser %d caractères.', self::DEVICE_NAME_MAX));
+            return $this->problem(Response::HTTP_BAD_REQUEST, \sprintf('Le nom d\'appareil ne peut pas dépasser %d caractères.', self::DEVICE_NAME_MAX));
         }
 
         $pairingCode = $pairingCodes->consume($code, $deviceName);
@@ -175,7 +187,7 @@ final class AuthController extends AbstractController
         $apiToken = $this->currentToken($request);
 
         if (!$apiToken instanceof ApiToken) {
-            return $this->problem(Response::HTTP_UNAUTHORIZED, 'Unauthorized', 'Jeton absent ou invalide.');
+            return $this->problem(Response::HTTP_UNAUTHORIZED, 'Jeton absent ou invalide.');
         }
 
         $this->em->remove($apiToken);
@@ -280,7 +292,7 @@ final class AuthController extends AbstractController
         try {
             $payload = $request->toArray();
         } catch (\Throwable) {
-            return $this->problem(Response::HTTP_BAD_REQUEST, 'Bad Request', 'Corps de requête JSON attendu.');
+            return $this->problem(Response::HTTP_BAD_REQUEST, 'Corps de requête JSON attendu.');
         }
 
         return $payload;
@@ -311,7 +323,7 @@ final class AuthController extends AbstractController
      */
     private function invalidCredentials(): JsonResponse
     {
-        return $this->problem(Response::HTTP_UNAUTHORIZED, 'Unauthorized', 'Identifiants invalides.');
+        return $this->problem(Response::HTTP_UNAUTHORIZED, 'Identifiants invalides.');
     }
 
     /**
@@ -321,25 +333,47 @@ final class AuthController extends AbstractController
      */
     private function invalidPairingCode(): JsonResponse
     {
-        return $this->problem(Response::HTTP_BAD_REQUEST, 'Bad Request', 'Code d\'appairage invalide ou expiré.');
+        return $this->problem(Response::HTTP_BAD_REQUEST, 'Code d\'appairage invalide ou expiré.');
     }
 
     /**
-     * Forme RFC 9457, la même que celle de l'authenticator. KL-13 la remontera
-     * dans un listener d'exception pour toute l'API ; en attendant, les seules
-     * erreurs que ce contrôleur produit passent par ici.
+     * Consomme un jeton de quota, et rend la réponse 429 s'il n'y en a plus.
+     *
+     * Le limiteur se consulte **en premier**, avant toute lecture du corps ou de
+     * la base : c'est ce qui garantit qu'un quota épuisé ne consomme pas non plus
+     * un code d'appairage valide (§0.6). L'en-tête `Retry-After` est en secondes
+     * — un client qui réessaie sans l'attendre ne fait que creuser son trou.
      */
-    private function problem(int $status, string $title, string $detail): JsonResponse
-    {
-        return new JsonResponse(
-            [
-                'type' => 'about:blank',
-                'title' => $title,
-                'status' => $status,
-                'detail' => $detail,
-            ],
-            $status,
-            ['Content-Type' => 'application/problem+json'],
+    private function throttle(
+        RateLimiterFactoryInterface $limiter,
+        Request $request,
+        string $detail = 'Trop de tentatives de connexion. Réessayez dans un instant.',
+    ): ?JsonResponse {
+        $quota = $limiter->create($request->getClientIp())->consume();
+
+        if ($quota->isAccepted()) {
+            return null;
+        }
+
+        return ApiProblem::response(
+            Response::HTTP_TOO_MANY_REQUESTS,
+            $detail,
+            headers: ['Retry-After' => (string) max(1, $quota->getRetryAfter()->getTimestamp() - time())],
         );
+    }
+
+    /**
+     * Forme RFC 9457, la même partout sur l'API — l'authenticator la produit
+     * pour ses 401, `ApiExceptionListener` (KL-13) pour tout ce qui remonte en
+     * exception. Ce contrôleur, lui, rend ses propres erreurs : il sait ce qu'il
+     * refuse et le formule (identifiants invalides, code d'appairage périmé), là
+     * où le listener ne peut que traduire un statut.
+     *
+     * Le `$title` n'est plus un paramètre : il se dérive du statut dans
+     * `ApiProblem`, il ne pouvait qu'entrer en désaccord avec lui.
+     */
+    private function problem(int $status, string $detail): JsonResponse
+    {
+        return ApiProblem::response($status, $detail);
     }
 }

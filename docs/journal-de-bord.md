@@ -3285,3 +3285,139 @@ secret présenté juste avant rende 401 juste après.
 **Prochain ticket : KL-13** — les réponses d'erreur normalisées (RFC 9457) et le
 limiteur de débit sur la connexion. Le lot 2 a désormais son socle
 d'authentification complet et réversible.
+
+---
+
+## Kadens Live KL-13 — Erreurs normalisées et limitation de débit (31/07/2026)
+
+Le lot 2 avait trois producteurs d'erreurs et aucune garantie. L'authenticator
+rendait un objet RFC 9457 écrit à la main, `AuthController` en rendait un autre
+écrit à la main, et **tout le reste** — une entité introuvable, une méthode qui
+n'existe pas sur une route qui existe, une exception Doctrine — serait sorti en
+HTML. Sur un pare-feu stateless dont le seul client est une app mobile qui n'a
+qu'un décodeur JSON, c'était une panne en attente. Ce lot ferme le trou par le
+bas (un listener qui rattrape tout) et par le haut (une enveloppe unique), et
+pose au passage le limiteur qui manquait sur la connexion.
+
+### Le contrôleur rend ses erreurs, le listener rattrape le reste
+
+La tentation était de faire du listener **la** couche d'erreurs et de convertir
+`AuthController` à des exceptions. Mauvaise idée, pour une raison qui tient en
+une phrase : un contrôleur sait ce qu'il refuse, un listener ne connaît qu'un
+statut. « Identifiants invalides. » et « Code d'appairage invalide ou expiré. »
+sont des messages travaillés — leur uniformité entre trois cas distincts est
+justement ce que KL-11 et KL-46 protègent par des tests qui comparent les corps
+au caractère près. Les faire transiter par une table de traduction statut →
+message les aurait tous ramenés à « Requête invalide. ».
+
+La répartition est donc : **le contrôleur rend ses erreurs, le listener rattrape
+ce que personne n'a rendu.** Le listener est un filet, pas une couche de plus à
+traverser. Ce qui se factorise, c'est l'enveloppe, pas la décision.
+
+### Le `title` ne s'écrit plus à la main
+
+`ApiProblem::response()` est cette enveloppe. La signature a perdu un paramètre
+au passage, et c'est le vrai gain : le `title` se dérive du statut. Avant, huit
+appels portaient un couple `(Response::HTTP_BAD_REQUEST, 'Bad Request')` — huit
+occasions de les mettre en désaccord, dont aucune ne se serait vue avant qu'un
+client ne lise le mauvais libellé. Un libellé de catégorie n'est pas un message :
+il n'y a rien à choisir.
+
+Reste une bizarrerie assumée : `title` en anglais, `detail` en français. Ce n'est
+pas une négligence. Le `title` est le vocabulaire HTTP, celui qu'on retrouve dans
+la RFC et dans les journaux ; le `detail` est ce que le mobile peut afficher tel
+quel.
+
+### Le message d'une exception est écrit pour les journaux
+
+C'est la décision qui porte le ticket, et elle va plus loin que la case « aucune
+trace de pile en prod ».
+
+Le réflexe est de rendre `$exception->getMessage()` pour les 4xx : le message est
+souvent bon, `createNotFoundException('Séance introuvable.')` s'écrit tout seul.
+Sauf que la majorité des exceptions 4xx ne sont pas écrites par nous. Le
+`NotFoundHttpException` du routeur récite l'URL demandée. Un résolveur d'argument
+annonce `App\Entity\Workout object not found by...`. Une exception Doctrine porte
+le SQL, avec son utilisateur et son hôte. Distinguer « message écrit pour le
+client » de « message écrit pour les journaux » demanderait de marquer les
+premiers — une exception maison, donc une discipline, donc un oubli un jour.
+
+Le `detail` est donc **choisi ici**, par statut, dans une table du listener.
+Aucune exception ne parle au client. La formulation de la case du ticket devient
+alors une conséquence, pas un objectif : il n'y a pas de chemin par lequel un
+détail interne puisse partir, pas seulement pas de trace.
+
+Hors prod, et **seulement sur une 5xx**, un membre d'extension `exception` ajoute
+la classe, le message et la ligne. Sans lui, une 500 d'API en développement est
+un mur de texte identique à toutes les autres. Mais toujours pas la trace : le
+profileur la garde déjà, et ne pas l'écrire ici, c'est ne pas avoir de code qui
+n'aurait pas le droit de tourner en prod.
+
+### Priorité -1, entre deux écoutes du même listener
+
+`ErrorListener` de Symfony écoute `kernel.exception` **deux fois** :
+`logKernelException` à **0**, `onKernelException` à **-128**. Et
+`setResponse()` sur un `ExceptionEvent` **arrête la propagation** — c'est un
+`RequestEvent`. Se placer à 0, le réflexe, revenait donc à jouer l'existence des
+journaux à pile ou face : selon l'ordre d'enregistrement des services, une 500
+d'API aurait pu cesser d'être tracée sans que rien ne le signale. À -1, la
+journalisation a déjà eu lieu et seul le rendu HTML est supplanté.
+
+L'autre borne est le pare-feu de sécurité, qui écoute à **1**. Il doit passer
+d'abord : c'est lui qui transforme un accès refusé en 401 via
+`ApiTokenAuthenticator::start()`, ou en 403. Notre listener n'a à connaître ni
+l'un ni l'autre.
+
+### Le périmètre est le préfixe, littéralement
+
+`str_starts_with($path, '/api')`, et pas une expression plus fine comme
+`^/api(/|$)`. C'est volontaire : le pare-feu de `security.yaml` matche `^/api`,
+et deux définitions du périmètre de l'API finiraient par diverger. Une zone où le
+pare-feu stateless s'applique mais pas la mise en forme, c'est une URL d'API qui
+sort en HTML — exactement ce que le lot vient supprimer.
+
+Hors du préfixe, le listener ne fait **rien**. Les pages d'erreur Twig du lot
+précédent (404, 403, 5xx) continuent de se rendre, et un test le vérifie par une
+vraie requête, pas par une lecture du code.
+
+### Le limiteur : 5, et par IP
+
+Plus serré que les 10 de l'appairage, parce que les deux secrets ne se ratent pas
+de la même façon. Un code de deux minutes se retape après une faute de frappe ; un
+mot de passe ne s'essaie pas de bonne foi cinq fois par minute.
+
+La clé reste l'**IP**, et c'est le point qui mérite d'être écrit : compter par
+email aurait été plus juste en apparence, mais aurait rendu à la connexion
+exactement ce que le 401 uniforme de KL-11 lui retire. « Ce compte est bloqué »
+dit « ce compte existe ». Et il aurait suffi de connaître un email pour en
+verrouiller l'accès à son titulaire.
+
+Le 429 se rend avant le décodage du corps, comme en appairage. Un test l'exige de
+la façon qui compte : quota épuisé, **bon** mot de passe, aucun jeton émis.
+
+### Tester ce que fait la prod, sans prod
+
+`kernel.debug` est vrai en test comme en dev. Une requête HTTP ne pouvait donc
+rien prouver sur ce que la prod laisse filtrer — c'est le même mur que les pages
+d'erreur, qui ne se rendent qu'en prod et que `ErrorPageTest` exerce en rendant
+les templates directement. Ici, `ApiExceptionListenerTest` instancie le listener
+avec `debug: false` et lui passe un `ExceptionEvent` construit à la main. Le test
+qui porte le lot y lève une exception dont le message contient une chaîne de
+connexion, et vérifie qu'elle ne sort nulle part.
+
+Le comportement en situation (404, 405 avec son `Allow`, périmètre) reste
+fonctionnel, dans `ApiErrorResponseTest`.
+
+### Fichiers touchés
+
+Neufs : `src/Http/ApiProblem.php`, `src/EventListener/ApiExceptionListener.php`,
+`tests/EventListener/ApiExceptionListenerTest.php` (7 tests),
+`tests/Controller/ApiErrorResponseTest.php` (5 tests).
+Modifiés : `config/packages/rate_limiter.yaml` (limiteur `api_login`),
+`src/Controller/Api/AuthController.php` (limiteur sur `login`, `throttle()`
+partagé avec `pair`, `problem()` délégué), `src/Security/ApiTokenAuthenticator.php`
+(401 délégué), `tests/Controller/ApiAuthEndpointsTest.php` (2 tests de limiteur +
+vidage du pool de cache au `setUp`), `CLAUDE.md` (§4 pour `src/Http/`, §6).
+
+**Prochain ticket : KL-14** — `GET /api/bootstrap`, l'hydratation complète de la
+base locale en une requête. C'est l'endpoint le plus important du lot.

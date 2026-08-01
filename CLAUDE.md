@@ -247,6 +247,8 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
 
 - Enum PHP → `src/Enum/` (backed enum `enum X: string`)
 - Service métier → `src/Service/` (autowiring)
+- Brique HTTP transverse (forme d'une réponse d'erreur…) → `src/Http/`, comme
+  `src/Doctrine/` pour les briques ORM : ce n'est ni du métier ni un contrôleur
 - Repository → `src/Repository/` (un par entité)
 - Form type → `src/Form/`
 - Commande console → `src/Command/`
@@ -330,7 +332,55 @@ d'authentification (`POST /api/auth/login`, `POST /api/auth/logout`,
 (`PairingCode`, `POST /pairing/code`, `POST /api/auth/pair`). **KL-47 livré le
 31/07/2026** : la page QR sur le desktop. **KL-12 livré le 31/07/2026** : la
 gestion des appareils dans `/profile/settings` — l'appairage est réversible.
-Prochain ticket KL-13 (erreurs normalisées RFC 9457 + limiteur sur la connexion).
+**KL-13 livré le 31/07/2026** : les erreurs normalisées RFC 9457 et le limiteur
+sur la connexion. Prochain ticket KL-14 (`GET /api/bootstrap`).
+
+Ce que KL-13 pose et qu'il ne faut pas casser :
+
+- **Le contrôleur rend ses erreurs, `ApiExceptionListener` rattrape ce que
+  personne n'a rendu.** `AuthController` et `ApiTokenAuthenticator` formulent
+  toujours leurs refus (ils savent ce qu'ils refusent) ; le listener ne peut, lui,
+  que traduire un statut. C'est un filet, pas une couche de plus à traverser.
+- **Une seule enveloppe : `App\Http\ApiProblem`.** Le `title` s'y **dérive du
+  statut** et ne s'écrit jamais à la main — le couple `(status, title)` répété à
+  huit endroits pouvait entrer en désaccord avec lui-même. `title` reste en
+  anglais (vocabulaire HTTP), `detail` en français (il est fait pour être lu).
+- **Le message d'une exception ne sort jamais dans la réponse** : il est écrit
+  pour les journaux (SQL d'une exception Doctrine, nom de classe d'un résolveur,
+  URL récitée par le routeur). Le `detail` est choisi par statut dans une table du
+  listener. C'est la lecture forte de « aucune trace de pile en prod » : aucun
+  détail interne ne peut partir, pas seulement pas de trace. Hors prod et
+  **seulement sur une 5xx**, un membre d'extension `exception` donne classe,
+  message et ligne — jamais la trace, que le profileur garde déjà.
+- **Priorité -1 sur `kernel.exception`, et c'est mesuré.** Le pare-feu de sécurité
+  écoute à **1** (il transforme un accès refusé en 401 via
+  `ApiTokenAuthenticator::start()`), `ErrorListener` de Symfony écoute **deux
+  fois** : journalisation à **0**, rendu HTML à **-128**. Se placer entre les deux
+  garde le journal et supplante le rendu. À 0, l'ordre avec la journalisation
+  dépendrait de l'enregistrement des services et une 500 d'API pourrait cesser
+  d'être tracée en silence. Rappel : `setResponse()` **arrête la propagation**.
+- **Le périmètre est le préfixe littéral de `security.yaml`**
+  (`str_starts_with('/api')`). Le raffiner (`^/api(/|$)`) créerait une zone où le
+  pare-feu stateless s'applique mais pas la mise en forme. Hors préfixe, le
+  listener ne fait rien — les pages d'erreur Twig continuent de sortir, un test le
+  vérifie par une vraie requête.
+- **Les en-têtes de l'exception survivent** (`Allow` sur un 405, `Retry-After` sur
+  un 429, `WWW-Authenticate` sur un 401) : ils font partie de la réponse.
+- **Une validation est un 422 même nue**, et les violations se cherchent dans
+  **toute** la chaîne des causes — `#[MapRequestPayload]` (KL-16) met la
+  `ValidationFailedException` en `previous`, s'arrêter au premier niveau rendrait
+  un 422 sans le moindre champ. C'est la présence de l'exception qui décide du
+  statut, pas le nombre de violations.
+- **Le limiteur de connexion est plus serré que celui de l'appairage** (5 contre
+  10 par minute et par IP) : un mot de passe ne s'essaie pas de bonne foi cinq fois
+  par minute. La clé reste l'**IP** — compter par email ferait de la connexion un
+  oracle d'existence de compte et offrirait un déni de service ciblé. Le 429 se
+  rend avant le décodage du corps : le bon mot de passe ne passe pas davantage.
+- **La garde de prod se teste hors requête HTTP** (`kernel.debug` est vrai en test
+  comme en dev) : `ApiExceptionListenerTest` instancie le listener avec
+  `debug: false` et lui passe un `ExceptionEvent` construit à la main, même
+  raisonnement que `ErrorPageTest`. Et le piège hérité de KL-46 reste entier : le
+  compteur du limiteur vit dans un pool de cache **sur disque**, à vider au `setUp`.
 
 Ce que KL-12 pose et qu'il ne faut pas casser :
 

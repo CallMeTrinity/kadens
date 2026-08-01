@@ -31,8 +31,10 @@
 > confirmation d'appairage. **KL-12 livré** : la gestion des appareils —
 > section « Appareils connectés » dans `/profile/settings`, révocation par
 > appareil et « tout révoquer », le jeton **supprimé** et non marqué.
-> L'appairage est désormais réversible. Prochain ticket : **KL-13** (erreurs
-> normalisées RFC 9457 et limiteur sur la connexion).
+> L'appairage est désormais réversible. **KL-13 livré** : les erreurs de l'API
+> sont normalisées (RFC 9457) par `ApiExceptionListener` et une enveloppe unique
+> `ApiProblem`, et la connexion par mot de passe est limitée à 5 tentatives par
+> IP et par minute. Prochain ticket : **KL-14** (`GET /api/bootstrap`).
 
 ---
 
@@ -1122,16 +1124,81 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
 
 ### KL-13 — Erreurs normalisées et limitation de débit
 
-**Où** : `src/EventListener/ApiExceptionListener.php`, `config/packages/rate_limiter.yaml`
+**Où** : `src/EventListener/ApiExceptionListener.php`, `src/Http/ApiProblem.php`,
+`config/packages/rate_limiter.yaml`
 
 **Fini quand** :
-- [ ] Toute exception sur `^/api` sort en `application/problem+json`
+- [x] Toute exception sur `^/api` sort en `application/problem+json`
       (RFC 9457 : `type`, `title`, `status`, `detail`)
-- [ ] Les erreurs de validation listent les champs fautifs
-- [ ] Aucune trace de pile en prod
-- [ ] Limiteur sur `POST /api/auth/login` (5 tentatives par IP et par minute)
-- [ ] Le listener **ne capte pas** les routes hors `^/api` (les pages d'erreur
+- [x] Les erreurs de validation listent les champs fautifs
+- [x] Aucune trace de pile en prod
+- [x] Limiteur sur `POST /api/auth/login` (5 tentatives par IP et par minute)
+- [x] Le listener **ne capte pas** les routes hors `^/api` (les pages d'erreur
       Twig existantes doivent continuer de sortir)
+
+Ce que le ticket pose, et qu'il ne faut pas casser :
+
+- **Le contrôleur rend ses erreurs, le listener rattrape ce que personne n'a
+  rendu.** `AuthController` et `ApiTokenAuthenticator` continuent de formuler
+  leurs refus (identifiants invalides, code d'appairage périmé, jeton absent) :
+  ils savent ce qu'ils refusent, là où le listener ne peut que traduire un
+  statut. Le listener est un filet, pas une couche de plus à traverser.
+- **Une seule enveloppe, `App\Http\ApiProblem`.** Les trois producteurs
+  d'erreurs de l'API passent par elle. Le `title` s'y **dérive du statut** et ne
+  s'écrit jamais à la main — un appelant qui le choisissait pouvait le mettre en
+  désaccord avec le `status` de la même réponse (c'était le cas avant, avec un
+  couple `(status, title)` répété à huit endroits). Corollaire : `title` reste en
+  anglais (le vocabulaire HTTP), `detail` en français (il est destiné à être lu).
+- **Le message d'une exception ne sort JAMAIS dans la réponse.** Il est écrit
+  pour les journaux : une exception Doctrine porte le SQL, un résolveur
+  d'argument porte un nom de classe interne, et le `NotFoundHttpException` du
+  routeur récite l'URL demandée. Le `detail` est donc choisi par statut, dans une
+  table du listener. C'est la lecture forte du « aucune trace de pile en prod » :
+  il n'y a pas de chemin par lequel un détail interne puisse partir, pas
+  seulement pas de trace. Hors prod, et **seulement sur une 5xx**, un membre
+  d'extension `exception` ajoute la classe, le message et la ligne — jamais la
+  trace, que le profileur garde déjà.
+- **Priorité -1 sur `kernel.exception`, et c'est mesuré.** Le pare-feu de
+  sécurité écoute à **1** : il doit passer d'abord, c'est lui qui transforme un
+  accès refusé en 401 (via `ApiTokenAuthenticator::start()`) ou en 403.
+  `ErrorListener` de Symfony écoute **deux fois** — la journalisation à **0**, le
+  rendu HTML à **-128**. Se placer entre les deux, c'est garder le journal et
+  supplanter le rendu. À 0, l'ordre avec la journalisation serait celui de
+  l'enregistrement des services : une 500 d'API pourrait cesser d'être tracée
+  sans que rien ne le dise. Rappel du mécanisme : `setResponse()` **arrête la
+  propagation** (`RequestEvent`), tout ce qui écoute plus bas est court-circuité.
+- **Le périmètre est le préfixe littéral de `security.yaml`**
+  (`str_starts_with('/api')`), volontairement pas une expression plus fine. Le
+  raffiner ici (`^/api(/|$)`) créerait une zone où le pare-feu stateless
+  s'applique mais pas la mise en forme, donc un chemin d'API qui sortirait en
+  HTML. Hors du préfixe, le listener ne fait **rien** : les pages d'erreur Twig
+  continuent de sortir, et un test le vérifie par une vraie requête.
+- **Les en-têtes de l'exception survivent** (`Allow` sur un 405, `Retry-After`
+  sur un 429, `WWW-Authenticate` sur un 401) : ils font partie de la réponse, pas
+  de sa décoration. Un 405 sans `Allow` ne dit pas ce qu'il aurait fallu appeler.
+- **Une validation est un 422 même nue.** Les violations sont cherchées dans
+  **toute** la chaîne des causes : `#[MapRequestPayload]` (KL-16) n'expose pas la
+  `ValidationFailedException`, il la met en `previous`. S'arrêter au premier
+  niveau rendrait un 422 sans le moindre champ, exactement l'inverse de ce que le
+  ticket demande. Et c'est la **présence** de l'exception qui décide du statut,
+  pas le nombre de violations : une liste vide reste une validation, pas une panne.
+- **Le limiteur de connexion est plus serré que celui de l'appairage** (5 contre
+  10 par minute et par IP) : un mot de passe ne s'essaie pas de bonne foi cinq
+  fois par minute, là où un code de deux minutes se retape après une faute de
+  frappe. La clé reste l'IP — compter par email ferait de la connexion un oracle
+  d'existence de compte (« ce compte est bloqué, donc il existe ») et offrirait
+  un déni de service ciblé sur un compte connu.
+- **Le 429 se rend avant le décodage du corps**, comme en appairage : un quota
+  épuisé ne coûte pas une lecture de plus, et le bon mot de passe ne passe pas
+  davantage — un test l'exige.
+- **La garde de prod se teste hors requête HTTP.** `kernel.debug` est vrai en
+  test comme en dev : une requête ne prouverait rien sur ce que la prod laisse
+  filtrer. `ApiExceptionListenerTest` instancie donc le listener avec
+  `debug: false` et lui passe un `ExceptionEvent` construit à la main. Même
+  raisonnement que `ErrorPageTest`, qui rend ses templates directement.
+- **Piège de test hérité de KL-46** : le compteur du limiteur vit dans un pool de
+  cache **sur disque**. `ApiAuthEndpointsTest` doit le vider au `setUp`, sinon
+  l'ordre des tests devient significatif.
 
 ### KL-14 — `GET /api/bootstrap`
 
