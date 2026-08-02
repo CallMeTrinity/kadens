@@ -30,8 +30,9 @@ final class PerformanceHistoryTest extends KernelTestCase
     {
         self::bootKernel();
         $this->em = static::getContainer()->get('doctrine.orm.entity_manager');
-        // Câblé à la main : le service n'a pas encore de consommateur (KL-07,
-        // KL-14, KL-50 viendront), le conteneur de test l'a donc inliné.
+        // Câblé à la main : le service est injecté dans d'autres services
+        // (BootstrapPayload, PerformanceHistoryPayload) et jamais tiré du
+        // conteneur, qui l'inline donc.
         $this->history = new PerformanceHistory(
             $this->em->getRepository(LoggedSet::class),
             new UnitFormatter(),
@@ -279,6 +280,111 @@ final class PerformanceHistoryTest extends KernelTestCase
         self::assertNotNull($first['best']);
         self::assertSame(51.0, $first['best']['weightKg']);
         self::assertSame(2, $first['last']['workingSets']);
+    }
+
+    // --- KL-17 : la trajectoire ----------------------------------------------
+
+    /**
+     * Les séances les plus récentes d'abord, et **la première est exactement la
+     * dernière performance** : c'est ce qui autorise `PerformanceHistoryPayload`
+     * à dériver `last` de `sessions[0]` au lieu de le relire. Si les deux
+     * lectures cessaient de s'accorder, ce test le dirait ici et pas sur le
+     * téléphone.
+     */
+    public function testRecentSessionsAreOrderedFromTheMostRecent(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise('Développé couché');
+
+        $this->log($user, $exercise, new \DateTimeImmutable('2026-03-01'), [[SetType::NORMAL, 8, 80.0]]);
+        $this->log($user, $exercise, new \DateTimeImmutable('2026-03-08'), [[SetType::NORMAL, 8, 85.0]]);
+        $this->log($user, $exercise, new \DateTimeImmutable('2026-03-15'), [
+            [SetType::NORMAL, 6, 90.0],
+            [SetType::NORMAL, 6, 90.0],
+        ]);
+
+        $sessions = $this->history->recentSessions($user, $exercise, 10);
+
+        self::assertCount(3, $sessions);
+        self::assertSame(
+            ['2026-03-15', '2026-03-08', '2026-03-01'],
+            array_map(static fn (array $s): string => $s['date']->format('Y-m-d'), $sessions),
+        );
+        self::assertSame(2, $sessions[0]['workingSets']);
+        self::assertSame(1080.0, $sessions[0]['tonnageKg']);
+        self::assertEquals($this->history->lastPerformance($user, $exercise), $sessions[0]);
+    }
+
+    /**
+     * La borne est en SQL, pas en PHP : l'historique d'un exercice grossit sans
+     * limite, ramener toutes ses séries pour n'en garder que dix séances
+     * marcherait la première année. Deux requêtes, et bornées toutes les deux.
+     */
+    public function testRecentSessionsAreLimitedInTwoQueries(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise('Squat');
+
+        for ($day = 1; $day <= 14; ++$day) {
+            $this->log($user, $exercise, new \DateTimeImmutable(sprintf('2026-03-%02d', $day)), [
+                [SetType::WARMUP, 10, 40.0],
+                [SetType::NORMAL, 5, 100.0 + $day],
+            ]);
+        }
+
+        $holder = static::getContainer()->get('doctrine.debug_data_holder');
+        self::assertInstanceOf(BacktraceDebugDataHolder::class, $holder);
+        $holder->reset();
+
+        $sessions = $this->history->recentSessions($user, $exercise, 10);
+
+        self::assertCount(2, $holder->getData()['default'] ?? [], 'La trajectoire tient en deux requêtes, quel que soit l\'historique.');
+        self::assertCount(10, $sessions);
+        self::assertSame('2026-03-14', $sessions[0]['date']->format('Y-m-d'));
+        self::assertSame('2026-03-05', $sessions[9]['date']->format('Y-m-d'));
+        // Même périmètre que les deux autres lectures : l'échauffement n'est
+        // jamais remonté, il ne compte pas comme une série de travail.
+        self::assertSame(1, $sessions[0]['workingSets']);
+    }
+
+    /** Rien de fait, pas d'entrée creuse : une liste vide. */
+    public function testRecentSessionsAreEmptyWithoutHistory(): void
+    {
+        $user = $this->createUser('owner@example.com');
+
+        self::assertSame([], $this->history->recentSessions($user, $this->createExercise('Jamais fait'), 10));
+    }
+
+    /** Deux séances le même jour restent deux points, départagés par leur rang. */
+    public function testTwoSessionsOnTheSameDayAreTwoPoints(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise('Traction');
+
+        $this->log($user, $exercise, new \DateTimeImmutable('2026-03-08'), [[SetType::NORMAL, 8, 10.0]]);
+        $this->log($user, $exercise, new \DateTimeImmutable('2026-03-08'), [[SetType::NORMAL, 6, 20.0]]);
+
+        $sessions = $this->history->recentSessions($user, $exercise, 10);
+
+        self::assertCount(2, $sessions);
+        self::assertSame(20.0, $sessions[0]['topWeightKg']);
+        self::assertSame(10.0, $sessions[1]['topWeightKg']);
+    }
+
+    /** L'isolation vaut pour la trajectoire comme pour le record (KL-50). */
+    public function testRecentSessionsAreScopedToTheirOwner(): void
+    {
+        $mine = $this->createUser('me@example.com');
+        $other = $this->createUser('other@example.com');
+        $exercise = $this->createExercise('Développé couché'); // global, sans owner
+
+        $this->log($mine, $exercise, new \DateTimeImmutable('2026-03-08'), [[SetType::NORMAL, 5, 90.0]]);
+        $this->log($other, $exercise, new \DateTimeImmutable('2026-03-09'), [[SetType::NORMAL, 5, 150.0]]);
+
+        $sessions = $this->history->recentSessions($mine, $exercise, 10);
+
+        self::assertCount(1, $sessions);
+        self::assertSame(90.0, $sessions[0]['topWeightKg']);
     }
 
     /** Un exercice fait mais jamais chargé a une dernière perf sans record. */

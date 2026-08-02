@@ -3756,3 +3756,111 @@ Aucune migration : le modèle du réalisé était complet depuis KL-02.
 
 **Prochain ticket : KL-17** — `GET /api/exercises/{id}/history`, qui consomme
 `PerformanceHistory` sans requêter en direct.
+
+---
+
+## Kadens Live KL-17 — la trajectoire d'un exercice (02/08/2026)
+
+`GET /api/exercises/{id}/history` : dernière performance, record, et les dix
+dernières séances sur un exercice. Le plus court ticket du lot 2, et pourtant
+deux décisions valaient d'être écrites — l'une sur le producteur, l'autre sur le
+code de refus.
+
+### « Consomme `PerformanceHistory`, ne requête pas en direct »
+
+Le service (KL-04) savait dire « la dernière fois » et « c'est quoi mon
+record ? ». Il ne savait pas dire « les dix dernières fois ». La tentation était
+d'écrire la requête dans le contrôleur ou dans un service à côté ; la ligne du
+ticket l'interdisait, et elle avait raison pour une raison qui n'est pas
+esthétique : les trois lectures doivent partager **le même périmètre**.
+Échauffement exclu, exercice sauté exclu, statut de la séance non filtré, portée
+du seul utilisateur demandé. Trois chiffres lus sur trois définitions différentes
+de « ce qui compte » ne se comparent pas, et l'écart ne se verrait que sur un
+téléphone, des semaines plus tard.
+
+`recentSessions()` est donc écrit dans `PerformanceHistory`, et le périmètre des
+trois lectures est descendu d'un cran dans le repository : `workingSetScope()`
+porte les filtres, `workingSetRows()` n'ajoute que la projection et le tri. Le
+résumé d'une séance (condensé des séries, tonnage, charge maximale) est lui aussi
+factorisé en `summarize()` — la dernière performance et chaque point de la
+trajectoire sont la même chose calculée une seule fois.
+
+### Deux requêtes, et bornées toutes les deux
+
+L'historique d'un exercice grossit sans limite. Ramener toutes ses séries pour
+n'en garder que dix séances marcherait la première année, puis se dégraderait
+sans que rien ne le signale. La borne est donc en SQL : une première requête
+prend les dix séances distinctes les plus récentes (`setMaxResults`), une seconde
+lit les séries de celles-là. Un test compte les requêtes sur quatorze séances,
+comme celui de `bulkFor()`.
+
+### `last` est dérivé, pas relu
+
+`sessions[0]` **est** la dernière performance : même requête, même règle. Le
+déduire supprime une lecture et, surtout, la possibilité que les deux se
+contredisent. Le champ reste exposé parce que le client l'a déjà dans son
+bootstrap — le retirer l'obligerait à traiter la fiche d'exercice autrement que
+le reste. Un test unitaire fige l'égalité avec `lastPerformance()` : si les deux
+lectures cessaient de s'accorder, il le dirait ici et pas sur le téléphone.
+
+### `PerformanceHistoryPayload`, ou la troisième fois qu'on extrait un producteur
+
+`BootstrapPayload` portait la traduction JSON d'une performance. L'endpoint
+l'aurait réécrite. C'est exactement ce que KL-14 avait évité pour la séance datée
+avec `ScheduledWorkoutPayload`, et pour la même raison : deux écritures de « à
+quoi ressemble une dernière perf » ne divergent pas tout de suite, elles
+divergent un jour, en silence, sur un client qui n'a qu'un désérialiseur.
+
+Le corps de l'endpoint est donc, au champ `sessions` près, une entrée du tableau
+`history` du bootstrap — et le test le compare sous-document par sous-document,
+pas clé par clé.
+
+Ce que la charge utile ne porte pas : **aucun identifiant de séance**. Une séance
+datée s'adresse par son `uuid` partout ailleurs dans l'API, et l'historique n'a
+pas vocation à en ouvrir une. C'est une trajectoire, une suite de points datés ;
+deux séances du même jour restent deux entrées, départagées par leur rang.
+
+### Introuvable et invisible rendent le même 404
+
+KL-15 avait tranché l'inverse pour la séance datée (404 *et* 403). Ce n'est pas
+une contradiction, c'est la même règle appliquée : ce qui décide, c'est la
+**nature de la clé**. Un `uuid` posé par le client ne se devine pas, il n'y a pas
+d'oracle à fermer. Un identifiant séquentiel d'exercice s'énumère en trois lignes
+de script, et un 403 y dirait « cet identifiant existe, il appartient à quelqu'un
+d'autre » — soit la taille et la composition de la bibliothèque perso des autres,
+exercice par exercice.
+
+La distinction ne manquerait à personne : le téléphone ne demande l'historique
+que d'un exercice reçu au bootstrap, donc visible.
+
+### Voir la fiche n'est pas voir l'historique
+
+`ExerciseVoter::VIEW` est la seule règle symétrique du projet : un coach ouvre la
+fiche de la variante maison de son athlète. Mais `PerformanceHistory` ne lit que
+le réalisé du **porteur du jeton**. Un coach qui ouvre cette fiche voit donc sa
+propre trajectoire sur cet exercice, pas celle de son athlète — et un test le
+fige. Lire le réalisé d'un athlète a son endroit, `GET /api/schedule/{uuid}`, où
+la séance dit de qui elle parle.
+
+### Le seul écran mobile qui suppose du réseau
+
+Assumé. Le bootstrap descend déjà le dernier point et le record de toute la
+bibliothèque : c'est ce que KL-32 affichera sous chaque exercice **en séance**,
+hors réseau. Descendre en plus dix séances par exercice ferait grossir une
+réponse bornée à 1 Mo pour un écran qu'on ouvre rarement. Consulter une
+progression n'est pas dérouler une séance.
+
+### Fichiers touchés
+
+Neufs : `src/Controller/Api/ExerciseController.php`,
+`src/Service/PerformanceHistoryPayload.php`,
+`tests/Controller/ApiExerciseHistoryTest.php` (7 tests).
+Modifiés : `src/Service/PerformanceHistory.php` (`recentSessions()`,
+`summarize()`), `src/Repository/LoggedSetRepository.php`
+(`findRecentWorkingSetsForExercise()`, périmètre extrait en `workingSetScope()`),
+`src/Service/BootstrapPayload.php` (délègue la mise en forme de l'historique),
+`tests/Service/PerformanceHistoryTest.php` (5 tests de plus), `CLAUDE.md` (§6),
+`docs/feature-live-tracking.md` (état, KL-17). Aucune migration.
+
+**Prochain ticket : KL-18** — les tests fonctionnels de l'API, endpoint par
+endpoint.

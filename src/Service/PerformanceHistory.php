@@ -61,6 +61,36 @@ final class PerformanceHistory
     }
 
     /**
+     * Les `limit` dernières séances où cet exercice a été fait, la plus récente
+     * d'abord, chacune sous **la même forme** qu'une dernière performance : ce
+     * sont les mêmes séries lues par la même règle, et `recentSessions()[0]` est
+     * exactement ce que `lastPerformance()` rend.
+     *
+     * C'est la trajectoire que KL-17 sert au téléphone, là où le bootstrap ne
+     * descend que le dernier point. Le tableau est **vide** quand l'exercice n'a
+     * jamais été fait, jamais une liste d'entrées creuses.
+     *
+     * @return list<LastPerformance>
+     */
+    public function recentSessions(User $user, Exercise $exercise, int $limit): array
+    {
+        $id = $exercise->getId();
+        if (null === $id) {
+            return [];
+        }
+
+        // Regroupement par séance en préservant l'ordre d'arrivée : le tri
+        // (date décroissante, puis identifiant) est déjà celui de la requête,
+        // et c'est lui qui départage deux séances du même jour.
+        $bySession = [];
+        foreach ($this->sets->findRecentWorkingSetsForExercise($user, $id, $limit) as $row) {
+            $bySession[$row['scheduledWorkoutId']][] = $row;
+        }
+
+        return array_values(array_map($this->summarize(...), $bySession));
+    }
+
+    /**
      * Le record : la série de travail la plus lourde jamais faite sur cet
      * exercice. null quand il n'a jamais été chargé (poids du corps, série en
      * durée) — il n'y a pas de record sans kilos.
@@ -154,14 +184,11 @@ final class PerformanceHistory
             $exerciseId = $row['exerciseId'];
 
             if (!isset($byExercise[$exerciseId])) {
-                $byExercise[$exerciseId] = [
-                    'scheduledWorkoutId' => $row['scheduledWorkoutId'],
-                    'date' => $row['date'],
-                    'rows' => [],
-                ];
+                $byExercise[$exerciseId] = ['session' => $row['scheduledWorkoutId'], 'rows' => [$row]];
+                continue;
             }
 
-            if ($byExercise[$exerciseId]['scheduledWorkoutId'] !== $row['scheduledWorkoutId']) {
+            if ($byExercise[$exerciseId]['session'] !== $row['scheduledWorkoutId']) {
                 continue;
             }
 
@@ -170,17 +197,32 @@ final class PerformanceHistory
 
         $performances = [];
         foreach ($byExercise as $exerciseId => $performance) {
-            $performances[$exerciseId] = [
-                'scheduledWorkoutId' => $performance['scheduledWorkoutId'],
-                'date' => $performance['date'],
-                'sets' => $this->condense($performance['rows']),
-                'workingSets' => \count($performance['rows']),
-                'tonnageKg' => $this->tonnage($performance['rows']),
-                'topWeightKg' => $this->topWeight($performance['rows']),
-            ];
+            $performances[$exerciseId] = $this->summarize($performance['rows']);
         }
 
         return $performances;
+    }
+
+    /**
+     * Les séries de travail d'**une** séance, résumées : leur condensé, leur
+     * nombre, le tonnage et la charge maximale. Écrit une seule fois pour la
+     * dernière performance et pour chaque point de la trajectoire (KL-17) —
+     * deux calculs du même résumé finiraient par ne plus donner le même chiffre.
+     *
+     * @param non-empty-list<PerfRow> $rows
+     *
+     * @return LastPerformance
+     */
+    private function summarize(array $rows): array
+    {
+        return [
+            'scheduledWorkoutId' => $rows[0]['scheduledWorkoutId'],
+            'date' => $rows[0]['date'],
+            'sets' => $this->condense($rows),
+            'workingSets' => \count($rows),
+            'tonnageKg' => $this->tonnage($rows),
+            'topWeightKg' => $this->topWeight($rows),
+        ];
     }
 
     /**

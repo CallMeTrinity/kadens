@@ -49,9 +49,9 @@ use App\Repository\ScheduledWorkoutRepository;
  * qu'un client garde en historique.
  *
  * @phpstan-import-type ApiScheduledWorkout from ScheduledWorkoutPayload
+ * @phpstan-import-type ApiHistoryEntry from PerformanceHistoryPayload
  *
  * @phpstan-type ApiExercise array{id: int|null, name: string|null, description: string|null, activity: string|null, targetAreas: list<string>, mediaUrl: string|null, global: bool, updatedAt: string|null}
- * @phpstan-type ApiHistoryEntry array{exerciseId: int, last: array<string, mixed>|null, best: array<string, mixed>|null}
  * @phpstan-type ApiBootstrap array{serverTime: string, since: string|null, window: array{from: string, to: string}, exercises: list<ApiExercise>, schedule: list<ApiScheduledWorkout>, history: list<ApiHistoryEntry>, deleted: array{exercises: list<int>, schedule: list<string>}}
  */
 final class BootstrapPayload
@@ -189,6 +189,10 @@ final class BootstrapPayload
      * client déchiffrerait autre chose sans qu'aucun test ne bronche. Même piège
      * que le `'p' ~ id` de KL-07, réglé ici par une forme qui n'a pas d'ambiguïté.
      *
+     * La mise en forme de chaque entrée appartient à `PerformanceHistoryPayload`
+     * (KL-17), qui sert aussi `GET /api/exercises/{id}/history` : le client n'a
+     * qu'un désérialiseur de performance, parce qu'il n'y a qu'un producteur.
+     *
      * @param list<User> $owners
      *
      * @return list<ApiHistoryEntry>
@@ -198,34 +202,7 @@ final class BootstrapPayload
         $entries = [];
 
         foreach ($this->history->bulkForIds($user, $this->exercises->libraryIdsForUsers($owners)) as $exerciseId => $entry) {
-            $last = $entry['last'];
-            $best = $entry['best'];
-
-            $entries[] = [
-                'exerciseId' => $exerciseId,
-                'last' => null === $last ? null : [
-                    'date' => $last['date']->format('Y-m-d'),
-                    'workingSets' => $last['workingSets'],
-                    'tonnageKg' => $last['tonnageKg'],
-                    'topWeightKg' => $last['topWeightKg'],
-                    'sets' => array_map(static fn (array $group): array => [
-                        'type' => $group['type']->value,
-                        'count' => $group['count'],
-                        'reps' => $group['reps'],
-                        'weightKg' => $group['weightKg'],
-                        'durationSeconds' => $group['durationSeconds'],
-                        'firstIndex' => $group['firstIndex'],
-                        'lastIndex' => $group['lastIndex'],
-                    ], $last['sets']),
-                ],
-                'best' => null === $best ? null : [
-                    'date' => $best['date']->format('Y-m-d'),
-                    'type' => $best['type']->value,
-                    'reps' => $best['reps'],
-                    'weightKg' => $best['weightKg'],
-                    'durationSeconds' => $best['durationSeconds'],
-                ],
-            ];
+            $entries[] = PerformanceHistoryPayload::entry($exerciseId, $entry['last'], $entry['best']);
         }
 
         return $entries;

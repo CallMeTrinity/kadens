@@ -98,9 +98,52 @@ class LoggedSetRepository extends ServiceEntityRepository
     }
 
     /**
-     * Socle commun des deux lectures de performance : les séries de travail
-     * d'un utilisateur sur un jeu d'exercices, en projection scalaire (aucune
-     * entité hydratée).
+     * Séries de TRAVAIL des `limit` dernières séances où un exercice apparaît —
+     * la trajectoire que le téléphone affiche sur la fiche d'un exercice
+     * (KL-17). Même périmètre que les deux lectures ci-dessus, à dessein : trois
+     * chiffres lus sur trois définitions différentes de « ce qui compte » ne se
+     * comparent pas.
+     *
+     * **Deux requêtes, et bornées toutes les deux.** L'historique d'un exercice
+     * grossit sans limite : ramener toutes ses séries pour n'en garder que dix
+     * séances marcherait la première année. On borne donc d'abord les séances
+     * (`setMaxResults` sur des lignes distinctes), puis on lit les séries de
+     * celles-là seulement.
+     *
+     * @return list<PerfRow> séance la plus récente d'abord, puis ordre
+     *                       d'exécution
+     */
+    public function findRecentWorkingSetsForExercise(User $owner, int $exerciseId, int $limit): array
+    {
+        if ($limit < 1) {
+            return [];
+        }
+
+        // `DISTINCT` parce qu'une séance porte plusieurs séries : ce qu'on
+        // compte ici, ce sont les séances, pas les lignes.
+        $sessions = $this->workingSetScope($owner, [$exerciseId])
+            ->select('DISTINCT s.id AS id', 's.scheduledDate AS date')
+            ->orderBy('s.scheduledDate', 'DESC')
+            ->addOrderBy('s.id', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getArrayResult();
+
+        if ([] === $sessions) {
+            return [];
+        }
+
+        $qb = $this->workingSetRows($owner, [$exerciseId])
+            ->andWhere('s.id IN (:sessions)')
+            ->setParameter('sessions', array_map(static fn (array $row): int => (int) $row['id'], $sessions));
+
+        return $this->hydrateRows($qb->getQuery()->getArrayResult());
+    }
+
+    /**
+     * Socle commun des lectures de performance : les séries de travail d'un
+     * utilisateur sur un jeu d'exercices, en projection scalaire (aucune entité
+     * hydratée).
      *
      * Le statut de la séance n'est PAS filtré : le réalisé est un fait dès
      * qu'il est écrit, une séance encore PLANNED en cours de synchro compte
@@ -111,7 +154,7 @@ class LoggedSetRepository extends ServiceEntityRepository
      */
     private function workingSetRows(User $owner, array $exerciseIds): \Doctrine\ORM\QueryBuilder
     {
-        return $this->createQueryBuilder('ls')
+        return $this->workingSetScope($owner, $exerciseIds)
             ->select(
                 'IDENTITY(le.exercise) AS exerciseId',
                 's.id AS scheduledWorkoutId',
@@ -122,6 +165,24 @@ class LoggedSetRepository extends ServiceEntityRepository
                 'ls.durationSeconds AS durationSeconds',
                 'ls.rpe AS rpe',
             )
+            ->orderBy('exerciseId', 'ASC')
+            ->addOrderBy('s.scheduledDate', 'DESC')
+            ->addOrderBy('s.id', 'DESC')
+            ->addOrderBy('le.position', 'ASC')
+            ->addOrderBy('ls.position', 'ASC');
+    }
+
+    /**
+     * Le périmètre, sans projection ni tri : « les séries de travail de cet
+     * utilisateur sur ces exercices ». C'est la définition que les trois
+     * lectures partagent — dernière performance, record, séances récentes — et
+     * la seule chose qui garantit qu'elles parlent du même réalisé.
+     *
+     * @param list<int> $exerciseIds
+     */
+    private function workingSetScope(User $owner, array $exerciseIds): \Doctrine\ORM\QueryBuilder
+    {
+        return $this->createQueryBuilder('ls')
             ->join('ls.loggedExercise', 'le')
             ->join('le.scheduledWorkout', 's')
             ->andWhere('s.owner = :owner')
@@ -130,12 +191,7 @@ class LoggedSetRepository extends ServiceEntityRepository
             ->andWhere('ls.setType != :warmup')
             ->setParameter('owner', $owner)
             ->setParameter('exercises', $exerciseIds)
-            ->setParameter('warmup', SetType::WARMUP->value)
-            ->orderBy('exerciseId', 'ASC')
-            ->addOrderBy('s.scheduledDate', 'DESC')
-            ->addOrderBy('s.id', 'DESC')
-            ->addOrderBy('le.position', 'ASC')
-            ->addOrderBy('ls.position', 'ASC');
+            ->setParameter('warmup', SetType::WARMUP->value);
     }
 
     /**

@@ -340,8 +340,49 @@ l'hydratation complète de la base locale du téléphone en une requête.
 **KL-15 et KL-16 livrés le 02/08/2026** : la séance datée s'ouvre seule
 (`GET /api/schedule/{uuid}`) et **le sens montant existe** —
 `PUT /api/schedule/{uuid}` (upsert idempotent du document complet) et `DELETE`
-(séances libres seulement). Prochain ticket KL-17
-(`GET /api/exercises/{id}/history`).
+(séances libres seulement). **KL-17 livré le 02/08/2026** :
+`GET /api/exercises/{id}/history`, la trajectoire d'un exercice. Prochain ticket
+KL-18 (tests fonctionnels de l'API).
+
+Ce que KL-17 pose et qu'il ne faut pas casser :
+
+- **Les trois lectures de performance partagent un seul périmètre.**
+  `recentSessions()` vit **dans** `PerformanceHistory`, pas à côté : échauffement
+  exclu, exercice sauté exclu, statut de la séance non filtré, portée du seul
+  utilisateur demandé. C'est le sens de « consomme `PerformanceHistory`, ne
+  requête pas en direct » — trois chiffres lus sur trois définitions différentes
+  de « ce qui compte » ne se comparent pas. Le périmètre est descendu d'un cran
+  dans le repository (`workingSetScope()`), le résumé d'une séance est factorisé
+  en `summarize()`.
+- **Deux requêtes, et bornées toutes les deux.** L'historique d'un exercice
+  grossit sans limite : on borne d'abord les **séances** (`setMaxResults` sur des
+  lignes distinctes), puis on lit les séries de celles-là. Ramener toutes les
+  séries pour n'en garder que dix séances marcherait la première année. Un test
+  compte les requêtes, comme pour `bulkFor()` (KL-04).
+- **`last` est dérivé de `sessions[0]`, jamais relu** : même requête, même règle,
+  donc une lecture de moins et aucune façon de se contredire. Le champ reste
+  exposé parce que le client l'a déjà dans son bootstrap. Un test unitaire fige
+  l'égalité avec `lastPerformance()`.
+- **`PerformanceHistoryPayload` est le producteur unique de la forme d'une
+  performance**, partagé avec le tableau `history` du bootstrap — même rôle que
+  `ScheduledWorkoutPayload` pour la séance datée. Le corps de l'endpoint est, au
+  champ `sessions` près, une entrée du bootstrap, et un test compare les
+  sous-documents entiers.
+- **Introuvable et invisible rendent le MÊME 404**, contrairement à
+  `GET /api/schedule/{uuid}`. Ce n'est pas la règle inverse : ce qui décide, c'est
+  la **nature de la clé**. Un `uuid` posé par le client ne se devine pas ; un id
+  séquentiel d'exercice s'énumère, et un 403 dirait la taille et la composition de
+  la bibliothèque perso des autres.
+- **Voir la fiche n'est pas voir l'historique.** `ExerciseVoter::VIEW` est
+  symétrique (le coach ouvre la variante maison de son athlète), mais
+  `PerformanceHistory` ne lit que le réalisé du **porteur du jeton** : le coach y
+  voit sa propre trajectoire. Le réalisé de l'athlète se lit sur
+  `GET /api/schedule/{uuid}`.
+- **Aucun identifiant de séance dans la charge utile** (l'historique est une
+  trajectoire, pas une liste de liens), et **c'est le seul écran mobile qui
+  suppose du réseau** : le bootstrap descend déjà le dernier point et le record de
+  toute la bibliothèque, dix séances par exercice en plus feraient grossir une
+  réponse bornée à 1 Mo.
 
 Ce que KL-15 et KL-16 posent et qu'il ne faut pas casser :
 

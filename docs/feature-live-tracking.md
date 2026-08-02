@@ -49,7 +49,12 @@
 > fait autorité sur le réalisé, le serveur sur la programmation (§KL-16) ; le
 > remplacement du réalisé se fait en deux `flush()` dans une transaction, et les
 > références invalides sortent en 422 avec le champ fautif.
-> Prochain ticket : **KL-17** (`GET /api/exercises/{id}/history`).
+> **KL-17 livré (02/08/2026)** : `GET /api/exercises/{id}/history` rend la
+> trajectoire d'un exercice — dernière performance, record, et les dix dernières
+> séances, en deux requêtes bornées. La mise en forme d'une performance a
+> désormais un producteur unique (`PerformanceHistoryPayload`), partagé avec le
+> tableau `history` du bootstrap.
+> Prochain ticket : **KL-18** (tests fonctionnels de l'API).
 
 ---
 
@@ -1412,9 +1417,63 @@ pièces.
 
 ### KL-17 — `GET /api/exercises/{id}/history`
 
+**Où** : `src/Controller/Api/ExerciseController.php`,
+`src/Service/PerformanceHistoryPayload.php`, `src/Service/PerformanceHistory.php`
+
 **Fini quand** :
-- [ ] Dernière performance, record, et les 10 dernières séances sur cet exercice
-- [ ] Consomme `PerformanceHistory`, ne requête pas en direct
+- [x] Dernière performance, record, et les 10 dernières séances sur cet exercice
+- [x] Consomme `PerformanceHistory`, ne requête pas en direct
+
+**Ce qui a été tranché en écrivant le ticket** :
+
+- **Le ticket a ajouté une lecture à `PerformanceHistory`, pas un contournement.**
+  Le service savait dire « la dernière fois » et « le record », pas « les dix
+  dernières fois » : `recentSessions()` est écrit **dans** le service, sur le
+  même périmètre que les deux autres (échauffement exclu, exercice sauté exclu,
+  statut de la séance non filtré, portée du seul utilisateur demandé). Trois
+  chiffres lus sur trois définitions différentes de « ce qui compte » ne se
+  comparent pas — c'est le sens de « ne requête pas en direct ».
+- **Deux requêtes, et bornées toutes les deux.** L'historique d'un exercice
+  grossit sans limite : ramener toutes ses séries pour n'en garder que dix
+  séances marcherait la première année. On borne d'abord les **séances**
+  (`setMaxResults` sur des lignes distinctes), puis on lit les séries de
+  celles-là. Un test compte les requêtes, comme pour `bulkFor()` (KL-04).
+- **`last` est dérivé de `sessions[0]`, pas relu.** C'est la même chose lue par
+  la même requête ; le déduire supprime une lecture **et** la possibilité que les
+  deux se contredisent. Le champ reste exposé parce que le client l'a déjà dans
+  son bootstrap : le retirer l'obligerait à traiter la fiche d'exercice
+  autrement que le reste. Un test unitaire fige l'égalité avec
+  `lastPerformance()`.
+- **La mise en forme d'une performance devient `PerformanceHistoryPayload`.**
+  `BootstrapPayload` la portait ; l'endpoint l'aurait réécrite, et deux écritures
+  de « à quoi ressemble une dernière perf » n'auraient divergé qu'un jour, en
+  silence, sur un client qui n'a qu'un désérialiseur. Même raison d'être que
+  `ScheduledWorkoutPayload` (KL-14) : un seul producteur par structure. Le corps
+  de l'endpoint est, au champ `sessions` près, une entrée du tableau `history` du
+  bootstrap — et un test compare les deux sous-documents entiers.
+- **Introuvable et invisible rendent le MÊME 404**, contrairement à
+  `GET /api/schedule/{uuid}` qui distingue 404 et 403. Ce n'est pas la règle
+  inverse mais la même règle appliquée : ce qui décide, c'est la **nature de la
+  clé**. Un `uuid` posé par le client ne se devine pas ; un identifiant
+  séquentiel d'exercice s'énumère en trois lignes, et un 403 y dirait la taille
+  et la composition de la bibliothèque perso des autres, exercice par exercice.
+  La distinction ne manquerait à personne : le téléphone ne demande l'historique
+  que d'un exercice reçu au bootstrap, donc visible.
+- **La portée de lecture et la portée de l'historique ne sont pas la même
+  chose.** `ExerciseVoter::VIEW` est symétrique (le coach ouvre la fiche de la
+  variante maison de son athlète), mais `PerformanceHistory` ne lit que le
+  réalisé du **porteur du jeton** : un coach qui ouvre cette fiche voit sa propre
+  trajectoire, pas celle de son athlète. Lire le réalisé d'un athlète a son
+  endroit — `GET /api/schedule/{uuid}` — où la séance dit de qui elle parle.
+- **Aucun identifiant de séance dans la charge utile.** Une séance datée
+  s'adresse par son `uuid` partout ailleurs, et l'historique n'a pas vocation à
+  en ouvrir une : c'est une trajectoire, une suite de points datés. Deux séances
+  du même jour restent deux entrées, départagées par leur rang.
+- **C'est le seul écran mobile qui suppose du réseau**, et c'est assumé : le
+  bootstrap descend déjà le dernier point et le record de toute la bibliothèque
+  (ce que KL-32 affiche en séance, hors réseau). Descendre dix séances par
+  exercice pour un écran qu'on ouvre rarement ferait grossir une réponse bornée à
+  1 Mo. Consulter une progression n'est pas dérouler une séance.
 
 ### KL-18 — Tests fonctionnels de l'API
 
