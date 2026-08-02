@@ -34,7 +34,15 @@
 > L'appairage est désormais réversible. **KL-13 livré** : les erreurs de l'API
 > sont normalisées (RFC 9457) par `ApiExceptionListener` et une enveloppe unique
 > `ApiProblem`, et la connexion par mot de passe est limitée à 5 tentatives par
-> IP et par minute. Prochain ticket : **KL-14** (`GET /api/bootstrap`).
+> IP et par minute. **KL-14 livré (01/08/2026)** : `GET /api/bootstrap`, une
+> requête qui rend la bibliothèque visible, la fenêtre J-30 → J+14 avec son
+> prescrit **et** son réalisé, l'historique par exercice et la liste des
+> disparus. Le delta `?since=` n'allège que la bibliothèque (§KL-14), les
+> suppressions sont tracées par une table de **pierres tombales**
+> (`deleted_entity`), et la structure d'une séance datée a désormais une
+> définition unique (`ScheduledWorkoutPayload`) que KL-15 et KL-16 réutiliseront.
+> Mesuré sur un jeu réaliste : 80,6 Ko, 16 requêtes SQL, 106 ms.
+> Prochain ticket : **KL-15** (`GET /api/schedule/{uuid}`).
 
 ---
 
@@ -1202,25 +1210,76 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
 
 ### KL-14 — `GET /api/bootstrap`
 
-**Où** : `src/Controller/Api/BootstrapController.php`, `src/Dto/`
+**Où** : `src/Controller/Api/BootstrapController.php`,
+`src/Service/BootstrapPayload.php`, `src/Service/ScheduledWorkoutPayload.php`
 
 **Quoi** : l'hydratation complète de la base locale en **une** requête. C'est
 l'endpoint le plus important du lot.
 
 **Fini quand** :
-- [ ] `?since=<ISO8601>` renvoie le delta ; sans paramètre, le jeu complet
-- [ ] Contenu : exercices visibles (perso + globale + biblio du coach en
+- [x] `?since=<ISO8601>` renvoie le delta ; sans paramètre, le jeu complet
+- [x] Contenu : exercices visibles (perso + globale + biblio du coach en
       lecture), séances datées de J-30 à J+14 avec leur prescrit à plat **et leur
       réalisé**, dernières perfs et records par exercice
-- [ ] Le delta sur les exercices se calcule sur `COALESCE(updatedAt, createdAt)` :
+- [x] Le delta sur les exercices se calcule sur `COALESCE(updatedAt, createdAt)` :
       `updatedAt` reste **null** tant qu'un exercice n'a jamais été modifié, un
       filtre naïf sur `updatedAt` les ferait tous disparaître du delta
-- [ ] Le prescrit vient de `PlanFlattener`, y compris `setLines`
-- [ ] Une liste des identifiants supprimés depuis `since` (sinon la base locale
+- [x] Le prescrit vient de `PlanFlattener`, y compris `setLines`
+- [x] Une liste des identifiants supprimés depuis `since` (sinon la base locale
       accumule des fantômes). Prévoir une table `deleted_entity` ou un
       `deletedAt` sur les entités concernées, à trancher dans le ticket
-- [ ] Le bloc-notes privé (`Workout.notes`) **n'est pas** dans la charge utile
-- [ ] Réponse mesurée sur un jeu réaliste : moins de 500 ms et moins de 1 Mo
+- [x] Le bloc-notes privé (`Workout.notes`) **n'est pas** dans la charge utile
+- [x] Réponse mesurée sur un jeu réaliste : moins de 500 ms et moins de 1 Mo
+
+**Ce qui a été tranché en écrivant le ticket** :
+
+- **Le delta n'allège que la bibliothèque d'exercices** (et la liste des
+  disparus). La fenêtre de séances datées et l'historique partent toujours en
+  entier. La fraîcheur d'une séance datée n'est portée par **aucune colonne** :
+  elle dépend de `Workout` → `Block` → `PrescribedExercise` → `PrescribedSet`, et
+  aucun niveau n'horodate son parent. Un delta sur `ScheduledWorkout.updatedAt`
+  manquerait en silence le programme corrigé par le coach. L'historique, lui,
+  coûte déjà deux requêtes quel que soit le volume (`PerformanceHistory`, KL-04) :
+  le rendre partiel laisserait un second appareil avec un record fantôme.
+- **`window` fait autorité.** La réponse annonce l'intervalle en clair ; une
+  séance datée que le client garde dedans et qui n'y est pas n'existe plus
+  (déplacée hors fenêtre ou supprimée, le geste local est le même). C'est ce qui
+  évite d'inventer une pierre tombale pour un déplacement.
+- **Table de pierres tombales, pas de `deletedAt`.** La suppression douce ne
+  supprime pas, elle cache : il faudrait alors la filtrer dans *chaque* requête
+  du site (index, sélecteurs de pose, calendrier, export, ICS, page publique), et
+  un oubli n'y produit aucune erreur, seulement une ligne morte qui réapparaît.
+  `deleted_entity` porte une **clé** (`id` d'exercice, `uuid` de séance datée) et
+  non une relation, plus un `owner` nullable qui dit à qui l'annoncer.
+  `TombstoneListener` (`onFlush` + `postFlush`) l'écrit pour **tous** les points
+  de suppression à la fois — il y en a une douzaine, et un oubli ne se verrait
+  que des semaines plus tard sur un téléphone. `app:deleted:purge` retire les
+  lignes de plus de 180 jours. La liste est **vide** sans `since` : un jeu
+  complet remplace tout.
+- **`ScheduledWorkoutPayload` est la définition unique** de la structure d'une
+  séance datée. C'est elle que KL-15 rendra seule et que KL-16 recevra : la seule
+  façon de tenir la promesse « un seul désérialiseur côté client » est de n'avoir
+  qu'un endroit qui produit la structure.
+- **Valeurs brutes, sauf `summary`.** Le cardio ne se saisit pas sur le mobile
+  (§0.4), il ne s'affiche qu'en lecture : réécrire les six branches de
+  `PlanFlattener::summarize()` en TypeScript pour une chaîne qu'on ne fait que
+  peindre serait une duplication sans contrepartie.
+- **L'historique est une liste, pas un objet indexé par id d'exercice** :
+  `json_encode` rend un tableau PHP en objet **ou** en liste selon ses clés.
+  Même piège que le `'p' ~ id` de KL-07.
+- **La portée de la bibliothèque est symétrique** (soi + coachs + athlètes),
+  celle d'`ExerciseVoter::VIEW`, pas celle — dirigée — de `CoachedLibrary` : une
+  séance composée par le coach peut poser ses variantes maison. Le calendrier, en
+  revanche, ne se partage pas.
+- **Piège de test** : `KernelBrowser` ne redémarre le noyau qu'à partir de la
+  **deuxième** requête. Une mesure de requêtes SQL faite sur la première compte
+  aussi les `INSERT` des fixtures (991 au lieu de 16). Une sonde `/api/ping`
+  intercalée force le redémarrage. Même famille que le piège `loginUser()` de
+  KL-11.
+- **Mesure** : 200 exercices, 15 séances de 5 exercices sur la fenêtre, réalisé
+  sur tout le passé → **80,6 Ko, 16 requêtes SQL, 106 ms** (profileur actif). Le
+  test garde la taille et le **nombre de requêtes**, pas le chronomètre : en CI un
+  chronomètre mesure la machine, un compteur de requêtes mesure le code.
 
 ### KL-15 — `GET /api/schedule/{uuid}`
 

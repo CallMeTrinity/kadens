@@ -7,6 +7,7 @@ use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Uid\Uuid;
 
@@ -56,6 +57,59 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
             ->addOrderBy('s.id', 'ASC')
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * La fenêtre du bootstrap mobile (KL-14) : les séances datées d'un
+     * utilisateur entre deux dates, **avec tout leur prescrit ET tout leur
+     * réalisé**, sans N+1.
+     *
+     * **Deux requêtes et pas une seule**, et c'est structurel : le prescrit
+     * (`w → b → pe → ps`) et le réalisé (`le → ls`) sont deux collections
+     * **sœurs** sous la même séance datée. Les joindre dans la même requête en
+     * ferait le produit cartésien — quinze séries prescrites et douze séries
+     * réalisées donneraient cent quatre-vingts lignes à hydrater pour un seul
+     * exercice. Chaque branche est en revanche une **chaîne**, donc sans risque :
+     * on peut y descendre aussi profond qu'on veut. La seconde requête retombe
+     * sur les mêmes entités gérées, Doctrine les complète en place.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findWindowWithContentAndLog(User $owner, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $prescribed = $this->windowQueryBuilder($owner, $from, $to)
+            ->addSelect('w', 'b', 'pe', 'ps', 'e')
+            ->leftJoin('s.workout', 'w')
+            ->leftJoin('w.blocks', 'b')
+            ->leftJoin('b.prescribedExercises', 'pe')
+            ->leftJoin('pe.detailedSets', 'ps')
+            ->leftJoin('pe.exercise', 'e')
+            ->getQuery()
+            ->getResult();
+
+        // Même fenêtre, branche sœur : le résultat est ignoré, il ne sert qu'à
+        // remplir les collections des entités déjà gérées ci-dessus.
+        $this->windowQueryBuilder($owner, $from, $to)
+            ->addSelect('le', 'ls')
+            ->leftJoin('s.loggedExercises', 'le')
+            ->leftJoin('le.loggedSets', 'ls')
+            ->getQuery()
+            ->getResult();
+
+        return $prescribed;
+    }
+
+    private function windowQueryBuilder(User $owner, \DateTimeImmutable $from, \DateTimeImmutable $to): QueryBuilder
+    {
+        return $this->createQueryBuilder('s')
+            ->andWhere('s.owner = :owner')
+            ->andWhere('s.scheduledDate BETWEEN :from AND :to')
+            ->setParameter('owner', $owner)
+            ->setParameter('from', $from, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE)
+            ->setParameter('to', $to, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE)
+            ->orderBy('s.scheduledDate', 'ASC')
+            ->addOrderBy('s.id', 'ASC')
+        ;
     }
 
     /**

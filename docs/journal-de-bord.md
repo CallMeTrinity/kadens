@@ -3421,3 +3421,194 @@ vidage du pool de cache au `setUp`), `CLAUDE.md` (§4 pour `src/Http/`, §6).
 
 **Prochain ticket : KL-14** — `GET /api/bootstrap`, l'hydratation complète de la
 base locale en une requête. C'est l'endpoint le plus important du lot.
+
+---
+
+## Kadens Live KL-14 — `GET /api/bootstrap` (01/08/2026)
+
+Tout ce que l'app fait hors réseau, elle le fait sur ce que cet appel a
+descendu : la bibliothèque d'exercices, une fenêtre de calendrier avec son
+prescrit **et** son réalisé, la dernière perf et le record par exercice. Une
+requête HTTP, seize requêtes SQL, et un nombre de requêtes qui ne bouge pas avec
+le volume.
+
+### Le delta n'allège que ce qui sait dire quand il a changé
+
+Le ticket demandait `?since=` sans préciser sur quoi. La réponse honnête, après
+avoir cherché la colonne, c'est : **sur les exercices, et sur rien d'autre**.
+
+La fraîcheur d'une séance datée n'est mesurable nulle part. Elle dépend d'un
+arbre — `Workout` → `Block` → `PrescribedExercise` → `PrescribedSet` — dont aucun
+niveau n'horodate son parent. Retoucher une série ne date pas sa séance, encore
+moins la séance datée qui la référence. Un delta sur `ScheduledWorkout.updatedAt`
+aurait très bien marché à l'essai, et aurait manqué **en silence** le seul cas
+qui compte : le coach qui corrige le programme de la semaine sur le web. Une
+fenêtre de 45 jours est bornée par construction ; un programme périmé sur le
+téléphone ne l'est pas. La fenêtre part donc toujours en entier.
+
+L'historique aussi, pour une raison différente : il est déjà bon marché — deux
+requêtes quel que soit le nombre d'exercices, c'est exactement ce pour quoi
+`PerformanceHistory::bulkFor()` a été écrit en KL-04. Le rendre partiel
+laisserait un second appareil, ou une suppression de réalisé faite sur le web,
+avec un record fantôme.
+
+Ce qui grossit sans borne, c'est la bibliothèque — la globale importée en
+console, surtout — et elle, elle a un horodatage fiable.
+
+Corollaire pour le client, écrit noir sur blanc dans la réponse : `window` dit
+l'intervalle, et ce qu'il contient fait autorité. Une séance datée que le
+téléphone garde dans cet intervalle et qui n'est pas dans la réponse n'existe
+plus — déplacée hors fenêtre ou supprimée, le geste local est le même. C'est ce
+qui évite d'inventer une pierre tombale pour un simple déplacement.
+
+### `COALESCE(updatedAt, createdAt)`, et la case du ticket qui sauve le delta
+
+`Exercise.updatedAt` n'est écrit qu'au `preUpdate` : il reste **null** tant qu'un
+exercice n'a jamais été retouché. Un filtre naïf `updatedAt >= :since` aurait
+donc fait disparaître du delta la quasi-totalité de la bibliothèque globale, et
+un exercice créé après le dernier bootstrap ne serait **jamais** arrivé sur le
+téléphone. Le ticket l'avait vu venir ; le test qui le garde crée les trois cas
+(ancien jamais retouché, récent jamais retouché, ancien retouché ce matin) et
+n'en attend que deux.
+
+### La pierre tombale plutôt que le `deleted_at`
+
+Sans trace des suppressions, un delta ne sait dire que ce qui a changé, jamais ce
+qui a disparu : la base locale accumule des fantômes, et un exercice supprimé
+reste proposé pendant des mois.
+
+Le ticket laissait le choix entre un `deletedAt` sur les entités concernées et
+une table dédiée. C'est la table, `deleted_entity`, et l'argument tient en une
+phrase : **la suppression douce ne supprime pas, elle cache**, et il faut alors
+la filtrer dans *chaque* requête du site — index, sélecteurs de pose, calendrier,
+export, ICS, page publique. Un oubli n'y produit aucune erreur, seulement une
+ligne morte qui réapparaît. La pierre tombale, elle, ne touche à rien : la ligne
+est bel et bien supprimée, et ce qu'on garde n'est plus l'entité mais son avis de
+décès.
+
+Elle porte une **clé** et non une relation (une FK vers une ligne supprimée
+n'existe pas) : l'`id` pour un exercice, l'`uuid` pour une séance datée — le
+mobile ne connaît que celui-là pour ce qu'il a créé lui-même. Et un `owner`
+nullable, qui dit à qui l'annoncer : null pour la bibliothèque globale, dont la
+disparition regarde tout le monde.
+
+### L'écrire dans un écouteur, pas au moment de supprimer
+
+Il y a une douzaine de points de suppression dans l'app, et il s'en ajoutera. Un
+oubli à un seul d'entre eux ne casse rien de visible : il laisse un fantôme dans
+la base d'un téléphone, des semaines plus tard. Une panne sans symptôme se
+prévient structurellement.
+
+`TombstoneListener` travaille en deux temps, et les deux sont nécessaires.
+`onFlush` est le seul moment où l'on voit encore les entités à supprimer *avec*
+leur identifiant et leur propriétaire ; `postFlush` le seul où l'on peut
+persister du neuf sans se battre avec l'unité de travail en cours. La liste vidée
+avant le second `flush()` borne la récursion à elle seule.
+
+Une garde qui n'est pas décorative : si le propriétaire part dans la même
+transaction (suppression de compte), la pierre tombale est **sautée**. Sa clé
+étrangère pointerait dans le vide, et il n'y a de toute façon plus de téléphone à
+prévenir. Limite assumée du même ordre : un `ON DELETE CASCADE` exécuté par la
+base ne déclenche aucun événement Doctrine — sans conséquence, pour la même
+raison.
+
+`app:deleted:purge` retire les lignes de plus de 180 jours, en cron, comme
+`app:pairing:purge`. Cent quatre-vingts jours, soit le double de la vie d'un
+`ApiToken` : un téléphone plus en retard que ça n'a plus de jeton valide, il
+repartira d'un bootstrap complet — où les pierres tombales ne servent pas,
+puisque le jeu complet remplace tout. C'est aussi pourquoi la liste des
+disparitions est **vide** quand `since` est absent.
+
+### Une structure de séance datée, et une seule définition
+
+`ScheduledWorkoutPayload` produit le document d'une séance datée. Le bootstrap le
+répète pour chaque séance de sa fenêtre, KL-15 le rendra seul, KL-16 le recevra.
+KL-15 exige que le client n'écrive qu'un désérialiseur : la seule façon de tenir
+cette promesse est de n'avoir qu'un endroit qui produit la structure.
+
+Le prescrit vient de `PlanFlattener`, `setLines` compris — règle verrouillée, et
+la vue déroulée est exactement ce dont le téléphone a besoin pour pré-remplir une
+séance. La liste **plate** du bloc et non ses `segments` : un superset y ferait
+figurer deux fois le même exercice, et le rang (`groupLabel`, « A1 »/« A2 »)
+suffit à le dessiner puisque le mobile ne recompose pas.
+
+Les valeurs sont brutes (kg, mètres, secondes), avec une exception assumée :
+`summary`, la ligne lisible d'un exercice. Le cardio est hors périmètre de la
+saisie mobile — il ne s'affiche qu'en lecture — et réécrire en TypeScript les six
+branches de `summarize()` pour une chaîne qu'on ne fait que peindre serait une
+duplication sans contrepartie.
+
+### Ce qui ne sort pas, et pourquoi c'est testé
+
+`Workout.notes` est le fourre-tout du propriétaire seul. Il n'entre pas dans
+`PlanFlattener`, donc ni dans l'export Excel, ni dans l'ICS, ni dans la page
+publique : l'API est une vue de consultation de plus, elle tombe sous la même
+garde. Le test le cherche dans le corps brut de la réponse, et vérifie du même
+geste que la consigne d'un exercice prescrit, elle, **sort** — c'est une note
+adressée à celui qui exécute.
+
+La portée de la bibliothèque est en revanche **symétrique**, celle
+d'`ExerciseVoter::VIEW` : soi, ses coachs, ses athlètes. Une séance composée par
+le coach peut poser ses variantes maison dans le programme de l'athlète, elles
+doivent donc descendre sur son téléphone — sinon il lit des exercices sans fiche.
+Ce n'est pas la portée dirigée de `CoachedLibrary` : ici on parle de ce qu'on peut
+lire, pas de ce qu'on retrouve dans sa bibliothèque. Le calendrier, lui, ne se
+partage pas : un coach ne reçoit pas les séances datées de son athlète.
+
+### Deux requêtes pour la fenêtre, et c'est structurel
+
+Le prescrit (`w → b → pe → ps`) et le réalisé (`le → ls`) sont deux collections
+**sœurs** sous la même séance datée. Les joindre dans la même requête en ferait
+le produit cartésien : quinze séries prescrites et douze réalisées donneraient
+cent quatre-vingts lignes à hydrater pour un seul exercice. Chaque branche est en
+revanche une chaîne, donc sans risque — on peut y descendre aussi profond qu'on
+veut. La seconde requête retombe sur les mêmes entités gérées, Doctrine les
+complète en place.
+
+L'historique est une liste, jamais un objet indexé par identifiant d'exercice :
+`json_encode` rend un tableau PHP en objet **ou** en liste selon ses clés, et un
+index qui se dégraderait en tableau JSON ferait déchiffrer autre chose au client
+sans qu'aucun test ne bronche. Même piège que le `'p' ~ id` de KL-07, réglé ici
+par une forme qui n'a pas d'ambiguïté.
+
+### Mesuré, et le piège qui a failli fausser la mesure
+
+Jeu d'essai : 200 exercices, un mois et demi de calendrier chargé (15 séances de
+5 exercices), le réalisé de tout le passé. **80,6 Ko et 16 requêtes SQL**,
+106 ms avec le profileur actif — les budgets du ticket étaient 1 Mo et 500 ms.
+
+Le test garde la taille et le **nombre de requêtes**, pas le chronomètre : en CI,
+un chronomètre mesure la machine, un compteur de requêtes mesure le code — et
+c'est un N+1 qui ferait exploser le budget de temps.
+
+Le piège, lui, valait le détour : `KernelBrowser` ne redémarre le noyau qu'à
+partir de la **deuxième** requête. La première mesure se faisait donc dans le
+conteneur qui venait de poser les fixtures, journal SQL compris : 991 requêtes,
+dont les centaines d'`INSERT` du jeu d'essai. Une sonde `/api/ping` intercalée
+force le redémarrage et la mesure retombe sur ce qu'elle prétend mesurer. Même
+famille que le piège `loginUser()` de KL-11.
+
+Dernier détail de taille : la réponse sort en `JSON_UNESCAPED_UNICODE`. Sans lui
+chaque caractère accentué part en `\uXXXX`, six octets pour un — sur des noms
+d'exercices et des consignes écrits en français, c'est le poste d'économie le
+plus bête à ne pas prendre.
+
+### Fichiers touchés
+
+Neufs : `src/Controller/Api/BootstrapController.php`,
+`src/Service/BootstrapPayload.php`, `src/Service/ScheduledWorkoutPayload.php`,
+`src/Entity/DeletedEntity.php`, `src/Enum/DeletedEntityType.php`,
+`src/Repository/DeletedEntityRepository.php`,
+`src/EventListener/TombstoneListener.php`,
+`src/Command/PurgeDeletedEntitiesCommand.php`,
+`migrations/Version20260801100000.php`,
+`tests/Controller/ApiBootstrapTest.php` (16 tests).
+Modifiés : `src/Repository/ExerciseRepository.php`
+(`findLibraryForUsersChangedSince`, `libraryIdsForUsers`),
+`src/Repository/ScheduledWorkoutRepository.php` (`findWindowWithContentAndLog`),
+`src/Service/PerformanceHistory.php` (`bulkForIds` extrait de `bulkFor`),
+`CLAUDE.md` (§6), `docs/feature-live-tracking.md` (état, KL-14).
+
+**Prochain ticket : KL-15** — `GET /api/schedule/{uuid}`, la même structure pour
+une séance seule. `ScheduledWorkoutPayload` est déjà là, il ne reste que la
+résolution par uuid et le voter.

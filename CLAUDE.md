@@ -249,6 +249,7 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
 - Service métier → `src/Service/` (autowiring)
 - Brique HTTP transverse (forme d'une réponse d'erreur…) → `src/Http/`, comme
   `src/Doctrine/` pour les briques ORM : ce n'est ni du métier ni un contrôleur
+- Écouteur d'événement (kernel ou Doctrine) → `src/EventListener/`
 - Repository → `src/Repository/` (un par entité)
 - Form type → `src/Form/`
 - Commande console → `src/Command/`
@@ -333,7 +334,86 @@ d'authentification (`POST /api/auth/login`, `POST /api/auth/logout`,
 31/07/2026** : la page QR sur le desktop. **KL-12 livré le 31/07/2026** : la
 gestion des appareils dans `/profile/settings` — l'appairage est réversible.
 **KL-13 livré le 31/07/2026** : les erreurs normalisées RFC 9457 et le limiteur
-sur la connexion. Prochain ticket KL-14 (`GET /api/bootstrap`).
+sur la connexion. **KL-14 livré le 01/08/2026** : `GET /api/bootstrap`,
+l'hydratation complète de la base locale du téléphone en une requête. Prochain
+ticket KL-15 (`GET /api/schedule/{uuid}`).
+
+Ce que KL-14 pose et qu'il ne faut pas casser :
+
+- **`?since` n'allège QUE la bibliothèque d'exercices** (et la liste des
+  disparus). La fenêtre de séances datées (J-30 → J+14) et l'historique partent
+  toujours en entier. La fraîcheur d'une séance datée n'est portée par **aucune
+  colonne** : elle dépend de `Workout` → `Block` → `PrescribedExercise` →
+  `PrescribedSet`, et aucun niveau n'horodate son parent. Un delta sur
+  `ScheduledWorkout.updatedAt` marcherait à l'essai et manquerait en silence le
+  programme corrigé par le coach. L'historique, lui, coûte déjà deux requêtes
+  quel que soit le volume (`PerformanceHistory`, KL-04) — le rendre partiel
+  laisserait un second appareil avec un record fantôme.
+- **Le filtre du delta est `COALESCE(updatedAt, createdAt)`.** `updatedAt` n'est
+  écrit qu'au `preUpdate` : il reste null pour tout ce qui n'a jamais été
+  retouché, c'est-à-dire la bibliothèque globale entière. Un filtre naïf la
+  ferait disparaître du delta.
+- **`window` fait autorité.** La réponse annonce l'intervalle en clair, et ce
+  qu'il contient le remplace en entier côté client : une séance datée qu'il garde
+  dedans et qui n'y est pas n'existe plus (déplacée hors fenêtre ou supprimée, le
+  geste local est le même). C'est ce qui évite une pierre tombale par
+  déplacement.
+- **Les suppressions se tracent dans une table, pas par un `deletedAt`.** La
+  suppression douce ne supprime pas, elle cache : il faudrait la filtrer dans
+  *chaque* requête du site, et un oubli n'y produit aucune erreur — seulement une
+  ligne morte qui réapparaît. `DeletedEntity` porte une **clé** (`id` d'exercice,
+  `uuid` de séance datée) et non une relation, plus un `owner` nullable qui dit à
+  qui l'annoncer (null = bibliothèque globale, donc tout le monde).
+- **`TombstoneListener` est le seul écrivain**, et il travaille en deux temps :
+  `onFlush` (dernier moment où l'entité a encore son id et son propriétaire) puis
+  `postFlush` (seul moment où l'on peut persister du neuf). Il couvre d'un coup
+  la douzaine de points de suppression de l'app — un appel explicite au moment de
+  supprimer se serait oublié quelque part, et l'oubli ne se verrait que des
+  semaines plus tard sur un téléphone. Trois détails à ne pas défaire : la liste
+  est vidée **avant** le flush imbriqué (c'est ce qui borne la récursion), la
+  pierre tombale est **détachée** après (gérée, elle ferait échouer un flush
+  ultérieur sur « A new entity was found through the relationship
+  `DeletedEntity#owner` » quand le propriétaire est supprimé à son tour), et une
+  pierre tombale dont le propriétaire part dans la même transaction est
+  **sautée**. Limite assumée : un `ON DELETE CASCADE` exécuté par la base ne
+  déclenche aucun événement Doctrine — sans conséquence, il n'y a plus de
+  téléphone à prévenir.
+- **La liste des disparus est vide sans `since`** : un jeu complet remplace tout,
+  et envoyer l'intégralité du cimetière serait le seul poste de la réponse à
+  grandir avec l'âge de l'installation. `app:deleted:purge` (180 jours, cron)
+  borne la table.
+- **`ScheduledWorkoutPayload` est la définition unique** de la structure d'une
+  séance datée : KL-15 la rendra seule, KL-16 la recevra. « Un seul
+  désérialiseur côté client » ne se tient qu'avec un seul producteur.
+- **Valeurs brutes, sauf `summary`.** Le cardio ne se saisit pas sur le mobile,
+  il ne s'affiche qu'en lecture : réécrire `PlanFlattener::summarize()` en
+  TypeScript pour une chaîne qu'on ne fait que peindre serait une duplication
+  sans contrepartie. Les séries, elles, partent en `reps` / `weightKg` /
+  `durationSeconds`.
+- **L'historique est une LISTE, jamais un objet indexé par id d'exercice** :
+  `json_encode` rend un tableau PHP en objet ou en liste selon ses clés, et la
+  bascule serait silencieuse. Même piège que le `'p' ~ id` de KL-07.
+- **La portée de la bibliothèque est symétrique** (soi + coachs + athlètes),
+  celle d'`ExerciseVoter::VIEW`, pas celle — dirigée — de `CoachedLibrary` : une
+  séance composée par le coach pose ses variantes maison, elles doivent être
+  lisibles sur le téléphone. Le calendrier, lui, ne se partage pas.
+- **`Workout.notes` ne sort pas** (même garde que l'export, l'ICS et la page
+  publique), et un test le cherche dans le corps brut. La note d'un exercice
+  prescrit, elle, sort : elle s'adresse à celui qui exécute.
+- **`markBootstrapped()` s'écrit après la construction de la charge utile**, et
+  seul cet endpoint l'écrit — sinon un appareil se dirait à jour sur une réponse
+  qui a échoué.
+- **Deux requêtes pour la fenêtre, et c'est structurel** : le prescrit
+  (`w → b → pe → ps`) et le réalisé (`le → ls`) sont deux collections **sœurs**
+  sous la même séance datée, les joindre ensemble en ferait le produit cartésien.
+  Chaque branche est une chaîne, donc sans risque.
+- **Piège de test** : `KernelBrowser` ne redémarre le noyau qu'à partir de la
+  **deuxième** requête. Compter les requêtes SQL sur la première compterait aussi
+  les `INSERT` des fixtures (991 au lieu de 16) — une sonde `/api/ping`
+  intercalée force le redémarrage. Et ce fichier de test **nettoie en
+  `tearDown`** : il est le premier, alphabétiquement, à laisser des `Workout`
+  derrière lui, et le ménage des tests suivants échouerait sur la clé étrangère
+  `workout.owner_id`.
 
 Ce que KL-13 pose et qu'il ne faut pas casser :
 

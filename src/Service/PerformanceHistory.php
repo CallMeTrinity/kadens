@@ -100,8 +100,22 @@ final class PerformanceHistory
                 $ids[$id] = $id;
             }
         }
-        $ids = array_values($ids);
 
+        return $this->bulkForIds($user, array_values($ids));
+    }
+
+    /**
+     * Même chose depuis des identifiants nus. Le bootstrap mobile (KL-14) passe
+     * par là : il rend l'historique de la bibliothèque **entière** même quand la
+     * réponse ne transporte qu'un delta d'exercices, et hydrater des centaines
+     * d'entités pour ne lire que leur `id` serait le seul coût de l'opération.
+     *
+     * @param list<int> $ids
+     *
+     * @return array<int, ExerciseHistory>
+     */
+    public function bulkForIds(User $user, array $ids): array
+    {
         $last = $this->lastByExercise($user, $ids);
         $best = $this->bestByExercise($user, $ids);
 
