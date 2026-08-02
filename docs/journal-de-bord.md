@@ -3612,3 +3612,147 @@ Modifiés : `src/Repository/ExerciseRepository.php`
 **Prochain ticket : KL-15** — `GET /api/schedule/{uuid}`, la même structure pour
 une séance seule. `ScheduledWorkoutPayload` est déjà là, il ne reste que la
 résolution par uuid et le voter.
+
+---
+
+## Kadens Live KL-15 et KL-16 — la séance datée, dans les deux sens (02/08/2026)
+
+Deux tickets d'un coup parce qu'ils ne se séparent pas : le second reçoit ce que
+le premier rend. Après ce lot, **le sens montant existe** — le téléphone peut
+écrire une séance faite, et c'est la dernière pièce manquante avant l'app.
+
+### KL-15 : la promesse « un seul désérialiseur » se teste, ou elle n'existe pas
+
+Le ticket demandait une structure identique à celle du bootstrap.
+`ScheduledWorkoutPayload` (KL-14) était déjà le producteur unique, donc le code
+était court. Ce qui a demandé de réfléchir, c'est comment **empêcher** la
+divergence future : rien n'aurait interdit à ce contrôleur d'ajouter un champ
+« juste pour cet endpoint ».
+
+Le test compare donc les deux réponses **entières** — la sortie du `GET` et
+l'entrée correspondante du tableau `schedule` du bootstrap — avec un `assertSame`
+sur les tableaux décodés. Il échoue au premier écart, d'où qu'il vienne. Comparer
+trois clés bien choisies aurait rassuré sans rien garantir.
+
+Deux extractions au passage, chacune pour la même raison :
+
+- **`ApiJson`**, pendant d'`ApiProblem` : un seul endroit pose
+  `JSON_UNESCAPED_UNICODE`. L'oublier ne casse rien de visible, ça gonfle la
+  réponse de six octets par caractère accentué.
+- **`IsoDate`**, qui reprend le garde-fou de forme que `?since` portait seul.
+  « Ce que l'API accepte comme date » n'a plus qu'une définition, et les charges
+  utiles de KL-16 s'y branchent.
+
+Sur le repository, `withPrescribed()` et `withLog()` remplacent les deux blocs de
+jointures écrits à la main : la fenêtre et l'unité partagent la définition de
+« avec tout son contenu ». Deux écritures auraient divergé, et la divergence ne
+se serait pas vue en erreur — seulement en N+1.
+
+### 404 ou 403 : la question s'est reposée, la réponse a changé
+
+KL-12 et KL-47 avaient tranché « 404, jamais 403 » pour un jeton ou un code
+d'appairage qui n'est pas le sien : distinguer confirmerait l'existence de la
+ressource à qui l'énumère. La règle est bonne **là où elle a été posée**, et elle
+ne s'applique pas ici.
+
+Ce qui change, c'est la clé. Un id d'`ApiToken` est séquentiel, un tiers les
+essaie tous en trois lignes de script. Un `uuid` de séance est posé par le client,
+128 bits : il n'y a pas d'énumération à fermer, donc pas d'oracle à protéger. Et
+le 403 dit quelque chose de vrai à quelqu'un de légitime — le coach dont la
+relation vient d'être rompue apprend qu'il n'a plus le droit, là où un 404 lui
+ferait croire à une séance disparue.
+
+### KL-16 : « le téléphone fait autorité » ne veut pas dire « le téléphone gagne »
+
+C'est la décision qui a demandé le plus de relecture du cadrage. §0.3 point 1 dit
+« le mobile est la seule source d'écriture du **réalisé** ». Pas du planning.
+
+D'où un partage d'autorité plus fin que ce que « le document complet écrase »
+laissait entendre :
+
+- `log`, `startedAt`, `endedAt` : du réalisé, le document les écrase.
+- `date` et `title` : **création seulement**. Déplacer une séance est un geste de
+  programmation, ouvert au coach par `EDIT`. Un téléphone resté trois jours hors
+  réseau ramènerait sinon à son ancienne date la séance que le coach vient de
+  décaler — et le client n'aurait rien fait de mal, il aurait juste renvoyé le
+  document qu'on lui avait donné.
+- `status` : ne peut que **clôturer**. Les autres valeurs passent la validation
+  mais restent sans effet — un client qui recopie le document reçu ne doit pas se
+  prendre un 422 sur un `planned` — et rien ne *déclôture* : §2.3 point 5 dit
+  « pas de reprise après clôture ».
+- `completionNotes` : s'écrit si le document en porte une, n'efface **jamais**
+  celle qui existe. Le silence du téléphone n'est pas un ordre d'effacer la note
+  d'écart du coach.
+
+### Deux `flush()`, et ce n'est pas une maladresse
+
+Le remplacement du réalisé a l'air trivial : on efface, on réécrit. Il ne l'est
+pas, et les deux chemins naïfs cassent tous les deux.
+
+**Un seul flush ne marche pas.** Doctrine ordonne un `flush()` en insertions,
+puis mises à jour, puis suppressions. Effacer et réécrire la même série dans le
+même flush envoie donc l'`INSERT` avant le `DELETE` : violation de
+`uniq_logged_set_uuid`, c'est-à-dire une 500 sur le cas le plus normal du ticket
+— un document rejoué, exactement ce que l'idempotence promet de bien traiter.
+
+**Réconcilier les lignes par uuid est pire.** C'était le premier réflexe : garder
+les entités existantes, mettre à jour leurs champs, supprimer le reste. Sauf
+qu'une série peut changer d'exercice au sein de la séance, et qu'un élément
+retiré d'une collection en `orphanRemoval` est **programmé pour suppression**,
+même si on l'ajoute ensuite ailleurs. La série déplacée disparaîtrait. Perte de
+données silencieuse, sur un chemin rare : le pire des deux mondes.
+
+Donc : on efface tout le réalisé, on flush, on réécrit, le tout dans une
+transaction. Le prix est quelques `DELETE`/`INSERT` sur des dizaines de lignes.
+Le gain est un invariant qu'on peut relire sans se demander « sauf si » — après
+l'appel, le réalisé **est** le document.
+
+### Les références se vérifient, elles ne se rattrapent pas
+
+Un `exerciseId` qu'on n'a pas le droit de voir, un `sourcePrescribedId` qui
+désigne la ligne du programme d'une **autre** séance : les deux sont refusés en
+422, avec le chemin du champ (`log[0].exerciseId`).
+
+La tentation était de les mettre à `null` — les colonnes sont nullable, la séance
+resterait lisible. Elle serait surtout **muette** : plus d'historique, plus de
+record, plus d'appariement prévu vs réalisé, et rien pour le signaler. Un client
+qui envoie une mauvaise référence a un bug ; il vaut mieux qu'il l'apprenne.
+
+La portée des exercices est celle d'`ExerciseVoter::VIEW`, appelé exercice par
+exercice, pas une requête DQL réécrite pour l'occasion : la réécrire ferait un
+second endroit qui décide de ce qu'on a le droit de lire. `CoachingResolver`
+mémoïse, et une séance référence une dizaine d'exercices.
+
+Un `uuid` de série emprunté à une autre séance rend **409** et non 422 : le
+document n'est pas malformé, il entre en conflit avec un état existant. Le client
+doit régénérer l'identifiant, pas corriger un champ.
+
+### Ce que le `DELETE` accepte
+
+Trois colonnes testées, pas une : `workout`, `sourcePlanTemplate`,
+`sourcePlanItem`. Une séance de plan dont la séance source a été supprimée en
+bibliothèque a `workout = null` sans être libre pour autant — c'est
+précisément le cas que le `SET NULL` de KL-02 a créé.
+
+Le refus est un **409**, pas un 403 : le propriétaire a bien le droit de
+supprimer sa séance, c'est l'état de la ressource qui rend le geste impossible
+*ici*. Une séance qui porte un programme se retire depuis le web, avec le
+contexte qui va avec.
+
+Et la garde est `LOG`, pas `DELETE` : ce que le téléphone efface, c'est du
+réalisé. Un coach ne supprime pas la séance libre de son athlète.
+
+### Fichiers touchés
+
+Neufs : `src/Controller/Api/ScheduleController.php`,
+`src/Service/LogIngestor.php`, `src/Http/ApiJson.php`, `src/Http/IsoDate.php`,
+`src/Http/ScheduledWorkoutInput.php`, `src/Http/LoggedExerciseInput.php`,
+`src/Http/LoggedSetInput.php`, `tests/Controller/ApiScheduleTest.php` (19 tests).
+Modifiés : `src/Repository/ScheduledWorkoutRepository.php`
+(`findByUuidWithContentAndLog`, jointures factorisées),
+`src/Controller/Api/BootstrapController.php` (passe par `ApiJson` et `IsoDate`),
+`CLAUDE.md` (§4, §6), `docs/feature-live-tracking.md` (état, KL-15, KL-16).
+Aucune migration : le modèle du réalisé était complet depuis KL-02.
+
+**Prochain ticket : KL-17** — `GET /api/exercises/{id}/history`, qui consomme
+`PerformanceHistory` sans requêter en direct.

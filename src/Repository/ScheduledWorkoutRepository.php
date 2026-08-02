@@ -22,9 +22,10 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     }
 
     /**
-     * Retrouve une séance datée par son identifiant client. Base de l'idempotence
-     * de `PUT /api/schedule/{uuid}` : une écriture rejouée retombe sur la même
-     * ligne au lieu d'en créer une seconde.
+     * Retrouve une séance datée par son identifiant client, sans son contenu.
+     * Les endpoints de l'API, eux, passent par `findByUuidWithContentAndLog()` :
+     * ils rendent le document complet, et le charger en une fois est ce qui leur
+     * évite un N+1 par exercice.
      */
     public function findByUuid(Uuid $uuid): ?ScheduledWorkout
     {
@@ -77,26 +78,45 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
      */
     public function findWindowWithContentAndLog(User $owner, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
-        $prescribed = $this->windowQueryBuilder($owner, $from, $to)
-            ->addSelect('w', 'b', 'pe', 'ps', 'e')
-            ->leftJoin('s.workout', 'w')
-            ->leftJoin('w.blocks', 'b')
-            ->leftJoin('b.prescribedExercises', 'pe')
-            ->leftJoin('pe.detailedSets', 'ps')
-            ->leftJoin('pe.exercise', 'e')
+        $prescribed = $this->withPrescribed($this->windowQueryBuilder($owner, $from, $to))
             ->getQuery()
             ->getResult();
 
         // Même fenêtre, branche sœur : le résultat est ignoré, il ne sert qu'à
         // remplir les collections des entités déjà gérées ci-dessus.
-        $this->windowQueryBuilder($owner, $from, $to)
-            ->addSelect('le', 'ls')
-            ->leftJoin('s.loggedExercises', 'le')
-            ->leftJoin('le.loggedSets', 'ls')
+        $this->withLog($this->windowQueryBuilder($owner, $from, $to))
             ->getQuery()
             ->getResult();
 
         return $prescribed;
+    }
+
+    /**
+     * La même chose pour **une** séance datée, désignée par son identifiant
+     * client : ce que rend `GET /api/schedule/{uuid}` (KL-15) et ce que relit
+     * `PUT /api/schedule/{uuid}` (KL-16).
+     *
+     * Les deux jointures sont celles de la fenêtre, au mot près, parce qu'elles
+     * sont écrites une seule fois (`withPrescribed` / `withLog`). Deux
+     * définitions de « avec tout son contenu » auraient fini par diverger, et la
+     * promesse de KL-15 — *structure identique à celle du bootstrap* — se serait
+     * dégradée en N+1 plutôt qu'en erreur.
+     */
+    public function findByUuidWithContentAndLog(Uuid $uuid): ?ScheduledWorkout
+    {
+        $found = $this->withPrescribed($this->uuidQueryBuilder($uuid))
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        if (null === $found) {
+            return null;
+        }
+
+        $this->withLog($this->uuidQueryBuilder($uuid))
+            ->getQuery()
+            ->getResult();
+
+        return $found;
     }
 
     private function windowQueryBuilder(User $owner, \DateTimeImmutable $from, \DateTimeImmutable $to): QueryBuilder
@@ -109,6 +129,37 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
             ->setParameter('to', $to, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE)
             ->orderBy('s.scheduledDate', 'ASC')
             ->addOrderBy('s.id', 'ASC')
+        ;
+    }
+
+    private function uuidQueryBuilder(Uuid $uuid): QueryBuilder
+    {
+        return $this->createQueryBuilder('s')
+            ->andWhere('s.uuid = :uuid')
+            ->setParameter('uuid', $uuid)
+        ;
+    }
+
+    /** La branche du PRESCRIT : une chaîne, donc aussi profonde qu'on veut. */
+    private function withPrescribed(QueryBuilder $qb): QueryBuilder
+    {
+        return $qb
+            ->addSelect('w', 'b', 'pe', 'ps', 'e')
+            ->leftJoin('s.workout', 'w')
+            ->leftJoin('w.blocks', 'b')
+            ->leftJoin('b.prescribedExercises', 'pe')
+            ->leftJoin('pe.detailedSets', 'ps')
+            ->leftJoin('pe.exercise', 'e')
+        ;
+    }
+
+    /** La branche SŒUR, le réalisé. Jamais dans la même requête que l'autre. */
+    private function withLog(QueryBuilder $qb): QueryBuilder
+    {
+        return $qb
+            ->addSelect('le', 'ls')
+            ->leftJoin('s.loggedExercises', 'le')
+            ->leftJoin('le.loggedSets', 'ls')
         ;
     }
 

@@ -247,7 +247,8 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
 
 - Enum PHP → `src/Enum/` (backed enum `enum X: string`)
 - Service métier → `src/Service/` (autowiring)
-- Brique HTTP transverse (forme d'une réponse d'erreur…) → `src/Http/`, comme
+- Brique HTTP transverse (forme d'une réponse d'erreur ou de succès, garde-fou de
+  format, **charge utile entrante d'une API**) → `src/Http/`, comme
   `src/Doctrine/` pour les briques ORM : ce n'est ni du métier ni un contrôleur
 - Écouteur d'événement (kernel ou Doctrine) → `src/EventListener/`
 - Repository → `src/Repository/` (un par entité)
@@ -335,8 +336,67 @@ d'authentification (`POST /api/auth/login`, `POST /api/auth/logout`,
 gestion des appareils dans `/profile/settings` — l'appairage est réversible.
 **KL-13 livré le 31/07/2026** : les erreurs normalisées RFC 9457 et le limiteur
 sur la connexion. **KL-14 livré le 01/08/2026** : `GET /api/bootstrap`,
-l'hydratation complète de la base locale du téléphone en une requête. Prochain
-ticket KL-15 (`GET /api/schedule/{uuid}`).
+l'hydratation complète de la base locale du téléphone en une requête.
+**KL-15 et KL-16 livrés le 02/08/2026** : la séance datée s'ouvre seule
+(`GET /api/schedule/{uuid}`) et **le sens montant existe** —
+`PUT /api/schedule/{uuid}` (upsert idempotent du document complet) et `DELETE`
+(séances libres seulement). Prochain ticket KL-17
+(`GET /api/exercises/{id}/history`).
+
+Ce que KL-15 et KL-16 posent et qu'il ne faut pas casser :
+
+- **Le partage d'autorité n'est pas « le téléphone gagne ».** §0.3 point 1 dit
+  « le mobile est la seule source d'écriture du **réalisé** » — pas du planning.
+  Le `PUT` écrase donc `log`, `startedAt` et `endedAt` ; `date` et `title` ne
+  servent qu'à la **création** (déplacer une séance est un geste de
+  programmation, ouvert au coach par `EDIT` : un téléphone resté trois jours hors
+  réseau ramènerait sinon la séance que le coach vient de décaler) ; `status` ne
+  peut que **clôturer** (les autres valeurs passent la validation sans effet,
+  pour qu'un client qui recopie le document reçu ne se prenne pas un 422, et rien
+  ne *déclôture* — §2.3 point 5) ; `completionNotes` s'écrit si le document en
+  porte une et **n'efface jamais** celle qui existe.
+- **Le remplacement du réalisé tient en DEUX `flush()`, dans une transaction.**
+  Doctrine ordonne un flush en insertions → mises à jour → suppressions :
+  effacer et réécrire la même série dans un seul flush enverrait l'`INSERT` avant
+  le `DELETE`, donc une violation de `uniq_logged_set_uuid` sur le cas le plus
+  normal du ticket (un document rejoué). Et « réconcilier les lignes par uuid »
+  est pire : déplacer une série d'un `LoggedExercise` à un autre la fait passer
+  par le `deleteDiff` d'une collection en `orphanRemoval`, qui la programme pour
+  suppression même si on l'ajoute ailleurs — perte de données silencieuse.
+  Invariant à préserver : après l'appel, le réalisé **est** le document.
+- **`position` n'est pas un champ d'entrée** : l'ordre de la liste fait foi, le
+  serveur renumérote. Deux sources pour un seul fait finissent par se contredire.
+- **Les références se vérifient avant d'écrire, jamais ne se rattrapent.** Un
+  `exerciseId` invisible (portée d'`ExerciseVoter::VIEW`, appelée exercice par
+  exercice — pas une requête DQL réécrite) et un `sourcePrescribedId` qui désigne
+  la ligne du programme d'une **autre** séance sortent en 422 avec le chemin du
+  champ. Les mettre à `null` laisserait la séance lisible mais muette : plus
+  d'historique, plus de record, plus d'appariement, et rien pour le signaler.
+  Inconnu et interdit rendent la **même** violation.
+- **Un `uuid` de série emprunté à une autre séance rend 409, pas 422** : le
+  document n'est pas malformé, il entre en conflit avec un état existant.
+- **`DELETE` teste trois colonnes** (`workout`, `sourcePlanTemplate`,
+  `sourcePlanItem`) : une séance de plan dont la source a été supprimée en
+  bibliothèque a `workout = null` sans être libre. Le refus est un **409** (le
+  propriétaire a le droit, c'est l'état qui l'empêche *ici*), et la garde est
+  **`LOG`**, pas `DELETE` : ce que le téléphone efface, c'est du réalisé.
+- **Introuvable rend 404, refusé rend 403** — pas le 404 uniforme de KL-12/KL-47.
+  La clé n'est pas de même nature : là-bas un identifiant séquentiel qu'on
+  énumère, ici un UUID posé par le client. Pas d'oracle à fermer, et le 403 dit
+  au coach dont la relation vient d'être rompue ce qui lui arrive.
+- **« Structure identique au bootstrap » se teste sur les corps ENTIERS.**
+  `ScheduledWorkoutPayload` reste le producteur unique, mais rien n'empêcherait
+  d'ajouter un champ « juste pour cet endpoint » : le test compare la réponse du
+  `GET` à l'entrée correspondante du bootstrap et échoue au premier écart.
+- **`ApiJson` (succès) est le pendant d'`ApiProblem` (erreur)**, et `IsoDate` est
+  la seule définition de « ce que l'API accepte comme date » — le garde-fou de
+  forme que `?since` portait seul est là, et les charges utiles s'y branchent.
+  Une réponse d'API qui n'emprunte pas `ApiJson` perd `JSON_UNESCAPED_UNICODE` :
+  six octets par caractère accentué, sans rien casser de visible.
+- **`withPrescribed()` / `withLog()` sur `ScheduledWorkoutRepository`** sont la
+  définition unique de « avec tout son contenu », partagée par la fenêtre du
+  bootstrap et la séance seule. Les dupliquer ne produirait pas une erreur, juste
+  un N+1.
 
 Ce que KL-14 pose et qu'il ne faut pas casser :
 

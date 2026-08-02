@@ -6,7 +6,9 @@ namespace App\Controller\Api;
 
 use App\Entity\ApiToken;
 use App\Entity\User;
+use App\Http\ApiJson;
 use App\Http\ApiProblem;
+use App\Http\IsoDate;
 use App\Security\ApiTokenAuthenticator;
 use App\Service\BootstrapPayload;
 use Doctrine\ORM\EntityManagerInterface;
@@ -53,7 +55,7 @@ final class BootstrapController extends AbstractController
         $since = null;
 
         if (null !== $raw && '' !== $raw) {
-            $since = self::parseSince((string) $raw);
+            $since = IsoDate::dateTime((string) $raw);
 
             if (null === $since) {
                 return ApiProblem::response(
@@ -72,34 +74,6 @@ final class BootstrapController extends AbstractController
             $this->em->flush();
         }
 
-        // `JSON_UNESCAPED_UNICODE` : sans lui chaque caractère accentué part en
-        // `\uXXXX`, six octets pour un. Sur des noms d'exercices et des consignes
-        // écrits en français, c'est le poste d'économie le plus bête à ne pas
-        // prendre — et le budget de la réponse est de 1 Mo.
-        return (new JsonResponse($body))->setEncodingOptions(
-            JsonResponse::DEFAULT_ENCODING_OPTIONS | \JSON_UNESCAPED_UNICODE,
-        );
-    }
-
-    /**
-     * Une date ISO 8601, ou null.
-     *
-     * Le garde-fou de forme (`AAAA-MM-JJT…`) n'est pas décoratif : le
-     * constructeur de `DateTimeImmutable` accepte aussi l'anglais relatif
-     * (« yesterday », « now », « +3 days ») et même la chaîne vide. Un client qui
-     * enverrait n'importe quoi obtiendrait alors un delta silencieusement faux —
-     * une réponse plausible, avec les mauvaises données — là où un 400 se voit.
-     */
-    private static function parseSince(string $raw): ?\DateTimeImmutable
-    {
-        if (1 !== preg_match('/^\d{4}-\d{2}-\d{2}T/', $raw)) {
-            return null;
-        }
-
-        try {
-            return new \DateTimeImmutable($raw);
-        } catch (\Exception) {
-            return null;
-        }
+        return ApiJson::response($body);
     }
 }

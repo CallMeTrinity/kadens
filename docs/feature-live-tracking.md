@@ -42,7 +42,14 @@
 > (`deleted_entity`), et la structure d'une séance datée a désormais une
 > définition unique (`ScheduledWorkoutPayload`) que KL-15 et KL-16 réutiliseront.
 > Mesuré sur un jeu réaliste : 80,6 Ko, 16 requêtes SQL, 106 ms.
-> Prochain ticket : **KL-15** (`GET /api/schedule/{uuid}`).
+> **KL-15 et KL-16 livrés (02/08/2026)** : la séance datée s'ouvre seule
+> (`GET /api/schedule/{uuid}`, dans la structure du bootstrap au champ près) et
+> **le sens montant existe** — `PUT /api/schedule/{uuid}` fait un upsert
+> idempotent du document complet, `DELETE` retire une séance libre. Le téléphone
+> fait autorité sur le réalisé, le serveur sur la programmation (§KL-16) ; le
+> remplacement du réalisé se fait en deux `flush()` dans une transaction, et les
+> références invalides sortent en 422 avec le champ fautif.
+> Prochain ticket : **KL-17** (`GET /api/exercises/{id}/history`).
 
 ---
 
@@ -1283,19 +1290,46 @@ l'endpoint le plus important du lot.
 
 ### KL-15 — `GET /api/schedule/{uuid}`
 
+**Où** : `src/Controller/Api/ScheduleController.php`, `src/Http/ApiJson.php`
+
 **Fini quand** :
-- [ ] Le prescrit à plat d'une séance datée, via `PlanFlattener`, plus son
+- [x] Le prescrit à plat d'une séance datée, via `PlanFlattener`, plus son
       réalisé s'il existe
-- [ ] Résolution par `uuid`, pas par `id` (le client ne connaît que l'uuid pour
+- [x] Résolution par `uuid`, pas par `id` (le client ne connaît que l'uuid pour
       ce qu'il a créé lui-même)
-- [ ] Une séance datée sans `workout` renvoie un prescrit vide, pas une erreur
-- [ ] `ScheduledWorkoutVoter::VIEW` appliqué
-- [ ] Structure identique à celle du bootstrap (le client n'a qu'un seul
+- [x] Une séance datée sans `workout` renvoie un prescrit vide, pas une erreur
+- [x] `ScheduledWorkoutVoter::VIEW` appliqué
+- [x] Structure identique à celle du bootstrap (le client n'a qu'un seul
       désérialiseur à écrire)
+
+**Ce qui a été tranché en écrivant le ticket** :
+
+- **« Structure identique » se teste en comparant les deux corps entiers**, pas
+  quelques clés. `ScheduledWorkoutPayload` (KL-14) est le producteur unique, mais
+  rien n'empêchait le contrôleur d'ajouter un champ « juste pour cet endpoint » ;
+  le test compare la réponse du `GET` à l'entrée correspondante du bootstrap et
+  échoue au premier écart, d'où qu'il vienne.
+- **Introuvable rend 404, refusé rend 403** — et pas le 404 uniforme de
+  `GET /pairing/{id}/status` (KL-47) ou de la révocation d'appareil (KL-12). La
+  clé n'est pas de même nature : là-bas un identifiant séquentiel qu'un tiers
+  énumère en trois lignes, ici un UUID posé par le client. Il n'y a pas d'oracle
+  à fermer, et le 403 dit au coach dont la relation vient d'être rompue ce qui
+  lui arrive, là où un 404 lui ferait croire à une séance disparue.
+- **Les deux requêtes du bootstrap deviennent une définition partagée.**
+  `withPrescribed()` / `withLog()` sur le repository servent la fenêtre **et**
+  l'unité : deux écritures de « avec tout son contenu » auraient divergé, et la
+  divergence ne se serait pas vue en erreur mais en N+1.
+- **`ApiJson` naît ici**, pendant d'`ApiProblem` : un seul endroit pose
+  `JSON_UNESCAPED_UNICODE`. L'oublier ne casse rien de visible, ça gonfle
+  simplement la réponse de six octets par caractère accentué — exactement le
+  genre d'oubli qu'on prévient par la structure. Au passage, `IsoDate` extrait le
+  garde-fou de forme que `?since` portait seul (KL-14) : « ce que l'API accepte
+  comme date » n'a plus qu'une définition.
 
 ### KL-16 — `PUT /api/schedule/{uuid}` idempotent
 
-**Où** : `src/Controller/Api/ScheduleController.php`, `src/Service/LogIngestor.php`
+**Où** : `src/Controller/Api/ScheduleController.php`, `src/Service/LogIngestor.php`,
+`src/Http/ScheduledWorkoutInput.php` (+ `LoggedExerciseInput`, `LoggedSetInput`)
 
 **Quoi** : l'app envoie **la séance datée complète avec son réalisé** en un
 document, pas série par série. Un seul endpoint couvre les deux cas : la séance
@@ -1303,24 +1337,78 @@ programmée qu'on remplit, et la séance libre que le téléphone crée de toute
 pièces.
 
 **Fini quand** :
-- [ ] `PUT /api/schedule/{uuid}` fait un **upsert** : la séance datée est créée
+- [x] `PUT /api/schedule/{uuid}` fait un **upsert** : la séance datée est créée
       si l'`uuid` est inconnu, mise à jour sinon
-- [ ] **Idempotent** : un même document rejoué ne crée rien de nouveau et renvoie
+- [x] **Idempotent** : un même document rejoué ne crée rien de nouveau et renvoie
       200 avec l'état persisté
-- [ ] Un document déjà connu avec un contenu différent **écrase le réalisé** (le
+- [x] Un document déjà connu avec un contenu différent **écrase le réalisé** (le
       téléphone fait autorité, cf. §0.3 point 1). Il n'écrase **jamais** le
       prescrit, ni `sourcePlanItem`, ni `planAnchorDate`
-- [ ] `DELETE /api/schedule/{uuid}` refuse une séance issue d'un plan (elle se
+- [x] `DELETE /api/schedule/{uuid}` refuse une séance issue d'un plan (elle se
       retire depuis le web) et n'accepte que les séances libres
-- [ ] Clôture → `ScheduledWorkout::setStatus(DONE)`
-- [ ] `exerciseName` renseigné côté serveur si le client ne l'a pas envoyé
-- [ ] Validation stricte : un poids négatif, 400 reps ou un `setType` inconnu
+- [x] Clôture → `ScheduledWorkout::setStatus(DONE)`
+- [x] `exerciseName` renseigné côté serveur si le client ne l'a pas envoyé
+- [x] Validation stricte : un poids négatif, 400 reps ou un `setType` inconnu
       sont refusés en 422
-- [ ] Toute l'ingestion dans **une transaction**
-- [ ] L'attribut `LOG` de KL-06 est testé, pas `EDIT` : un coach n'écrit jamais
+- [x] Toute l'ingestion dans **une transaction**
+- [x] L'attribut `LOG` de KL-06 est testé, pas `EDIT` : un coach n'écrit jamais
       le réalisé de son athlète
-- [ ] Une séance libre créée par le téléphone arrive avec `workout = null` et un
+- [x] Une séance libre créée par le téléphone arrive avec `workout = null` et un
       `title`. Le serveur ne crée **aucun** `Workout` en bibliothèque
+
+**Ce qui a été tranché en écrivant le ticket** :
+
+- **Le partage d'autorité est plus fin que « le téléphone gagne ».** §0.3 point 1
+  dit « le mobile est la seule source d'écriture du **réalisé** » — pas du
+  planning. Le document écrase donc `log`, `startedAt` et `endedAt`, mais `date`
+  et `title` ne servent qu'à la **création** : déplacer une séance est un geste de
+  programmation (`EDIT`, ouvert au coach), et un téléphone resté trois jours hors
+  réseau ramènerait sinon à son ancienne date la séance que le coach vient de
+  décaler. `status` ne peut que **clôturer** — les autres valeurs sont acceptées
+  sans effet, pour qu'un client qui renvoie le document reçu ne se prenne pas un
+  422 sur un `planned` recopié, mais rien ne *déclôture* (§2.3 point 5).
+  `completionNotes` s'écrit si le document en porte une et **n'efface jamais**
+  celle qui existe : le silence du téléphone n'est pas un ordre d'effacer la note
+  d'écart du coach.
+- **Le remplacement du réalisé se fait en DEUX `flush()`, et c'est structurel.**
+  Doctrine ordonne un flush en insertions, puis mises à jour, puis suppressions :
+  effacer et réécrire la même série dans un seul flush enverrait l'`INSERT` avant
+  le `DELETE`, donc une violation de `uniq_logged_set_uuid` — une 500 sur le cas
+  le plus normal du ticket, un document rejoué. L'alternative « réconcilier les
+  lignes par uuid » est pire : déplacer une série d'un `LoggedExercise` à un autre
+  la ferait passer par le `deleteDiff` d'une collection en `orphanRemoval`, qui la
+  programme pour suppression même si on l'ajoute ensuite ailleurs. Perte de
+  données silencieuse sur un chemin rare. On efface, on flush, on réécrit, le tout
+  dans une transaction — et l'invariant devient relisible : après l'appel, le
+  réalisé **est** le document.
+- **`position` n'est pas un champ d'entrée.** L'ordre de la liste fait foi, le
+  serveur renumérote. Un rang envoyé à côté de l'ordre du tableau, ce sont deux
+  sources pour un seul fait.
+- **Les références sont vérifiées avant d'écrire, et refusées en 422 avec le
+  chemin du champ.** Un `exerciseId` invisible (portée d'`ExerciseVoter::VIEW`,
+  pas une requête maison) et un `sourcePrescribedId` qui désigne la ligne du
+  programme d'une **autre** séance sont des erreurs. Les rattacher silencieusement
+  à `null` serait pire que l'erreur : le réalisé resterait lisible, mais il
+  sortirait de l'historique et des records sans que rien ne le signale. Inconnu et
+  interdit rendent la même violation — distinguer ferait de l'API un oracle sur la
+  bibliothèque des autres.
+- **Un `uuid` de série emprunté à une autre séance rend 409, pas 422.** Le
+  document n'est pas malformé, il entre en conflit avec un état existant : le
+  client doit régénérer l'identifiant, pas corriger un champ. Sans ce contrôle, le
+  cas sortirait en 500 par violation d'unicité.
+- **`DELETE` n'accepte que les séances vraiment libres**, et le teste sur trois
+  colonnes : `workout`, `sourcePlanTemplate` et `sourcePlanItem`. Une séance de
+  plan dont la séance source a été supprimée en bibliothèque a `workout = null`
+  sans être libre pour autant. Le refus est un **409** : ce n'est pas une question
+  de droit — le propriétaire l'a — c'est l'état de la ressource qui rend le geste
+  impossible ici.
+- **201 à la création, 200 ensuite.** Rejouer sa file de mutations dit au client
+  lesquelles étaient déjà passées, et le corps est identique dans les deux cas.
+- **Les violations « faites à la main » empruntent la route de KL-13.** Une
+  `ValidationFailedException` levée par le service ressort en 422 avec sa liste de
+  champs, exactement comme celles d'un attribut de validation : le client n'a
+  qu'un format d'erreur à lire. C'est ce que la recherche dans toute la chaîne des
+  causes, écrite en KL-13, rend possible.
 
 ### KL-17 — `GET /api/exercises/{id}/history`
 
