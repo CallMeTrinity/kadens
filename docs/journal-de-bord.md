@@ -4390,3 +4390,215 @@ Aucun code serveur touché.
 
 **Prochain ticket : KL-48** — l'écran de scan du QR d'appairage, qui complète
 `pairing.tsx` d'une caméra.
+
+---
+
+## Kadens Live KL-48 — l'écran de scan du QR d'appairage (03/08/2026)
+
+`pairing.tsx` (KL-26) se complète du lecteur de QR promis, sans se réécrire :
+la saisie manuelle reste au même endroit, sur la même page, comme repli.
+
+### La permission se demande après explication, jamais au montage
+
+`useCameraPermissions` sert de garde d'affichage plutôt que de déclencheur
+automatique : tant que `permission.granted` est faux, l'écran montre pourquoi
+la caméra sert (lire le QR, rien d'autre n'est capturé) et un bouton
+« Activer la caméra ». Ce n'est qu'à ce tap que `requestPermission()` part.
+Un refus définitif (`permission.canAskAgain === false`, Android ne redemande
+jamais après un second refus) bascule sur un renvoi vers les réglages
+(`Linking.openSettings()`) — la saisie manuelle, elle, reste utilisable dans
+les deux cas.
+
+### L'URL du serveur se pose avant l'échange, et se remet en place si besoin
+
+Le QR porte `{url, code, exp}` (§3.1 du contrat). La nouvelle
+`signInWithPairingQr` (`src/api/auth.ts`) pose l'URL de base **avant**
+d'échanger le code — c'est ce qui permet de scanner contre une IP LAN sans
+rien saisir. Si l'échange échoue par réseau ou délai (`NetworkError` /
+`TimeoutError`), l'URL scannée est **remise** à ce qu'elle était : un QR mal
+lu ou pointant vers un serveur injoignable ne doit pas stranger la saisie
+manuelle de repli sur une URL morte pour le reste de la session. Un refus
+**du serveur** (code expiré, déjà consommé) ne revert rien — le serveur a
+répondu, l'URL est donc bonne, seul le code est mauvais.
+
+### `src/api` ne s'est pas mis à connaître `@/db`
+
+Persister l'URL dans `sync_state.apiUrl` demande `@/db`, que `src/api`
+n'importe jamais (règle posée par KL-25, `baseUrl.ts`). `signInWithPairingQr`
+retourne donc l'`apiUrl` scannée sans l'écrire ; c'est l'écran d'appairage —
+seul point qui connaît les deux couches pour ce geste, même statut que
+`_layout.tsx` pour la restauration du jeton au démarrage — qui appelle
+`patchSyncState({ apiUrl })`, et seulement après un succès. `sync_state.apiUrl`
+a désormais son seul écrivain, comme l'annonçait déjà le commentaire de
+`syncState.ts` depuis KL-24.
+
+### Le corps du QR se valide en pur, avant tout effet de bord
+
+`parsePairingQrPayload` (nouveau, `src/api/pairingQr.ts`) est une fonction
+sans réseau ni état : elle vérifie que le JSON décodé a bien trois chaînes
+`url`/`code`/`exp`, et lève `InvalidPairingQrError` sinon — jamais un
+`JSON.parse` qui remonte tel quel et ferait planter l'écran sur un QR
+étranger. `exp` n'est en revanche **pas** revérifiée côté client : comparer
+l'échéance à l'horloge du téléphone ferait dépendre le verdict d'un
+désaccord d'horloge, alors que le serveur est déjà seul maître de l'échéance
+à l'échange, et « inconnu / expiré / déjà consommé » rendent le même message
+par construction — dupliquer la vérification ici aurait donné deux verdicts
+possibles pour un même code, sans rien gagner en fiabilité.
+
+### Une erreur, un seul emplacement
+
+Scan et saisie manuelle appellent la même API et partagent le même état
+`error`, affiché une fois en tête de l'écran plutôt que dupliqué sous chaque
+chemin : le serveur ne distingue pas leur origine, l'écran n'a pas de raison
+de le faire non plus.
+
+### Ce qui a été vérifié, et ce qui ne l'a pas été
+
+`npm run typecheck`, `npm run lint`, `npx prettier --check .`,
+`npx expo export` pour Android et pour web sont passés sans rien à
+signaler. Le **build natif sur appareil réel** (`expo run:android`), en
+revanche, échoue à la compilation Kotlin de `expo-dev-menu` et
+`expo-log-box` (`Unresolved reference 'ReactActivityLifecycleListener'`, et
+une dizaine d'erreurs voisines) — avant même d'atteindre `expo-camera`.
+Pour ne pas laisser planer le doute, le même build a été rejoué sur l'état
+du dépôt **d'avant ce ticket** (`git stash`, sans `expo-camera`) : échec
+identique, au même endroit. C'est donc un problème de toolchain
+(Kotlin/AGP/React Native) préexistant sur cette machine, à diagnostiquer
+séparément — pas un défaut de l'écran de scan, qui reste vérifié par tout le
+reste.
+
+### Fichiers touchés
+
+Dépôt `kadens-mobile` : `src/app/pairing.tsx` (caméra ajoutée),
+`src/api/auth.ts` (`signInWithPairingQr`), `src/api/pairingQr.ts` (neuf),
+`src/api/index.ts`, `app.json` (plugin `expo-camera`), `package.json` /
+`package-lock.json` (`expo-camera` ajouté par `npx expo install`),
+`CLAUDE.md`. Dépôt `kadens` : `docs/feature-live-tracking.md` (état, KL-48),
+ce journal. Aucun code serveur touché.
+
+**Prochain ticket : KL-27** — le moteur de synchronisation, qui rendra l'app
+utilisable au-delà d'un écran de connexion.
+
+---
+
+## Kadens Live KL-27 — le moteur de synchronisation (03/08/2026)
+
+Le cœur technique du chantier mobile. Tout ce qui précède (base locale, client
+API, écrans de connexion) existait pour arriver ici : `src/sync/`, cinq fichiers,
+qui font qu'une séance faite au sous-sol se retrouve sur le web en remontant
+l'escalier.
+
+### L'ordre est la moitié du ticket
+
+Push, puis pull. Jamais l'inverse, et il n'existe pas de fonction « pull seul »
+exportée. Le pull **remplace** la fenêtre de séances datées — c'est le contrat
+(§4.5), pas un choix d'implémentation — donc lancé en premier il écraserait la
+séance du matin pas encore envoyée. Il n'y a rien à consulter pour savoir
+laquelle : la base locale n'a pas de drapeau « modifié localement », c'est
+`mutation_queue` qui porte ce fait depuis KL-24. Pousser d'abord vide la file de
+ce qui peut partir ; ce qui reste est exactement ce que le pull doit épargner.
+
+### Ce que le pull ne peut pas écraser, et pourquoi c'est deux choses
+
+Une séance est protégée si une mutation la concerne (**épuisée comprise**), ou si
+elle est commencée et pas terminée. La seconde condition est de la ceinture
+par-dessus les bretelles : KL-29 empilera une mutation dès la première série
+cochée. Mais une séance ouverte dont rien n'a encore été coché n'en a pas, et
+l'exigence du ticket ne souffre aucune fenêtre.
+
+Sur une séance protégée, le partage d'autorité du §4.1 se lit **dans le sens
+descendant** : la programmation descend (le coach a pu la déplacer, la renommer,
+corriger son programme), le reste ne descend pas. Ni le réalisé, ni
+`startedAt`/`endedAt`, ni le statut, ni la note de clôture. Ce dernier point est
+le moins évident et le plus coûteux à rater : écraser un `done` local par le
+`planned` du serveur ferait repartir le document relu au push suivant en
+`planned`, et la clôture serait perdue **au moment précis où on essayait de
+l'envoyer**.
+
+### Le compteur d'échecs ne compte pas les échecs
+
+C'est la décision qui décide de ce qu'on montre à l'utilisateur. « Après 5
+échecs, elle est marquée » se lit comme un compteur universel ; appliqué à tout,
+il transforme une salle de sport en panne. Réseau absent, délai dépassé, `429`,
+`5xx` : le cycle s'arrête, la dernière erreur s'affiche, et `attempts` ne bouge
+pas — rien n'est imputable au document, et les mutations suivantes échoueraient
+pour la même raison. Seuls les refus définitifs comptent (`409`, `422`, `403`),
+et ceux-là **laissent passer la suivante** : le problème est dans ce document-là,
+le garder en tête de file bloquerait les séances des autres jours pour toujours.
+
+Une mutation marquée n'est jamais supprimée. Elle sort du dépilage, elle attend
+un geste humain (KL-35), et surtout : tant qu'elle est là, **la séance qu'elle
+porte reste protégée du pull**. C'est ce qui rend « rejouée, jamais perdue »
+vrai jusqu'au bout.
+
+### Deux détails du contrat qu'il fallait relire
+
+Le ticket disait `?since=<sync_state.lastPulledAt>`. C'est `serverTime` qu'il
+faut envoyer : l'horloge du **serveur** au dernier pull réussi, pas celle du
+téléphone. Trente secondes de désaccord entre les deux suffiraient à sauter un
+exercice modifié entre les deux appels, sans rien pour le signaler.
+`lastPulledAt` reste écrit — l'écran de réglages l'affichera — mais il ne pilote
+rien.
+
+Et `deleted.schedule` n'est pas appliqué séparément, alors que
+`deleted.exercises` l'est. L'asymétrie vient de `?since`, qui n'allège **que** la
+bibliothèque : le jeu d'exercices reçu est partiel, il faut donc une liste des
+disparus. La fenêtre de séances datées, elle, part toujours entière — « absente
+du jeu reçu » suffit à décider, et c'est cette purge qui borne la base. Sans
+elle, chaque jour qui passe y laisserait une séance de plus, à vie.
+
+### Empiler une mutation est un geste transactionnel
+
+Toutes les écritures de `src/sync` sont **synchrones** et prennent l'exécuteur de
+l'appelant (`enqueueSchedulePut(uuid, tx)`, nouveau type `Writer` dans `@/db`).
+Ce n'est pas de l'élégance : écrire une série et empiler son envoi doivent tenir
+dans la même transaction, sinon l'app tuée entre les deux laisse un réalisé que
+rien ne signale comme non poussé — et le pull suivant l'efface sans un mot.
+
+### Un effet de bord attendu : KL-26 persiste enfin
+
+`bootstrapping.tsx` appelait `GET /api/bootstrap` sans rien en faire, faute de
+moteur au moment où il a été écrit : la base restait vide jusqu'au déclencheur
+suivant. Il passe désormais par `syncNow('first-sync')`, et le moteur reste le
+seul écrivain de `sync_state`, comme annoncé.
+
+### Ce qui a été vérifié
+
+`typecheck`, `lint`, `prettier --check`, `expo export` pour Android et web. Puis
+un banc d'essai de **55 contrôles contre le vrai Symfony**, hors React Native :
+`src/sync` bundlé pour Node, `expo-sqlite` reposé sur `node:sqlite`, le reste
+bouchonné. Il exerce ce qu'aucune vérification statique ne voit — le pull complet
+puis le delta, la fenêtre qui fait autorité, une séance protégée dont le réalisé
+et la clôture survivent à un serveur qui la dit `planned`, une séance en cours
+épargnée sans mutation, dix modifications qui ne font qu'une entrée, la
+suppression qui remplace l'envoi en attente, l'upsert `201` puis le rejeu `200`
+sans doublon, une série ajoutée après l'enfilement qui part quand même (le
+document se relit **au moment** du push), le réseau coupé qui n'incrémente rien,
+un `422` qui compte et laisse passer la suivante, les cinq refus, le marquage, le
+réarmement, et le cycle complet dans l'ordre.
+
+Un faux échec s'est glissé au premier passage : le nettoyage final trouvait une
+séance de trop côté serveur. Elle venait d'un run **antérieur** interrompu par
+une erreur du banc lui-même, pas du moteur — les uuid le disaient. Vérifié en
+rejouant deux fois, avec et sans temporisation : 55/55.
+
+**Pas de contrôle sur appareil.** Le build natif est toujours bloqué par le
+problème de toolchain Kotlin/AGP constaté en KL-48, préexistant et sans rapport.
+C'est la limite connue de ce ticket : le moteur n'a pas encore vu de vraies
+bascules d'`AppState` ni d'`expo-network`. La carte « Synchro » ajoutée à
+`src/app/index.tsx` est là pour le jour où le build repassera.
+
+### Fichiers touchés
+
+Dépôt `kadens-mobile` : `src/sync/` (`engine.ts`, `pull.ts`, `push.ts`,
+`queue.ts`, `document.ts`, `triggers.ts`, `index.ts` — tous neufs),
+`src/db/client.ts` (types `Transaction` et `Writer`), `src/db/syncState.ts`
+(`patchSyncStateIn`), `src/db/index.ts`, `src/app/_layout.tsx` (déclencheurs),
+`src/app/bootstrapping.tsx` (premier pull réellement persisté),
+`src/app/index.tsx` (carte de vérification), `package.json` /
+`package-lock.json` (`expo-network`), `CLAUDE.md`. Dépôt `kadens` :
+`docs/feature-live-tracking.md` (état, KL-27), ce journal. Aucun code serveur
+touché.
+
+**Le lot 3 est clos. Prochain ticket : KL-28** — l'écran Aujourd'hui, le premier
+qui montrera enfin des séances.

@@ -121,9 +121,27 @@
 > `login`/`pair` frais et son premier `GET /api/bootstrap`. Une session
 > **restaurée** saute cet écran (elle a déjà un dernier pull en base) : c'est ce
 > qui garde le hors-ligne intact au lancement normal. « Scanner le QR » et
-> « Saisir le code » mènent aujourd'hui au même écran de saisie manuelle — rien
-> ne les distingue avant que KL-48 y ajoute la caméra. Prochain ticket :
-> **KL-48** (écran de scan du QR d'appairage).
+> « Saisir le code » menaient jusqu'ici au même écran de saisie manuelle.
+> **KL-48 livré (03/08/2026)** : `pairing.tsx` gagne le lecteur de QR
+> (`expo-camera`), permission demandée après explication (un refus définitif
+> renvoie vers les réglages Android), URL de serveur configurée au scan et
+> **remise en place** si le serveur scanné ne répond pas du tout, saisie
+> manuelle du code en repli inchangée.
+> **KL-27 livré (03/08/2026) — le lot 3 est clos.** Le moteur de synchronisation
+> vit dans `src/sync/` : un cycle **push puis pull**, un seul à la fois, qui ne
+> lève jamais et ne retient aucun écran. Le pull applique le bootstrap en **une**
+> transaction (bibliothèque en delta, fenêtre qui fait autorité, purge de ce
+> qu'elle ne contient plus, `sync_state` avancé dans le même geste) ; le push
+> dépile `mutation_queue` en FIFO, une mutation à la fois, en relisant le document
+> **au moment de l'envoi**. Ce qui n'est pas confirmé par le serveur est
+> intouchable : une séance qui a une mutation en file, ou qui est commencée et pas
+> terminée, garde son réalisé, ses bornes, son statut et sa note — seule la
+> programmation descend. Le compteur d'échecs ne compte que les **refus du
+> serveur** (un réseau absent n'est pas une panne, §KL-27), et une mutation
+> marquée reste en file, donc continue de protéger sa séance. Déclenchée au
+> lancement, au retour au premier plan, au retour du réseau (`expo-network`) et à
+> la clôture d'une séance. Vérifié par 55 contrôles contre le vrai Symfony, hors
+> React Native. Prochain ticket : **KL-28** (écran Aujourd'hui).
 
 ---
 
@@ -2021,8 +2039,8 @@ seul `GET /api/exercises/{id}/history`.
    `expo-camera` (réservé à KL-48), il n'y a rien à distinguer aujourd'hui entre
    les deux : les deux boutons de l'écran d'accueil poussent vers `pairing.tsx`,
    qui n'implémente que la saisie manuelle du code de 8 caractères (clavier en
-   majuscules, normalisé côté client comme côté serveur). KL-48 **complète** cet
-   écran d'une caméra, il ne le remplace pas — le champ manuel y reste le repli.
+   majuscules, normalisé côté client comme côté serveur). **KL-48 a complété**
+   cet écran d'une caméra sans le remplacer — le champ manuel y reste le repli.
 4. **Le formulaire mot de passe de KL-25 est déplacé, pas réécrit.**
    `login.tsx` devient l'écran de choix (plus de formulaire dedans) ;
    `login-password.tsx` reprend le contenu tel quel. Les trois écrans
@@ -2041,18 +2059,51 @@ avant KL-48.
 **Où** : repo `kadens-mobile`
 
 **Fini quand** :
-- [ ] `expo-camera` avec demande de permission **expliquée avant** de la
+- [x] `expo-camera` avec demande de permission **expliquée avant** de la
       déclencher (un refus définitif ne se rattrape que dans les réglages
       Android)
-- [ ] Le scan lit `{url, code, exp}` et **configure l'URL de l'API au passage** :
+- [x] Le scan lit `{url, code, exp}` et **configure l'URL de l'API au passage** :
       c'est ce qui rend l'app utilisable sans aucune saisie, y compris en
       développement contre une IP LAN
-- [ ] Saisie manuelle du code de 8 caractères en repli, clavier en majuscules
-- [ ] Erreurs traitées : code expiré, code déjà utilisé, réseau absent, permission
+- [x] Saisie manuelle du code de 8 caractères en repli, clavier en majuscules
+- [x] Erreurs traitées : code expiré, code déjà utilisé, réseau absent, permission
       caméra refusée
-- [ ] Le token reçu part directement dans `expo-secure-store`, il n'est jamais
+- [x] Le token reçu part directement dans `expo-secure-store`, il n'est jamais
       journalisé ni écrit en base locale
-- [ ] Un QR d'une autre application est rejeté proprement, sans plantage
+- [x] Un QR d'une autre application est rejeté proprement, sans plantage
+
+**Livré le 03/08/2026.** `pairing.tsx` (KL-26) se complète d'un lecteur de QR
+sans se réécrire — la saisie manuelle reste le repli. Trois décisions prises
+en cours de route :
+
+1. **`signInWithPairingQr` (nouveau, `src/api/auth.ts`) pose l'URL de base
+   *avant* l'échange, et la remet à sa valeur précédente seulement si l'appel
+   échoue par réseau ou délai.** Un refus du serveur (code expiré ou déjà
+   consommé) ne revert pas l'URL : le serveur a répondu, elle est donc bonne.
+   Un QR qui pointe vers un serveur injoignable ne doit pas stranger la
+   saisie manuelle de repli sur une URL morte pour le reste de la session.
+2. **`src/api` ne connaît toujours pas `@/db`** (règle posée par KL-25). La
+   fonction retourne l'`apiUrl` scannée sans l'écrire ; c'est l'écran
+   d'appairage — seul point qui connaît les deux couches, même statut que
+   `_layout.tsx` pour la restauration du jeton — qui appelle
+   `patchSyncState({ apiUrl })` **après** un succès seulement.
+3. **`exp` n'est pas revérifiée côté client.** `parsePairingQrPayload`
+   (`src/api/pairingQr.ts`) valide juste la forme de la charge utile et lève
+   une erreur dédiée sinon, sans jamais laisser remonter un `JSON.parse` brut
+   (c'est ce qui couvre « QR d'une autre application » proprement). Comparer
+   l'échéance à l'horloge du téléphone ferait dépendre le verdict d'un
+   désaccord d'horloge, alors que le serveur est déjà seul maître de
+   l'échéance à l'échange, et « inconnu / expiré / déjà consommé » rendent le
+   même message par construction (§3.1) — dupliquer la vérification ici
+   aurait donné deux verdicts possibles pour un même code.
+
+Vérifié : `npm run typecheck`, `npm run lint`, `npx prettier --check .`,
+`npx expo export` pour Android et web. **Build natif sur appareil non
+concluant** : `expo run:android` sur un appareil réel échoue à la compilation
+Kotlin de `expo-dev-menu` et `expo-log-box`, **confirmé préexistant et sans
+rapport avec ce ticket** en rejouant le même build sur l'état d'avant KL-48
+(sans `expo-camera`) — échec identique. Problème de toolchain (Kotlin/AGP/RN)
+à diagnostiquer séparément.
 
 ### KL-27 — Moteur de synchronisation
 
@@ -2060,19 +2111,93 @@ avant KL-48.
 bugs coûteux se logent.
 
 **Fini quand** :
-- [ ] **Pull** : `GET /api/bootstrap?since=<sync_state.lastPulledAt>`, application
-      en transaction, mise à jour de `lastPulledAt`
-- [ ] **Push** : dépilage de `mutation_queue` en FIFO, une mutation à la fois,
+- [x] **Pull** : `GET /api/bootstrap?since=…`, application en transaction, mise à
+      jour de `lastPulledAt`. Une nuance sur le `since`, voir le point 1 ci-dessous
+- [x] **Push** : dépilage de `mutation_queue` en FIFO, une mutation à la fois,
       suppression sur succès
-- [ ] Une mutation en échec est **rejouée**, jamais perdue. Après 5 échecs, elle
+- [x] Une mutation en échec est **rejouée**, jamais perdue. Après 5 échecs, elle
       est marquée et remontée dans les réglages, pas silencieusement abandonnée
-- [ ] Déclenchement : au lancement, au retour au premier plan, au retour du
+- [x] Déclenchement : au lancement, au retour au premier plan, au retour du
       réseau (`expo-network`), et à la clôture d'une séance
-- [ ] **Le push passe toujours avant le pull** : sinon un bootstrap écraserait
+      (`syncOnWorkoutClosed()`, que KL-33 appellera)
+- [x] **Le push passe toujours avant le pull** : sinon un bootstrap écraserait
       localement une séance pas encore envoyée
-- [ ] Aucune fenêtre où une séance en cours peut être perdue : la base locale est
+- [x] Aucune fenêtre où une séance en cours peut être perdue : la base locale est
       la source de vérité tant que le log n'est pas confirmé par le serveur
-- [ ] La synchronisation ne bloque **jamais** l'interface
+- [x] La synchronisation ne bloque **jamais** l'interface
+
+**Livré le 03/08/2026.** Le moteur vit dans `src/sync/` (dépôt `kadens-mobile`),
+importé par `@/sync`. Sept décisions prises en cours de route, à ne pas
+redécouvrir :
+
+1. **Le `since` envoyé est `sync_state.serverTime`, pas `lastPulledAt`.** Le
+   ticket nommait le second ; c'est le premier qui est juste, et le contrat le dit
+   déjà (§6.5) : `serverTime` est l'horloge du **serveur** au dernier pull réussi,
+   `lastPulledAt` celle du téléphone. Deux pendules qui divergent de trente
+   secondes suffiraient à sauter un exercice modifié entre les deux, sans rien
+   pour le signaler. `lastPulledAt` reste écrit — c'est ce que l'écran de réglages
+   affichera comme « dernière synchro » — mais il ne pilote rien.
+2. **Une séance non confirmée par le serveur est intouchable, et « non
+   confirmée » a deux définitions.** Une mutation en file (épuisée comprise), ou
+   une séance commencée et pas terminée. La seconde est de la ceinture par-dessus
+   les bretelles : KL-29 empilera une mutation dès la première série cochée, mais
+   une séance ouverte dont rien n'a encore été coché n'en a pas, et l'exigence du
+   ticket est absolue. Sur une séance protégée, le pull applique la
+   **programmation** (date, titre, plan, blocs — le coach a pu corriger) et **rien
+   d'autre** : ni le réalisé, ni `startedAt`/`endedAt`, ni `status`, ni la note de
+   clôture. Écraser `status` serait le pire des trois — le document relu au push
+   suivant repartirait en `planned`, et la clôture serait perdue au moment même où
+   on essaie de l'envoyer.
+3. **Le compteur d'échecs ne compte que les refus du serveur.** Réseau absent,
+   délai dépassé, `429`, `5xx` : le cycle s'arrête, `lastError` s'affiche, et
+   `attempts` **ne bouge pas**. Le sous-sol d'une salle de sport est le cas
+   d'usage nominal du chantier ; y épuiser en cinq lancements une mutation
+   parfaitement valide afficherait une panne là où il n'y a qu'un mur de béton.
+   Un refus définitif (`409`, `422`, `403`), lui, compte **et** laisse passer la
+   suivante : le problème est dans ce document-là, le laisser en tête de file
+   bloquerait les séances des autres jours pour toujours.
+4. **`deleted.schedule` n'est pas appliqué séparément, `deleted.exercises` si.**
+   L'asymétrie n'est pas un oubli : `?since` n'allège que la bibliothèque, dont le
+   jeu reçu est donc *partiel* — sans la liste des disparus, un exercice supprimé
+   resterait local à vie. La fenêtre de séances datées, elle, part toujours
+   entière : « absente du jeu reçu » suffit à décider, et c'est cette purge qui
+   borne la base (sans elle, chaque jour qui passe y laisserait une séance de
+   plus).
+5. **Un exercice supprimé côté serveur n'est pas supprimé localement s'il est
+   référencé par un réalisé non confirmé.** `logged_exercise.exercise_id` est en
+   `SET NULL` : le supprimer viderait la référence, et le document poussé ensuite
+   arriverait sans `exerciseId`. La séance resterait lisible — le nom est un
+   snapshot — mais elle sortirait de l'historique et des records, silencieusement.
+6. **Empiler une mutation est un geste synchrone qui prend l'exécuteur de
+   l'appelant** (`enqueueSchedulePut(uuid, tx)`). Écrire une série et empiler son
+   envoi doivent tenir dans la **même** transaction : l'app tuée entre les deux
+   laisserait un réalisé que rien ne signale comme non poussé, et le pull suivant
+   l'effacerait sans un mot. D'où le type `Writer` (`@/db`) et des fonctions non
+   `async` dans tout `src/sync`.
+7. **L'écran de bootstrap de KL-26 persiste enfin ce qu'il descend.** Il appelait
+   `GET /api/bootstrap` sans rien en faire, faute de moteur — la base restait vide
+   jusqu'au déclencheur suivant. Il passe désormais par `syncNow('first-sync')`,
+   qui reste le seul écrivain de `sync_state`.
+
+**Vérifié** : `npm run typecheck`, `npm run lint`, `npx prettier --check .`,
+`npx expo export` pour Android **et** web, puis un **banc d'essai de 55 contrôles
+contre le vrai Symfony** — `src/sync` bundlé pour Node, `expo-sqlite` posé sur
+`node:sqlite`, le reste bouchonné. Il exerce ce qu'aucune vérification statique ne
+voit : le pull complet puis le delta, la fenêtre qui fait autorité, une séance
+protégée dont le réalisé et la clôture survivent à un serveur qui la dit
+`planned`, une séance en cours épargnée sans mutation, la coalescence (dix
+modifications, une entrée), la suppression qui remplace l'envoi en attente,
+l'upsert `201` puis le rejeu `200` sans doublon avec les uuid de séries posés par
+le client, le document relu **au moment** du push (une série ajoutée après
+l'enfilement part bien), le réseau coupé qui n'incrémente rien, un `422` qui
+compte et laisse passer la suivante, les cinq refus puis le marquage, le
+réarmement, et le cycle complet dans l'ordre push → pull.
+
+**Pas de contrôle sur appareil** : le build natif reste bloqué par le problème de
+toolchain Kotlin/AGP constaté en KL-48 (préexistant, sans rapport). C'est la
+limite connue de ce ticket — le moteur n'a pas encore tourné sur un vrai réseau
+mobile, avec de vraies bascules d'`AppState` et d'`expo-network`. La carte
+« Synchro » de `src/app/index.tsx` est là pour ça le jour où le build repassera.
 
 ---
 
