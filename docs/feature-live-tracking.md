@@ -69,8 +69,14 @@
 > `public/design-tokens.json` (155 tokens, `var()` résolues, aucune traduction),
 > le fichier est versionné et un test échoue dès qu'il a divergé de la feuille,
 > et `tools/fetch-fonts.sh` produit en plus les `.ttf` que lira `expo-font`.
-> Prochain ticket : **KL-21** (init du dépôt `kadens-mobile`), qui n'attend rien
-> du serveur.
+> **KL-21 livré (03/08/2026)** : le dépôt `kadens-mobile` existe — Expo SDK 57 en
+> TypeScript avec `expo-router`, ESLint + Prettier, `app.json` à l'identité
+> Kadens (`fr.antoninpamart.kadens`, portrait, `light`, icônes reprises de
+> `public/pwa/`), `android/` non versionné, `.env.example` et un README qui
+> rappelle l'IP LAN. Le boilerplate du template est retiré pour ne pas laisser un
+> thème concurrent de celui que KL-22 va générer.
+> Prochain ticket : **KL-22** (socle de design natif), qui consomme
+> `design-tokens.json` et les `.ttf` de KL-20.
 
 ---
 
@@ -1634,16 +1640,54 @@ les laisser diverger, on les publie.
 ### KL-21 — Init du dépôt
 
 **Fini quand** :
-- [ ] Projet Expo TypeScript, `expo-router`, ESLint + Prettier
-- [ ] `app.json` : nom « Kadens », identifiant `fr.antoninpamart.kadens`,
+- [x] Projet Expo TypeScript, `expo-router`, ESLint + Prettier
+- [x] `app.json` : nom « Kadens », identifiant `fr.antoninpamart.kadens`,
       orientation portrait, `userInterfaceStyle: light`
-- [ ] Le dossier `android/` **n'est pas** versionné : le workflow le régénère par
+- [x] Le dossier `android/` **n'est pas** versionné : le workflow le régénère par
       `expo prebuild`. Toute configuration native passe donc par un plugin
       déclaré dans `app.json`, jamais par une édition manuelle
-- [ ] README : prérequis, lancement, et **le rappel de l'IP LAN** (l'app doit
+- [x] README : prérequis, lancement, et **le rappel de l'IP LAN** (l'app doit
       viser l'IP de la machine, pas `localhost`, et Symfony démarre avec
       `--listen-ip=0.0.0.0`)
-- [ ] `.env` d'exemple avec l'URL de l'API
+- [x] `.env` d'exemple avec l'URL de l'API
+
+**Ce qui a été tranché en faisant** :
+
+- **Le boilerplate du template est retiré, pas rangé de côté.** `create-expo-app`
+  livre un exemple à deux onglets (composants thémés, icônes React, écran
+  « explore ») et un `reset-project.js` qui le déplace dans `app-example/`. Le
+  garder, c'est se donner un thème concurrent de celui que KL-22 va générer
+  depuis `design-tokens.json`, et deux sources pour une couleur finissent
+  toujours par diverger. Ne survivent que la route racine et le layout.
+- **`EXPO_PUBLIC_API_URL` est un défaut de développement, pas la configuration.**
+  L'URL du serveur arrive par le QR d'appairage (KL-48) et vivra dans la base
+  locale (KL-24). Deux détails que `src/config.ts` documente sur place : une
+  variable `EXPO_PUBLIC_*` est **inlinée dans le bundle**, donc lisible dans
+  l'APK — rien de secret n'y passe jamais — et l'accès doit rester écrit en
+  toutes lettres, un `process.env[nom]` dynamique rendrait `undefined`.
+- **Le rendu web reste installé, alors qu'aucun ticket ne le cible.** Il a
+  d'abord été retiré avec le reste (`react-dom`, `react-native-web`, la clé
+  `web` d'`app.json`) au motif que la cible est Android : un `expo start` lancé
+  en parallèle a échoué sur `Unable to resolve "react-native-web/dist/index"`.
+  `expo-router` l'importe depuis son point d'entrée, et c'est le chemin le plus
+  court pour regarder un composant sans téléphone. Il est donc rétabli, avec la
+  mention explicite dans le README qu'il n'est qu'un confort — rien ne s'y
+  vérifie.
+- **iOS, en revanche, sort du dépôt** : l'icône `assets/expo.icon` du template et
+  la clé `ios` d'`app.json` sont supprimées, conformément au hors-périmètre
+  §0.4. Le code reste multiplateforme par nature ; aucun visuel iOS n'a à être
+  maintenu.
+- **Les visuels viennent de `public/pwa/`**, produits par
+  `tools/build-pwa-icons.php` : l'icône reprend `icon-512.png`, l'icône
+  adaptative Android reprend le maskable (marque à 55 % du côté, donc dans la
+  zone sûre du disque), et les deux fonds sont le papier `#dcdcd7` de
+  `--color-bg`. Redessiner une icône ici aurait créé une deuxième source pour
+  une marque déjà générée.
+- **La vérification tient sans téléphone** : `tsc --noEmit`, `eslint`,
+  `prettier --check`, `expo-doctor` (20/20) et surtout un `expo export` réel
+  pour Android **et** pour web — c'est le seul de ces contrôles qui exerce
+  vraiment le bundler, et c'est lui qui a fait sortir le point précédent. Le
+  bundle Android contient bien l'URL inlinée, vérifié dans le `.hbc`.
 
 ### KL-22 — Socle de design natif
 

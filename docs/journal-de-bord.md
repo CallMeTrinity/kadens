@@ -4037,3 +4037,83 @@ migration, aucun code de production touché.
 
 **Prochain ticket : KL-21** — l'init du dépôt `kadens-mobile`. Il n'attend rien
 du serveur, et KL-40 (le keystore Android) n'attend que lui.
+
+---
+
+## Kadens Live KL-21 — le dépôt mobile (03/08/2026)
+
+Premier ticket qui n'écrit pas une ligne de PHP. `kadens-mobile` existe : Expo
+SDK 57 (React Native 0.86, React 19), TypeScript, `expo-router`, ESLint et
+Prettier, `app.json` à l'identité Kadens (`fr.antoninpamart.kadens`, portrait,
+`userInterfaceStyle: light`), `android/` hors versionnement, `.env.example` et un
+README.
+
+### Le boilerplate est retiré, pas rangé de côté
+
+`create-expo-app` livre un exemple complet : deux onglets, des composants
+« thémés », un `constants/theme.ts` avec ses couleurs, un `reset-project.js` qui
+déplace tout ça dans `app-example/` le jour où l'on veut démarrer pour de bon.
+
+Le garder aurait posé un thème concurrent de celui que KL-22 va **générer** à
+partir de `design-tokens.json`. Deux sources pour une couleur, c'est la situation
+que KL-20 a passé un ticket entier à éviter. Ne survivent donc que `_layout.tsx`
+et une route racine qui n'affiche que la configuration effective — elle sera
+remplacée par l'écran de connexion (KL-26).
+
+Même raisonnement pour iOS : l'icône `assets/expo.icon` du template et la clé
+`ios` d'`app.json` sont supprimées. Le hors-périmètre §0.4 est explicite, et un
+visuel qu'on ne regarde jamais est un visuel qui pourrit.
+
+### Le rendu web reste, et c'est un revirement
+
+Il avait été retiré avec le reste — `react-dom`, `react-native-web`, la clé `web`
+d'`app.json`, `platforms: ["android"]` — au motif que la cible est Android et que
+le web mort est du bruit.
+
+Un `expo start` lancé en parallèle sur la machine a échoué : `Unable to resolve
+"react-native-web/dist/index" from expo-router/build/renderRootComponent.js`. Le
+point d'entrée d'`expo-router` l'importe, et c'est le chemin le plus court pour
+regarder un composant sans téléphone branché. Rétabli, avec la mention explicite
+dans le README que rien ne s'y vérifie.
+
+### `EXPO_PUBLIC_API_URL` est un défaut, pas la configuration
+
+L'URL du serveur arrive par le QR d'appairage (KL-48) et vivra dans la base
+locale (KL-24). La variable d'environnement ne sert qu'au développement, et
+`src/config.ts` documente les deux pièges sur place : une variable
+`EXPO_PUBLIC_*` est **inlinée dans le bundle**, donc lisible dans l'APK — rien de
+secret n'y passe jamais — et l'accès doit rester écrit en toutes lettres, un
+`process.env[nom]` calculé rendrait `undefined`.
+
+Le README porte le rappel qui fait perdre une soirée à qui l'ignore : sur le
+téléphone, `localhost` désigne le téléphone. L'IP LAN de la machine, et Symfony
+démarré avec `--listen-ip=0.0.0.0`, faute de quoi il n'écoute que la boucle
+locale et l'erreur ressemble à une panne réseau.
+
+### Ce qui se vérifie sans téléphone
+
+`tsc --noEmit`, `eslint`, `prettier --check`, `expo-doctor` (20/20), et surtout
+un `expo export` réel pour Android **et** pour web. C'est le seul de ces
+contrôles qui exerce vraiment le bundler, et c'est lui qui aurait dû faire sortir
+l'histoire de `react-native-web` — il a fallu qu'un `expo start` extérieur la
+révèle d'abord. Le bundle Android contient bien l'URL inlinée, vérifié dans le
+`.hbc`.
+
+### Les visuels ne se redessinent pas
+
+L'icône et l'icône adaptative Android reprennent `public/pwa/icon-512.png` et
+`icon-maskable-512.png`, produits par `tools/build-pwa-icons.php` — le maskable
+porte la marque à 55 % du côté, donc dans la zone sûre du disque Android. Fonds
+au papier `#dcdcd7` de `--color-bg`. Dessiner ici aurait créé une seconde source
+pour une marque déjà générée.
+
+### Fichiers touchés
+
+Dépôt `kadens-mobile` (neuf) : projet Expo, `src/app/_layout.tsx`,
+`src/app/index.tsx`, `src/config.ts`, `eslint.config.js`, `.prettierrc.json`,
+`.env.example`, `README.md`, `CLAUDE.md`. Dépôt `kadens` : `CLAUDE.md` (§6),
+`docs/feature-live-tracking.md` (état, KL-21), ce journal. Aucun code de
+production serveur touché.
+
+**Prochain ticket : KL-22** — le socle de design natif, qui consomme le
+`design-tokens.json` et les `.ttf` publiés par KL-20.

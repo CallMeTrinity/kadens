@@ -346,8 +346,29 @@ KL-19 livrés le 03/08/2026 — le lot 2 est clos** : la matrice transversale de
 endpoints et [`docs/api-mobile.md`](./docs/api-mobile.md), le contrat client.
 **KL-20 livré le 03/08/2026** : les tokens de design sont publiés
 (`app:tokens:export` → `public/design-tokens.json`) et `tools/fetch-fonts.sh`
-produit aussi les `.ttf`. Prochain ticket KL-21 (init du dépôt `kadens-mobile`),
-qui n'attend rien du serveur.
+produit aussi les `.ttf`. **KL-21 livré le 03/08/2026** : le dépôt
+`kadens-mobile` est initialisé (Expo SDK 57, `expo-router`, ESLint + Prettier,
+`app.json` à l'identité Kadens, `android/` non versionné) — **le travail bascule
+dans l'autre dépôt**, qui porte désormais son propre `CLAUDE.md`. Prochain
+ticket KL-22 (socle de design natif), qui consomme `design-tokens.json`.
+
+Ce que KL-21 pose et qu'il ne faut pas casser (côté `kadens-mobile`) :
+
+- **Le dépôt mobile a sa propre référence.** `kadens-mobile/CLAUDE.md` tient les
+  règles qui n'ont de sens que là-bas (stack Expo, rangement, `android/` non
+  versionné) et **renvoie** ici pour tout le reste : les décisions, les tickets
+  et le contrat d'API restent dans `docs/feature-live-tracking.md` et
+  `docs/api-mobile.md`. Recopier une règle dans les deux dépôts, c'est se donner
+  deux versions du même raisonnement.
+- **Le boilerplate d'Expo est retiré, pas rangé de côté** : garder le thème
+  d'exemple du template aurait donné une deuxième source de couleurs face au
+  `src/theme/tokens.ts` que KL-22 génère depuis `design-tokens.json`.
+- **`EXPO_PUBLIC_API_URL` n'est qu'un défaut de développement** (l'URL vient du
+  QR d'appairage, KL-48), et une variable `EXPO_PUBLIC_*` est **inlinée dans le
+  bundle** : rien de secret n'y passe.
+- **Les visuels du mobile viennent de `public/pwa/`**, donc de
+  `tools/build-pwa-icons.php` : une icône redessinée à la main dans l'autre
+  dépôt serait une seconde source pour une marque déjà générée.
 
 Ce que KL-20 pose et qu'il ne faut pas casser :
 
