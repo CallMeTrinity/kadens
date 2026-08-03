@@ -344,7 +344,36 @@ l'hydratation complète de la base locale du téléphone en une requête.
 `GET /api/exercises/{id}/history`, la trajectoire d'un exercice. **KL-18 et
 KL-19 livrés le 03/08/2026 — le lot 2 est clos** : la matrice transversale des
 endpoints et [`docs/api-mobile.md`](./docs/api-mobile.md), le contrat client.
-Prochain ticket KL-20 (export des tokens de design).
+**KL-20 livré le 03/08/2026** : les tokens de design sont publiés
+(`app:tokens:export` → `public/design-tokens.json`) et `tools/fetch-fonts.sh`
+produit aussi les `.ttf`. Prochain ticket KL-21 (init du dépôt `kadens-mobile`),
+qui n'attend rien du serveur.
+
+Ce que KL-20 pose et qu'il ne faut pas casser :
+
+- **`tokens.css` reste la source unique ; le JSON en est une projection.**
+  `app:tokens:export` résout les `var()` (un consommateur natif ne suit pas une
+  référence) et **ne traduit rien d'autre** : une pile de polices reste une pile,
+  `--color-scrim` reste un `color-mix()`. Traduire ici, ce serait écrire un
+  moteur CSS partiel en PHP dont chaque cas non couvert donnerait une valeur
+  fausse et muette — l'adaptation aux API natives vit dans `src/theme/tokens.ts`
+  côté mobile (KL-22). Une `var()` non résoluble (nom inconnu, cycle) **échoue
+  la commande** : c'est une faute de frappe, elle doit sortir au build.
+- **`public/design-tokens.json` est généré ET versionné**, comme
+  `assets/styles/fonts.css` et `_pwa_splash.html.twig` : jamais édité à la main,
+  et `ExportDesignTokensCommandTest` compare les **documents entiers** à ce que
+  la feuille produit aujourd'hui. D'où un rendu **déterministe** — aucun
+  horodatage, sinon la comparaison n'existe plus. La commande tourne aussi dans
+  le workflow de build.
+- **Seuls les blocs `:root` sont lus**, et les deux couches restent séparées
+  (`primitives` / `semantic`) : une propriété posée sur un composant est une
+  variable locale, et aplatir les couches effacerait la règle 1 du §5.
+- **Les `.ttf` du mobile vivent dans `public/fonts/`, jamais dans `assets/`** :
+  AssetMapper les compilerait en URL digestées, soit un méga-octet embarqué en
+  prod pour des fichiers que le web ne demande jamais et que le mobile ne
+  trouverait pas. Ils ne sont pas subsettés (Google ne sert le ttf qu'entier), et
+  le script les obtient en appelant Google Fonts **sans** l'UA moderne — c'est
+  exactement ce qui fait basculer la réponse du woff2 au truetype.
 
 Ce que KL-18 et KL-19 posent et qu'il ne faut pas casser :
 

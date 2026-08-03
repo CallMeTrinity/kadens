@@ -64,7 +64,13 @@
 > format exact du QR, et un `curl` réellement exécuté par endpoint. Une limite
 > connue en est sortie : les horodatages à décalage non nul perdent leur fuseau
 > (§KL-19), à envoyer en UTC en attendant un correctif.
-> Prochain ticket : **KL-20** (export des tokens de design).
+> **KL-20 livré (03/08/2026)** : les tokens de design sont publiés.
+> `app:tokens:export` projette `assets/styles/tokens.css` en
+> `public/design-tokens.json` (155 tokens, `var()` résolues, aucune traduction),
+> le fichier est versionné et un test échoue dès qu'il a divergé de la feuille,
+> et `tools/fetch-fonts.sh` produit en plus les `.ttf` que lira `expo-font`.
+> Prochain ticket : **KL-21** (init du dépôt `kadens-mobile`), qui n'attend rien
+> du serveur.
 
 ---
 
@@ -1573,13 +1579,53 @@ sait pas lire. Plutôt que de les recopier à la main dans le repo mobile et de
 les laisser diverger, on les publie.
 
 **Fini quand** :
-- [ ] `php bin/console app:tokens:export` lit `tokens.css` et écrit
+- [x] `php bin/console app:tokens:export` lit `tokens.css` et écrit
       `public/design-tokens.json` (primitives `--kd-*` et tokens sémantiques)
-- [ ] La commande tourne dans le workflow de build, le fichier est servi sur
+- [x] La commande tourne dans le workflow de build, le fichier est servi sur
       `kadens.antoninpamart.fr/design-tokens.json`
-- [ ] Un test qui échoue si un token sémantique du CSS n'est pas dans le JSON
-- [ ] `tools/fetch-fonts.sh` produit aussi les `.ttf` de Barlow et Barlow
+- [x] Un test qui échoue si un token sémantique du CSS n'est pas dans le JSON
+- [x] `tools/fetch-fonts.sh` produit aussi les `.ttf` de Barlow et Barlow
       Condensed (React Native ne lit pas le `woff2`)
+
+**Ce qui a été tranché en écrivant le ticket** :
+
+- **Les `var()` sont résolues, et rien d'autre ne l'est.** Un consommateur natif
+  ne sait pas suivre une référence : `--color-bg` doit valoir `#dcdcd7`, pas
+  `var(--kd-page)`. Mais la commande ne **traduit** pas — une pile de polices
+  reste une pile de polices, `--color-scrim` reste un `color-mix()`. Traduire ici
+  reviendrait à écrire un moteur CSS partiel en PHP, dont chaque cas non couvert
+  serait une valeur fausse et silencieuse ; la fidélité à la source est ce qui
+  rend l'export **vérifiable**, et l'adaptation aux API natives est précisément
+  le travail de `src/theme/tokens.ts` (KL-22).
+- **Une `var()` qui ne se résout pas fait échouer la commande**, cycle compris.
+  Un token qui pointe un nom inexistant est une faute de frappe dans
+  `tokens.css` : elle doit sortir au build, pas sur un téléphone où la couleur
+  manquerait sans rien dire.
+- **Le JSON est versionné, et un test le compare à la feuille.** C'est la
+  convention déjà tenue par `assets/styles/fonts.css` et
+  `_pwa_splash.html.twig` : le fichier est généré, jamais édité à la main, et un
+  test échoue quand il a divergé. Le « fini quand » demandait qu'un token
+  sémantique absent du JSON casse la suite — le test compare **les documents
+  entiers**, donc un token ajouté, renommé, ou dont la valeur a bougé, échoue de
+  la même façon. Le rendu est déterministe (aucun horodatage), sans quoi cette
+  comparaison serait impossible. La commande tourne quand même dans le workflow
+  de build : ce qui part en prod est alors produit par la source.
+- **On ne lit que les blocs `:root`.** Une propriété personnalisée posée sur un
+  sélecteur de composant est une variable **locale** ; l'exporter donnerait au
+  mobile une valeur qui n'a de sens nulle part ailleurs. C'est aussi ce qui
+  laisse `--kd-navbar-h` (qui n'existe que sous 560px) hors du champ.
+- **Les clés gardent leurs deux tirets** (`"--color-bg"`), et les deux couches
+  restent séparées (`primitives` / `semantic`). La séparation n'est pas
+  décorative : c'est la règle 1 du design system — une vue ne consomme jamais une
+  primitive — et un `tokens.ts` qui les aplatirait la ferait disparaître.
+- **Les `.ttf` sont publiés dans `public/fonts/`**, pas rangés à côté des woff2 :
+  dans `assets/`, AssetMapper les compilerait en URL digestées, c'est-à-dire un
+  méga-octet embarqué en prod pour des fichiers que le web ne demande jamais et
+  que le mobile ne saurait pas trouver. Ils ne sont pas subsettés — Google ne
+  sert le ttf qu'entier, et un téléphone n'a pas de budget de première peinture.
+- **IBM Plex Mono est du lot**, alors que le ticket ne nomme que les deux Barlow.
+  KL-22 charge les **trois** familles par `expo-font` : en livrer deux aurait
+  garanti un ticket de rattrapage.
 
 ---
 

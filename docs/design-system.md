@@ -151,7 +151,7 @@ l'accent rouge reste disponible pour l'exercice sauté du réalisé.
 
 | Token | Valeur | Statut |
 |---|---|---|
-| `--color-status-done` | `#0b0b0b` | `DONE` — fait |
+| `--color-status-done` | `#006d14` | `DONE` — fait |
 | `--color-status-planned` | `#8a8a82` | `PLANNED` — prévu |
 | `--color-status-missed` | `#d8261e` | `MISSED` — manqué |
 
@@ -197,6 +197,10 @@ sont dans `assets/fonts/` (subsets latin + latin-ext), les `@font-face` dans
 > et graisses vivent dans le tableau `FAMILIES` en tête du script — c'est la
 > seule chose à modifier. `fonts.css` est **généré**, ne jamais l'éditer à la
 > main.
+
+Le même script dépose un `.ttf` par famille et par graisse dans `public/fonts/` :
+`expo-font` ne lit pas le `woff2`. Ces fichiers ne servent **pas** au web — ils
+sont publiés pour l'app mobile, comme `design-tokens.json` (cf. §9).
 
 ---
 
@@ -398,3 +402,33 @@ décomposé en `_workout_program`, `_workout_sets_table`, `_workout_analysis`.
    sémantique. On n'expose jamais une primitive directement aux vues.
 4. **Le condensé capitales ne touche pas au contenu saisi** (cf. §3).
 5. **Toute évolution se répercute** ici et dans `CLAUDE.md` (§5 Design system).
+6. **Une valeur ajoutée à `tokens.css` doit être réexportée** :
+   `php bin/console app:tokens:export` (cf. §9). Un test échoue sinon.
+
+---
+
+## 9. Export vers le mobile
+
+L'app Android (Kadens Live) partage cette identité mais ne lit pas de CSS. Les
+tokens lui sont donc **publiés**, jamais recopiés :
+
+```
+php bin/console app:tokens:export   →   public/design-tokens.json
+```
+
+La commande lit `tokens.css`, résout les `var()` et rend deux objets,
+`primitives` et `semantic`, dans l'ordre du fichier. Trois choses à savoir :
+
+- Elle **ne traduit pas**. Une pile de polices reste une pile de polices,
+  `--color-scrim` reste un `color-mix()`. L'adaptation aux API natives vit dans
+  le générateur TypeScript du repo mobile ; ici, on reste fidèle à la source,
+  c'est ce qui rend l'export vérifiable.
+- Le JSON est **généré et versionné**, comme `fonts.css` : ne jamais l'éditer à
+  la main, relancer la commande. `ExportDesignTokensCommandTest` compare le
+  fichier versionné à ce que la feuille produit et échoue à la moindre
+  divergence.
+- Seuls les blocs `:root` sont lus. Une propriété personnalisée posée sur un
+  sélecteur de composant est une variable locale, pas un token.
+
+Les polices suivent le même canal : `tools/fetch-fonts.sh` dépose les `.ttf`
+dans `public/fonts/` (cf. §3).

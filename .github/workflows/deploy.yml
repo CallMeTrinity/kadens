@@ -55,6 +55,15 @@ jobs:
           APP_ENV: prod
           APP_DEBUG: '0'
 
+      # Le JSON est versionné et un test garde sa fraîcheur (KL-20) ; on le
+      # régénère quand même ici, pour que ce qui part en prod soit produit par la
+      # source et non par un fichier qu'on aurait édité à la main.
+      - name: Exporter les tokens de design
+        run: php bin/console app:tokens:export
+        env:
+          APP_ENV: prod
+          APP_DEBUG: '0'
+
       # L'archive doit être écrite hors de l'arborescence source : si elle est
       # créée dans le dossier qu'on archive, sa création modifie le mtime de
       # "." pendant que tar le parcourt (erreur "file changed as we read it").

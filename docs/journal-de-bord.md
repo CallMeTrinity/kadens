@@ -3961,3 +3961,79 @@ code de production touché.
 
 **Le lot 2 est clos. Prochain ticket : KL-20** — l'export des tokens de design,
 premier ticket du lot 3 (l'app Android).
+
+---
+
+## Kadens Live KL-20 — les tokens publiés (03/08/2026)
+
+Premier ticket du lot 3, et le seul de ce lot qui vive côté serveur. L'identité
+« Presse » est décrite dans `assets/styles/tokens.css`, que React Native ne sait
+pas lire. La question n'est donc pas « comment donner ces valeurs au mobile »
+mais « comment éviter qu'elles y divergent ».
+
+### Une projection, pas une traduction
+
+`app:tokens:export` lit la feuille, résout les `var()` et écrit
+`public/design-tokens.json` : 90 primitives, 65 tokens sémantiques, dans l'ordre
+du fichier, avec les deux couches séparées.
+
+Résoudre les références est indispensable — `--color-bg` doit valoir `#dcdcd7`,
+un consommateur natif ne suit pas une référence. **Traduire** aurait été le
+piège : `--font-display` sort en `'Barlow Condensed', system-ui, sans-serif`,
+`--color-scrim` en `color-mix(in srgb, #0b0b0b 42%, transparent)`, et il est
+tentant de rendre la première famille et de calculer le mélange. Ce serait écrire
+un moteur CSS partiel en PHP, dont chaque cas non couvert produirait une valeur
+fausse — et muette. La fidélité à la source est ce qui rend l'export vérifiable ;
+l'adaptation aux API natives est exactement le travail de `src/theme/tokens.ts`
+(KL-22), qui sait, lui, ce que `expo-font` attend.
+
+Ce que la commande refuse, en revanche, c'est une `var()` qui ne se résout pas :
+nom inconnu ou cycle, elle échoue. Un token qui pointe un nom inexistant est une
+faute de frappe dans `tokens.css`, et sans cette garde elle sortirait sur un
+téléphone, sous la forme d'une couleur manquante qui ne dit rien.
+
+### Le fichier est versionné, et c'est ce qui rend le test possible
+
+Le ticket demandait « un test qui échoue si un token sémantique du CSS n'est pas
+dans le JSON ». Un test qui régénère puis vérifie sa propre sortie ne prouverait
+que le parseur. Le JSON est donc **généré et versionné**, comme
+`assets/styles/fonts.css` et `templates/components/_pwa_splash.html.twig` — la
+convention existait déjà — et `ExportDesignTokensCommandTest` compare les
+**documents entiers** : un token ajouté, renommé, ou dont la valeur a bougé, fait
+échouer la suite avec le diff sous les yeux. Vérifié en ajoutant un token pour
+voir.
+
+Corollaire : le rendu est déterministe, aucun horodatage. Une date de génération
+aurait rendu la comparaison impossible et bruité chaque diff. La commande tourne
+quand même dans le workflow de build, pour que ce qui part en prod soit produit
+par la source.
+
+### Les polices
+
+`tools/fetch-fonts.sh` produit en plus un `.ttf` par famille et par graisse dans
+`public/fonts/` (11 fichiers, 1 Mo). Deux détails qui ne s'inventent pas :
+
+- **Le ttf s'obtient en appelant Google Fonts *sans* l'UA moderne.** Le script en
+  posait un pour forcer le woff2 ; le retirer bascule la réponse en `truetype`.
+  Ces fichiers-là ne sont pas subsettés — Google ne sert le ttf qu'entier, et un
+  téléphone n'a pas de budget de première peinture à tenir.
+- **Ils vivent dans `public/fonts/`, pas dans `assets/`.** Rangés à côté des
+  woff2, AssetMapper les compilerait en URL digestées : un méga-octet embarqué en
+  prod pour des fichiers que le web ne demande jamais et que le mobile ne saurait
+  pas trouver.
+
+Le ticket ne nommait que les deux Barlow. IBM Plex Mono est du lot quand même :
+KL-22 charge les trois familles par `expo-font`, en livrer deux aurait garanti un
+ticket de rattrapage.
+
+### Fichiers touchés
+
+Neufs : `src/Command/ExportDesignTokensCommand.php`,
+`tests/Command/ExportDesignTokensCommandTest.php`, `public/design-tokens.json`,
+`public/fonts/*.ttf`. Modifiés : `tools/fetch-fonts.sh`,
+`.github/workflows/deploy.yml`, `CLAUDE.md` (§6),
+`docs/feature-live-tracking.md` (état, KL-20), `docs/design-system.md`. Aucune
+migration, aucun code de production touché.
+
+**Prochain ticket : KL-21** — l'init du dépôt `kadens-mobile`. Il n'attend rien
+du serveur, et KL-40 (le keystore Android) n'attend que lui.
