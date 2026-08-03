@@ -54,7 +54,17 @@
 > séances, en deux requêtes bornées. La mise en forme d'une performance a
 > désormais un producteur unique (`PerformanceHistoryPayload`), partagé avec le
 > tableau `history` du bootstrap.
-> Prochain ticket : **KL-18** (tests fonctionnels de l'API).
+> **KL-18 et KL-19 livrés (03/08/2026) — le lot 2 est clos.** Les gardes que
+> *tous* les endpoints doivent tenir sont désormais tenues au même endroit
+> (`ApiEndpointMatrixTest` : anonyme / expiré / révoqué → 401, nominal → 2xx,
+> aucun cookie, aucune fuite du bloc-notes privé, ressource d'un tiers refusée),
+> et le contrat client est écrit noir sur blanc dans
+> [`docs/api-mobile.md`](./api-mobile.md) — onze endpoints, le partage
+> d'autorité champ par champ, le protocole d'appairage de bout en bout avec le
+> format exact du QR, et un `curl` réellement exécuté par endpoint. Une limite
+> connue en est sortie : les horodatages à décalage non nul perdent leur fuseau
+> (§KL-19), à envoyer en UTC en attendant un correctif.
+> Prochain ticket : **KL-20** (export des tokens de design).
 
 ---
 
@@ -1477,28 +1487,82 @@ pièces.
 
 ### KL-18 — Tests fonctionnels de l'API
 
+**Où** : `tests/Controller/ApiEndpointMatrixTest.php`
+
 **Fini quand** :
-- [ ] Un test par endpoint : cas nominal, non authentifié, token expiré, token
+- [x] Un test par endpoint : cas nominal, non authentifié, token expiré, token
       révoqué, ressource d'un autre utilisateur
-- [ ] **Un test d'idempotence** : le même document envoyé trois fois donne une
+- [x] **Un test d'idempotence** : le même document envoyé trois fois donne une
       seule séance datée et un seul jeu de séries
-- [ ] Un test vérifiant qu'un `PUT` n'écrase jamais le prescrit ni le
+- [x] Un test vérifiant qu'un `PUT` n'écrase jamais le prescrit ni le
       rattachement au plan de la séance datée visée
-- [ ] **Un test d'appairage** : un code consommé deux fois échoue la seconde
+- [x] **Un test d'appairage** : un code consommé deux fois échoue la seconde
       fois, un code expiré échoue, et un code émis par un utilisateur ne crée
       jamais un token pour un autre
-- [ ] Un test vérifiant qu'aucune réponse d'API ne contient `notes` de `Workout`
-- [ ] Un test vérifiant qu'aucune requête `^/api` ne pose de cookie de session
+- [x] Un test vérifiant qu'aucune réponse d'API ne contient `notes` de `Workout`
+- [x] Un test vérifiant qu'aucune requête `^/api` ne pose de cookie de session
+
+**Ce que le ticket pose et qu'il ne faut pas casser** :
+
+- **Ce fichier ne teste rien de particulier, et c'est son rôle.** Chaque endpoint
+  avait déjà le sien (bootstrap, schedule, historique, auth, appairage) ; les
+  quatre cases restantes — être authentifié, ne pas ouvrir de session, ne pas
+  laisser fuiter le bloc-notes — ne se vérifient utilement que sur la **liste
+  entière**. D'où un fournisseur de données unique (`endpoints()`) plutôt que
+  huit tests copiés : un endpoint ajouté demain s'écrit une fois et se retrouve
+  aussitôt soumis aux quatre gardes.
+- **Le seul trou possible est un endpoint absent de la liste**, et il se voit à
+  la lecture. Compromis assumé : dériver la liste des routes ne dispenserait pas
+  de fabriquer une ressource valide pour chacune.
+- **La sentinelle du bloc-notes est en ASCII** (`SENTINELLE-BLOC-NOTES-PRIVE`).
+  `AuthController` rend ses réponses par `$this->json()`, sans
+  `JSON_UNESCAPED_UNICODE` : une note accentuée sortirait échappée en `\uXXXX`
+  et `assertStringNotContainsString` passerait sur une **vraie** fuite. Chercher
+  une chaîne sans accent, c'est la chercher quel que soit l'échappement.
+- **Le nominal est testé en même temps que les trois refus.** Sans lui, un
+  endpoint cassé rendrait 401 partout et passerait toute la matrice.
+- **`WWW-Authenticate` n'est exigé que sur les routes gardées par
+  `access_control`.** `POST /api/auth/logout` est sous `^/api/auth`, donc
+  public pour le pare-feu : sa garde vit dans le contrôleur, et il formule son
+  401 lui-même. D'où la colonne `byFirewall` du fournisseur.
+- **Le cookie se vérifie sur les DEUX issues**, refus et succès : une réponse
+  d'erreur traverse un autre chemin (entry point, `ApiExceptionListener`), et
+  c'est exactement là qu'une session pourrait s'ouvrir sans qu'on la voie.
+- **La révocation se teste par le vrai geste** (`POST /api/auth/logout`), pas en
+  effaçant la ligne à la main : c'est le chemin que le mobile emprunte.
+- Piège hérité : le limiteur vit dans un pool de cache **sur disque**, à vider au
+  `setUp` ; et ce fichier **nettoie en `tearDown`**, comme `ApiBootstrapTest`.
 
 ### KL-19 — `docs/api-mobile.md`
 
 **Fini quand** :
-- [ ] Chaque endpoint documenté : méthode, charge utile, réponse, codes d'erreur
-- [ ] Le protocole de synchronisation décrit noir sur blanc (qui fait autorité
+- [x] Chaque endpoint documenté : méthode, charge utile, réponse, codes d'erreur
+- [x] Le protocole de synchronisation décrit noir sur blanc (qui fait autorité
       sur quoi, comment les conflits sont tranchés)
-- [ ] Le protocole d'appairage décrit de bout en bout, avec le format exact de
+- [x] Le protocole d'appairage décrit de bout en bout, avec le format exact de
       la charge utile du QR
-- [ ] Un exemple `curl` complet par endpoint, réellement exécuté
+- [x] Un exemple `curl` complet par endpoint, réellement exécuté
+
+**Ce que le ticket pose et qu'il ne faut pas casser** :
+
+- **Le document dit le *quoi*, jamais le *pourquoi*.** Le raisonnement vit ici et
+  dans `CLAUDE.md` ; le recopier en ferait une seconde source à tenir à jour, qui
+  divergerait. `docs/api-mobile.md` renvoie aux deux et s'en tient au contrat.
+- **Le partage d'autorité est un tableau champ par champ**, pas un paragraphe :
+  c'est la question que le client se pose à chaque ligne de code de synchro.
+- **Un `curl` par endpoint, exécuté, réponses collées telles quelles.** Une doc
+  d'API dont les exemples n'ont jamais tourné se trompe toujours quelque part —
+  ici, l'exécution a fait sortir une limite que personne n'avait vue (ci-dessous).
+- **Limite trouvée en exécutant : les horodatages à décalage non nul perdent
+  leur fuseau.** `2026-08-02T18:04:00+02:00` est relu `…T18:04:00+00:00` — l'heure
+  murale est conservée, le décalage jeté, donc l'instant absolu est faux de deux
+  heures (les durées, elles, restent justes). Cause : le décalage n'est pas
+  normalisé avant persistance et Doctrine écrit l'heure telle que l'objet la
+  porte. **Contournement documenté et vérifié : envoyer tout en UTC (`…Z`).** Le
+  correctif change le comportement d'un endpoint livré (KL-16) : il relève d'un
+  ticket à part, pas de la documentation.
+- **Le tableau final renvoie chaque garde à son fichier de test.** Une
+  affirmation de doc qui n'est adossée à rien finit par mentir.
 
 ### KL-20 — Export des tokens de design
 

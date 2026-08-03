@@ -3864,3 +3864,100 @@ Modifiés : `src/Service/PerformanceHistory.php` (`recentSessions()`,
 
 **Prochain ticket : KL-18** — les tests fonctionnels de l'API, endpoint par
 endpoint.
+
+---
+
+## Kadens Live KL-18 et KL-19 — la matrice et le contrat (03/08/2026)
+
+Deux tickets de clôture du lot 2. L'un fige ce que tous les endpoints doivent
+tenir, l'autre écrit ce que le client peut en attendre. Ils vont ensemble : la
+documentation n'engage à rien si rien ne la garde, et une garde qui n'est écrite
+nulle part ne se lit que dans le code.
+
+### Ce qui existait déjà, et ce qui manquait vraiment
+
+La tentation, sur un ticket « tests fonctionnels de l'API », est d'écrire huit
+fichiers de plus. Ils existaient : `ApiBootstrapTest`, `ApiScheduleTest`,
+`ApiExerciseHistoryTest`, `ApiAuthEndpointsTest`, `ApiPairingTest`,
+`ApiAuthenticationTest`, `ApiErrorResponseTest` — chacun teste ce que son
+endpoint fait de particulier, et la plupart des cases du ticket étaient déjà
+cochées (idempotence à trois envois, `PUT` qui ne touche ni le prescrit ni le
+plan, les trois refus d'appairage).
+
+Ce qui manquait n'était pas un test de plus par endpoint : c'étaient les gardes
+qui **ne dépendent d'aucun endpoint**. Être authentifié, ne pas ouvrir de
+session, ne pas laisser fuiter le bloc-notes privé — trois règles vraies partout,
+vérifiées à deux ou trois endroits. Le bloc-notes était testé sur le bootstrap,
+l'absence de cookie sur `ping` et `bootstrap`, le jeton expiré sur `ping` seul, le
+jeton révoqué nulle part.
+
+### Une liste, pas huit copies
+
+`ApiEndpointMatrixTest` tient dans un fournisseur de données et cinq tests. La
+liste des endpoints s'écrit une fois ; chacun passe par anonyme → 401, expiré →
+401, révoqué → 401, nominal → son statut, et aucun cookie sur les deux issues.
+Huit endpoints, quarante-cinq tests, cent vingt-trois assertions.
+
+L'intérêt n'est pas la couverture d'aujourd'hui, c'est celle de demain : un
+endpoint ajouté au lot 3 s'écrit **une ligne** dans `endpoints()` et se retrouve
+soumis aux quatre gardes d'un coup. Le seul trou possible est un endpoint absent
+de la liste, et il se voit à la lecture — compromis assumé, dériver la liste des
+routes ne dispenserait pas de fabriquer une ressource valide pour chacune.
+
+### Trois pièges qui valaient la peine
+
+**La sentinelle du bloc-notes doit être en ASCII.** `AuthController` rend ses
+réponses par `$this->json()`, pas par `ApiJson` : sans `JSON_UNESCAPED_UNICODE`,
+une note écrite « Brouillon privé » sortirait en `Brouillon privé`, et
+`assertStringNotContainsString('Brouillon privé', …)` passerait sur une **vraie**
+fuite. Le test cherche donc `SENTINELLE-BLOC-NOTES-PRIVE`, qu'aucun échappement
+ne peut déguiser.
+
+**Le nominal fait partie de la matrice.** Sans lui, un endpoint cassé rendrait
+401 partout et passerait les trois tests de refus sans qu'un seul ne bronche.
+
+**`WWW-Authenticate` n'est pas uniforme, et c'est correct.**
+`POST /api/auth/logout` vit sous `^/api/auth`, donc public pour `access_control` :
+sa garde est dans le contrôleur, qui formule son propre 401 sans en-tête de défi.
+D'où une colonne `byFirewall` dans le fournisseur plutôt qu'une assertion faussée
+sur sept endpoints.
+
+### La doc écrite en l'exécutant
+
+`docs/api-mobile.md` documente onze endpoints, le partage d'autorité champ par
+champ, le protocole d'appairage de bout en bout et le format exact de la charge
+utile du QR. La règle qui le tient : **il dit le *quoi*, jamais le *pourquoi***.
+Le raisonnement vit dans `CLAUDE.md` et dans `feature-live-tracking.md` ; le
+recopier créerait une seconde source qui divergerait au premier changement.
+
+La case « un exemple `curl` complet par endpoint, réellement exécuté » n'est pas
+une formalité. Tout a tourné contre le serveur de dev : compte de démonstration,
+appairage complet (session web, jeton CSRF, code émis, code échangé, code rejoué,
+sondage de statut avant et après), cycle de synchronisation entier, et les
+réponses sont collées telles quelles.
+
+### Ce que l'exécution a fait sortir
+
+Un défaut que personne n'avait vu, et qu'aucun test n'aurait attrapé puisqu'ils
+écrivent tous en UTC : **un horodatage entrant à décalage non nul perd son
+fuseau.** `"startedAt": "2026-08-02T18:04:00+02:00"` est stocké `18:04:00` et
+relu `2026-08-02T18:04:00+00:00` — l'heure murale conservée, le décalage jeté,
+l'instant absolu faux de deux heures. Les durées, elles, restent justes : les
+deux bornes glissent ensemble.
+
+Cause : le décalage n'est pas normalisé avant persistance, et Doctrine formate
+l'objet tel qu'il le reçoit. Le correctif tient en une normalisation à la lecture
+de la charge utile, mais il change le comportement d'un endpoint déjà livré
+(KL-16) : ce n'est pas à la documentation de le décider. Le contournement client
+est documenté et vérifié — **tout envoyer en UTC** (`2026-08-02T16:04:00Z` est
+relu à l'identique).
+
+### Fichiers touchés
+
+Neufs : `tests/Controller/ApiEndpointMatrixTest.php` (45 tests),
+`docs/api-mobile.md`. Modifiés : `CLAUDE.md` (§6),
+`docs/feature-live-tracking.md` (état, KL-18, KL-19). Aucune migration, aucun
+code de production touché.
+
+**Le lot 2 est clos. Prochain ticket : KL-20** — l'export des tokens de design,
+premier ticket du lot 3 (l'app Android).

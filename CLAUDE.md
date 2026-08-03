@@ -341,8 +341,42 @@ l'hydratation complète de la base locale du téléphone en une requête.
 (`GET /api/schedule/{uuid}`) et **le sens montant existe** —
 `PUT /api/schedule/{uuid}` (upsert idempotent du document complet) et `DELETE`
 (séances libres seulement). **KL-17 livré le 02/08/2026** :
-`GET /api/exercises/{id}/history`, la trajectoire d'un exercice. Prochain ticket
-KL-18 (tests fonctionnels de l'API).
+`GET /api/exercises/{id}/history`, la trajectoire d'un exercice. **KL-18 et
+KL-19 livrés le 03/08/2026 — le lot 2 est clos** : la matrice transversale des
+endpoints et [`docs/api-mobile.md`](./docs/api-mobile.md), le contrat client.
+Prochain ticket KL-20 (export des tokens de design).
+
+Ce que KL-18 et KL-19 posent et qu'il ne faut pas casser :
+
+- **`ApiEndpointMatrixTest` ne teste rien de particulier, et c'est son rôle.**
+  Chaque endpoint a déjà son fichier ; les gardes qui ne dépendent d'aucun
+  endpoint — être authentifié, ne pas ouvrir de session, ne pas laisser fuiter le
+  bloc-notes privé — ne se vérifient utilement que sur la **liste entière**. La
+  liste est donc un fournisseur de données unique (`endpoints()`), et un endpoint
+  ajouté demain s'y écrit une fois pour être soumis aux quatre gardes d'un coup.
+  Le seul trou possible est un endpoint absent de la liste, et il se voit à la
+  lecture.
+- **La sentinelle du bloc-notes est en ASCII.** `AuthController` rend ses
+  réponses par `$this->json()`, donc sans `JSON_UNESCAPED_UNICODE` : une note
+  accentuée sortirait en `\uXXXX` et `assertStringNotContainsString` passerait
+  sur une vraie fuite.
+- **`WWW-Authenticate` n'est exigé que sur les routes gardées par
+  `access_control`** : `POST /api/auth/logout` est sous `^/api/auth`, sa garde
+  vit dans le contrôleur et il formule son 401 lui-même.
+- **Le cookie se vérifie sur le refus ET sur le succès** : une réponse d'erreur
+  traverse un autre chemin (entry point, `ApiExceptionListener`), et c'est là
+  qu'une session s'ouvrirait sans qu'on la voie.
+- **`docs/api-mobile.md` dit le *quoi*, jamais le *pourquoi*** (qui vit ici et
+  dans `docs/feature-live-tracking.md`) : deux sources du même raisonnement
+  divergeraient. Ses `curl` ont tous été exécutés, et leurs réponses sont collées
+  telles quelles — c'est ce qui a fait sortir la limite ci-dessous.
+- **Limite connue, trouvée en exécutant la doc : un horodatage entrant à décalage
+  non nul perd son fuseau.** `2026-08-02T18:04:00+02:00` est relu
+  `…T18:04:00+00:00` : l'heure murale est gardée, le décalage jeté, l'instant
+  absolu est donc faux de deux heures (les durées restent justes, les deux bornes
+  glissent ensemble). Le contournement client est documenté et vérifié — **tout
+  envoyer en UTC** ; le correctif change le comportement de KL-16 et attend son
+  propre ticket.
 
 Ce que KL-17 pose et qu'il ne faut pas casser :
 
