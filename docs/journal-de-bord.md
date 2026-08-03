@@ -4117,3 +4117,213 @@ production serveur touché.
 
 **Prochain ticket : KL-22** — le socle de design natif, qui consomme le
 `design-tokens.json` et les `.ttf` publiés par KL-20.
+
+---
+
+## Kadens Live KL-24 — la base locale (03/08/2026)
+
+`expo-sqlite` + Drizzle, huit tables, des migrations générées et embarquées, des
+UUIDv7 posés par le téléphone, un jeu de démonstration. C'est le socle sur lequel
+tout le lot 4 va s'écrire : ce que l'app fait hors réseau, elle le fait sur ce
+qu'il y a là-dedans.
+
+### La décision de forme : un document d'un côté, des lignes de l'autre
+
+Le ticket demande `prescribed_snapshot` au singulier, à côté de `logged_exercise`
+et `logged_set` au pluriel. Ce n'est pas une inattention de rédaction, c'est la
+forme juste, et elle mérite d'être dite parce qu'elle a l'air d'une incohérence.
+
+Le prescrit ne se recompose pas sur le téléphone — règle verrouillée, « en séance
+on dévie, on ne recompose pas » — et il est **remplacé en entier** à chaque pull.
+Il ne peut pas en être autrement : la fraîcheur d'une séance datée n'est portée
+par aucune colonne côté serveur (§KL-14), `?since` n'allège que la bibliothèque,
+la fenêtre part toujours complète. Un programme local n'est donc jamais mis à
+jour champ par champ, il est jeté et réécrit.
+
+L'éclater en `block` / `prescribed_exercise` / `prescribed_set` produirait trois
+tables qu'on ne lirait **qu'en bloc**, qu'on n'écrirait **qu'en bloc**, et qu'il
+faudrait rejoindre à chaque ouverture de séance — pour reconstruire exactement le
+document qu'on venait de recevoir. La colonne `blocks` en JSON dit la même chose
+en une ligne et un remplacement atomique.
+
+Le réalisé, lui, s'écrit série par série pendant une heure de salle. C'est la
+seule partie de la base que le téléphone modifie, la seule qui se lit par
+morceaux, la seule qui a besoin d'index. Elle est normalisée.
+
+Une conséquence moins évidente : `prescribed_snapshot` est une **table séparée**
+et non une colonne de plus sur `scheduled_workout`. La liste des séances du jour,
+les jours voisins, le calendrier se lisent sans jamais toucher au programme, qui
+est de loin le plus gros document de la base. En colonne, il serait remonté à
+chaque `SELECT`.
+
+### Une table en plus, et pourquoi elle n'était pas optionnelle
+
+Le ticket liste sept tables. Il y en a huit : `exercise_history` s'ajoute.
+
+`GET /api/bootstrap` descend un tableau `history` — dernière performance et
+record par exercice — et il le fait pour une raison précise, écrite en toutes
+lettres en §KL-17 : ces deux chiffres s'affichent **en séance, hors ligne**,
+et c'est justement pour ça que `GET /api/exercises/{id}/history` peut rester « le
+seul écran de l'app qui suppose du réseau ». Sans table pour les recevoir, la
+réponse serait désérialisée puis jetée à chaque pull, et l'écran de KL-32 se
+retrouverait à devoir appeler le réseau entre deux séries. Une ligne par
+exercice, `last` et `best` en JSON : ce sont des agrégats recalculés en entier par
+le serveur, jamais interrogés champ par champ.
+
+### Ce qui n'est pas dans le schéma, et c'est délibéré
+
+Pas de drapeau « modifié localement » sur `scheduled_workout`. La tentation est
+réelle : le pull remplace la fenêtre en entier, il faut bien savoir ce qu'il ne
+doit pas écraser.
+
+Mais ce fait est **déjà** porté par `mutation_queue` — une séance en attente de
+push y a sa ligne — et deux sources pour un seul fait finissent toujours par se
+contredire. Le corollaire est ce qui rend l'ordre « push avant pull » de §4.5 non
+négociable plutôt que recommandé : ce n'est pas une optimisation, c'est la seule
+chose qui protège un réalisé pas encore envoyé.
+
+### Les quatre réglages d'ouverture, dont aucun n'est cosmétique
+
+`foreign_keys = ON` d'abord, et c'est le plus important : **SQLite désactive les
+clés étrangères par défaut, et par connexion**. Sans ce pragma, les `ON DELETE
+CASCADE` du schéma sont purement décoratifs — supprimer une séance datée sortie de
+la fenêtre laisserait son réalisé orphelin, invisible et jamais poussé. Le geste
+le plus fréquent de la synchronisation deviendrait une perte de données
+silencieuse.
+
+`journal_mode = WAL` ensuite : une écriture ne bloque plus les lectures, ce qui
+est la condition de « la synchronisation ne bloque jamais l'interface » (KL-27),
+pas un confort.
+
+`enableChangeListener: true` enfin, activé maintenant parce qu'il ne se rattrape
+pas : `openDatabaseSync` met ses connexions en cache **par nom de fichier**, et
+rouvrir plus tard avec d'autres options rend la même connexion avec les options
+de la première. L'activer après coup demanderait `useNewConnection`, donc deux
+connexions sur le même fichier.
+
+Et le quatrième, qui est dans le schéma et pas dans le code :
+`mutation_queue.id` en `AUTOINCREMENT` **strict**. Sans le mot-clé, SQLite
+réattribue le plus grand rowid libéré ; une mutation créée après une purge se
+retrouverait devant une mutation plus ancienne. L'ordre de la file est le seul
+ordre qui existe, il ne doit pas dépendre de ce qui a été supprimé. Vérifié :
+après insertion, purge, réinsertion, l'identifiant vaut bien 2.
+
+### Le piège qui n'a pas d'erreur : la transaction synchrone
+
+Le pilote Drizzle d'`expo-sqlite` est en mode `sync`. `db.transaction()` émet un
+`begin`, appelle le rappel, et émet `commit` **dès que le rappel retourne**.
+
+Un rappel `async` retourne une promesse immédiatement. La transaction serait donc
+validée avant la première écriture, et toutes les écritures suivantes se feraient
+hors transaction — sans exception, sans avertissement, avec un résultat correct
+neuf fois sur dix. C'est exactement le genre de bug qui se révèle sur un téléphone
+coupé en pleine clôture de séance. La règle est écrite en tête de `src/db/index.ts`
+et dans `CLAUDE.md` des deux dépôts : dans une transaction, rappel non-`async` et
+`.run()` / `.get()` / `.all()` explicites.
+
+### L'UUIDv7 et son compteur
+
+`expo-crypto` ne sait faire que de la v4. La v7 se réécrit donc à la main : 48
+bits d'horodatage en millisecondes, la version, 12 bits, la variante, 62 bits
+d'aléa.
+
+Le détail qui compte est le **compteur monotone** dans ces 12 bits. Une clôture
+de séance écrit tout un exercice d'un coup : sans compteur, ces séries partagent
+le même préfixe temporel et leur ordre est décidé par 74 bits d'aléa,
+c'est-à-dire par rien. Le compteur est amorcé au hasard à chaque nouvelle
+milliseconde (méthode 2 de la RFC 9562, pour que deux appareils ne produisent pas
+la même séquence), et en cas de débordement on emprunte une milliseconde au futur
+plutôt que de casser l'ordre.
+
+Vérifié hors app, sur 10 000 tirages consécutifs (donc massivement dans la même
+milliseconde) : tous uniques, tous de forme v7, et **ordre de génération = ordre
+lexicographique**.
+
+### Ce que le jeu de démonstration contient, et ce qu'il refuse
+
+`seedDemo()` remplit la base avec ce que le bootstrap descendrait, en choisissant
+les cas qui cassent : un superset (A1/A2), un exercice de cardio dont les `sets`
+sont `null` et non `[]`, un exercice **sauté** avec sa note, une séance libre sans
+programme, une séance faite dont la dernière série est courte — pour que l'écart
+au prévu soit visible dès l'ouverture — et une mutation déjà en file.
+
+Deux gardes : la fonction **lève** hors `__DEV__` (de fausses séances injectées
+dans le réalisé partiraient au serveur au push suivant), et toutes les dates sont
+relatives à aujourd'hui. Un jeu daté en dur sortirait de la fenêtre J-30 → J+14
+au bout d'un mois, et « Aujourd'hui » se viderait sans qu'on comprenne pourquoi.
+
+### Trois fichiers de configuration à la racine, et ce qu'ils coûtent
+
+`babel.config.js` (plugin `inline-import` pour les `.sql`), `metro.config.js`
+(extension `sql` en source) et `drizzle.config.ts` (génération). Les deux
+premiers n'existaient pas : Expo applique ses défauts tant qu'aucun fichier n'est
+présent. Les créer implique donc de **redéclarer** `babel-preset-expo` et de
+repartir de `getDefaultConfig`, faute de quoi on perd tout ce qu'Expo configure.
+
+`metro.config.js` a gagné une ligne de plus après coup : `assetExts.push('wasm')`.
+L'export web échouait — le portage web d'`expo-sqlite` importe un `.wasm` — et
+l'export web est la seule vérification qui exerce vraiment le bundler. L'app ne
+cible toujours pas le web pour autant : la base s'y charge, elle ne s'y lance pas.
+
+### Le piège que seul le téléphone pouvait montrer
+
+Le ticket a été livré une première fois avec tous les contrôles au vert. Puis
+l'app a été lancée sur l'appareil, et le compteur de la file de push est resté à
+**1** alors que la base extraite par `adb` était bien à **0**.
+
+Cause : `DELETE FROM t` **sans** clause `WHERE` déclenche l'optimisation
+« truncate » de SQLite. La table est vidée d'un bloc, sans visiter les lignes —
+et `sqlite3_update_hook` n'est donc **jamais appelé**. Toute vue montée sur
+`useLiveQuery` reste alors figée sur l'ancien contenu, sans erreur, sans
+avertissement, sans rien.
+
+Le détail qui rend l'affaire vicieuse : le piège ne touche que `mutation_queue`
+et `sync_state`. Partout ailleurs SQLite doit déjà parcourir les lignes pour
+appliquer les contraintes de clé étrangère, donc le signal part. Ces deux tables
+sont les seules du schéma sans aucune clé étrangère, entrante ou sortante —
+autrement dit, **la seule table qu'un écran de réglages voudra observer en direct
+est exactement celle qui se taisait**. Vérifié par `EXPLAIN` : l'opcode `Clear`
+n'apparaît que pour ces deux-là, et une clause `WHERE 1 = 1` suffit à le faire
+disparaître.
+
+`wipe()` porte donc la clause, et la règle est écrite dans `src/db/index.ts`,
+`src/db/client.ts` et les `CLAUDE.md` des deux dépôts. Cycle revérifié sur
+l'appareil après correctif : 0 → injecter → 8/4/10/1 → vider → 0/0/0/0, à
+l'écran comme dans le fichier.
+
+### Ce qui a été vérifié
+
+`tsc --noEmit`, `eslint`, `prettier --check`, et `expo export` pour Android
+**et** pour web. Plus trois vérifications que ces contrôles ne pouvaient pas
+faire :
+
+- le SQL généré rejoué dans un `sqlite3` réel, pour prouver que les invariants
+  sont bien tenus par la base et pas seulement écrits dans le schéma — cascade
+  effective, `CHECK` du singleton qui refuse une seconde ligne, clé étrangère
+  orpheline refusée, `AUTOINCREMENT` qui ne réutilise pas un identifiant purgé ;
+- le générateur d'UUID exécuté hors React Native (voir plus haut) ;
+- **l'app lancée sur le téléphone**, base extraite par `adb` : les huit tables et
+  le journal de Drizzle sont là, `PRAGMA journal_mode` rend `wal`, le jeu de
+  démonstration s'injecte et se vide, et les `uuid` des séries triés
+  alphabétiquement redonnent exactement l'ordre des `position`. C'est ce contrôle
+  qui a fait sortir le piège ci-dessus, qu'aucun des autres ne pouvait voir.
+
+Note d'environnement, parce qu'elle coûte un quart d'heure : le build Gradle
+demande la **JDK 21** épinglée par `.java-version`. Un `JAVA_HOME` pointant une
+JDK plus récente échoue sur `react-native-worklets` avec « a restricted method in
+java.lang.System has been called », un message qui ne ressemble en rien à un
+problème de version de JDK.
+
+### Fichiers touchés
+
+Dépôt `kadens-mobile` : `src/db/` (neuf — `schema.ts`, `types.ts`, `client.ts`,
+`uuid.ts`, `time.ts`, `syncState.ts`, `seed.ts`, `migrate.ts`, `index.ts`,
+`migrations/` généré), `src/app/_layout.tsx` (migrations au démarrage et écran
+d'échec), `src/app/index.tsx` (compteur de lignes en requête vive),
+`babel.config.js`, `metro.config.js`, `drizzle.config.ts` (neufs),
+`package.json`, `eslint.config.js`, `.prettierignore`, `CLAUDE.md`. Dépôt
+`kadens` : `CLAUDE.md` (§6), `docs/feature-live-tracking.md` (état, KL-24), ce
+journal. Aucun code serveur touché.
+
+**Prochain ticket : KL-25** — le client API et le stockage du jeton dans
+`expo-secure-store`.

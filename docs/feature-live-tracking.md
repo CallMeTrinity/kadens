@@ -83,7 +83,37 @@
 > sépare les rôles de **structure** (condensé capitales) des rôles de
 > **contenu** (Barlow, casse normale). Les polices sont chargées par `useFonts`
 > derrière l'écran de démarrage, une graisse = une police enregistrée.
-> Prochain ticket : **KL-23** (composants de base).
+> **KL-23 livré (03/08/2026)** : les huit composants de base (`Button`, `Card`,
+> `Chip`, `Field`, `NumberStepper`, `Sheet`, `Header`, `EmptyState`) dans
+> `src/components/`, tous peints aux seuls tokens et tous plafonnés au plancher
+> tactile de 44 points, désormais nommé une fois pour toutes dans
+> `src/theme/layout.ts`. Le `NumberStepper` est le composant du ticket : pas de
+> 2,5 kg, répétition à l'appui long, saisie directe en brouillon local (donc
+> « 82, » se tape), virgule décimale acceptée et rendue. Pas d'icônes : le
+> projet n'embarque pas encore de jeu de glyphes et la question se tranchera
+> quand un écran en aura besoin.
+> **KL-24 livré (03/08/2026)** : la base locale existe. `expo-sqlite` + Drizzle,
+> huit tables dans `src/db/schema.ts` — le prescrit stocké **en un document**
+> (`prescribed_snapshot`, remplacé en entier à chaque pull, puisque le mobile ne
+> recompose pas), le réalisé **normalisé** (`logged_exercise` / `logged_set`,
+> seule partie que le téléphone écrit), plus `exercise_history` (le bootstrap
+> descend la dernière perf et le record pour qu'ils s'affichent **hors ligne** :
+> sans table, la réponse serait lue puis jetée), `sync_state` (une ligne,
+> garantie par un `CHECK`, qui porte aussi l'URL d'API du QR) et
+> `mutation_queue`. Migrations générées par `drizzle-kit` dans
+> `src/db/migrations/` (versionnées, jamais éditées) et appliquées au démarrage
+> par `useMigrations`. Les UUIDv7 sont posés localement, avec compteur monotone
+> dans la milliseconde. Un jeu de démonstration `seedDemo()`, gardé par `__DEV__`.
+> **KL-25 livré (03/08/2026)** : le client API, dans `src/api/`. Un `request()`
+> unique porte le timeout, le rejeu à backoff exponentiel — **réservé aux
+> méthodes idempotentes**, un `POST` rejoué émettrait un second jeton — et la
+> purge sur `401`. Le jeton vit dans `expo-secure-store`, jamais en base ni dans
+> `AsyncStorage` ; la session est un magasin de module (le transport et le futur
+> moteur de synchronisation le lisent hors de React) et le garde
+> `Stack.Protected` du layout racine fait retomber la pile sur `login` dès
+> qu'elle se ferme. Le nom d'appareil vient d'`expo-device`. Vérifié contre le
+> **vrai serveur** : 15 scénarios de bout en bout, plus 21 sur le transport.
+> Prochain ticket : **KL-26** (écran de connexion).
 
 ---
 
@@ -1711,37 +1741,235 @@ les laisser diverger, on les publie.
 - [x] Pas de thème sombre (l'identité Presse est papier et encre, un thème sombre
       serait une deuxième identité à maintenir)
 
+**Ce qui a été tranché en le faisant** :
+
+- **La traduction native vit dans `tools/sync-tokens.mjs`, et elle échoue plutôt
+  que d'approcher.** C'est la contrepartie du choix de KL-20 : la commande PHP
+  résout les `var()` et ne traduit rien d'autre, donc quelqu'un doit convertir
+  `color-mix()`, les piles de polices, les `px` et les `em` en valeurs que React
+  Native comprend. Toute forme non reconnue **arrête la génération** — un token
+  muet deviendrait `undefined`, donc du transparent, sans rien signaler. Même
+  raisonnement pour les rayons et les ombres : ils sont **vérifiés nuls**, pas
+  recopiés. Le jour où le web gagne une ombre, il faut décider ce qu'elle devient
+  en natif, et le script force la décision.
+- **Un préfixe sémantique inconnu échoue ; une primitive inconnue est ignorée.**
+  Ce n'est pas une incohérence : la couche sémantique est ce que les composants
+  consomment (règle 1), rien ne doit s'y perdre en silence, alors que les
+  primitives de couleur et de police sont déjà résolues **dans** cette couche —
+  les émettre ouvrirait un second chemin vers la même valeur. Seules les
+  primitives qui n'ont pas de couche sémantique (espacement, rayon, graisse,
+  interlettrage) sont traduites, exactement comme `components.css` les consomme
+  en direct.
+- **L'échelle typographique n'est pas générée, et elle ne peut pas l'être** :
+  côté web elle vit en `clamp()` dans `components.css`, `tokens.css` n'en porte
+  rien. `src/theme/typography.ts` en est la transposition à une seule largeur, et
+  c'est **là** que se tient la règle 4 : des rôles de *structure* (condensé
+  capitales) et des rôles de *contenu* (Barlow, casse normale) séparés
+  explicitement, pour qu'un nom d'exercice ne puisse pas atterrir en capitales
+  condensées par distraction.
+- **`letterSpacing` est absolu en React Native**, là où le CSS l'exprime en `em`.
+  Les tokens sont donc exposés **en em** et convertis au point d'usage
+  (`letterSpacing(em, fontSize)`) : une valeur figée en points ne serait juste
+  qu'à une seule taille de police. Et **l'interligne a un plancher à 1** — Android
+  rogne le haut des lettres dès que `lineHeight` passe sous la taille de police,
+  ce que le web ne fait pas : les `.88`/`.92` du hero ne se transposent pas.
+- **Une graisse = une police enregistrée, et `fontWeight` ne choisit rien.**
+  Android ne synthétise pas les graisses d'une famille chargée à l'exécution :
+  `fontWeight: '700'` sur « Barlow » y rend du régulier, silencieusement. Chaque
+  fichier est donc enregistré sous son propre nom et le choix passe par
+  `fontFamily(stack, weight)`, dont le typage refuse à la compilation une graisse
+  non embarquée.
+- **Les polices sont chargées par `useFonts`, pas par le plugin natif
+  d'`expo-font`** : le rendu web reste identique au natif et rien ne dépend d'un
+  `expo prebuild` réussi pour itérer. L'app ne rend **rien** tant qu'elles ne sont
+  pas prêtes (l'écran de démarrage tient la place) — un premier rendu en police
+  système suivi d'une bascule ferait sauter toute la mise en page. L'écran de
+  démarrage est masqué **aussi en cas d'erreur** : une police manquante dégrade
+  l'affichage, elle ne bloque pas l'app.
+- **Les `.ttf` sont versionnés dans le dépôt mobile** (ils entrent dans le
+  bundle : un build ne doit pas dépendre d'un serveur joignable), mais leur source
+  reste `tools/fetch-fonts.sh` côté serveur, comme les visuels viennent de
+  `public/pwa/`.
+
 ### KL-23 — Composants de base
 
 **Fini quand** :
-- [ ] `Button` (primaire rouge, secondaire encre, fantôme), `Card`, `Chip`,
+- [x] `Button` (primaire rouge, secondaire encre, fantôme), `Card`, `Chip`,
       `Field`, `NumberStepper`, `Sheet`, `Header`, `EmptyState`
-- [ ] Aucune couleur ni police en dur dans un composant, toujours un token
+- [x] Aucune couleur ni police en dur dans un composant, toujours un token
       sémantique (règle 1 du design system)
-- [ ] Toutes les cibles tactiles à 44 points minimum
-- [ ] `NumberStepper` : saisie au clavier numérique **et** boutons plus/moins par
+- [x] Toutes les cibles tactiles à 44 points minimum
+- [x] `NumberStepper` : saisie au clavier numérique **et** boutons plus/moins par
       incrément (2,5 kg par défaut). En salle, on ne tape pas au clavier
+
+**Ce qui a été décidé en le faisant** :
+
+- **Le `:hover` du web devient l'état pressé.** Il n'y a pas de survol au doigt,
+  et chaque variante de bouton avait son geste d'accentuation : l'aplat rouge
+  s'éclaircit (le foncer refermerait le bouton), le contour encre s'inverse, le
+  fantôme se pose sur un fond. Transposer le sens plutôt que la déclaration.
+- **Le plancher tactile est un chiffre nommé une fois** (`layout.touchTarget`,
+  `src/theme/layout.ts`), pas un `44` recopié dans huit fichiers. Deux autres
+  constantes l'accompagnent, pour la même raison : l'épaisseur de filet — **pas**
+  `StyleSheet.hairlineWidth`, qui vaut moins d'un point sur Android et dissoudrait
+  une identité qui tient par ses filets — et la hauteur maximale d'une feuille
+  (78 %, comme le `78vh` du web). Ce ne sont pas des tokens : le web les porte
+  dans `base.css` ou en `vh`, l'export de KL-20 ne les voit pas.
+- **`sm` resserre les gouttières, jamais la hauteur.** Le web réduisait aussi la
+  taille du texte ; l'échelle native n'a pas ce cran et en inventer un pour un
+  bouton secondaire ne vaut pas le rôle supplémentaire. Un petit bouton reste
+  visable au doigt.
+- **Un seul rôle typographique ajouté** (`inputValue`, mono 22) : la valeur d'un
+  `NumberStepper` se lit à bout de bras, barre en main, et `numeric` (16) est
+  calibré pour une colonne de tableau. Écrire `22` dans le composant aurait sorti
+  l'échelle de `typography.ts`, qui est justement l'endroit où elle se tient.
+- **Trois pièges du `NumberStepper`**, tous invisibles à la lecture du ticket :
+  1. **La frappe ne remonte pas au parent.** La saisie vit dans un brouillon de
+     texte local jusqu'au relâchement du champ ; convertir à chaque frappe rend
+     « 82, » impossible à taper — la virgule seule n'est pas un nombre, la valeur
+     serait réécrite sous les doigts. La virgule est acceptée à l'entrée **et**
+     rendue à l'affichage : c'est ce que propose le clavier français.
+  2. **La répétition lit sa base dans une `ref`**, pas dans la prop `value` :
+     elle avance plus vite que les rendus du parent, et une closure sur `value`
+     collerait le compteur à `value + step`. Le pas de 2,5 kg sans répétition,
+     c'est seize appuis pour aller de 60 à 100 kg.
+  3. **`onPressIn` applique le pas, `onPress` ne le double pas.** Le premier
+     donne le retour immédiat qu'on veut en salle, mais TalkBack n'émet **que**
+     `onPress` : un drapeau distingue les deux chemins, sinon le lecteur d'écran
+     n'incrémenterait rien. Les timers sont nettoyés au démontage — un écran qui
+     disparaît pendant un appui laisserait un intervalle tourner.
+- **Pas d'icônes.** Le bouton de retour et la fermeture d'une feuille disent
+  « Retour » et « Fermer » en toutes lettres. Embarquer un jeu de glyphes
+  (`lucide-react-native` + `react-native-svg`) est une décision qui engage le
+  bundle et le rendu web : elle se prendra quand un écran en aura vraiment
+  besoin, pas pour un chevron. L'identité Presse est typographique, le mot n'y
+  détonne pas.
+- **Un `Chip` ne se tape pas.** C'est une marque de lecture, comme `.kd-badge`
+  côté web. Le jour où un filtre en aura besoin, ce sera un autre composant avec
+  son plancher tactile — pas une prop `onPress` greffée sur celui-ci. Il porte
+  deux façons de dire quelque chose, et elles ne se mélangent pas : un `tone`
+  (statut, accent) où la couleur parle, et un `rank` catégoriel rendu par un
+  filet gauche dans l'échelle de gris.
+- **Le `Header` porte lui-même la zone sûre du haut.** Sinon chaque écran doit
+  choisir entre un `SafeAreaView` (qui laisse une bande de fond papier au-dessus
+  de l'en-tête) et un rembourrage doublé. Corollaire : un écran l'emploie à la
+  racine, **hors** `SafeAreaView`.
+- **La `Sheet` : `flexShrink`, pas `flex: 1`.** C'est le maillon qui manque au
+  web sous une autre forme (`flex: 1` + `min-height: 0`) : sans lui, un contenu
+  long pousse l'en-tête hors de l'écran au lieu de défiler sous lui — et avec
+  `flex: 1`, une feuille courte s'étirerait inutilement jusqu'aux 78 %. Le voile
+  est une cible de fermeture, le bouton retour d'Android ferme aussi, et le
+  dégagement bas suit `insets.bottom` (barre gestuelle).
+- **La vérification tient sans téléphone** : `tsc --noEmit`, `eslint`,
+  `prettier --check`, et un `expo export` réel pour Android **et** pour web —
+  le seul de ces contrôles qui exerce vraiment le bundler. `src/app/index.tsx`
+  reste l'écran de vérification et montre désormais les huit composants au lieu
+  de l'échelle : c'est là qu'on voit sur un vrai écran qu'une cible se vise au
+  doigt et qu'une feuille monte du bas.
 
 ### KL-24 — Couche SQLite + Drizzle
 
 **Fini quand** :
-- [ ] Schéma local miroir de §2.2 : `exercise`, `scheduled_workout` (qui porte le
+- [x] Schéma local miroir de §2.2 : `exercise`, `scheduled_workout` (qui porte le
       prévu **et** le réalisé, comme côté serveur), `prescribed_snapshot`,
       `logged_exercise`, `logged_set`, plus `sync_state` et `mutation_queue`
-- [ ] Migrations locales versionnées et rejouables
-- [ ] `mutation_queue` : `id`, `type`, `payload`, `attempts`, `lastError`,
+- [x] Migrations locales versionnées et rejouables
+- [x] `mutation_queue` : `id`, `type`, `payload`, `attempts`, `lastError`,
       `createdAt`
-- [ ] Les UUID sont générés **localement** à la création (UUIDv7, ordonnable par
+- [x] Les UUID sont générés **localement** à la création (UUIDv7, ordonnable par
       le temps)
-- [ ] Un jeu de données de démonstration injectable en dev
+- [x] Un jeu de données de démonstration injectable en dev
+
+**Ajouté au périmètre du ticket** : une huitième table, `exercise_history`. Le
+bootstrap descend `history` pour que la dernière performance et le record
+s'affichent **en séance, hors ligne** ; sans table pour les recevoir, la réponse
+serait lue puis jetée, et KL-32 supposerait du réseau — ce que §KL-17 réserve au
+seul `GET /api/exercises/{id}/history`.
 
 ### KL-25 — Client API et stockage du token
 
 **Fini quand** :
-- [ ] Client typé partagé, timeout, retry avec backoff exponentiel
-- [ ] Token dans `expo-secure-store`, jamais dans `AsyncStorage`
-- [ ] Un 401 purge le token et renvoie vers l'écran de connexion
-- [ ] Le nom d'appareil envoyé au login vient de `expo-device`
+- [x] Client typé partagé, timeout, retry avec backoff exponentiel
+- [x] Token dans `expo-secure-store`, jamais dans `AsyncStorage`
+- [x] Un 401 purge le token et renvoie vers l'écran de connexion
+- [x] Le nom d'appareil envoyé au login vient de `expo-device`
+
+**Ce qui a été tranché en le faisant** :
+
+- **Le rejeu se décide sur la méthode, jamais sur le résultat.** « Retry avec
+  backoff exponentiel » se lit comme une propriété du client ; appliqué à tout,
+  il fabrique des dégâts. Un `POST /api/auth/login` dont la réponse s'est perdue
+  a peut-être abouti : le rejouer émet un **second jeton que personne ne
+  détient**, qui apparaîtra comme un appareil fantôme dans `/profile/settings` et
+  vivra 90 jours. `GET`, `PUT` et `DELETE` sont idempotents par construction dans
+  cette API (§4.2) et se rejouent trois fois ; les `POST`, une seule.
+- **Un `429` n'est pas rejoué, alors qu'il est passager.** Le serveur dit combien
+  de temps attendre, et c'est jusqu'à ~60 s sur la connexion : dormir une minute
+  à l'intérieur d'un appel, c'est une interface figée sans rien à montrer — et
+  c'est aussi ce qui fait tourner le compteur du limiteur. L'échéance
+  (`retryAfterSeconds`) remonte à l'appelant, qui sait, lui, s'il peut revenir
+  plus tard. C'est la même frontière que partout ailleurs dans le projet : le
+  transport transporte, il ne décide pas de la politique.
+- **Trois classes d'erreur, pas un code.** `NetworkError` / `TimeoutError` /
+  `ApiError`, plus `isTransient()`. La file de mutations (KL-27) n'a qu'une
+  question à poser à chaque échec — « est-ce que ça vaut le coup de réessayer ? »
+  — et y répondre en lisant un message serait dépendre d'un texte que le contrat
+  interdit explicitement d'analyser.
+- **Un appel authentifié sans jeton ne part pas.** Il ferme la session sur place
+  et lève un `401` local : le laisser partir nu userait un aller-retour pour
+  apprendre ce qu'on savait déjà, et sur un réseau absent il échouerait en
+  `NetworkError`, donc en « réessaie plus tard » — la session resterait ouverte
+  sans jeton, indéfiniment.
+- **Le `401` purge, et c'est le garde de navigation qui redirige.**
+  `Stack.Protected` (expo-router) **retire** l'écran de la pile au lieu de rendre
+  une redirection : le routeur retombe seul sur `login`. Aucun écran n'a donc à
+  intercepter d'erreur d'authentification, et il n'existe pas de chemin où l'on
+  reste sur un écran de séance avec un jeton mort.
+- **L'URL du serveur est injectée, pas lue en base.** Elle vit dans
+  `sync_state.apiUrl` (KL-48), mais la relire à chaque requête ferait ouvrir
+  SQLite à un client HTTP pour savoir où appeler. Elle est posée une fois au
+  démarrage par le layout racine, seul endroit où `@/api` et `@/db` se
+  rencontrent. Corollaire : `setApiBaseUrl()` ne persiste rien, qui la change
+  écrit aussi `sync_state`.
+- **La session est un magasin de module, pas un contexte React.** Le jeton est lu
+  par du code qui n'est pas un composant — le transport, et demain le moteur de
+  synchronisation qui tourne quand aucun écran n'est monté. Elle expose trois
+  états et non deux : sans un `unknown` le temps que le trousseau réponde, le
+  premier rendu se confondrait avec « déconnecté » et l'écran de connexion
+  clignoterait à chaque lancement. C'est aussi pour ça que l'écran de démarrage
+  reste levé jusqu'à la restauration.
+- **`useSession()` ne rend jamais le jeton.** Seul `currentToken()`, réservé au
+  transport, le donne : ce qu'on ne passe pas en props ne finit pas dans un
+  journal de rendu.
+- **`requireAuthentication` du magasin sécurisé est refusé**, et ce n'est pas un
+  oubli : le jeton est lu par **chaque** requête, y compris par un push qui
+  tourne pendant qu'on est barre en main. Demander une empreinte à ce moment-là
+  rendrait la synchronisation impossible. Ce qui protège ici, c'est le
+  chiffrement au repos par l'Android Keystore, pas un geste par requête.
+- **`signOut` efface le jeton local même si la révocation échoue.** Quelqu'un qui
+  se déconnecte hors réseau doit être déconnecté ; le jeton resté vivant côté
+  serveur se révoque depuis `/profile/settings` et périmera de lui-même.
+  L'inverse laisserait un accès utilisable sur un téléphone qu'on croit fermé.
+- **Un `DELETE` qui rend `404` est un succès**, le contrat le dit. Sans ça, une
+  mutation dont la réponse s'est perdue resterait bloquée en tête de file pour
+  toujours.
+- **`src/app/login.tsx` est une coquille assumée**, née de la troisième case du
+  ticket : « renvoie vers l'écran de connexion » a besoin d'une destination. Elle
+  ne porte que le repli mot de passe et n'anticipe aucune décision de KL-26, qui
+  la remplace (QR en primaire, code en secondaire, mot de passe en dernier).
+- **Vérification** : `tsc --noEmit`, `eslint`, `prettier --check`, `expo export`
+  pour Android **et** web (le seul contrôle qui exerce le bundler, et qui montre
+  la route `login` enregistrée), puis deux bancs d'essai hors React Native — le
+  paquet `src/api` est bundlé pour Node avec `expo-secure-store` et `expo-device`
+  bouchonnés. Le premier (21 contrôles) exerce le transport contre un serveur
+  HTTP local : nombre de tentatives par méthode, croissance du délai, timeout,
+  annulation, `Retry-After` lu et non rejoué, corps illisible, `204`, purge du
+  jeton sur `401` et **absence** de purge sur un `401` non authentifié. Le second
+  (15 contrôles) fait tourner le **vrai** client contre le **vrai** Symfony :
+  login, `ping`, `me` (le nom d'appareil relu est bien celui d'`expo-device`),
+  bootstrap complet et delta, `?since` illisible en `400`, upsert `201` puis
+  rejeu `200` sans duplication, `422` avec le chemin du champ, `DELETE` puis
+  rejeu, et un jeton révoqué depuis l'extérieur qui purge le trousseau.
 
 ### KL-26 — Écran de connexion
 
