@@ -4,6 +4,7 @@ namespace App\Tests\Controller;
 
 use App\Entity\ApiToken;
 use App\Entity\User;
+use App\Tests\PurgesDatabase;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -19,6 +20,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  */
 final class ApiAuthenticationTest extends WebTestCase
 {
+    use PurgesDatabase;
+
     private KernelBrowser $client;
     private EntityManagerInterface $em;
 
@@ -27,13 +30,7 @@ final class ApiAuthenticationTest extends WebTestCase
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine.orm.entity_manager');
 
-        foreach ($this->em->getRepository(ApiToken::class)->findAll() as $token) {
-            $this->em->remove($token);
-        }
-        foreach ($this->em->getRepository(User::class)->findAll() as $user) {
-            $this->em->remove($user);
-        }
-        $this->em->flush();
+        $this->purgeDatabase($this->em);
     }
 
     public function testValidTokenAuthenticates(): void

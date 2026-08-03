@@ -5,11 +5,9 @@ namespace App\Tests\Controller;
 use App\Entity\ApiToken;
 use App\Entity\Block;
 use App\Entity\Coaching;
-use App\Entity\DeletedEntity;
 use App\Entity\Exercise;
 use App\Entity\LoggedExercise;
 use App\Entity\LoggedSet;
-use App\Entity\PlanTemplate;
 use App\Entity\PrescribedExercise;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
@@ -20,6 +18,7 @@ use App\Enum\CoachingStatus;
 use App\Enum\PrescriptionType;
 use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
+use App\Tests\PurgesDatabase;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -44,6 +43,8 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  */
 final class ApiBootstrapTest extends WebTestCase
 {
+    use PurgesDatabase;
+
     private KernelBrowser $client;
     private EntityManagerInterface $em;
 
@@ -52,42 +53,23 @@ final class ApiBootstrapTest extends WebTestCase
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine.orm.entity_manager');
 
-        $this->purge();
+        $this->purgeDatabase($this->em);
     }
 
     /**
-     * Nettoyer AVANT ne suffit pas ici. Ce fichier est le premier, dans l'ordre
-     * alphabétique, à laisser des `Workout` derrière lui, et le `setUp` des
-     * tests suivants ne supprime que ce qui les concerne : un `User` orphelin
-     * d'une séance ferait échouer leur ménage sur la clé étrangère
-     * `workout.owner_id`. On rend donc la base telle qu'on l'a trouvée.
+     * Nettoyer AVANT suffit à s'isoler, pas à laisser la base comme on l'a
+     * trouvée. Ce fichier est le premier, dans l'ordre alphabétique, à laisser
+     * des `Workout` derrière lui : sans ce ménage, ils survivraient jusqu'au run
+     * suivant, où le `setUp` d'un fichier lancé seul les retrouverait.
      */
     protected function tearDown(): void
     {
         // Re-résolu : une requête redémarre le noyau, et le gestionnaire
         // d'entités du `setUp` appartient alors à un conteneur éteint.
         $this->em = static::getContainer()->get('doctrine.orm.entity_manager');
-        $this->purge();
+        $this->purgeDatabase($this->em);
 
         parent::tearDown();
-    }
-
-    private function purge(): void
-    {
-        foreach ([ApiToken::class, ScheduledWorkout::class, Coaching::class, PlanTemplate::class, Workout::class, Exercise::class, User::class] as $class) {
-            foreach ($this->em->getRepository($class)->findAll() as $entity) {
-                $this->em->remove($entity);
-            }
-        }
-        $this->em->flush();
-
-        // EN DERNIER : le ménage ci-dessus passe par `$em->remove()`, donc il
-        // vient lui-même d'écrire des pierres tombales (TombstoneListener). Les
-        // purger avant les suppressions ne servirait à rien.
-        foreach ($this->em->getRepository(DeletedEntity::class)->findAll() as $tombstone) {
-            $this->em->remove($tombstone);
-        }
-        $this->em->flush();
     }
 
     // --- Le jeu complet -------------------------------------------------------

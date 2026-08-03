@@ -5,6 +5,7 @@ namespace App\Tests\Controller;
 use App\Entity\ApiToken;
 use App\Entity\PairingCode;
 use App\Entity\User;
+use App\Tests\PurgesDatabase;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -22,6 +23,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  */
 final class ApiPairingTest extends WebTestCase
 {
+    use PurgesDatabase;
+
     private KernelBrowser $client;
     private EntityManagerInterface $em;
 
@@ -37,16 +40,7 @@ final class ApiPairingTest extends WebTestCase
         // du même test par le `services_resetter`, et le quota ne compterait plus.
         static::getContainer()->get('cache.rate_limiter')->clear();
 
-        foreach ($this->em->getRepository(PairingCode::class)->findAll() as $code) {
-            $this->em->remove($code);
-        }
-        foreach ($this->em->getRepository(ApiToken::class)->findAll() as $token) {
-            $this->em->remove($token);
-        }
-        foreach ($this->em->getRepository(User::class)->findAll() as $user) {
-            $this->em->remove($user);
-        }
-        $this->em->flush();
+        $this->purgeDatabase($this->em);
     }
 
     // --- Émission du code (desktop) -----------------------------------------

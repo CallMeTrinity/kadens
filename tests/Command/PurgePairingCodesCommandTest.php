@@ -4,6 +4,7 @@ namespace App\Tests\Command;
 
 use App\Entity\PairingCode;
 use App\Entity\User;
+use App\Tests\PurgesDatabase;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -19,6 +20,8 @@ use Symfony\Component\Console\Tester\CommandTester;
  */
 final class PurgePairingCodesCommandTest extends KernelTestCase
 {
+    use PurgesDatabase;
+
     private EntityManagerInterface $em;
 
     protected function setUp(): void
@@ -26,13 +29,7 @@ final class PurgePairingCodesCommandTest extends KernelTestCase
         self::bootKernel();
         $this->em = static::getContainer()->get('doctrine.orm.entity_manager');
 
-        foreach ($this->em->getRepository(PairingCode::class)->findAll() as $code) {
-            $this->em->remove($code);
-        }
-        foreach ($this->em->getRepository(User::class)->findAll() as $user) {
-            $this->em->remove($user);
-        }
-        $this->em->flush();
+        $this->purgeDatabase($this->em);
     }
 
     public function testItDeletesExpiredCodesAndKeepsTheLiveOnes(): void

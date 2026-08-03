@@ -12,6 +12,7 @@ use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
 use App\Service\PerformanceHistory;
 use App\Service\UnitFormatter;
+use App\Tests\PurgesDatabase;
 use Doctrine\Bundle\DoctrineBundle\Middleware\BacktraceDebugDataHolder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -23,6 +24,8 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
  */
 final class PerformanceHistoryTest extends KernelTestCase
 {
+    use PurgesDatabase;
+
     private EntityManagerInterface $em;
     private PerformanceHistory $history;
 
@@ -38,16 +41,19 @@ final class PerformanceHistoryTest extends KernelTestCase
             new UnitFormatter(),
         );
 
-        foreach ($this->em->getRepository(ScheduledWorkout::class)->findAll() as $scheduled) {
-            $this->em->remove($scheduled);
-        }
-        foreach ($this->em->getRepository(Exercise::class)->findAll() as $exercise) {
-            $this->em->remove($exercise);
-        }
-        foreach ($this->em->getRepository(User::class)->findAll() as $user) {
-            $this->em->remove($user);
-        }
-        $this->em->flush();
+        $this->purgeDatabase($this->em);
+    }
+
+    /**
+     * Ce fichier est le dernier de la suite dans l'ordre alphabétique : ce qu'il
+     * laisse, c'est ce que le run suivant trouve. On rend donc la base telle
+     * qu'on l'a prise.
+     */
+    protected function tearDown(): void
+    {
+        $this->purgeDatabase($this->em);
+
+        parent::tearDown();
     }
 
     /** Rien de fait, rien à dire : pas de cadre vide à afficher. */
