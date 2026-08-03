@@ -432,3 +432,14 @@ La commande lit `tokens.css`, résout les `var()` et rend deux objets,
 
 Les polices suivent le même canal : `tools/fetch-fonts.sh` dépose les `.ttf`
 dans `public/fonts/` (cf. §3).
+
+Côté mobile, la reprise est symétrique : `npm run sync:tokens` traduit le JSON en
+`src/theme/tokens.ts` et `npm run sync:fonts` rapatrie les `.ttf`. C'est là que
+vivent les conversions que cette commande refuse de faire — `color-mix()` vers
+un `rgba()`, une pile de polices vers une famille, les `px` et les `em` vers des
+nombres — et **toute valeur non traduisible arrête la génération**. Deux
+conséquences pour qui touche à `tokens.css` : une nouvelle famille de tokens
+sémantiques doit être classée côté mobile avant d'y arriver, et un rayon ou une
+ombre non nuls demandent une décision explicite (ils sont vérifiés, pas
+recopiés). L'échelle typographique, elle, n'est pas tokenisée ici : le mobile la
+transpose à la main depuis §3.

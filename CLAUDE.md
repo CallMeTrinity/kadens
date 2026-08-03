@@ -349,8 +349,59 @@ endpoints et [`docs/api-mobile.md`](./docs/api-mobile.md), le contrat client.
 produit aussi les `.ttf`. **KL-21 livré le 03/08/2026** : le dépôt
 `kadens-mobile` est initialisé (Expo SDK 57, `expo-router`, ESLint + Prettier,
 `app.json` à l'identité Kadens, `android/` non versionné) — **le travail bascule
-dans l'autre dépôt**, qui porte désormais son propre `CLAUDE.md`. Prochain
-ticket KL-22 (socle de design natif), qui consomme `design-tokens.json`.
+dans l'autre dépôt**, qui porte désormais son propre `CLAUDE.md`. **KL-22 livré
+le 03/08/2026** : le socle de design natif — tokens générés, polices embarquées,
+échelle typographique. Prochain ticket KL-23 (composants de base).
+
+Ce que KL-22 pose et qu'il ne faut pas casser (côté `kadens-mobile`) :
+
+- **La traduction native vit dans `tools/sync-tokens.mjs`, et elle échoue plutôt
+  que d'approcher.** C'est la contrepartie du choix de KL-20 : la commande PHP
+  résout les `var()` et ne traduit rien d'autre, donc quelqu'un doit convertir
+  `color-mix()`, les piles de polices, les `px` et les `em` en valeurs que React
+  Native comprend. Toute forme non reconnue **arrête la génération** — un token
+  muet deviendrait `undefined`, donc du transparent, sans rien signaler. Même
+  raisonnement pour les rayons et les ombres : ils sont **vérifiés nuls**, pas
+  recopiés. Le jour où le web gagne une ombre, il faut décider ce qu'elle devient
+  en natif, et le script force la décision.
+- **Un préfixe sémantique inconnu échoue ; une primitive inconnue est ignorée.**
+  Ce n'est pas une incohérence : la couche sémantique est ce que les composants
+  consomment (règle 1), rien ne doit s'y perdre en silence, alors que les
+  primitives de couleur et de police sont déjà résolues **dans** cette couche —
+  les émettre ouvrirait un second chemin vers la même valeur. Seules les
+  primitives qui n'ont pas de couche sémantique (espacement, rayon, graisse,
+  interlettrage) sont traduites, exactement comme `components.css` les consomme
+  en direct.
+- **L'échelle typographique n'est pas générée, et elle ne peut pas l'être** :
+  côté web elle vit en `clamp()` dans `components.css`, `tokens.css` n'en porte
+  rien. `src/theme/typography.ts` en est la transposition à une seule largeur, et
+  c'est **là** que se tient la règle 4 : des rôles de *structure* (condensé
+  capitales) et des rôles de *contenu* (Barlow, casse normale) séparés
+  explicitement, pour qu'un nom d'exercice ne puisse pas atterrir en capitales
+  condensées par distraction.
+- **`letterSpacing` est absolu en React Native**, là où le CSS l'exprime en `em`.
+  Les tokens sont donc exposés **en em** et convertis au point d'usage
+  (`letterSpacing(em, fontSize)`) : une valeur figée en points ne serait juste
+  qu'à une seule taille de police. Et **l'interligne a un plancher à 1** — Android
+  rogne le haut des lettres dès que `lineHeight` passe sous la taille de police,
+  ce que le web ne fait pas : les `.88`/`.92` du hero ne se transposent pas.
+- **Une graisse = une police enregistrée, et `fontWeight` ne choisit rien.**
+  Android ne synthétise pas les graisses d'une famille chargée à l'exécution :
+  `fontWeight: '700'` sur « Barlow » y rend du régulier, silencieusement. Chaque
+  fichier est donc enregistré sous son propre nom et le choix passe par
+  `fontFamily(stack, weight)`, dont le typage refuse à la compilation une graisse
+  non embarquée.
+- **Les polices sont chargées par `useFonts`, pas par le plugin natif
+  d'`expo-font`** : le rendu web reste identique au natif et rien ne dépend d'un
+  `expo prebuild` réussi pour itérer. L'app ne rend **rien** tant qu'elles ne sont
+  pas prêtes (l'écran de démarrage tient la place) — un premier rendu en police
+  système suivi d'une bascule ferait sauter toute la mise en page. L'écran de
+  démarrage est masqué **aussi en cas d'erreur** : une police manquante dégrade
+  l'affichage, elle ne bloque pas l'app.
+- **Les `.ttf` sont versionnés dans le dépôt mobile** (ils entrent dans le
+  bundle : un build ne doit pas dépendre d'un serveur joignable), mais leur source
+  reste `tools/fetch-fonts.sh` côté serveur, comme les visuels viennent de
+  `public/pwa/`.
 
 Ce que KL-21 pose et qu'il ne faut pas casser (côté `kadens-mobile`) :
 

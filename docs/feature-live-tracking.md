@@ -75,8 +75,15 @@
 > `public/pwa/`), `android/` non versionné, `.env.example` et un README qui
 > rappelle l'IP LAN. Le boilerplate du template est retiré pour ne pas laisser un
 > thème concurrent de celui que KL-22 va générer.
-> Prochain ticket : **KL-22** (socle de design natif), qui consomme
-> `design-tokens.json` et les `.ttf` de KL-20.
+> **KL-22 livré (03/08/2026)** : le socle de design natif. `npm run sync:tokens`
+> traduit `design-tokens.json` en `src/theme/tokens.ts` (généré, versionné,
+> jamais édité), `npm run sync:fonts` rapatrie les onze `.ttf` dans
+> `assets/fonts/`, et l'échelle typographique — la seule chose que les tokens ne
+> portent pas — vit à la main dans `src/theme/typography.ts`, où la règle 4
+> sépare les rôles de **structure** (condensé capitales) des rôles de
+> **contenu** (Barlow, casse normale). Les polices sont chargées par `useFonts`
+> derrière l'écran de démarrage, une graisse = une police enregistrée.
+> Prochain ticket : **KL-23** (composants de base).
 
 ---
 
@@ -1692,16 +1699,16 @@ les laisser diverger, on les publie.
 ### KL-22 — Socle de design natif
 
 **Fini quand** :
-- [ ] `npm run sync:tokens` télécharge `design-tokens.json` et génère
+- [x] `npm run sync:tokens` télécharge `design-tokens.json` et génère
       `src/theme/tokens.ts` typé. Le fichier généré est versionné mais **jamais
       édité à la main** (même règle que `assets/styles/fonts.css`)
-- [ ] Polices Barlow, Barlow Condensed et IBM Plex Mono chargées par `expo-font`
-- [ ] Échelle typographique, espacements, rayon 0, aucune ombre
-- [ ] **Le condensé capitales ne touche pas au contenu saisi** : titres, boutons
+- [x] Polices Barlow, Barlow Condensed et IBM Plex Mono chargées par `expo-font`
+- [x] Échelle typographique, espacements, rayon 0, aucune ombre
+- [x] **Le condensé capitales ne touche pas au contenu saisi** : titres, boutons
       et onglets en Barlow Condensed capitales ; noms d'exercice et de séance en
       Barlow, casse normale. C'est la règle 4 du design system, elle s'applique
       telle quelle en natif
-- [ ] Pas de thème sombre (l'identité Presse est papier et encre, un thème sombre
+- [x] Pas de thème sombre (l'identité Presse est papier et encre, un thème sombre
       serait une deuxième identité à maintenir)
 
 ### KL-23 — Composants de base
