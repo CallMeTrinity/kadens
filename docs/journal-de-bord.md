@@ -4327,3 +4327,66 @@ journal. Aucun code serveur touché.
 
 **Prochain ticket : KL-25** — le client API et le stockage du jeton dans
 `expo-secure-store`.
+
+---
+
+## Kadens Live KL-26 — l'écran de connexion (03/08/2026)
+
+Trois routes plutôt qu'une : le formulaire mot de passe de KL-25 (une coquille
+assumée à l'époque) devient l'écran de choix, avec un repli mot de passe et un
+écran de code d'appairage à côté.
+
+### Un quatrième champ sur la session, pas un quatrième statut
+
+Le ticket demande qu'un premier `GET /api/bootstrap` s'intercale entre la
+connexion et l'écran suivant, avec un message honnête plutôt qu'un chargement
+muet. Le garde de `_layout.tsx` ne connaissait que deux cases,
+`signedIn`/`!signedIn` : « en train de récupérer sa première séance » n'est pas
+un troisième statut de connexion, c'est une étape *après* que la connexion a
+réussi, et confondre les deux aurait fait gonfler `SessionStatus` d'une valeur
+qui ne dit rien sur l'identité de l'utilisateur.
+
+`SessionState` gagne donc `awaitingFirstSync`, posé par `openSession` (un
+`login`/`pair` frais) et jamais par `restoreSession`. C'est ce deuxième point
+qui porte la vraie décision : une session **restaurée** au lancement ne repasse
+**pas** par l'écran de bootstrap. Sa base locale porte déjà le dernier pull, et
+l'y forcer à chaque ouverture contredirait le principe même du hors-ligne — le
+rafraîchissement d'une session restaurée est le travail du déclenchement « au
+lancement » que KL-27 posera sur le moteur de synchronisation, pas de cet
+écran-ci. Sans cette distinction, rouvrir l'app resterait bloqué sur
+« Récupération de tes séances » à chaque lancement, y compris hors réseau.
+
+### Le bootstrap se déclenche, mais ne s'applique pas
+
+`bootstrapping.tsx` appelle `GET /api/bootstrap` sans `since` (le premier pull
+complet) et referme le garde avec `completeFirstSync()` — sans écrire la
+réponse en base. Ce n'est pas un oubli : appliquer ce document en transaction,
+et tenir `sync_state` (fenêtre, `lastPulledAt`) est le rôle **déclaré** de
+KL-27, qui doit en être le seul écrivain. Le faire ici, même une fois,
+dupliquerait ce travail hors de ses garanties transactionnelles, pour un
+résultat que rien ne consomme encore — KL-28 (« Aujourd'hui ») n'existe pas
+plus que KL-27. L'appel ne sert donc, pour l'instant, qu'à vérifier que le
+serveur répond avant de laisser entrer dans l'app, avec un échappement
+explicite (« Continuer sans mes séances ») pour ne jamais enfermer quelqu'un
+derrière un réseau qui ne revient pas.
+
+### « Scanner le QR » et « Saisir le code » mènent au même endroit
+
+L'écran d'accueil hiérarchise trois actions comme le demande le cadrage :
+primaire, secondaire, dernier repli. Mais tant qu'`expo-camera` n'existe pas
+(réservé à KL-48), les deux premières n'ont rien qui les distingue — les deux
+boutons poussent vers `pairing.tsx`, qui n'implémente que la saisie manuelle du
+code de 8 caractères. KL-48 ajoutera la caméra à cet écran, il ne le remplacera
+pas : le champ manuel y restera le repli, comme le cadrage l'exige déjà.
+
+### Fichiers touchés
+
+Dépôt `kadens-mobile` : `src/app/login.tsx` (réécrit en écran de choix),
+`src/app/login-password.tsx`, `src/app/pairing.tsx`, `src/app/bootstrapping.tsx`
+(neufs), `src/app/_layout.tsx` (troisième branche du garde), `src/api/session.ts`
+(`awaitingFirstSync`, `completeFirstSync`), `src/api/index.ts`, `CLAUDE.md`.
+Dépôt `kadens` : `docs/feature-live-tracking.md` (état, KL-26), ce journal.
+Aucun code serveur touché.
+
+**Prochain ticket : KL-48** — l'écran de scan du QR d'appairage, qui complète
+`pairing.tsx` d'une caméra.

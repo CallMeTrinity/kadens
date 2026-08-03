@@ -113,7 +113,17 @@
 > `Stack.Protected` du layout racine fait retomber la pile sur `login` dès
 > qu'elle se ferme. Le nom d'appareil vient d'`expo-device`. Vérifié contre le
 > **vrai serveur** : 15 scénarios de bout en bout, plus 21 sur le transport.
-> Prochain ticket : **KL-26** (écran de connexion).
+> **KL-26 livré (03/08/2026)** : l'écran de connexion, dans `src/app/`. Trois
+> chemins hiérarchisés — « Scanner le QR » en primaire, « Saisir le code » en
+> secondaire, « Email et mot de passe » en dernier repli, sans lien
+> d'inscription — et un **quatrième état de session** (`awaitingFirstSync`) qui
+> retient l'app sur un écran « Récupération de tes séances » entre un
+> `login`/`pair` frais et son premier `GET /api/bootstrap`. Une session
+> **restaurée** saute cet écran (elle a déjà un dernier pull en base) : c'est ce
+> qui garde le hors-ligne intact au lancement normal. « Scanner le QR » et
+> « Saisir le code » mènent aujourd'hui au même écran de saisie manuelle — rien
+> ne les distingue avant que KL-48 y ajoute la caméra. Prochain ticket :
+> **KL-48** (écran de scan du QR d'appairage).
 
 ---
 
@@ -1974,13 +1984,57 @@ seul `GET /api/exercises/{id}/history`.
 ### KL-26 — Écran de connexion
 
 **Fini quand** :
-- [ ] Écran d'accueil proposant **« Scanner le QR » en action primaire**, et
+- [x] Écran d'accueil proposant **« Scanner le QR » en action primaire**, et
       « Saisir le code » puis « Email et mot de passe » en actions secondaires
-- [ ] Le formulaire mot de passe existe mais n'est pas le chemin par défaut
-- [ ] Session restaurée au lancement si le token est valide
-- [ ] Premier bootstrap déclenché après connexion, avec un état de chargement
+- [x] Le formulaire mot de passe existe mais n'est pas le chemin par défaut
+- [x] Session restaurée au lancement si le token est valide
+- [x] Premier bootstrap déclenché après connexion, avec un état de chargement
       honnête (« Récupération de tes séances »)
-- [ ] Aucun lien « créer un compte » (il n'y a pas d'inscription publique)
+- [x] Aucun lien « créer un compte » (il n'y a pas d'inscription publique)
+
+**Livré le 03/08/2026.** Quatre décisions prises en cours de route :
+
+1. **`SessionState` gagne un quatrième champ, `awaitingFirstSync`, plutôt qu'un
+   quatrième statut.** Le garde de `_layout.tsx` n'avait jusqu'ici que deux cases
+   (`signedIn` / `!signedIn`) ; « en train de récupérer sa première séance » n'est
+   pas un statut de connexion, c'est une étape *après* que la connexion a réussi.
+   `openSession` (un `login` ou un `pair` frais) le pose à `true` ; `restoreSession`
+   le pose à `false` dans les deux branches. C'est ce deuxième point qui compte :
+   une session restaurée au lancement **ne repasse pas** par l'écran de bootstrap,
+   parce que sa base locale porte déjà le dernier pull — l'y forcer à chaque
+   ouverture d'app contredirait le hors-ligne, alors que la vraie mise à jour d'une
+   session restaurée est le travail du **déclenchement au lancement** que KL-27
+   posera sur le moteur de synchronisation, pas de cet écran.
+2. **Le nouvel écran `bootstrapping.tsx` ne persiste pas la réponse du
+   bootstrap.** Il appelle `GET /api/bootstrap` (sans `since`, premier pull
+   complet) pour deux raisons seulement — valider que le serveur répond, honorer
+   « état de chargement honnête » — puis referme le garde avec
+   `completeFirstSync()` sans toucher à `src/db`. Écrire le document en base,
+   en transaction, en tenant `sync_state` (fenêtre, `lastPulledAt`) est le rôle
+   déclaré de **KL-27**, qui en sera **le seul écrivain** (`docs/api-mobile.md`
+   et le CLAUDE.md mobile le disent déjà pour les autres champs de
+   `sync_state`) : le dupliquer ici referait ce travail hors de ses garanties.
+   Un échec de ce premier appel n'enferme pas l'utilisateur : « Réessayer » relance
+   le même appel, « Continuer sans mes séances » referme le garde quand même — la
+   base locale reste vide jusqu'au prochain pull, mais l'app reste utilisable.
+3. **« Scanner le QR » et « Saisir le code » mènent au même écran.** Sans
+   `expo-camera` (réservé à KL-48), il n'y a rien à distinguer aujourd'hui entre
+   les deux : les deux boutons de l'écran d'accueil poussent vers `pairing.tsx`,
+   qui n'implémente que la saisie manuelle du code de 8 caractères (clavier en
+   majuscules, normalisé côté client comme côté serveur). KL-48 **complète** cet
+   écran d'une caméra, il ne le remplace pas — le champ manuel y reste le repli.
+4. **Le formulaire mot de passe de KL-25 est déplacé, pas réécrit.**
+   `login.tsx` devient l'écran de choix (plus de formulaire dedans) ;
+   `login-password.tsx` reprend le contenu tel quel. Les trois écrans
+   (`login`, `pairing`, `login-password`) rejoignent le même groupe
+   `Stack.Protected guard={!signedIn}` du layout racine.
+
+Vérifié : `npm run typecheck`, `npm run lint`, `npx prettier --check .`,
+`npx expo export` pour Android et web (quatre routes statiques rendues :
+`/login`, `/pairing`, `/login-password`, `/bootstrapping`). Pas de vérification
+sur un vrai téléphone à ce stade : rien ici n'exerce encore `expo-secure-store`
+au-delà de ce que KL-25 avait déjà vérifié, et il n'y a pas de caméra à tester
+avant KL-48.
 
 ### KL-48 — Écran de scan du QR d'appairage
 
