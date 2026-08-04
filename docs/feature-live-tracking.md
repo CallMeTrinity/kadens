@@ -55,7 +55,7 @@
 > désormais un producteur unique (`PerformanceHistoryPayload`), partagé avec le
 > tableau `history` du bootstrap.
 > **KL-18 et KL-19 livrés (03/08/2026) — le lot 2 est clos.** Les gardes que
-> *tous* les endpoints doivent tenir sont désormais tenues au même endroit
+> _tous_ les endpoints doivent tenir sont désormais tenues au même endroit
 > (`ApiEndpointMatrixTest` : anonyme / expiré / révoqué → 401, nominal → 2xx,
 > aucun cookie, aucune fuite du bloc-notes privé, ressource d'un tiers refusée),
 > et le contrat client est écrit noir sur blanc dans
@@ -219,7 +219,46 @@
 > l'annonçait : une marque de lecture ne se tape pas, une facette si. Vérifié par
 > 49 contrôles hors React Native et une séance vierge poussée au vrai Symfony —
 > `freeform: true`, `blocks: []`, hors plan, et zéro `Workout` en bibliothèque.
-> Prochain ticket : **KL-35** (écran Réglages).
+> **KL-35 livré (04/08/2026)** : l'écran Réglages, et la **disparition de l'écran
+> de diagnostic** — compte, serveur et appareil, état de synchronisation, file
+> d'envoi lisible séance par séance, réglages de repos, version. Trois décisions
+> structurantes : la dernière synchronisation se lit dans `sync_state` et non dans
+> le moteur, dont l'état repart vide à chaque lancement ; **se déconnecter efface
+> la base locale mais pas l'URL du serveur**, qui vient de l'appairage et non du
+> compte ; et **« tout resynchroniser » ne purge qu'après une synchronisation
+> avérée** — cycle réussi, échange réellement eu lieu, file vide — la
+> reconstruction étant un cycle complet de plus, rendu exhaustif par le seul fait
+> que la purge remet `serverTime` à null. Vérifié par 19 contrôles hors React
+> Native sur ces gardes.
+> **KL-36 livré (04/08/2026)** : les tests mobile, et une CI qui les fait tourner
+> à chaque poussée — 92 contrôles en 10 suites (`jest-expo/android`,
+> `@testing-library/react-native`), typage, lint et format compris. La décision
+> structurante est qu'**`expo-sqlite` est remplacé par `node:sqlite` et non par un
+> bouchon** : ce que ces tests vérifient _est_ du SQLite (transaction repliée,
+> cascade, `AUTOINCREMENT` qui ne réattribue rien), et le schéma vient des
+> migrations du dépôt plutôt que d'une copie qui dériverait. Deuxième décision :
+> **seul `fetch` est bouchonné**, donc tout `src/api` reste dans la boucle
+> (timeout, rejeu, `201` contre `200`, taxonomie d'erreurs) — et le `fetch` par
+> défaut **échoue en nommant l'appel**, ce qui prouve qu'une écriture de réalisé
+> ne part jamais sur le réseau. Le parcours entier est couvert de bout en bout :
+> séance programmée, faite hors réseau, déviée, clôturée, puis synchronisée sans
+> rien perdre.
+> **KL-37 livré (05/08/2026)** : la passe design. Les tokens étaient déjà tenus
+> depuis KL-22 — aucun écran ne portait de couleur en dur — donc le ticket était
+> ailleurs. Trois décisions structurantes : les **visuels Android sortent du dépôt
+> web** (`public/pwa/android/`, `npm run sync:icons`), dans le sens que
+> `public/fonts/*.ttf` avait déjà tracé, et depuis une **marque à eux** — la
+> variante rouge et noire, pour que l'app ne se confonde pas avec le site sur un
+> écran d'accueil ; la **barre basse transpose la forme du web, pas ses
+> destinations** —
+> Aujourd'hui, Historique, Réglages, l'historique étant né avec elle parce que la
+> bande de jours s'arrête à J-2 ; et les **zones sûres ont deux rendus qui ne se
+> cumulent jamais**, une barre peinte prenant l'inset en rembourrage là où une
+> page qui défile l'ajoute à son dégagement. Au passage, l'échec se dit
+> `statusMissed` et non `primary` (même valeur, sens différent) et les icônes
+> Lucide sont figées en local comme côté web. Vérifié par 94 contrôles hors React
+> Native ; le rendu reste à valider sur l'appareil.
+> Prochain ticket : **KL-38** (états vides, erreurs, bandeau hors ligne).
 
 ---
 
@@ -240,9 +279,9 @@ une API à token, et l'affichage web du réalisé.
 
 ### 0.2 La règle verrouillée qu'on change
 
-`ROADMAP.md §1.5` et `CLAUDE.md §3` disent : *« Aucun log détaillé de séries
-réalisées. Strava fait le suivi. »* Et `ROADMAP.md` Phase 7 point 4 : *« Ne pas
-ajouter de log de séries réalisées. La frontière est nette. »*
+`ROADMAP.md §1.5` et `CLAUDE.md §3` disent : _« Aucun log détaillé de séries
+réalisées. Strava fait le suivi. »_ Et `ROADMAP.md` Phase 7 point 4 : _« Ne pas
+ajouter de log de séries réalisées. La frontière est nette. »_
 
 **Cette règle était mal calibrée.** Strava enregistre une activité
 « musculation » avec une durée et un chrono, et rien d'autre : ni série, ni
@@ -301,16 +340,16 @@ Trois corollaires à ne pas casser :
 
 ### 0.5 Stack retenue
 
-| Sujet | Choix | Pourquoi pas l'autre |
-|---|---|---|
-| App | Expo SDK + expo-router, TypeScript | Capacitor resterait un webview, donc les travers reprochés à la PWA. Flutter ajouterait Dart à maintenir. |
-| Base locale | `expo-sqlite` + Drizzle ORM | WatermelonDB et PowerSync sont disproportionnés pour un client unique. |
-| Sync | File de mutations maison (~200 lignes) | Voir ci-dessus. |
-| Auth API | Token opaque en base (`ApiToken`) | Le JWT n'apporte rien avec un seul client et une seule base, et impose des clés RSA à gérer sur du mutualisé. Le token opaque est révocable pour de vrai. |
-| Connexion | Appairage par QR depuis le desktop (§0.6) | Le deep link « Se connecter avec Kadens » demande des App Links vérifiés, PKCE et un Custom Tab, pour un geste trimestriel. |
-| Sérialisation | `symfony/serializer` (déjà installé) + DTO | API Platform impose un modèle CRUD-ish qui colle mal, et contredit l'esprit « pas de surcouche » du projet. |
-| Build | `expo prebuild` + Gradle dans GitHub Actions | EAS Build ajoute une dépendance à un service tiers pour un besoin que Gradle couvre. |
-| Distribution | Dépôt F-Droid statique auto-hébergé | Cohérent avec la philosophie du projet. Obtainium sur GitHub Releases reste le repli documenté. |
+| Sujet         | Choix                                        | Pourquoi pas l'autre                                                                                                                                      |
+| ------------- | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| App           | Expo SDK + expo-router, TypeScript           | Capacitor resterait un webview, donc les travers reprochés à la PWA. Flutter ajouterait Dart à maintenir.                                                 |
+| Base locale   | `expo-sqlite` + Drizzle ORM                  | WatermelonDB et PowerSync sont disproportionnés pour un client unique.                                                                                    |
+| Sync          | File de mutations maison (~200 lignes)       | Voir ci-dessus.                                                                                                                                           |
+| Auth API      | Token opaque en base (`ApiToken`)            | Le JWT n'apporte rien avec un seul client et une seule base, et impose des clés RSA à gérer sur du mutualisé. Le token opaque est révocable pour de vrai. |
+| Connexion     | Appairage par QR depuis le desktop (§0.6)    | Le deep link « Se connecter avec Kadens » demande des App Links vérifiés, PKCE et un Custom Tab, pour un geste trimestriel.                               |
+| Sérialisation | `symfony/serializer` (déjà installé) + DTO   | API Platform impose un modèle CRUD-ish qui colle mal, et contredit l'esprit « pas de surcouche » du projet.                                               |
+| Build         | `expo prebuild` + Gradle dans GitHub Actions | EAS Build ajoute une dépendance à un service tiers pour un besoin que Gradle couvre.                                                                      |
+| Distribution  | Dépôt F-Droid statique auto-hébergé          | Cohérent avec la philosophie du projet. Obtainium sur GitHub Releases reste le repli documenté.                                                           |
 
 **Deux gains à noter** : une app native n'est pas un navigateur, donc **aucune
 configuration CORS**. Et un dépôt F-Droid n'accepte que des **APK**, pas des AAB.
@@ -353,13 +392,13 @@ Six règles à tenir, elles sont reprises dans les tickets KL-46 à KL-48 :
 Cinq endroits, et pas un de plus. Dans tous les cas le réalisé est **dérivé, pas
 stocké** : rien n'est ajouté sur `Workout`, `PrescribedExercise` ni `Exercise`.
 
-| Vue | Ce qu'on y voit | Ticket |
-|---|---|---|
-| `/schedule/{id}` | La séance datée : prévu et réalisé **côte à côte**, en place | KL-07 |
-| Le calendrier | L'état de chaque séance, et les séances libres « hors plan » | KL-08 |
-| `plan_template/show` | Le réalisé **superposé** à la courbe de progression prévue | KL-49 |
-| `/exercise/{id}` | La trajectoire réelle sur un exercice, tous plans confondus | KL-50 |
-| `/exercise` | Le tri de la bibliothèque par usage réel | KL-51 |
+| Vue                  | Ce qu'on y voit                                              | Ticket |
+| -------------------- | ------------------------------------------------------------ | ------ |
+| `/schedule/{id}`     | La séance datée : prévu et réalisé **côte à côte**, en place | KL-07  |
+| Le calendrier        | L'état de chaque séance, et les séances libres « hors plan » | KL-08  |
+| `plan_template/show` | Le réalisé **superposé** à la courbe de progression prévue   | KL-49  |
+| `/exercise/{id}`     | La trajectoire réelle sur un exercice, tous plans confondus  | KL-50  |
+| `/exercise`          | Le tri de la bibliothèque par usage réel                     | KL-51  |
 
 **La comparaison se lit en place, jamais dans un onglet séparé.** Le projet a
 déjà posé la règle « une ligne = une série, quel que soit le mode de saisie » :
@@ -433,7 +472,7 @@ dupliqué les quatre.
 
 La séance datée devient donc le point unique où le prévu et le réalisé se
 rencontrent, ce qui correspond enfin à ce que `CLAUDE.md` dit déjà de la page
-`/schedule/{id}` : *« la seule page qui porte la boucle prévu vs réalisé »*.
+`/schedule/{id}` : _« la seule page qui porte la boucle prévu vs réalisé »_.
 
 ```
 Workout ───────► ScheduledWorkout ◄─────── LoggedExercise
@@ -489,7 +528,7 @@ LoggedSet                               (NOUVELLE)
 
 1. **`ScheduledWorkout.workout` passe de `CASCADE` à `SET NULL`.** C'est la
    conséquence la plus importante de la fusion. Le commentaire actuel du code
-   dit *« La séance datée n'a pas de sens sans sa séance source »* : ça devient
+   dit _« La séance datée n'a pas de sens sans sa séance source »_ : ça devient
    **faux** le jour où elle porte le réalisé. En l'état, supprimer une séance de
    la bibliothèque effacerait une séance réellement faite, ce qui contredit
    frontalement la décision « préserver le réalisé ». Le snapshot `title` prend
@@ -517,59 +556,59 @@ réalisé devient calculable série par série, ce qui n'existait pas.
 Sept lots, 51 tickets. Taille indicative : S = moins d'une soirée, M = une
 soirée ou deux, L = un week-end.
 
-| # | Ticket | Lot | Taille | Dépend de |
-|---|---|---|---|---|
-| KL-01 | Acter la révision de la règle §1.5 | 0 | S | — |
-| KL-02 | Entités du réalisé + migration de `ScheduledWorkout` | 1 | M | KL-01 |
-| KL-03 | `LogMetrics` | 1 | M | KL-02 |
-| KL-04 | `PerformanceHistory` (dernière perf + record) | 1 | M | KL-02 |
-| KL-05 | `LogComparator` (écart prévu vs réalisé) | 1 | M | KL-02, KL-03 |
-| KL-06 | Garde d'écriture sur `ScheduledWorkoutVoter` | 1 | S | KL-02 |
-| KL-07 | Affichage du réalisé sur `/schedule/{id}` | 1 | L | KL-05, KL-06 |
-| KL-08 | Séance datée sans source au calendrier | 1 | S | KL-07 |
-| KL-09 | Tests du lot 1 | 1 | M | KL-08 |
-| KL-10 | Entité `ApiToken` + authenticator + firewall | 2 | M | KL-01 |
-| KL-11 | Endpoints d'authentification (mot de passe, repli) | 2 | S | KL-10 |
-| KL-46 | Appairage : entité `PairingCode` + endpoints | 2 | M | KL-10 |
-| KL-47 | Page QR d'appairage sur le desktop | 2 | M | KL-46 |
-| KL-12 | Gestion des appareils dans `/profile/settings` | 2 | M | KL-10 |
-| KL-13 | Réponses d'erreur normalisées + limitation de débit | 2 | M | KL-10 |
-| KL-14 | `GET /api/bootstrap` | 2 | L | KL-11, KL-04 |
-| KL-15 | `GET /api/schedule/{uuid}` | 2 | M | KL-11 |
-| KL-16 | `PUT /api/schedule/{uuid}` idempotent | 2 | L | KL-11, KL-02 |
-| KL-17 | `GET /api/exercises/{id}/history` | 2 | S | KL-11, KL-04 |
-| KL-18 | Tests fonctionnels de l'API | 2 | L | KL-17 |
-| KL-19 | `docs/api-mobile.md` | 2 | M | KL-18 |
-| KL-20 | Export des tokens de design | 2 | S | KL-01 |
-| KL-21 | Init du dépôt `kadens-mobile` | 3 | M | — |
-| KL-22 | Socle de design natif | 3 | L | KL-21, KL-20 |
-| KL-23 | Composants de base | 3 | L | KL-22 |
-| KL-24 | Couche SQLite + Drizzle | 3 | L | KL-21 |
-| KL-25 | Client API + stockage sécurisé du token | 3 | M | KL-21, KL-11 |
-| KL-26 | Écran de connexion | 3 | M | KL-25, KL-23 |
-| KL-48 | Écran de scan du QR d'appairage | 3 | M | KL-26, KL-46 |
-| KL-27 | Moteur de synchronisation | 3 | L | KL-24, KL-25, KL-14, KL-16 |
-| KL-28 | Écran Aujourd'hui | 4 | M | KL-27, KL-23 |
-| KL-29 | Écran Séance en cours (lecture + cochage) | 4 | L | KL-28, KL-15 |
-| KL-30 | Déviations en séance | 4 | L | KL-29 |
-| KL-31 | Timer de repos, veille écran, notification | 4 | M | KL-29 |
-| KL-32 | Historique en séance | 4 | M | KL-29, KL-17 |
-| KL-33 | Clôture de séance | 4 | M | KL-30 |
-| KL-34 | Séance vierge | 4 | L | KL-33 |
-| KL-35 | Écran Réglages | 4 | S | KL-27 |
-| KL-36 | Tests mobile | 4 | L | KL-34 |
-| KL-37 | Passe design complète | 5 | L | KL-35 |
-| KL-38 | États vides, erreurs, bandeau hors ligne | 5 | M | KL-37 |
-| KL-39 | Ergonomie de salle + accessibilité | 5 | M | KL-37 |
-| KL-40 | Signature Android | 6 | M | KL-21 |
-| KL-41 | Workflow de build APK | 6 | L | KL-40, KL-36 |
-| KL-42 | Dépôt F-Droid auto-hébergé + publication | 6 | L | KL-41 |
-| KL-43 | Page d'installation + contrôle de version in-app | 6 | M | KL-42 |
-| KL-44 | Recette finale et documentation | 6 | M | KL-43, KL-39 |
-| KL-49 | Réalisé superposé à la progression du plan | 7 | L | KL-05, KL-07 |
-| KL-50 | Trajectoire d'un exercice sur `/exercise/{id}` | 7 | M | KL-04 |
-| KL-51 | Tri de la bibliothèque par usage réel | 7 | S | KL-02 |
-| KL-45 | Lecture du réalisé par le coach | 7 | M | KL-07 |
+| #     | Ticket                                               | Lot | Taille | Dépend de                  |
+| ----- | ---------------------------------------------------- | --- | ------ | -------------------------- |
+| KL-01 | Acter la révision de la règle §1.5                   | 0   | S      | —                          |
+| KL-02 | Entités du réalisé + migration de `ScheduledWorkout` | 1   | M      | KL-01                      |
+| KL-03 | `LogMetrics`                                         | 1   | M      | KL-02                      |
+| KL-04 | `PerformanceHistory` (dernière perf + record)        | 1   | M      | KL-02                      |
+| KL-05 | `LogComparator` (écart prévu vs réalisé)             | 1   | M      | KL-02, KL-03               |
+| KL-06 | Garde d'écriture sur `ScheduledWorkoutVoter`         | 1   | S      | KL-02                      |
+| KL-07 | Affichage du réalisé sur `/schedule/{id}`            | 1   | L      | KL-05, KL-06               |
+| KL-08 | Séance datée sans source au calendrier               | 1   | S      | KL-07                      |
+| KL-09 | Tests du lot 1                                       | 1   | M      | KL-08                      |
+| KL-10 | Entité `ApiToken` + authenticator + firewall         | 2   | M      | KL-01                      |
+| KL-11 | Endpoints d'authentification (mot de passe, repli)   | 2   | S      | KL-10                      |
+| KL-46 | Appairage : entité `PairingCode` + endpoints         | 2   | M      | KL-10                      |
+| KL-47 | Page QR d'appairage sur le desktop                   | 2   | M      | KL-46                      |
+| KL-12 | Gestion des appareils dans `/profile/settings`       | 2   | M      | KL-10                      |
+| KL-13 | Réponses d'erreur normalisées + limitation de débit  | 2   | M      | KL-10                      |
+| KL-14 | `GET /api/bootstrap`                                 | 2   | L      | KL-11, KL-04               |
+| KL-15 | `GET /api/schedule/{uuid}`                           | 2   | M      | KL-11                      |
+| KL-16 | `PUT /api/schedule/{uuid}` idempotent                | 2   | L      | KL-11, KL-02               |
+| KL-17 | `GET /api/exercises/{id}/history`                    | 2   | S      | KL-11, KL-04               |
+| KL-18 | Tests fonctionnels de l'API                          | 2   | L      | KL-17                      |
+| KL-19 | `docs/api-mobile.md`                                 | 2   | M      | KL-18                      |
+| KL-20 | Export des tokens de design                          | 2   | S      | KL-01                      |
+| KL-21 | Init du dépôt `kadens-mobile`                        | 3   | M      | —                          |
+| KL-22 | Socle de design natif                                | 3   | L      | KL-21, KL-20               |
+| KL-23 | Composants de base                                   | 3   | L      | KL-22                      |
+| KL-24 | Couche SQLite + Drizzle                              | 3   | L      | KL-21                      |
+| KL-25 | Client API + stockage sécurisé du token              | 3   | M      | KL-21, KL-11               |
+| KL-26 | Écran de connexion                                   | 3   | M      | KL-25, KL-23               |
+| KL-48 | Écran de scan du QR d'appairage                      | 3   | M      | KL-26, KL-46               |
+| KL-27 | Moteur de synchronisation                            | 3   | L      | KL-24, KL-25, KL-14, KL-16 |
+| KL-28 | Écran Aujourd'hui                                    | 4   | M      | KL-27, KL-23               |
+| KL-29 | Écran Séance en cours (lecture + cochage)            | 4   | L      | KL-28, KL-15               |
+| KL-30 | Déviations en séance                                 | 4   | L      | KL-29                      |
+| KL-31 | Timer de repos, veille écran, notification           | 4   | M      | KL-29                      |
+| KL-32 | Historique en séance                                 | 4   | M      | KL-29, KL-17               |
+| KL-33 | Clôture de séance                                    | 4   | M      | KL-30                      |
+| KL-34 | Séance vierge                                        | 4   | L      | KL-33                      |
+| KL-35 | Écran Réglages                                       | 4   | S      | KL-27                      |
+| KL-36 | Tests mobile                                         | 4   | L      | KL-34                      |
+| KL-37 | Passe design complète                                | 5   | L      | KL-35                      |
+| KL-38 | États vides, erreurs, bandeau hors ligne             | 5   | M      | KL-37                      |
+| KL-39 | Ergonomie de salle + accessibilité                   | 5   | M      | KL-37                      |
+| KL-40 | Signature Android                                    | 6   | M      | KL-21                      |
+| KL-41 | Workflow de build APK                                | 6   | L      | KL-40, KL-36               |
+| KL-42 | Dépôt F-Droid auto-hébergé + publication             | 6   | L      | KL-41                      |
+| KL-43 | Page d'installation + contrôle de version in-app     | 6   | M      | KL-42                      |
+| KL-44 | Recette finale et documentation                      | 6   | M      | KL-43, KL-39               |
+| KL-49 | Réalisé superposé à la progression du plan           | 7   | L      | KL-05, KL-07               |
+| KL-50 | Trajectoire d'un exercice sur `/exercise/{id}`       | 7   | M      | KL-04                      |
+| KL-51 | Tri de la bibliothèque par usage réel                | 7   | S      | KL-02                      |
+| KL-45 | Lecture du réalisé par le coach                      | 7   | M      | KL-07                      |
 
 Deux tickets peuvent démarrer sans attendre : **KL-21** (init mobile) est
 indépendant du serveur, et **KL-40** (keystore) n'attend que lui. Le reste suit
@@ -592,6 +631,7 @@ portent la règle actuelle, avant toute ligne de code. Une session de dev qui
 lirait `CLAUDE.md` sans cette mise à jour appliquerait une règle abrogée.
 
 **Fini quand** :
+
 - [x] `ROADMAP.md §1.5` reformulé (« pas de tracking **cardio** »), et la
       Phase 7 point 4 amendée avec un renvoi vers ce document
 - [x] `CLAUDE.md §3` : nouvelle puce sur le modèle du réalisé, le principe
@@ -619,6 +659,7 @@ le `SET NULL` — c'est la section que KL-02 viendra lire.
 donc **le plus sensible du lot**.
 
 **Fini quand** :
+
 - [x] `LoggedExercise` et `LoggedSet` conformes à §2.2
 - [x] `ScheduledWorkout` gagne `uuid`, `title`, `startedAt`, `endedAt` et la
       collection `loggedExercises`
@@ -635,11 +676,11 @@ donc **le plus sensible du lot**.
 - [x] Index `(exercise_id)` sur `LoggedExercise` (c'est la requête d'historique)
 - [x] `ScheduledWorkoutRepository::findByUuid()`
 - [~] Migration jouée et rejouée à blanc sur MariaDB 10.4, **sur une copie de la
-      base de prod** et pas seulement sur une base vide — jouée, annulée puis
-      rejouée sur la base de **dev peuplée** (44 séances datées réelles, uuid
-      tous distincts, aucun titre nul), et la chaîne complète des 17 migrations
-      rejouée sur une base vierge. La copie de prod reste à faire au moment du
-      déploiement : elle demande un accès qu'une session de dev n'a pas.
+  base de prod** et pas seulement sur une base vide — jouée, annulée puis
+  rejouée sur la base de **dev peuplée** (44 séances datées réelles, uuid
+  tous distincts, aucun titre nul), et la chaîne complète des 17 migrations
+  rejouée sur une base vierge. La copie de prod reste à faire au moment du
+  déploiement : elle demande un accès qu'une session de dev n'a pas.
 
 **Piège** : `uuid` en `binary(16)` ou en `char(36)` ? Prendre `char(36)` avec le
 type Doctrine `uuid` de `symfony/uid`. Le gain de place du binaire ne compense
@@ -688,6 +729,7 @@ séries de travail (échauffement exclu, comme partout), durée réelle
 (`endedAt - startedAt`), répartition par `TargetRegion`.
 
 **Fini quand** :
+
 - [x] `summary(ScheduledWorkout): array` avec la même forme que
       `WorkoutMetrics::summary()` (pour que les composants Twig de KPI se
       réutilisent tels quels)
@@ -734,6 +776,7 @@ case de KL-09.
 le record. C'est le service qui donne sa valeur à l'app en séance.
 
 **Fini quand** :
+
 - [x] `lastPerformance(User, Exercise): ?array` (date, séries de travail
       condensées à la manière de `detailedSetGroups`)
 - [x] `bestSet(User, Exercise): ?array` (charge max sur une série de travail)
@@ -789,6 +832,7 @@ historique n'appartient qu'à celui qui l'a fait (KL-50 en dépend).
 série, pour produire l'écart affichable.
 
 **Fini quand** :
+
 - [x] `compare(ScheduledWorkout): array` avec, par exercice : prescrit, réalisé,
       état (`tenu`, `dépassé`, `allégé`, `sauté`, `hors programme`)
 - [x] L'appariement se fait sur `sourcePrescribedExercise` quand il est présent,
@@ -847,6 +891,7 @@ voter accorde aussi `EDIT` au coach accepté, et `EDIT` ne doit pas devenir un
 droit d'écrire le réalisé de son athlète.
 
 **Fini quand** :
+
 - [x] Nouvel attribut `LOG` : accordé **au seul propriétaire**, jamais au coach
 - [x] `EDIT` conserve son sens actuel (déplacer, marquer fait, retirer) et reste
       ouvert au coach
@@ -872,6 +917,7 @@ réalisé ». Elle affiche maintenant le réalisé quand il existe. Depuis la fu
 (§2.1), l'entité de la page correspond enfin à sa fonction.
 
 **Fini quand** :
+
 - [x] **Comparaison en place, pas d'onglet dédié** (§0.7) : `_workout_sets_table`
       gagne une colonne « Réalisé » quand `LogComparator` a quelque chose à dire.
       Le composant se paramètre, il ne se duplique pas
@@ -954,6 +1000,7 @@ C'est tout ce qui reste de ce ticket depuis la fusion (§2.1), et il n'y a ni
 requête supplémentaire ni risque de N+1 à traiter.
 
 **Fini quand** :
+
 - [x] La pastille retombe sur `title` quand `workout` est null, sans planter
 - [x] Marque visuelle « hors plan », codée par le rang dans l'échelle de gris,
       jamais par une teinte inventée
@@ -1001,6 +1048,7 @@ passerait le test.
 **Où** : `tests/`
 
 **Fini quand** :
+
 - [x] `LogMetricsTest` : tonnage, exclusion de l'échauffement, séance sans réalisé
       (livré avec KL-03)
 - [x] `PerformanceHistoryTest` : record, dernière perf, absence d'historique,
@@ -1031,6 +1079,7 @@ passerait le test.
 **Quoi** : un firewall `api` **stateless** sur `^/api`, distinct de `main`.
 
 **Fini quand** :
+
 - [x] Entité `ApiToken` : `owner`, `tokenHash` (hash SHA-256, **jamais le token
       en clair** — le constructeur prend le secret et le hache sur place, il n'y a
       pas de chemin où il puisse être écrit), `deviceName`, `createdAt`,
@@ -1065,6 +1114,7 @@ token deviendrait décoratif. L'ordre dans `security.yaml` n'est pas cosmétique
 reste comme repli, et parce que les tests fonctionnels de l'API en ont besoin.
 
 **Fini quand** :
+
 - [x] `POST /api/auth/login` : `{email, password, deviceName}` → `{token, user}`.
       Le token en clair n'est renvoyé **qu'ici et à l'appairage**, une seule fois.
       **201** et non 200 : l'appel enregistre un appareil, il ne fait pas que lire
@@ -1076,7 +1126,7 @@ reste comme repli, et parce que les tests fonctionnels de l'API en ont besoin.
       verrouillée). Le mot de passe oublié reste hors périmètre
 - [x] Réponse 401 uniforme, sans distinguer « email inconnu » de « mot de passe
       faux » — **corps identique au caractère près**, et hachage à vide sur un
-      compte inexistant pour que le *temps* de réponse ne le trahisse pas non plus
+      compte inexistant pour que le _temps_ de réponse ne le trahisse pas non plus
 
 Ce que le ticket pose, et qu'il ne faut pas casser :
 
@@ -1087,8 +1137,8 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
   C'est la différence entre « ce téléphone répond » et « ce téléphone travaille
   sur des données à jour », et c'est ce que KL-12 affichera.
 - **Le jeton validé est publié sur la requête** (`ApiTokenAuthenticator::REQUEST_ATTRIBUTE`),
-  pas relu depuis l'en-tête par le contrôleur. `logout` révoque *celui qu'on
-  présente* et `/api/me` décrit l'appareil courant sans qu'aucun second endroit
+  pas relu depuis l'en-tête par le contrôleur. `logout` révoque _celui qu'on
+  présente_ et `/api/me` décrit l'appareil courant sans qu'aucun second endroit
   n'ait à savoir ce que vaut un `Bearer`. Le préfixe `_` le tient hors des
   arguments de contrôleur résolus par nom.
 - **`logout` vit sous `^/api/auth`, donc publique pour `access_control` : la
@@ -1106,7 +1156,7 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
   trop long rend 400, jamais une erreur SQL en 500 : le nom vient du client, il
   n'a pas à atteindre la base pour être jugé.
 - **Piège de test** : `loginUser()` pose le jeton dans le `token_storage` du
-  conteneur *en plus* du cookie. Tant que le noyau n'a pas redémarré, ce jeton
+  conteneur _en plus_ du cookie. Tant que le noyau n'a pas redémarré, ce jeton
   résiduel traverse n'importe quel pare-feu, **stateless compris** — un test
   « la session web n'authentifie pas l'API » passerait alors pour la mauvaise
   raison. Il faut une requête web intercalée pour purger le conteneur ; ce qui
@@ -1120,6 +1170,7 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
 émet un code à usage unique ; le téléphone l'échange contre un `ApiToken`.
 
 **Fini quand** :
+
 - [x] Entité `PairingCode` : `owner`, `codeHash`, `createdAt`, `expiresAt`
       (2 minutes), `usedAt` nullable, `consumedByDevice` nullable
 - [x] Le code fait 8 caractères en alphabet **sans ambiguïté** (ni `O`/`0`, ni
@@ -1128,12 +1179,12 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
       code et rend la charge utile du QR :
       `{"url": "<base API>", "code": "<code>", "exp": "<ISO8601>"}`.
       **Précision apportée par KL-47** : cette charge utile est ce que le QR
-      *encode*, pas ce que la réponse HTTP rend — le ticket la rendait en JSON
+      _encode_, pas ce que la réponse HTTP rend — le ticket la rendait en JSON
       faute d'écran pour l'afficher, l'endpoint rend désormais le panneau
 - [x] **Le QR ne contient jamais de token**, seulement ce code (§0.6 règle 1)
 - [x] `POST /api/auth/pair` : `{code, deviceName}` → `{token, user}`
 - [x] **Consommation atomique** : `UPDATE pairing_code SET used_at = NOW()
-      WHERE id = ? AND used_at IS NULL`, puis vérification des lignes affectées.
+    WHERE id = ? AND used_at IS NULL`, puis vérification des lignes affectées.
       Une lecture suivie d'une écriture laisserait passer deux scans simultanés
 - [x] Un code expiré, déjà utilisé ou inconnu renvoie la **même** erreur 400
 - [x] Limiteur de débit sur `POST /api/auth/pair` (10 essais par IP et par
@@ -1192,6 +1243,7 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
 `src/Service/PairingQr.php`, `assets/controllers/pairing_controller.js`
 
 **Fini quand** :
+
 - [x] Une section « Connecter un téléphone » dans `/profile/settings`
 - [x] Le QR est généré **côté serveur** (`endroid/qr-code`, rendu SVG inline) :
       pas de dépendance JavaScript à faire passer par l'importmap, et ça marche
@@ -1207,7 +1259,7 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
 
 Ce que le ticket pose, et qu'il ne faut pas casser :
 
-- **L'état par défaut de la page est *sans* code.** Émettre est une écriture, pas
+- **L'état par défaut de la page est _sans_ code.** Émettre est une écriture, pas
   un effet de bord de l'affichage : générer un code à chaque ouverture des
   paramètres en gâcherait un à chaque fois et invaliderait celui qu'un autre
   onglet montre (« un écran, un code », KL-46). D'où un bouton « Afficher le
@@ -1258,6 +1310,7 @@ L'échéance d'un `ApiToken` glisse à chaque usage (KL-10) : un téléphone qui
 sert ne s'éteint jamais tout seul.
 
 **Fini quand** :
+
 - [x] Liste des appareils connectés (nom, dernière utilisation, expiration —
       plus « appairé le » et `lastBootstrapAt`, la dernière synchro, qui
       distingue « ce téléphone répond » de « ce téléphone est à jour »)
@@ -1312,6 +1365,7 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
 `config/packages/rate_limiter.yaml`
 
 **Fini quand** :
+
 - [x] Toute exception sur `^/api` sort en `application/problem+json`
       (RFC 9457 : `type`, `title`, `status`, `detail`)
 - [x] Les erreurs de validation listent les champs fautifs
@@ -1393,6 +1447,7 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
 l'endpoint le plus important du lot.
 
 **Fini quand** :
+
 - [x] `?since=<ISO8601>` renvoie le delta ; sans paramètre, le jeu complet
 - [x] Contenu : exercices visibles (perso + globale + biblio du coach en
       lecture), séances datées de J-30 à J+14 avec leur prescrit à plat **et leur
@@ -1422,7 +1477,7 @@ l'endpoint le plus important du lot.
   (déplacée hors fenêtre ou supprimée, le geste local est le même). C'est ce qui
   évite d'inventer une pierre tombale pour un déplacement.
 - **Table de pierres tombales, pas de `deletedAt`.** La suppression douce ne
-  supprime pas, elle cache : il faudrait alors la filtrer dans *chaque* requête
+  supprime pas, elle cache : il faudrait alors la filtrer dans _chaque_ requête
   du site (index, sélecteurs de pose, calendrier, export, ICS, page publique), et
   un oubli n'y produit aucune erreur, seulement une ligne morte qui réapparaît.
   `deleted_entity` porte une **clé** (`id` d'exercice, `uuid` de séance datée) et
@@ -1462,6 +1517,7 @@ l'endpoint le plus important du lot.
 **Où** : `src/Controller/Api/ScheduleController.php`, `src/Http/ApiJson.php`
 
 **Fini quand** :
+
 - [x] Le prescrit à plat d'une séance datée, via `PlanFlattener`, plus son
       réalisé s'il existe
 - [x] Résolution par `uuid`, pas par `id` (le client ne connaît que l'uuid pour
@@ -1506,6 +1562,7 @@ programmée qu'on remplit, et la séance libre que le téléphone crée de toute
 pièces.
 
 **Fini quand** :
+
 - [x] `PUT /api/schedule/{uuid}` fait un **upsert** : la séance datée est créée
       si l'`uuid` est inconnu, mise à jour sinon
 - [x] **Idempotent** : un même document rejoué ne crée rien de nouveau et renvoie
@@ -1535,7 +1592,7 @@ pièces.
   réseau ramènerait sinon à son ancienne date la séance que le coach vient de
   décaler. `status` ne peut que **clôturer** — les autres valeurs sont acceptées
   sans effet, pour qu'un client qui renvoie le document reçu ne se prenne pas un
-  422 sur un `planned` recopié, mais rien ne *déclôture* (§2.3 point 5).
+  422 sur un `planned` recopié, mais rien ne _déclôture_ (§2.3 point 5).
   `completionNotes` s'écrit si le document en porte une et **n'efface jamais**
   celle qui existe : le silence du téléphone n'est pas un ordre d'effacer la note
   d'écart du coach.
@@ -1585,6 +1642,7 @@ pièces.
 `src/Service/PerformanceHistoryPayload.php`, `src/Service/PerformanceHistory.php`
 
 **Fini quand** :
+
 - [x] Dernière performance, record, et les 10 dernières séances sur cet exercice
 - [x] Consomme `PerformanceHistory`, ne requête pas en direct
 
@@ -1644,6 +1702,7 @@ pièces.
 **Où** : `tests/Controller/ApiEndpointMatrixTest.php`
 
 **Fini quand** :
+
 - [x] Un test par endpoint : cas nominal, non authentifié, token expiré, token
       révoqué, ressource d'un autre utilisateur
 - [x] **Un test d'idempotence** : le même document envoyé trois fois donne une
@@ -1690,6 +1749,7 @@ pièces.
 ### KL-19 — `docs/api-mobile.md`
 
 **Fini quand** :
+
 - [x] Chaque endpoint documenté : méthode, charge utile, réponse, codes d'erreur
 - [x] Le protocole de synchronisation décrit noir sur blanc (qui fait autorité
       sur quoi, comment les conflits sont tranchés)
@@ -1699,7 +1759,7 @@ pièces.
 
 **Ce que le ticket pose et qu'il ne faut pas casser** :
 
-- **Le document dit le *quoi*, jamais le *pourquoi*.** Le raisonnement vit ici et
+- **Le document dit le _quoi_, jamais le _pourquoi_.** Le raisonnement vit ici et
   dans `CLAUDE.md` ; le recopier en ferait une seconde source à tenir à jour, qui
   divergerait. `docs/api-mobile.md` renvoie aux deux et s'en tient au contrat.
 - **Le partage d'autorité est un tableau champ par champ**, pas un paragraphe :
@@ -1727,6 +1787,7 @@ sait pas lire. Plutôt que de les recopier à la main dans le repo mobile et de
 les laisser diverger, on les publie.
 
 **Fini quand** :
+
 - [x] `php bin/console app:tokens:export` lit `tokens.css` et écrit
       `public/design-tokens.json` (primitives `--kd-*` et tokens sémantiques)
 - [x] La commande tourne dans le workflow de build, le fichier est servi sur
@@ -1782,6 +1843,7 @@ les laisser diverger, on les publie.
 ### KL-21 — Init du dépôt
 
 **Fini quand** :
+
 - [x] Projet Expo TypeScript, `expo-router`, ESLint + Prettier
 - [x] `app.json` : nom « Kadens », identifiant `fr.antoninpamart.kadens`,
       orientation portrait, `userInterfaceStyle: light`
@@ -1834,6 +1896,7 @@ les laisser diverger, on les publie.
 ### KL-22 — Socle de design natif
 
 **Fini quand** :
+
 - [x] `npm run sync:tokens` télécharge `design-tokens.json` et génère
       `src/theme/tokens.ts` typé. Le fichier généré est versionné mais **jamais
       édité à la main** (même règle que `assets/styles/fonts.css`)
@@ -1868,8 +1931,8 @@ les laisser diverger, on les publie.
 - **L'échelle typographique n'est pas générée, et elle ne peut pas l'être** :
   côté web elle vit en `clamp()` dans `components.css`, `tokens.css` n'en porte
   rien. `src/theme/typography.ts` en est la transposition à une seule largeur, et
-  c'est **là** que se tient la règle 4 : des rôles de *structure* (condensé
-  capitales) et des rôles de *contenu* (Barlow, casse normale) séparés
+  c'est **là** que se tient la règle 4 : des rôles de _structure_ (condensé
+  capitales) et des rôles de _contenu_ (Barlow, casse normale) séparés
   explicitement, pour qu'un nom d'exercice ne puisse pas atterrir en capitales
   condensées par distraction.
 - **`letterSpacing` est absolu en React Native**, là où le CSS l'exprime en `em`.
@@ -1899,6 +1962,7 @@ les laisser diverger, on les publie.
 ### KL-23 — Composants de base
 
 **Fini quand** :
+
 - [x] `Button` (primaire rouge, secondaire encre, fantôme), `Card`, `Chip`,
       `Field`, `NumberStepper`, `Sheet`, `Header`, `EmptyState`
 - [x] Aucune couleur ni police en dur dans un composant, toujours un token
@@ -1929,20 +1993,20 @@ les laisser diverger, on les publie.
   calibré pour une colonne de tableau. Écrire `22` dans le composant aurait sorti
   l'échelle de `typography.ts`, qui est justement l'endroit où elle se tient.
 - **Trois pièges du `NumberStepper`**, tous invisibles à la lecture du ticket :
-  1. **La frappe ne remonte pas au parent.** La saisie vit dans un brouillon de
-     texte local jusqu'au relâchement du champ ; convertir à chaque frappe rend
-     « 82, » impossible à taper — la virgule seule n'est pas un nombre, la valeur
-     serait réécrite sous les doigts. La virgule est acceptée à l'entrée **et**
-     rendue à l'affichage : c'est ce que propose le clavier français.
-  2. **La répétition lit sa base dans une `ref`**, pas dans la prop `value` :
-     elle avance plus vite que les rendus du parent, et une closure sur `value`
-     collerait le compteur à `value + step`. Le pas de 2,5 kg sans répétition,
-     c'est seize appuis pour aller de 60 à 100 kg.
-  3. **`onPressIn` applique le pas, `onPress` ne le double pas.** Le premier
-     donne le retour immédiat qu'on veut en salle, mais TalkBack n'émet **que**
-     `onPress` : un drapeau distingue les deux chemins, sinon le lecteur d'écran
-     n'incrémenterait rien. Les timers sont nettoyés au démontage — un écran qui
-     disparaît pendant un appui laisserait un intervalle tourner.
+    1. **La frappe ne remonte pas au parent.** La saisie vit dans un brouillon de
+       texte local jusqu'au relâchement du champ ; convertir à chaque frappe rend
+       « 82, » impossible à taper — la virgule seule n'est pas un nombre, la valeur
+       serait réécrite sous les doigts. La virgule est acceptée à l'entrée **et**
+       rendue à l'affichage : c'est ce que propose le clavier français.
+    2. **La répétition lit sa base dans une `ref`**, pas dans la prop `value` :
+       elle avance plus vite que les rendus du parent, et une closure sur `value`
+       collerait le compteur à `value + step`. Le pas de 2,5 kg sans répétition,
+       c'est seize appuis pour aller de 60 à 100 kg.
+    3. **`onPressIn` applique le pas, `onPress` ne le double pas.** Le premier
+       donne le retour immédiat qu'on veut en salle, mais TalkBack n'émet **que**
+       `onPress` : un drapeau distingue les deux chemins, sinon le lecteur d'écran
+       n'incrémenterait rien. Les timers sont nettoyés au démontage — un écran qui
+       disparaît pendant un appui laisserait un intervalle tourner.
 - **Pas d'icônes.** Le bouton de retour et la fermeture d'une feuille disent
   « Retour » et « Fermer » en toutes lettres. Embarquer un jeu de glyphes
   (`lucide-react-native` + `react-native-svg`) est une décision qui engage le
@@ -1975,6 +2039,7 @@ les laisser diverger, on les publie.
 ### KL-24 — Couche SQLite + Drizzle
 
 **Fini quand** :
+
 - [x] Schéma local miroir de §2.2 : `exercise`, `scheduled_workout` (qui porte le
       prévu **et** le réalisé, comme côté serveur), `prescribed_snapshot`,
       `logged_exercise`, `logged_set`, plus `sync_state` et `mutation_queue`
@@ -1994,6 +2059,7 @@ seul `GET /api/exercises/{id}/history`.
 ### KL-25 — Client API et stockage du token
 
 **Fini quand** :
+
 - [x] Client typé partagé, timeout, retry avec backoff exponentiel
 - [x] Token dans `expo-secure-store`, jamais dans `AsyncStorage`
 - [x] Un 401 purge le token et renvoie vers l'écran de connexion
@@ -2079,6 +2145,7 @@ seul `GET /api/exercises/{id}/history`.
 ### KL-26 — Écran de connexion
 
 **Fini quand** :
+
 - [x] Écran d'accueil proposant **« Scanner le QR » en action primaire**, et
       « Saisir le code » puis « Email et mot de passe » en actions secondaires
 - [x] Le formulaire mot de passe existe mais n'est pas le chemin par défaut
@@ -2092,7 +2159,7 @@ seul `GET /api/exercises/{id}/history`.
 1. **`SessionState` gagne un quatrième champ, `awaitingFirstSync`, plutôt qu'un
    quatrième statut.** Le garde de `_layout.tsx` n'avait jusqu'ici que deux cases
    (`signedIn` / `!signedIn`) ; « en train de récupérer sa première séance » n'est
-   pas un statut de connexion, c'est une étape *après* que la connexion a réussi.
+   pas un statut de connexion, c'est une étape _après_ que la connexion a réussi.
    `openSession` (un `login` ou un `pair` frais) le pose à `true` ; `restoreSession`
    le pose à `false` dans les deux branches. C'est ce deuxième point qui compte :
    une session restaurée au lancement **ne repasse pas** par l'écran de bootstrap,
@@ -2136,6 +2203,7 @@ avant KL-48.
 **Où** : repo `kadens-mobile`
 
 **Fini quand** :
+
 - [x] `expo-camera` avec demande de permission **expliquée avant** de la
       déclencher (un refus définitif ne se rattrape que dans les réglages
       Android)
@@ -2154,7 +2222,7 @@ sans se réécrire — la saisie manuelle reste le repli. Trois décisions prise
 en cours de route :
 
 1. **`signInWithPairingQr` (nouveau, `src/api/auth.ts`) pose l'URL de base
-   *avant* l'échange, et la remet à sa valeur précédente seulement si l'appel
+   _avant_ l'échange, et la remet à sa valeur précédente seulement si l'appel
    échoue par réseau ou délai.** Un refus du serveur (code expiré ou déjà
    consommé) ne revert pas l'URL : le serveur a répondu, elle est donc bonne.
    Un QR qui pointe vers un serveur injoignable ne doit pas stranger la
@@ -2188,6 +2256,7 @@ rapport avec ce ticket** en rejouant le même build sur l'état d'avant KL-48
 bugs coûteux se logent.
 
 **Fini quand** :
+
 - [x] **Pull** : `GET /api/bootstrap?since=…`, application en transaction, mise à
       jour de `lastPulledAt`. Une nuance sur le `since`, voir le point 1 ci-dessous
 - [x] **Push** : dépilage de `mutation_queue` en FIFO, une mutation à la fois,
@@ -2235,7 +2304,7 @@ redécouvrir :
    bloquerait les séances des autres jours pour toujours.
 4. **`deleted.schedule` n'est pas appliqué séparément, `deleted.exercises` si.**
    L'asymétrie n'est pas un oubli : `?since` n'allège que la bibliothèque, dont le
-   jeu reçu est donc *partiel* — sans la liste des disparus, un exercice supprimé
+   jeu reçu est donc _partiel_ — sans la liste des disparus, un exercice supprimé
    resterait local à vie. La fenêtre de séances datées, elle, part toujours
    entière : « absente du jeu reçu » suffit à décider, et c'est cette purge qui
    borne la base (sans elle, chaque jour qui passe y laisserait une séance de
@@ -2283,6 +2352,7 @@ mobile, avec de vraies bascules d'`AppState` et d'`expo-network`. La carte
 ### KL-28 — Écran Aujourd'hui
 
 **Fini quand** :
+
 - [x] Les séances programmées du jour, lues en local
 - [x] Bouton « Démarrer » par séance, et « Séance libre » toujours accessible
 - [x] Reprise d'une séance en cours si l'app a été fermée
@@ -2359,6 +2429,7 @@ téléphone.
 ### KL-29 — Écran Séance en cours
 
 **Fini quand** :
+
 - [x] Le prescrit s'affiche bloc par bloc, dans l'ordre, avec les rangs de
       superset (A1/A2) **dérivés de l'ordre**, jamais stockés
 - [x] Chaque série est une ligne cochable, pré-remplie par le prescrit
@@ -2391,8 +2462,8 @@ redécouvrir :
    deux sens : le réalisé renvoyé par le serveur avec ses positions renumérotées à
    partir de 0 se relit **exactement** aux mêmes lignes.
 2. **`prescribed_snapshot` se lit ici, et nulle part ailleurs.** L'invariant de
-   KL-24 interdit de remonter le plus gros document de la base pour *lister* un
-   jour ; il n'a jamais interdit de le lire pour *dérouler* une séance, ce qui est
+   KL-24 interdit de remonter le plus gros document de la base pour _lister_ un
+   jour ; il n'a jamais interdit de le lire pour _dérouler_ une séance, ce qui est
    exactement le seul endroit où il sert. C'est la première lecture du document
    depuis qu'il existe.
 3. **Trois lectures vives et non une.** `useLiveQuery` n'écoute que la table du
@@ -2472,6 +2543,7 @@ cocher à bout de bras.
 ### KL-30 — Déviations
 
 **Fini quand** :
+
 - [x] Modifier le poids, les reps ou la durée d'une série
 - [x] Ajouter une série à un exercice, en supprimer une
 - [x] Marquer un exercice comme sauté (avec une raison optionnelle)
@@ -2575,6 +2647,7 @@ d'ajustement au pouce, gants aux mains.
 ### KL-31 — Timer de repos, veille, notification
 
 **Fini quand** :
+
 - [x] Timer démarré automatiquement à la validation d'une série
 - [x] Durée par défaut réglable, ajustable en un geste (+ 15 s / - 15 s)
 - [x] `expo-keep-awake` actif pendant toute la séance, relâché à la clôture
@@ -2697,6 +2770,7 @@ Enfin, `expo-notifications` et `expo-keep-awake` sont des modules **natifs** :
 ### KL-32 — Historique en séance
 
 **Fini quand** :
+
 - [x] Sous chaque exercice : « Dernière fois » et « Record », lus en local
       (donc disponibles hors réseau, ils viennent du bootstrap)
 - [x] Affichage compact, sur deux lignes maximum
@@ -2768,6 +2842,7 @@ typée, personne ne l'ouvre.
 ### KL-33 — Clôture de séance
 
 **Fini quand** :
+
 - [x] Écran de résumé : durée, tonnage, séries faites, écarts au prescrit
 - [x] Champ de notes libre
 - [x] La clôture empile la mutation finale et déclenche une synchronisation
@@ -2868,6 +2943,7 @@ mutation confirmée.
 ### KL-34 — Séance vierge
 
 **Fini quand** :
+
 - [x] Démarrage sans prescrit, à la date du jour
 - [x] Recherche d'exercice dans la bibliothèque **locale** (donc hors réseau),
       avec filtre par activité et zone
@@ -2906,7 +2982,7 @@ que sont les décisions.
   propre rangée se réduirait à elle-même et on ne pourrait plus en changer.
 - **Changer d'activité relâche toujours la zone.** Une règle qu'on peut énoncer
   plutôt qu'un nettoyage au cas par cas, qui demanderait de connaître les zones de
-  l'activité *suivante* — que le rendu en cours n'a pas. Sans ça, un filtre resté
+  l'activité _suivante_ — que le rendu en cours n'a pas. Sans ça, un filtre resté
   actif sort de sa rangée et devient indéfaisable, devant une liste vide sans
   raison visible.
 - **L'ordre des facettes est celui de déclaration des enums serveur**, jamais
@@ -2962,23 +3038,209 @@ liste dans une feuille bornée à 78 %.
 ### KL-35 — Écran Réglages
 
 **Fini quand** :
-- [ ] Compte, déconnexion, version de l'app et du build
-- [ ] État de synchronisation : dernière réussite, mutations en attente,
+
+- [x] Compte, déconnexion, version de l'app et du build
+- [x] État de synchronisation : dernière réussite, mutations en attente,
       mutations en échec avec possibilité de les rejouer
-- [ ] Durée de repos par défaut, vibration
-- [ ] Bouton « Resynchroniser tout » (purge locale et bootstrap complet)
+- [x] Durée de repos par défaut, vibration
+- [x] Bouton « Resynchroniser tout » (purge locale et bootstrap complet)
+
+**Livré le 04/08/2026.** `src/app/settings.tsx`, quatre cartes — compte,
+synchronisation, repos, application — et la disparition de l'écran de
+diagnostic, qui portait ces morceaux depuis KL-25 faute d'un endroit à eux.
+
+**Ce qui a été tranché en le faisant.**
+
+- **L'écran de diagnostic disparaît, il ne se replie pas.** Ping, bootstrap
+  manuel, compteurs de tables, galerie de composants : c'était l'outillage d'un
+  socle qu'on construisait, pas une fonction de l'app, et le garder aurait fait
+  deux écrans se partager la déconnexion. Seul le **jeu de démonstration**
+  survit, dans la carte « Application » et sous `__DEV__` — rien d'autre ne
+  remplit une base sans serveur, et `seedDemo()` refuse déjà de s'exécuter en
+  production. Survit aussi le **test de repos**, mais pas au même titre : ce
+  n'est pas un outil de développement, c'est le seul moyen de savoir _avant_ une
+  séance si ce téléphone laisse passer la notification (canal muet, mode
+  silencieux, permission refusée). Le découvrir barre en main serait le
+  découvrir trop tard.
+- **La dernière synchronisation se lit en base, pas dans le moteur.**
+  `useSyncStatus()` vit en mémoire et repart vide à chaque lancement : un écran
+  qui n'aurait lu que lui annoncerait « jamais synchronisé » sur une base
+  descendue une heure plus tôt. D'où `useSyncState()` (`sync/hooks.ts`), lecture
+  vive de `sync_state`, qui porte `lastPulledAt` / `lastPushedAt` et la fenêtre
+  couverte. Le moteur ne dit plus que ce qui se passe **maintenant** — la phase
+  et la dernière erreur.
+- **Se déconnecter efface la base locale ; l'URL du serveur y survit.** La
+  première moitié était déjà décidée (`seed.ts`) : le réalisé d'un compte n'a
+  rien à faire sur l'appareil une fois le jeton parti. La seconde est neuve —
+  `sync_state.apiUrl` vient du **QR d'appairage**, pas du compte, et l'effacer
+  déconnecterait l'app de son serveur au point que le repli « email et mot de
+  passe » n'aurait plus où appeler. `clearDatabase()` la préserve donc, pour les
+  deux gestes qui l'appellent. L'ordre compte aussi : **la base part avant le
+  jeton**. L'app tuée entre les deux vaut mieux avec une base vide et un jeton
+  valide (le pull la remplit) qu'avec le réalisé d'un compte déconnecté et plus
+  aucun écran pour l'atteindre.
+- **« Tout resynchroniser » ne purge qu'après une synchronisation avérée.**
+  C'est le seul geste destructeur de l'app, et `resyncAll()` (`sync/reset.ts`) le
+  garde par trois conditions, dans cet ordre : un cycle complet doit réussir
+  (il pousse ce qui attend **et** prouve que le serveur répond) ; ce cycle doit
+  avoir réellement échangé — un `ok: true` **sans pull** est un cycle _sauté_,
+  session fermée, et purger là viderait l'app sans rien pour la recombler ; et
+  la file doit être vide, ce qui reste après un push réussi étant précisément ce
+  que le serveur **refuse**. Aucun chemin de « pull seul » n'a été inventé pour
+  l'occasion : la reconstruction est un second cycle complet, rendu exhaustif par
+  le seul fait que la purge remet `serverTime` à null — le `?since` disparaît,
+  le serveur renvoie tout.
+- **Le compteur de tentatives ne s'affiche qu'à partir d'un refus du serveur.**
+  Une séance qui attend du réseau n'a rien d'un échec ; lui coller « 0/5 » et un
+  message d'erreur ferait lire une panne là où il n'y a qu'un mur de béton. La
+  condition est `attempts > 0`, et elle est exacte parce que le compteur ne bouge
+  **que** sur un refus définitif (`sync/queue.ts`). Même raison pour l'erreur
+  globale, qui se rend en gris quand `offline` est vrai et en rouge sinon.
+- **Une seule action primaire, et elle n'est pas toujours là.** Le rouge va à
+  « Synchroniser » **quand la file n'est pas vide**, et à rien du tout sinon
+  (règle 2). Un écran de réglages où tout est à jour n'a aucune action urgente,
+  et un rouge permanent aurait cessé de vouloir dire quelque chose — c'est déjà
+  ce que KL-28 avait tranché pour les cartes du jour.
+- **La version vient du manifeste embarqué, pas d'`expo-application`.** L'app
+  n'embarque pas `expo-updates` : le manifeste est figé au build et ne **peut
+  pas** diverger du binaire installé, donc `Constants.expoConfig` dit la vérité
+  sans ajouter un module natif (donc un rebuild) pour une valeur qu'on a déjà. La
+  question se reposera avec un vrai besoin quand KL-43 comparera cette version à
+  celle du dépôt F-Droid. Deux corollaires : `android.versionCode` est désormais
+  **déclaré** dans `app.json` (sinon « build » serait une devinette), et en
+  développement l'écran affiche « développement » plutôt qu'un numéro qui ferait
+  croire à une version distribuée.
+- **Le compte d'une session restaurée se complète en tâche de fond.**
+  `restoreSession()` ne rend qu'un jeton, pour que l'app s'ouvre hors ligne
+  (KL-25) : sans rattrapage, l'écran afficherait indéfiniment un compte inconnu
+  sur un téléphone parfaitement connecté. Un `refreshMe()` au montage, échec
+  ignoré — et c'est du même coup l'endroit où un jeton **révoqué depuis
+  `/profile/settings`** se découvre, le `401` purgeant la session et le garde de
+  navigation faisant le reste.
+
+**Vérifié** : `npm run typecheck`, `npm run lint`, `npx prettier --check .`,
+`npx expo export` pour Android **et** web (dix routes, `/settings` présente,
+`/diagnostics` disparue), plus **19 contrôles hors React Native** sur
+`resyncAll()` — `src/sync/reset.ts` bundlé pour Node avec des stubs à la place du
+moteur, de la file et de la base, jamais recopié. Ils exercent ce que ni le
+typage ni le bundler ne disent : les deux refus (serveur injoignable, cycle
+sauté, file non vide) laissent la base **intacte** et ne lancent aucun second
+cycle ; le chemin nominal purge **entre** les deux cycles et pas ailleurs ; une
+reconstruction qui échoue rapporte l'échec sans le maquiller en refus (la purge,
+elle, a bien eu lieu) ; et les deux cycles partent en `manual`, donc délibérés,
+donc hors du plancher anti-rafale du moteur.
+
+**Limites de ce ticket** : le rendu n'a pas été observé sur l'appareil. Rien n'a
+été rejoué contre le vrai Symfony non plus, et c'est assumé — l'écran n'ajoute
+**aucun appel** au contrat (`login`, `logout`, `bootstrap` existent depuis le lot
+2), il ne fait qu'ordonner des gestes déjà vérifiés. Restent donc à voir à
+l'œil : la file en échec avec de vraies mutations refusées, la déconnexion
+complète sur un téléphone appairé, et le fait que « tout resynchroniser » ramène
+bien une base identique.
 
 ### KL-36 — Tests mobile
 
 **Fini quand** :
-- [ ] Jest configuré, `@testing-library/react-native`
-- [ ] **Le moteur de synchronisation est testé en priorité** : file rejouée,
+
+- [x] Jest configuré, `@testing-library/react-native`
+- [x] **Le moteur de synchronisation est testé en priorité** : file rejouée,
       échec puis succès, mutation en double, application d'un delta, ordre
       push avant pull
-- [ ] Les réducteurs de séance testés (cocher, dévier, sauter, clôturer)
-- [ ] Un test de bout en bout du parcours « séance programmée, entièrement hors
+- [x] Les réducteurs de séance testés (cocher, dévier, sauter, clôturer)
+- [x] Un test de bout en bout du parcours « séance programmée, entièrement hors
       réseau, puis synchronisée »
-- [ ] Les tests tournent en CI sur chaque push
+- [x] Les tests tournent en CI sur chaque push
+
+**Livré le 04/08/2026.** **92 contrôles, 10 suites** — `src/**/__tests__/`, les
+utilitaires dans `src/test/`, la CI dans `.github/workflows/ci.yml` (typage,
+lint, format, tests, sur chaque poussée). Préréglage `jest-expo/android` : le
+dépôt ne vise qu'Android, et le préréglage universel ferait tourner chaque test
+trois fois dont deux sur des cibles qu'on ne livre pas.
+
+**Ce qui a été tranché en le faisant.**
+
+- **`expo-sqlite` est remplacé par `node:sqlite`, pas par un bouchon.** C'est la
+  décision structurante du ticket. Ce que ces tests ont à vérifier **est du
+  SQLite** : une transaction qui se replie, un `ON DELETE CASCADE` qui emporte
+  les séries, un `AUTOINCREMENT` qui ne réattribue pas un rang libéré, un
+  `ON CONFLICT DO UPDATE` qui remplace au lieu de doubler. Un faux qui rendrait
+  des lignes toutes prêtes ne dirait rien de tout ça — il dirait que le faux est
+  d'accord avec lui-même. `node:sqlite` est la même bibliothèque que celle
+  qu'embarque `expo-sqlite`, sans module natif à compiler ; il n'y a donc rien à
+  simuler, seulement une API à traduire dans l'autre
+  (`__mocks__/expo-sqlite.ts`, appliqué **automatiquement** par Jest à tout ce
+  qui importe le module). Le seul point non évident de la traduction :
+  `executeSync()` doit rendre à la fois les lignes lues et le compte de lignes
+  modifiées, là où `node:sqlite` sépare `run()` et `all()` — les appeler tous les
+  deux exécuterait la requête deux fois, donc doublerait un `INSERT` en silence.
+  Le tri se fait sur `columns()`, une seule branche s'exécute.
+- **Le schéma des tests vient des migrations du dépôt.** `src/test/database.ts`
+  rejoue `src/db/migrations/`, les mêmes fichiers que le téléphone applique au
+  démarrage. Un schéma recopié dériverait au premier `npm run db:generate` et les
+  tests continueraient de passer sur une base que l'app n'a plus ; en prime, une
+  suite qui tourne prouve que les migrations s'appliquent sur une base vierge. On
+  **vide** entre deux tests plutôt que de rouvrir, `db/client.ts` ouvrant sa
+  connexion au chargement du module et la gardant (choix documenté là-bas) —
+  `sqlite_sequence` compris, sans quoi l'`AUTOINCREMENT` de `mutation_queue`
+  compterait d'un test à l'autre.
+- **Seul `fetch` est bouchonné, jamais `@/api`.** Remplacer les endpoints par des
+  espions ferait des tests qui vérifient les espions : plus de timeout, plus de
+  rejeu, plus de `201` contre `200`, plus de taxonomie d'erreurs — c'est-à-dire
+  plus rien de ce qui décide du comportement de la file. En bouchonnant le
+  transport, un test de push exerce vraiment `putSchedule`, `ApiError` et
+  `isTransient`. Corollaire assumé : les trois tentatives du transport coûtent du
+  vrai temps sur les scénarios hors réseau (une seconde et demie par appel
+  idempotent), et c'est justement ce comportement qu'on veut voir tourner.
+- **Le `fetch` par défaut échoue en nommant l'appel** (`src/test/setup.ts`).
+  Ce n'est pas un confort mais un garde-fou : `@/session` écrit du réalisé **hors
+  réseau**, et un import mal placé qui ferait partir une requête depuis une
+  écriture locale passerait sinon inaperçu — les tests réussiraient en s'appuyant
+  sur un serveur qui n'existe pas.
+- **Les jeux de données sont des charges utiles, et la base se remplit par un
+  vrai pull.** `src/test/fixtures.ts` construit du `BootstrapPayload` et
+  `seedBootstrap()` applique `applyBootstrap`. Un test qui insérerait ses lignes
+  à la main décrirait un état que le serveur ne sait pas produire, et il
+  continuerait de passer le jour où le contrat bouge. Conséquence : dans une
+  suite de séance, la mise en place est déjà un morceau du parcours testé.
+- **L'horloge se fige là où le moteur la lit.** Le plancher anti-rafale de dix
+  secondes se mesure sur `Date.now()` et l'état du moteur vit au niveau du
+  module, donc d'un test à l'autre : sans horloge tenue par le test, « le réseau
+  revient » serait sauté par un plancher parfaitement légitime hérité du test
+  précédent. Même raison pour `waitForIdle()` (`src/test/sync.ts`), qui compte en
+  tours de boucle et non en `Date.now()`.
+- **On attend le moteur en l'observant, on ne le relance pas.**
+  `closeWorkout()` déclenche sa synchronisation sans l'attendre (KL-33), et un
+  `await syncNow()` pour la rejoindre en **enchaînerait** un second à la fin
+  (`engine.ts`) : le test relancerait indéfiniment ce qu'il essaie d'attendre.
+  D'où `waitForIdle()`, qui lit la phase publiée. Rien n'a été ajouté côté app
+  pour ça, et c'est le point : personne n'attend `syncNow()`.
+- **Deux modules Expo demandent un double, pour des raisons opposées.**
+  `expo-sqlite` parce qu'on veut le **vrai** comportement ;
+  `expo-notifications` parce que le module refuse de se charger en test (il
+  détecte Expo Go par `Constants.appOwnership`, que le préréglage simule) et que
+  toute suite important `@/session` en hérite via `rest.ts`. Le second ne vérifie
+  donc rien et ne reprend que la surface appelée : le repos n'entre en base nulle
+  part et n'a rien à dire au serveur, ce qu'il a d'observable se vérifie sur un
+  téléphone.
+- **`tsconfig` déclare ses `types`.** TypeScript 6 n'inclut plus les paquets
+  `@types` tout seul : `["jest", "node"]` est le seul moyen d'avoir les globales
+  des suites et `node:sqlite`, et ça garde la liste lisible. La CI tourne sur
+  **Node 24** — `node:sqlite` est sans drapeau depuis la 22.13, et l'alternative
+  (`better-sqlite3`) ajouterait un module natif à compiler pour un SQLite que
+  Node embarque déjà.
+- **Piège de `@testing-library/react-native` v14** : `render` et `fireEvent` sont
+  **asynchrones**. Oublier l'`await` ne donne pas un test qui échoue à
+  l'assertion mais un `screen` vide, avec « `render` function has not been
+  called » — noté dans `CLAUDE.md`, parce que le message ne désigne pas la cause.
+
+**Ce que ces tests ne couvrent pas, et pourquoi.** Aucun écran n'est monté : le
+seul test de rendu porte sur `NumberStepper`, qui est le seul composant du dépôt
+à porter de la logique (bornes, virgule décimale, libellés TalkBack) plutôt que
+de la mise en page. Rendre `session/[uuid]/index.tsx` demanderait `expo-router`,
+Reanimated et les polices, pour vérifier une composition qui se voit mieux à
+l'œil — c'est ce que KL-37 à KL-39 iront regarder sur l'appareil. Le repos
+(`rest.ts`) reste hors périmètre pour la même raison : ce qu'il a d'observable
+est un canal Android et une vibration.
 
 ---
 
@@ -2987,22 +3249,129 @@ liste dans une feuille bornée à 78 %.
 ### KL-37 — Passe design complète
 
 **Fini quand** :
-- [ ] Tous les écrans repris à l'identité Presse : papier froid, encre quasi
+
+- [x] Tous les écrans repris à l'identité Presse : papier froid, encre quasi
       noire, un seul accent rouge, rayon 0, aucune ombre
-- [ ] **Le rouge ne sort que pour l'action primaire, l'intensité et l'échec.**
+- [x] **Le rouge ne sort que pour l'action primaire, l'intensité et l'échec.**
       Toute catégorie (activité, zone, rôle de bloc) se code par son rang dans
       l'échelle de gris, jamais par une teinte inventée
-- [ ] Icône de l'app générée depuis `assets/icons/kadens.png`, en réutilisant la
-      logique d'isolation du K par composantes connexes de
-      `tools/build-pwa-icons.php` (les traits de vitesse chevauchent le K, aucun
-      recadrage rectangulaire ne les sépare)
-- [ ] Écran de démarrage natif cohérent avec celui de la PWA
-- [ ] Navigation basse à trois entrées, cohérente avec le web
-- [ ] Zones sûres respectées (barre gestuelle Android)
+- [x] Icône de l'app générée par `tools/build-pwa-icons.php` — **depuis
+      `assets/icons/kadens-red-black.png`**, pas depuis `kadens.png` comme le
+      ticket l'écrivait : une variante de la marque est née en cours de route
+      pour que l'app se distingue du site sur un écran d'accueil. Elle arrive
+      déjà réduite au K, il n'y a donc plus de traits de vitesse à isoler par
+      composantes connexes ; c'est le fond blanc qu'il faut retirer (voir la
+      décision 1 ci-dessous)
+- [x] Écran de démarrage natif cohérent avec celui de la PWA — même traitement
+      (marque centrée sur papier), marque distincte pour la même raison
+- [x] Navigation basse à trois entrées, cohérente avec le web
+- [x] Zones sûres respectées (barre gestuelle Android)
+
+**Livré le 05/08/2026.** Le ticket arrivait à moitié fait sur ses deux premières
+cases : le socle de KL-22 ayant posé les tokens dès le départ, aucun écran ne
+portait de couleur en dur, d'ombre ni de rayon parasite. Ce qui restait était
+ailleurs — les **visuels de l'app**, la **barre basse**, les **zones sûres** —
+et six décisions ont été prises en le faisant.
+
+1. **Les visuels Android sortent du dépôt web, et d'une marque à eux.** Les
+   fichiers d'`assets/images/` étaient des **copies manuelles** des visuels PWA,
+   en RGB sans alpha. Conséquence invisible en revue et bien visible sur un
+   lanceur : `adaptiveIcon.backgroundColor` ne se voyait jamais, le fond blanc
+   étant cuit dans l'image. `tools/build-pwa-icons.php` gagne donc une section
+   Android (`public/pwa/android/`) et le mobile un `npm run sync:icons`, dans le
+   sens que les polices avaient déjà tracé : `public/fonts/*.ttf` ne sert lui non
+   plus jamais au web, il existe pour le téléphone. Corollaire technique : tout
+   est transparent sauf `icon.png`, parce que sur Android la couleur de fond se
+   déclare et se compose à l'affichage.
+   **Le script a désormais deux sources**, et c'est le point : le site garde le
+   lockup complet (`kadens.png`), l'app prend la variante rouge et noire
+   (`kadens-red-black.png`), pour être reconnaissable au milieu d'un écran
+   d'accueil — deux icônes de la même famille au même endroit se confondent.
+   Cette seconde source arrive **déjà réduite au K, sur fond blanc opaque** :
+   `isolateGlyph()` n'y sert à rien (il raisonne sur l'alpha, et une image sans
+   alpha n'a qu'une composante, le canevas entier), et il n'y a de toute façon
+   pas de traits de vitesse à retirer. C'est `unmatte()` qui la prépare, en
+   **récupérant l'antialiasing plutôt qu'en seuillant** : les deux teintes de la
+   marque ayant chacune un canal à zéro, ce canal vaut exactement `255·(1−a)` et
+   donne l'opacité du pixel. Un seuil aurait dentelé les diagonales du K, qui
+   sont tout ce que cette marque a à montrer.
+2. **La silhouette de notification et la couche monochrome ne sont qu'un alpha.**
+   Android ignore les canaux de couleur des deux et teinte lui-même. `flatten()`
+   les aplatit donc sur une seule couleur en conservant l'alpha : ça ne change
+   rien à l'écran, mais un fichier ouvert dans un visualiseur dit ce qu'il est.
+   Ça referme au passage la limite laissée par KL-31, où le repos s'annonçait
+   avec la silhouette par défaut de l'icône d'app.
+3. **La barre basse transpose la forme du web, pas ses destinations.** Le web
+   navigue en Séances / Plans / Calendrier et aucune des trois n'existe ici : le
+   téléphone ne compose pas, il déroule. Ce qui se transpose est le dessin
+   (56 points, filet d'encre, liséré haut sur l'actif, trois cibles au pouce),
+   appliqué aux trois questions de cette app-là — **Aujourd'hui, Historique,
+   Réglages**. L'historique est donc né avec la barre : la bande de jours s'arrête
+   à J-2, et « qu'est-ce que j'ai fait » n'avait pas d'écran. Sa portée est celle
+   de la base locale, donc la fenêtre du serveur (J-30 → J+14), et l'écran le
+   **dit** plutôt que de s'arrêter sans prévenir — poser une seconde borne ici
+   aurait créé une fenêtre de plus à tenir d'accord avec celle de §4.5.
+4. **L'historique retient ce qui a eu lieu, pas ce qui est passé.** Clôturée ici
+   (`ended_at`) ou tranchée par le serveur (`done`, `missed`). Une séance
+   d'avant-hier jamais ouverte n'est pas de l'historique, c'est un trou — et la
+   bande de jours la montre déjà.
+5. **Une séance en cours vit au-dessus de la barre, pas dedans.** Elle reste un
+   écran de pile : trois onglets sous le pouce y disputeraient la place à la
+   seule cible qui compte. En sortir, c'est revenir, pas changer d'onglet. C'est
+   aussi ce qui a fait choisir les composants **sans style** d'`expo-router/ui`
+   plutôt que le `<Tabs>` classique : ce dernier étend le navigateur de React
+   Navigation, dont la barre se configure (teinte active, badges) mais ne se
+   dessine pas — or l'identité Presse n'est pas une configuration.
+6. **Les zones sûres ont deux rendus, jamais cumulés.** Android dessine de bord à
+   bord depuis le SDK 54. Le haut était déjà réglé une fois pour toutes par
+   `Header` ; le bas ne l'était nulle part, et il n'a pas une seule réponse : une
+   **barre peinte** prend l'inset en rembourrage (elle peint sous la barre
+   gestuelle, ses cibles remontent), une **page qui défile** l'ajoute à son
+   dégagement de contenu. Cumuler les deux creuse deux fois le même vide — d'où
+   la barre d'action de « Aujourd'hui », qui a cessé de le compter le jour où la
+   barre d'onglets s'est posée sous elle. La règle est écrite dans
+   `components/Header.tsx`, là où le lecteur rencontre déjà la question.
+
+**Deux corrections de fond au passage.** Le rouge d'un **échec** se dit
+`statusMissed` et non `primary` : les deux partagent leur valeur aujourd'hui, pas
+leur sens, et le web pose déjà `--color-status-missed` sur `.kd-flash--error` —
+trois écrans suivaient l'accent. Et l'indicateur d'attente du bootstrap passe à
+l'encre : attendre n'est ni une action primaire, ni de l'intensité, ni un échec.
+Le jeu de glyphes arrivé avec la barre (Lucide, figé en local dans
+`components/Icon.tsx`, recopié depuis `assets/icons/lucide/` du dépôt web) referme
+enfin la note de KL-23 sur le bouton de retour, qui n'avait pas d'icône faute de
+jeu.
+
+**Vérifié** : `npm run typecheck`, `npm run lint`, `npm run format:check`, **94
+contrôles hors React Native** en 11 suites (deux neufs, sur ce qui entre dans
+l'historique et sur le décompte de séries de sa requête jumelle, celle-ci n'ayant
+plus de filtre de date pour rattraper une dérive), et `npx expo export` pour
+Android **et** web — aucune route fantôme, le groupe `(tabs)` ne s'ajoutant pas à
+l'URL.
+
+**Limites de ce ticket.** Rien n'a été observé sur l'appareil : l'icône du
+lanceur et sa version thématisée, la silhouette du repos dans la barre de statut,
+l'écran de démarrage et son enchaînement avec l'app, les trois onglets au pouce
+restent à valider à l'œil — et `react-native-svg` étant un module **natif**,
+`npm run android` est obligatoire, un rechargement Metro ne suffit pas. Un point
+précis à regarder : la **teinte du trait gestuel** d'Android sur la barre
+d'onglets claire. Le système la choisit seul, l'app ne la pilote pas (ce serait
+`expo-navigation-bar`, un module de plus) ; si le trait ressort clair sur clair,
+c'est une ligne à ajouter, pas une reprise. Le fond de l'écran de démarrage suit
+le manifest de la PWA (`#ffffff`) et non le papier de l'app (`#dcdcd7`) : c'est
+« cohérent avec la PWA » au pied de la lettre, au prix du même très léger saut de
+valeur que le web a déjà au lancement. Enfin la variante rouge et noire fait
+**512 px** là où le lockup du site en fait 1254 : rien n'est agrandi (l'icône de
+repli sort à 512, le plus gros besoin d'Android étant la mipmap xxxhdpi à 192),
+mais une source plus grande laisserait plus de marge le jour où un format
+l'exigerait. Ses teintes (`#FF0000`, `#000000`) ne sont pas celles des tokens
+(`#d8261e`, `#0b0b0b`) — c'est assumé : une marque n'est pas de l'interface, et
+le logo du site n'est pas dans la palette non plus.
 
 ### KL-38 — États vides, erreurs, hors ligne
 
 **Fini quand** :
+
 - [ ] Un état vide dessiné pour chaque liste
 - [ ] Bandeau hors ligne discret et **non bloquant** : hors réseau, l'app marche,
       le bandeau informe, il n'alerte pas
@@ -3016,7 +3385,12 @@ liste dans une feuille bornée à 78 %.
 le noir. Ce ticket n'est pas cosmétique.
 
 **Fini quand** :
+
 - [ ] Cible principale (valider une série) atteignable au pouce, en bas d'écran
+- [ ] Clavier qui n'osbrue pas la vue
+- [ ] fix le bug quand on entre une valeur numérique du premier chiffre qui n'est pas pris en compte
+- [ ] Ajouter une nouvelle série n'ouvre pas la modale par défaut
+- [ ] La vue des derière fois et record est amélioré et explicite (tableau, plutot que des lignes qui peuvent être tronqué)
 - [ ] Aucun geste fin requis : pas de glissement pour supprimer sans repli, pas
       de zone de moins de 44 points
 - [ ] Contrastes vérifiés à AA
@@ -3031,6 +3405,7 @@ le noir. Ce ticket n'est pas cosmétique.
 ### KL-40 — Signature Android
 
 **Fini quand** :
+
 - [ ] Keystore de release généré et **sauvegardé hors du dépôt** (perdre cette
       clé rend toute mise à jour de l'app impossible : il faudrait désinstaller
       et réinstaller, en perdant les données locales)
@@ -3043,6 +3418,7 @@ le noir. Ce ticket n'est pas cosmétique.
 **Où** : `.github/workflows/build.yml` (repo mobile)
 
 **Fini quand** :
+
 - [ ] Sur push : installation, lint, tests, `expo prebuild --platform android`,
       `./gradlew assembleRelease`
 - [ ] **APK, pas AAB** : un dépôt F-Droid ne distribue que des APK
@@ -3059,6 +3435,7 @@ le noir. Ce ticket n'est pas cosmétique.
 statiques, donc parfaitement servi par le mutualisé Infomaniak.
 
 **Fini quand** :
+
 - [ ] `fdroidserver` exécuté en CI (image Docker officielle, elle embarque le SDK
       Android dont `fdroid update` a besoin)
 - [ ] L'APK de la release est ajouté au dépôt, l'index régénéré et signé
@@ -3078,6 +3455,7 @@ statiques, donc parfaitement servi par le mutualisé Infomaniak.
 **Où** : `templates/` (repo web), `src/Controller/` (repo web), repo mobile
 
 **Fini quand** :
+
 - [ ] Une page `/app` sur le site : à quoi sert l'app, comment ajouter le dépôt
       F-Droid, QR code de l'URL du dépôt, lien APK direct en secours
 - [ ] Page rendue dans l'identité Presse, accessible sans être connecté
@@ -3090,6 +3468,7 @@ statiques, donc parfaitement servi par le mutualisé Infomaniak.
 ### KL-44 — Recette finale et documentation
 
 **Fini quand** :
+
 - [ ] **Recette réelle en salle** : une séance programmée complète en mode avion,
       puis synchronisation. Une séance vierge. Une déviation. Un exercice sauté.
       Une app tuée en pleine séance puis rouverte
@@ -3121,6 +3500,7 @@ Ce ticket referme le « lot B » de `feature-progression.md`, resté en attente 
 décision depuis le début.
 
 **Fini quand** :
+
 - [ ] Le réalisé se superpose à la rampe prévue, semaine par semaine
 - [ ] Indicateur de respect du plan (« 11 séances tenues sur 14 »)
 - [ ] **Une trame n'a pas de dates** : le réalisé affiché est celui de la
@@ -3139,6 +3519,7 @@ endroit qui peut répondre à « est-ce que je progresse sur cet exercice ? » s
 passer par un plan, toutes séances et tous plans confondus.
 
 **Fini quand** :
+
 - [ ] Courbe de charge dans le temps, sur les séries de travail
 - [ ] Record et dernière performance, alimentés par `PerformanceHistory` (KL-04)
 - [ ] Les dix dernières séances où l'exercice apparaît, avec un lien vers leur
@@ -3161,6 +3542,7 @@ paramètres » tient : le compteur se lit à travers `LoggedExercise.exercise`, 
 ne se range pas sur l'entité.
 
 **Fini quand** :
+
 - [ ] **Une seule** requête d'agrégat renvoie `[exercise_id => count, lastAt]`
       pour l'utilisateur courant, fusionnée en PHP avec la liste existante
 - [ ] **Le compteur est scopé sur l'utilisateur courant.** Un exercice de la
@@ -3187,6 +3569,7 @@ extension de ce ticket.
 qu'à afficher le réalisé qu'elles portent désormais.
 
 **Fini quand** :
+
 - [ ] La fiche athlète sous `/coach` montre les séances réalisées
 - [ ] Lecture seule stricte, garantie par l'attribut `LOG` de KL-06
 - [ ] La vue se scope sur `$entity->getOwner()`, jamais sur `$this->getUser()`
@@ -3201,7 +3584,6 @@ qu'à afficher le réalisé qu'elles portent désormais.
    de `CASCADE` en `SET NULL`. Le rejouer sur une copie de la base de prod n'est
    pas une précaution, c'est une condition. Tout le reste de la feature est
    additif.
-
 
 1. **La tentation de recomposer** (§0.3 point 3). C'est le risque numéro un, et
    il ne se manifestera pas au cadrage mais au ticket KL-30, sous la forme
