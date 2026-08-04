@@ -191,8 +191,35 @@
 > jamais été fait : rien ne se rend plutôt qu'un cadre vide. La décision
 > structurante est que **l'historique suit le réalisé, pas le prescrit** — un
 > exercice remplacé en séance se lit contre l'historique de ce qu'on fait
-> vraiment. Vérifié par 27 contrôles hors React Native. Prochain ticket :
-> **KL-33** (clôture de séance).
+> vraiment. Vérifié par 27 contrôles hors React Native.
+> **KL-33 livré (04/08/2026)** : la clôture. Un écran dédié (`session/[uuid]/close`)
+> montre durée, tonnage, séries faites et **écarts au prescrit**, prend une note
+> libre, puis clôture — `ended_at` posé, statut `done`, mutation empilée dans la
+> même transaction et synchronisation déclenchée dans la foulée. Deux décisions
+> structurantes : le résumé se **recalcule en local**, avec la cascade d'axes de
+> `LogComparator` et le périmètre de `LogMetrics`, parce qu'un écran de fin de
+> séance qui attendrait le serveur serait vide dans un sous-sol ; et **l'abandon
+> n'écrit rien** — on remonte, la séance reste ouverte et reprenable, donc le
+> retour s'appelle « Reprendre la séance » plutôt qu'« Abandonner ». Clôturer est
+> du réalisé (contrairement à ouvrir, KL-28), et c'est terminal : rien ne
+> déclôture, ni sur le téléphone ni au serveur. Vérifié par 56 contrôles hors
+> React Native.
+> **KL-34 livré (04/08/2026)** : la séance vierge. Le ticket arrivait à moitié
+> fait — `createFreeWorkout` (KL-28) posait déjà la séance datée du jour, sans
+> `workout`, avec son uuid client et son titre daté ; `addExercise` (KL-30) savait
+> déjà la garnir. Ce qui manquait était les **facettes** de la bibliothèque locale,
+> activité et zone, et c'est là que sont les décisions : une facette **décrit ce
+> que la bibliothèque porte**, pas l'enum (proposer « Natation » à qui n'en a
+> aucune offre un filtre dont la seule issue est le vide) ; **facette et frappe ne
+> répondent pas à la même question** — le nom se tape, l'activité et la zone se
+> choisissent — donc les zones n'entrent pas dans le texte cherché, contrairement
+> au web où elles sont le seul chemin faute de facette ; et la séance vierge
+> **n'a aucun chemin d'écriture à elle**, tout ce qu'elle contient étant du réalisé
+> ajouté par le geste de KL-30. `FilterChip` naît au passage, comme `Chip`
+> l'annonçait : une marque de lecture ne se tape pas, une facette si. Vérifié par
+> 49 contrôles hors React Native et une séance vierge poussée au vrai Symfony —
+> `freeform: true`, `blocks: []`, hors plan, et zéro `Workout` en bibliothèque.
+> Prochain ticket : **KL-35** (écran Réglages).
 
 ---
 
@@ -2741,27 +2768,196 @@ typée, personne ne l'ouvre.
 ### KL-33 — Clôture de séance
 
 **Fini quand** :
-- [ ] Écran de résumé : durée, tonnage, séries faites, écarts au prescrit
-- [ ] Champ de notes libre
-- [ ] La clôture empile la mutation finale et déclenche une synchronisation
-- [ ] Une séance clôturée hors réseau se voit « en attente de synchronisation »,
+- [x] Écran de résumé : durée, tonnage, séries faites, écarts au prescrit
+- [x] Champ de notes libre
+- [x] La clôture empile la mutation finale et déclenche une synchronisation
+- [x] Une séance clôturée hors réseau se voit « en attente de synchronisation »,
       et l'état disparaît une fois confirmée
-- [ ] Abandon possible sans clôture (la séance reste ouverte et reprenable, son
+- [x] Abandon possible sans clôture (la séance reste ouverte et reprenable, son
       statut ne passe pas à `DONE`)
-- [ ] **Pas de reprise après clôture** : une séance clôturée est close (§2.3
+- [x] **Pas de reprise après clôture** : une séance clôturée est close (§2.3
       point 5). Refaire la même séance dans la journée crée une séance libre
+
+**Livré le 04/08/2026.** Le domaine gagne deux fichiers (`session/summary.ts`, le
+résumé et les écarts, purs ; `session/close.ts`, l'écriture terminale) et
+l'écran de séance gagne un voisin : `src/app/session/[uuid]/close.tsx`. Le
+fichier de route `[uuid].tsx` est devenu `[uuid]/index.tsx` — sans quoi la
+clôture n'aurait pas pu être un **écran** de la séance, seulement une route
+sœur nommée à côté d'elle. Sept décisions prises en le faisant :
+
+1. **Le résumé se recalcule sur le téléphone, et doit rendre le même verdict que
+   le serveur.** `LogMetrics` et `LogComparator` font déjà exactement ça, mais
+   l'écran de clôture s'ouvre **avant le moindre envoi**, au sous-sol : le
+   demander au serveur, ce serait un écran vide au moment précis où il sert.
+   D'où un calcul local qui reprend le périmètre de l'un (échauffement hors
+   volume, exercice sauté compté à part et sans tonnage même s'il porte des
+   séries abandonnées) et la cascade de l'autre (tonnage, charge, répétitions,
+   durée, nombre de séries ; un axe muet d'un côté ne tranche jamais). Les six
+   états sont ceux de `LogDeviation`, valeurs et libellés compris. Un mobile qui
+   dirait « allégé » là où `/schedule/{id}` dit « tenu » vaudrait moins que pas
+   de résumé du tout.
+2. **La durée diverge du serveur, volontairement.** `LogMetrics::durationSeconds()`
+   rend `null` tant qu'une borne manque — une durée « jusqu'à maintenant »
+   bougerait à chaque rafraîchissement d'une page web. Ici c'est l'inverse qu'on
+   veut : l'écran est ouvert pendant que la séance dure encore. Elle court donc
+   jusqu'à l'instant présent et se fige à la clôture, c'est-à-dire au moment où
+   la valeur part. Le chrono vit dans **son propre composant** : un rendu par
+   seconde de l'écran entier ferait sauter la saisie de la note juste en dessous.
+3. **Clôturer est du réalisé ; ouvrir ne l'était pas.** `beginWorkout` n'empile
+   aucune mutation (KL-28 : rien n'a encore été fait, et le pull protège déjà la
+   séance). La clôture est l'inverse exact — le fait accompli — donc elle écrit
+   sa mutation dans la **même transaction**, comme chaque série cochée. C'est
+   aussi ce qui fait partir ce qui n'avait rien dit jusque-là : une sortie cardio
+   cochée, une séance libre restée vide.
+4. **La synchronisation part du domaine, pas de l'écran.** `closeWorkout()`
+   appelle `syncOnWorkoutClosed()` après avoir validé sa transaction — le
+   commentaire de `sync/triggers.ts` annonçait « un geste d'écran », c'était une
+   erreur de placement : tout chemin de clôture doit déclencher l'envoi, et
+   KL-34 en ouvrira un second. Le repos en cours s'arrête au passage : il
+   n'appartient à aucun écran (KL-31), rien d'autre ne le couperait, et un
+   décompte qui survivrait à la séance ferait vibrer le téléphone sous la douche.
+5. **L'abandon n'écrit rien, donc il n'a pas de bouton.** La façon la plus sûre
+   de tenir « la séance reste ouverte et reprenable » est de **ne rien faire** :
+   on remonte, le statut ne bouge pas, « Aujourd'hui » la remet en tête. Un
+   bouton « Abandonner » laisserait croire qu'on jette le réalisé, alors qu'il
+   est déjà écrit, déjà en file, déjà en sécurité. Le retour s'appelle donc
+   « Reprendre la séance ».
+6. **La note de clôture ne s'efface pas.** Le contrat dit `completionNotes`
+   « n'efface jamais l'existante » (§4.1) : écrire `null` localement sur un champ
+   laissé vide ferait diverger les deux bases au premier aller-retour, le serveur
+   gardant ce que le téléphone vient de perdre. Une note vide n'est donc pas
+   écrite. Le champ, lui, se pré-remplit sans effet de bord : tant que rien n'est
+   tapé, c'est la valeur enregistrée qui s'affiche, et un pull ne peut pas
+   réécrire une saisie en cours.
+7. **La clôture ne démonte pas l'écran, elle le retourne.** Le même écran passe
+   en « Séance terminée », la note devient un texte, et la marque de
+   synchronisation vit en **lecture vive** : « À synchroniser » hors réseau,
+   « Synchronisée » dès que le push aboutit, sans que rien n'ait à prévenir
+   l'écran. C'est la démonstration visible de « rien n'est perdu », et c'est ce
+   qui rend la case vérifiable en mode avion. Sortir vide la pile (`dismissAll`)
+   plutôt que de revenir en arrière : derrière, il y a une séance qu'on ne peut
+   plus dérouler.
+
+**Vérifié** : `npm run typecheck`, `npm run lint`, `npx prettier --check`,
+`npx expo export` pour Android **et** pour le web (dont le manifeste de routes
+confirme `/session/[uuid]` et `/session/[uuid]/close`), et **56 contrôles hors
+React Native** — les fonctions pures sont extraites du source par script, jamais
+recopiées. Le résumé est exercé via `buildProgram`, donc sur de vraies entrées :
+durée (absente, en cours, figée, fin antérieure au début, date illisible), les
+quatre états non mesurables (sauté avec séries, hors programme, non réalisé,
+cardio coché ou non), la cascade complète (tonnage, charge, répétitions, durée,
+compte), le cas emblématique de KL-05 (plus lourd mais moins de travail = allégé),
+l'échauffement qui ne pèse jamais, l'exercice remplacé, et les compteurs du
+résumé (tonnage, séries de travail, échauffement à part, prescrit, exercices,
+sautés, hors programme, poids du corps, séance vide).
+
+**Limites de ce ticket.** Le rendu n'a pas été observé sur l'appareil : restent à
+valider à l'œil la lisibilité des quatre grands chiffres à bout de bras, et le
+fait que le bouton de clôture ne se trouve pas sous la barre gestuelle Android
+(les zones sûres sont KL-39 ; cet écran prend l'`inset` du bas comme
+« Aujourd'hui », mais rien n'est vérifié sur un vrai téléphone). Le garde de
+navigation n'est pas exercé non plus : `Stack.Protected` ne rend ses écrans que
+session ouverte, et l'export statique n'y entre pas — un nom de route erroné ne
+se verrait qu'au lancement. Côté serveur, rien n'a été rejoué : `PUT` n'a pas
+changé de forme, la clôture n'ajoute aucun champ au document, et §4.1 montre
+déjà en `curl` réel qu'un `status: done` clôture et que rien ne déclôture. Enfin,
+le résumé d'une séance **poussée puis redescendue** est celui du serveur (le pull
+remplace le réalisé) : il ne peut plus être comparé au calcul local une fois la
+mutation confirmée.
 
 ### KL-34 — Séance vierge
 
 **Fini quand** :
-- [ ] Démarrage sans prescrit, à la date du jour
-- [ ] Recherche d'exercice dans la bibliothèque **locale** (donc hors réseau),
+- [x] Démarrage sans prescrit, à la date du jour
+- [x] Recherche d'exercice dans la bibliothèque **locale** (donc hors réseau),
       avec filtre par activité et zone
-- [ ] Ajout d'exercices au fil de la séance
-- [ ] L'app crée une **séance datée sans `workout`**, avec son propre `uuid` et
+- [x] Ajout d'exercices au fil de la séance
+- [x] L'app crée une **séance datée sans `workout`**, avec son propre `uuid` et
       un `title` saisi ou daté par défaut. Elle apparaît au calendrier web en
       « hors plan » (KL-08)
-- [ ] Aucun `Workout` n'est créé en bibliothèque (décision actée)
+- [x] Aucun `Workout` n'est créé en bibliothèque (décision actée)
+
+**Livré le 04/08/2026.** Le ticket arrivait à moitié fait : `createFreeWorkout`
+(KL-28) posait déjà la séance datée, et `addExercise` (KL-30) savait déjà la
+garnir. Ce qui manquait était les **facettes** de la bibliothèque, et c'est là
+que sont les décisions.
+
+**Ce qui a été tranché en le faisant.**
+
+- **La séance vierge n'a aucun chemin d'écriture à elle.** Elle se garnit par le
+  geste « ajouter un exercice hors programme » de KL-30, sans exception. Tout ce
+  qu'elle contient est du **réalisé** — il n'y a rien d'autre, puisqu'il n'y a pas
+  de prescrit — donc rien à inventer : ni entité, ni requête, ni écran. C'est ce
+  qui explique qu'un ticket noté « L » se réduise à des facettes.
+- **Facette et frappe ne répondent pas à la même question.** Le nom se **tape**
+  (« je sais ce que je veux »), l'activité et la zone se **choisissent** (« je
+  cherche quoi faire »). La séance vierge est le seul écran où la seconde question
+  se pose vraiment. Conséquence à ne pas casser : les zones n'entrent **pas** dans
+  le texte cherché, contrairement au web où `data-filter-text` recopie leurs
+  libellés — là-bas c'est le seul chemin faute de facette, ici la facette existe,
+  et deux chemins pour le même fait finissent par se contredire.
+- **Une facette décrit ce que la bibliothèque porte, elle n'annonce pas l'enum.**
+  `libraryActivities` / `libraryAreas` dérivent les rangées du contenu réel :
+  proposer « Natation » à qui n'a aucun exercice de natation offre un filtre dont
+  la seule issue est une liste vide. Les deux rangées ne se cadrent pas sur la
+  même liste — les activités sur la bibliothèque entière, les zones sur la
+  bibliothèque **réduite à l'activité retenue** (choisir « Course à pied » doit
+  faire disparaître « Pectoraux ») mais **pas** sur la zone déjà choisie, sinon sa
+  propre rangée se réduirait à elle-même et on ne pourrait plus en changer.
+- **Changer d'activité relâche toujours la zone.** Une règle qu'on peut énoncer
+  plutôt qu'un nettoyage au cas par cas, qui demanderait de connaître les zones de
+  l'activité *suivante* — que le rendu en cours n'a pas. Sans ça, un filtre resté
+  actif sort de sa rangée et devient indéfaisable, devant une liste vide sans
+  raison visible.
+- **L'ordre des facettes est celui de déclaration des enums serveur**, jamais
+  l'alphabétique ni la fréquence : c'est l'ordre du web, et pour les zones il est
+  déjà anatomique (celui que `TargetRegion` formalise), donc « Pectoraux » voisine
+  « Dos » et pas « Quadriceps ». Une rangée qui se réordonne se re-cherche.
+- **Les rangées défilent horizontalement.** Treize zones (le compte réel de la
+  bibliothèque) enroulées au plancher tactile de 44 points mangeraient quatre
+  lignes de feuille — donc la liste de résultats, qui est ce qu'on est venu voir.
+  Le prix est réel : ce qui dépasse à droite ne se voit pas. Il est payable parce
+  que les rangées sont ordonnées et réduites à ce qui existe. Une rangée d'un seul
+  choix ne se rend pas : elle ne filtre rien, elle occupe la place.
+- **`FilterChip` est un composant à part, pas un `Chip` avec un `onPress`.**
+  C'est ce que `Chip` annonçait mot pour mot (« le jour où un filtre en aura
+  besoin, ce sera un autre composant, avec son plancher tactile ») : un `Chip` est
+  une marque de lecture, une facette est un contrôle, et les greffer ensemble
+  aurait donné un composant parfois au plancher tactile et parfois non. L'état
+  retenu **s'inverse à l'encre** et ne rougit pas, contrairement au web
+  (`.kd-libfilter--on` en `primary-tint`) : la règle 2 réserve le rouge à l'action
+  primaire, à l'intensité et à l'échec, et c'est déjà ce que la bande de jours de
+  KL-28 avait tranché.
+- **Dans une séance vierge, l'en-tête « Hors programme » devient « Exercices ».**
+  Il n'existe aucun programme dont on puisse être hors ; le garder ferait lire la
+  séance entière comme une longue déviation.
+- **Le vide se distingue.** « Aucun exercice ne correspond à ces filtres » quand
+  une facette est active, « la bibliothèque est celle du dernier bootstrap » sinon.
+  Sans ça, on cherche la panne du mauvais côté.
+
+**Vérifié** : `npm run typecheck`, `npm run lint`, `npx prettier --check .`,
+`npx expo export` pour Android **et** web (dix routes, aucune fantôme), plus **49
+contrôles hors React Native** — `src/session/library.ts` et `labels.ts` bundlés
+pour Node, jamais recopiés — et **une séance vierge poussée au vrai Symfony**.
+Les premiers exercent l'ordre canonique des deux rangées (les 17 zones et les 6
+activités y passent toutes, une oubliée serait filtrable mais jamais proposée),
+leur dérivation du contenu réel, le cumul des deux facettes (« Salle de sport »
+**et** « Dos », pas l'un ou l'autre), le croisement impossible qui rend vide, un
+exercice sans zone qui ne répond à aucune facette de zone, la composition avec la
+recherche accentuée de KL-30, le fait que « pectoraux » tapé ne trouve rien (les
+zones ne sont pas dans le texte), et que tous les libellés sont bien traduits. Le
+second répond à ce que le local ne peut pas trancher : `PUT /api/schedule/{uuid}`
+sur un uuid neuf rend `freeform: true`, `blocks: []`, `plan: null`, le titre
+saisi conservé, et les deux exercices du log — dont un **sans série**, le cas
+« ajouté mais pas encore fait ». En base : `workout_id` nul,
+`source_plan_item_id` nul (donc bucket « hors plan » du calendrier), et **zéro
+`Workout` en bibliothèque** pour ce compte.
+
+**Limite de ce ticket** : le rendu n'a pas été observé sur l'appareil. Restent à
+valider à l'œil le défilement horizontal des rangées au pouce (et le fait qu'il
+ne vole pas le geste vertical de la feuille), la lisibilité de treize pilules de
+zone à bout de bras, et la place que les deux rangées laissent vraiment à la
+liste dans une feuille bornée à 78 %.
 
 ### KL-35 — Écran Réglages
 
