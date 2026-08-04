@@ -4602,3 +4602,419 @@ touché.
 
 **Le lot 3 est clos. Prochain ticket : KL-28** — l'écran Aujourd'hui, le premier
 qui montrera enfin des séances.
+
+---
+
+## Kadens Live KL-28 — l'écran Aujourd'hui (04/08/2026)
+
+Le premier écran qui montre des séances. Tout ce qui précède — base locale,
+client API, moteur de synchronisation — remplissait un fichier SQLite que
+personne ne regardait ; il se regarde maintenant.
+
+### Un module est né, et c'est la vraie nouveauté
+
+`src/session/`. `@/db` sait écrire des lignes, `@/sync` sait échanger avec le
+serveur, et ni l'un ni l'autre ne sait ce que « démarrer une séance » veut dire :
+qu'on pose `started_at` mais pas le statut, qu'une séance close ne se reprend
+pas, qu'une séance libre naît à la date du jour avec un uuid posé localement. Ces
+règles ne sont ni du stockage ni du transport. Laissées dans le composant de
+l'écran, elles auraient été invisibles à KL-29, qui les aurait réécrites autrement.
+
+Cinq fichiers : `days.ts` (arithmétique de calendrier et libellés français),
+`queries.ts` (requêtes pures), `hooks.ts` (les mêmes montées sur `useLiveQuery`),
+`start.ts`, `index.ts`. C'est là que cocher une série, dévier et clôturer
+viendront se poser.
+
+### Démarrer n'empile aucune mutation
+
+C'est la décision qui demande le plus d'explication, parce qu'elle a l'air de
+contredire une règle verrouillée : « écrire du réalisé, c'est empiler sa mutation
+dans la même transaction ».
+
+Elle ne la contredit pas, elle en lit la portée. Cette règle vaut pour le
+**réalisé** — une série cochée, une clôture — parce que sans mutation, rien ne
+signale à la base qu'elle détient quelque chose que le serveur n'a pas, et le
+pull suivant l'efface. Ouvrir une séance n'est pas du réalisé : rien n'a été
+fait, et le pull la protège déjà par son **second** critère, « commencée et pas
+terminée ». KL-27 l'avait écrit noir sur blanc en anticipant ce ticket.
+
+Le gain n'est pas théorique. Sans ça, une séance ouverte puis refermée sans rien
+cocher partirait au serveur pour y afficher un `startedAt` orphelin, et une
+séance libre créée puis abandonnée apparaîtrait au calendrier web comme une
+séance vide qu'on ne peut pas encore supprimer depuis le téléphone. Elles
+partiront à la première série, ou à la clôture.
+
+Vérifié dans les deux sens contre la vraie fonction de pull : un bootstrap qui
+ignore la séance libre locale ne l'emporte pas, et un bootstrap qui renvoie la
+séance programmée avec `startedAt: null` ne l'écrase pas — il ne descend que le
+titre corrigé par le coach.
+
+### Rattraper la veille, ce n'est pas déplacer une séance
+
+Le ticket demande l'accès à J-2 → J+2 « pour rattraper la veille ». La tentation
+était de redater la séance au jour où on la fait. Le partage d'autorité l'interdit
+et il a raison : la `date` appartient au serveur, et une séance faite avec un jour
+de retard **a été prévue** ce jour-là. Ouvrir la séance d'hier pose ses bornes et
+rien d'autre. Elle reste datée d'hier partout, y compris au calendrier web, ce qui
+est la vérité de ce qui s'est passé.
+
+### La sélection du jour est un écart, pas une date
+
+Détail d'implémentation, mais il ferme un bug réel. L'état de l'écran est
+`offset ∈ [-2, +2]`, le jour affiché s'en déduit. Une app React Native ne
+redémarre pas à minuit : laissée en arrière-plan, elle rouvre le lendemain, et
+avec une date absolue « Aujourd'hui » aurait affiché hier jusqu'à ce qu'on
+touche l'écran. Avec un écart, la sélection suit toute seule et ne peut jamais
+sortir de la bande. `useToday()` relit la date locale au retour au premier plan,
+et c'est le seul état à tenir.
+
+### Ce que la carte d'une séance ne peut pas dire
+
+« 5 exercices » avant de l'ouvrir. Le programme vit dans `prescribed_snapshot`,
+et l'invariant posé en KL-24 dit que lister un jour ne doit pas remonter le plus
+gros document de la base. Le compter demanderait `json_array_length`, donc
+l'extension json1 sur tous les Android visés — que le projet a déjà refusé de
+supposer pour la file de mutations. La carte montre donc ce que les colonnes de
+la séance datée et le réalisé savent dire : le plan, l'état, les séries
+consignées, l'attente de synchronisation. C'est une limite assumée, pas un oubli.
+
+### Un seul bouton primaire
+
+Règle 2 du design system, appliquée à un écran qui peut porter trois séances le
+même jour : le rouge va à **l'action la plus urgente** — reprendre s'il y a une
+séance ouverte, sinon démarrer la première séance actionnable. Les autres passent
+en secondaire. Trois rouges auraient dit trois fois « c'est ici », donc plus rien.
+
+La bande de jours n'est pas un `Chip` : KL-23 avait posé qu'un `Chip` est une
+marque de lecture et ne se tape pas, et qu'un filtre tactile serait « un autre
+composant, avec son plancher ». C'est celui-là.
+
+### L'écran de vérification déménage
+
+Il occupait la route `index` depuis KL-22 et montrait successivement l'échelle
+typographique, les huit composants, la base locale, l'API, la synchro. Le
+supprimer aurait été plus propre s'il ne portait pas encore la **seule
+déconnexion de l'app** et les seuls contrôles qui ne s'observent que sur un
+appareil. Il devient `/diagnostics`, atteignable depuis l'en-tête, et KL-35 le
+remplacera par les vrais réglages.
+
+### Ce qui a été vérifié
+
+`typecheck`, `lint`, `prettier --check`, `expo export` pour Android et web (neuf
+routes statiques rendues, dont `/session/[uuid]` et `/diagnostics`), puis un banc
+d'essai de **44 contrôles hors React Native** : `src/session` bundlé pour Node,
+`expo-sqlite` reposé sur `node:sqlite`, la vraie migration appliquée. Il exerce
+l'arithmétique de calendrier (fin de mois, fin d'année, les deux changements
+d'heure — c'est pour ça que les dates se parsent à midi et non à minuit),
+l'idempotence de la reprise, le refus d'une séance close, l'absence de mutation,
+les lectures de l'écran, et l'interaction avec le pull décrite plus haut.
+
+**Pas de contrôle sur appareil.** Le build natif reste bloqué par le problème de
+toolchain Kotlin/AGP constaté en KL-48, préexistant et sans rapport. C'est la
+limite connue de ce ticket, et elle porte plus loin que les précédentes : le
+rendu, les cibles tactiles de la bande de jours et la bascule de minuit n'ont pas
+été vus sur un vrai téléphone.
+
+### Fichiers touchés
+
+Dépôt `kadens-mobile` : `src/session/` (`days.ts`, `queries.ts`, `hooks.ts`,
+`start.ts`, `index.ts` — tous neufs), `src/app/index.tsx` (l'écran Aujourd'hui,
+réécrit), `src/app/session/[uuid].tsx` (coquille, neuf), `src/app/diagnostics.tsx`
+(l'ancien `index.tsx`, déplacé), `src/app/_layout.tsx` (les deux routes déclarées
+dans le garde), `CLAUDE.md`. Dépôt `kadens` : `docs/feature-live-tracking.md`
+(état, KL-28), ce journal. Aucun code serveur touché.
+
+**Prochain ticket : KL-29** — l'écran Séance en cours, qui remplira la coquille.
+
+---
+
+## Kadens Live KL-29 — l'écran Séance en cours (04/08/2026)
+
+L'écran pour lequel toute l'app existe. KL-28 amenait jusqu'à une porte,
+`src/app/session/[uuid].tsx` était une coquille qui disait « le déroulé arrive
+avec KL-29 ». Il arrive.
+
+### La décision du ticket : l'appariement se fait au rang, et il n'y a pas le choix
+
+C'est le point qu'il ne faut pas redécouvrir dans six mois, parce qu'il a l'air
+d'un choix d'ergonomie alors que c'est une conséquence du contrat.
+
+Question posée par l'écran : quand on coche la troisième série d'un exercice,
+comment relire plus tard que c'était la troisième ? Réponse : on ne peut pas. Le
+contrat ne transporte aucune référence de la série réalisée vers la ligne
+prescrite — `sourcePrescribedId` vit sur l'**exercice**, et `position` n'est même
+pas un champ du `PUT` (« l'ordre de la liste fait foi, le serveur renumérote »,
+`docs/api-mobile.md` §6.8). Une série réalisée est un élément d'une liste
+ordonnée, rien de plus.
+
+La seule règle possible est donc celle que `LogComparator` tient déjà depuis
+KL-05 : **le n-ième réalisé de travail correspond à la n-ième ligne de travail,
+l'échauffement comptant dans sa propre file.** Deux files et pas une : un
+échauffement prescrit mais non fait — le cas courant — décalerait sinon toutes
+les séries de travail d'un cran, et une séance parfaitement tenue se lirait
+« allégée » de bout en bout sur `/schedule/{id}`.
+
+Et il ne peut pas y en avoir deux : ce que le téléphone coche doit se relire à
+l'identique sur le web, sinon la boucle prévu vs réalisé raconte deux histoires.
+
+**Conséquence assumée : cocher est séquentiel.** Seule la première ligne non
+cochée de sa file est actionnable, seule la dernière cochée se décoche. On ne
+peut pas cocher la troisième série en laissant les deux premières vides — pas par
+rigidité, mais parce que cet état n'existe pas dans le modèle : il repartirait au
+serveur comme « une série faite » et reviendrait apparié à la première ligne. Une
+ligne inerte, qui dit à TalkBack *pourquoi* elle ne répond pas, vaut mieux qu'une
+coche qui se déplace toute seule après une synchronisation.
+
+Le banc d'essai le vérifie dans les deux sens : le réalisé renvoyé par le serveur
+après un push, positions renumérotées à partir de zéro, se relit **exactement**
+aux mêmes lignes, échauffements compris.
+
+### Le document du prescrit se lit enfin
+
+`prescribed_snapshot` existait depuis KL-24 et n'avait jamais été lu. L'invariant
+posé alors — « lister un jour ne doit pas remonter le plus gros document de la
+base » — a été relu de près : il interdit de le remonter pour *lister*, jamais de
+le lire pour *dérouler*. C'est le seul écran qui le fait, et c'est exactement ce
+pour quoi la table avait été séparée de `scheduled_workout`.
+
+### Trois lectures vives, pas une jointure
+
+`useLiveQuery` n'écoute que la table du `from` — le piège relevé en KL-28. Le
+programme, les exercices réalisés et les séries sont donc trois requêtes montées
+sur trois tables, croisées ensuite par une fonction pure (`buildProgram`). Une
+jointure unique aurait été plus courte et n'aurait été republiée que par sa table
+de tête : le déroulé serait resté figé sur les deux autres, sans erreur. C'est le
+genre de bug qu'on met une soirée à voir.
+
+Le croisement étant pur, il se vérifie sans monter React ni SQLite, et c'est la
+moitié du banc d'essai.
+
+### Un réalisé sans rattachement vaut mieux qu'une série perdue
+
+`logged_exercise.exercise_id` porte une clé étrangère, et les clés étrangères sont
+actives depuis KL-24. Un exercice que la bibliothèque locale ignore ferait donc
+**échouer l'insertion** — perdre la série au moment précis où on la coche, ce qui
+est la seule chose que cette app n'a pas le droit de faire.
+
+Le repli : `exerciseId` à `null`, le nom conservé. Le réalisé reste lisible
+partout, il sort seulement de l'historique et des records pour cette ligne-là.
+KL-27 avait rencontré le même problème en descendant l'historique et avait
+identifié la sortie propre : retirer cette FK, une clé étrangère vers un cache
+partiel étant une erreur de catégorie. À traiter avec KL-35.
+
+### La garde vit dans le domaine, pas dans l'écran
+
+« On ne consigne que dans une séance ouverte » : les trois écritures la
+franchissent dans leur transaction, pas seulement le composant. Close, on n'écrit
+plus — pas de reprise après clôture. Pas commencée, on n'écrit pas non plus : un
+réalisé sans borne de départ décrirait une séance qu'on n'a pas faite, et le pull
+ne protégerait même pas la séance, faute de `started_at`. Même raison que pour
+`beginWorkout`, qui refusait déjà une séance close depuis KL-28 : une règle qui ne
+vit que dans un composant est invisible au composant suivant.
+
+### La progression compte des gestes, pas du volume
+
+Partout ailleurs dans Kadens, l'échauffement est exclu — du tonnage, des records,
+du décompte de séries par zone. Ici il entre dans le total, et c'est cohérent : ce
+qui se lit en tête d'écran n'est pas un volume, c'est ce qu'il reste à faire, et
+un échauffement reste à faire. Un exercice cardio compte pour une unité, un
+exercice sauté sort du dénominateur — sinon la progression ne pourrait jamais
+atteindre son terme.
+
+### Ce que le programme ne réclame pas est affiché quand même
+
+Une série de plus qu'annoncé, un exercice hors programme : KL-29 n'en crée aucun
+(c'est KL-30), mais le pull peut en descendre. Ils se rendent en lecture — les
+séries surnuméraires à la suite des lignes prescrites, comme le tableau du web
+qui peut déjà en avoir plus que le prescrit ; les exercices dans une section
+« Hors programme ». Du réalisé invisible serait la pire trahison de « rien n'est
+jamais perdu ».
+
+### Toujours pas d'icônes
+
+La case à cocher est un carré au filet qui se remplit à l'encre. Un « ✓ »
+dépendrait de ce que Barlow contient, et KL-23 avait posé « pas d'icônes tant
+qu'un écran n'en a pas besoin ». Celui-ci n'en a pas eu besoin : la ligne entière
+est la cible tactile, la case n'est qu'un repère à droite.
+
+Un fichier de plus dans `src/components/` en revanche : `units.ts`, le pendant
+natif d'`UnitFormatter`. Une charge et une durée doivent se lire à l'identique sur
+le téléphone et sur `/schedule/{id}`, sinon comparer les deux écrans demande de
+traduire de tête. Il est là plutôt que dans `@/session` parce que décider de ce
+qui est fait est du domaine, et écrire « 82,5 kg » est du rendu.
+
+### Ce qui a été vérifié
+
+`typecheck`, `lint`, `prettier --check`, `expo export` pour Android et web, puis
+un banc d'essai de **97 contrôles hors React Native** : `src/session` bundlé pour
+Node, `expo-sqlite` reposé sur `node:sqlite`, la vraie migration appliquée. Il
+exerce l'appariement en deux files, les groupes de superset (contiguïté comprise :
+A1/A2 puis B1/B2 ne se recollent pas), la coalescence — dix séries cochées, une
+seule entrée en file —, le refus d'une ligne hors tour, la suppression en cascade
+de l'exercice vidé, le cardio, le repli sur une bibliothèque incomplète, le
+document poussé, la protection du pull (le réalisé survit, la correction du coach
+descend quand même), et l'aller-retour serveur décrit plus haut.
+
+**Le build natif repasse**, et c'est la nouvelle du jour au-delà du ticket :
+`npm run android` a produit l'APK et installé l'app sur un appareil réel. L'échec
+de compilation Kotlin d'`expo-dev-menu` et `expo-log-box`, constaté en KL-48 puis
+rejoué à l'identique en KL-27 et KL-28, ne s'est pas reproduit — la limite qui
+plombait les trois derniers tickets est levée.
+
+**Le rendu, en revanche, n'a pas été regardé** : le téléphone était en cours
+d'utilisation au moment du contrôle. Ce qui reste à valider à l'œil, et qu'aucun
+banc d'essai ne peut dire : les cibles tactiles des lignes de série, la densité de
+l'écran sur une séance de douze exercices, la lisibilité de la case à cocher à
+bout de bras, et le rail de superset.
+
+### Fichiers touchés
+
+Dépôt `kadens-mobile` : `src/session/program.ts`, `src/session/log.ts`,
+`src/session/labels.ts` (neufs), `src/session/queries.ts`, `src/session/hooks.ts`,
+`src/session/index.ts` (étendus), `src/components/units.ts` (neuf),
+`src/components/index.ts`, `src/app/session/[uuid].tsx` (la coquille, remplie),
+`CLAUDE.md`. Dépôt `kadens` : `docs/feature-live-tracking.md` (état, KL-29), ce
+journal. Aucun code serveur touché.
+
+**Prochain ticket : KL-30** — les déviations en séance, qui rendront les valeurs
+modifiables et les séries ajoutables.
+
+---
+
+## Kadens Live KL-30 — les déviations en séance (04/08/2026)
+
+KL-29 déroulait une séance et la cochait. Elle supposait qu'on fait exactement ce
+qui est écrit, ce qui n'arrive jamais : on met 82,5 au lieu de 80, on fait une
+série de plus, la machine est prise, on finit sur une autre. Ce ticket est celui
+qui rend la séance vraie.
+
+### La décision du ticket : on ne dévie que sur ce qui a été fait
+
+Elle ressemble à un choix d'ergonomie, c'est une conséquence du modèle. Le
+prescrit ne bouge jamais — c'est le principe qui tient toute la feature (§0.3) —
+et `prescribed_snapshot` est remplacé en entier à chaque pull. Il n'existe donc
+**aucun endroit où écrire** « la série 3 se fera à 82,5 kg » : ni dans le
+prescrit, qui n'est pas à nous, ni dans le réalisé, qui n'existe pas avant d'être
+coché. Un état d'écran l'aurait tenu, mais l'écran de séance se vante depuis
+KL-29 de n'avoir aucun état en mémoire — c'est ce qui fait qu'une app tuée
+retrouve exactement la même chose.
+
+D'où le geste : **on coche aux valeurs prescrites, puis on corrige.** Le cas
+nominal en salle reste un seul appui (on fait ce qui est écrit), la correction
+est un geste de plus pour ceux qui dévient.
+
+Et d'où la forme de la ligne, qui est la vraie nouveauté visuelle. Non cochée,
+elle coche d'un appui n'importe où — la grande cible de KL-29, celle qu'on vise
+avec un pouce moite. Une fois faite, elle se scinde en **deux cibles**, chacune
+au plancher tactile : la zone de valeurs ouvre la feuille d'ajustement, la case
+reste le décochage. L'alternative était l'appui long, plus simple à coder ; elle
+a été écartée parce qu'un geste qui ne se voit nulle part se découvre par
+accident, et que cette app n'aura jamais de tutoriel.
+
+### Le défaut que le banc d'essai a trouvé
+
+Il ne serait pas sorti d'une relecture. KL-29 nettoie l'exercice réalisé devenu
+vide : plus de série, pas de note, non sauté — sinon le document poussé dirait
+« fait, zéro série », ce qui est faux. La condition avait l'air complète.
+
+Elle ne l'est plus dès qu'on peut **remplacer** un exercice. On remplace le
+développé incliné par l'écarté à la poulie, on coche une série, on se ravise, on
+décoche : la ligne redevient « vide » au sens du nettoyage, elle disparaît, et la
+séance repart au serveur comme si rien n'avait été substitué. Silencieusement.
+
+La correction dit ce que le remplacement est vraiment : une **déclaration**, au
+même titre que « sauté » et que la note. La base ne peut pas le voir seule — le
+prescrit vit dans un document JSON, il n'y a pas de colonne à comparer — donc
+c'est l'appelant qui le passe. Trois fonctions ont gagné un argument, et un
+exercice hors programme vide est épargné pour la même raison : aucune ligne
+prescrite ne le ferait revenir.
+
+### Un seul type d'exercice
+
+`SessionExtra` disparaît. KL-29 l'avait créé pour afficher en lecture le réalisé
+que le pull peut descendre sans ligne prescrite en face ; à partir du moment où
+on peut **ajouter** un exercice, il fallait le rendre éditable comme les autres —
+et un second type aurait voulu dire un second composant d'affichage, un second
+chemin d'écriture, une seconde façon de compter, pour décrire la même chose.
+`SessionExercise.prescribed` devient donc nullable, les deux moitiés n'étant
+jamais nulles ensemble.
+
+Conséquence assumée : un exercice ajouté **n'entre pas dans la progression**, ni
+au numérateur ni au dénominateur. Ce qui se lit en tête d'écran est ce qu'il reste
+à faire **du programme** ; trois séries en plus ne rapprochent pas de sa fin.
+
+### Ce qui a été refusé, et pourquoi
+
+**Réordonner, créer un superset, changer un tour.** C'était le risque numéro un
+identifié au cadrage, et il devait se manifester exactement ici, sous la forme
+« tant qu'à faire ». La réponse est non : la moitié de la difficulté du
+compositeur (`SupersetGrouper`, la contiguïté, la renumérotation) vit côté
+serveur, la réécrire en React Native coûterait plusieurs soirées pour un geste
+qu'on ne fait pas barre en main.
+
+**Le type de série.** Il décide de la file d'appariement — échauffement ou
+travail — donc le changer déplacerait le rang de la série et de toutes les
+suivantes, ici comme sur `/schedule/{id}`. Pour un gain faible, le type venant du
+programme et étant juste dans le cas normal. Le **RPE**, lui, est saisissable :
+le modèle le porte par série et aucun autre écran ne permettra jamais de le
+renseigner.
+
+**Remplacer un exercice qui a déjà des séries.** Elles ont été faites sur
+l'exercice d'origine ; les rattacher à un autre les ferait entrer dans
+l'historique et les records de la mauvaise machine. Le chemin honnête existe déjà
+dans le modèle et la feuille le dit en toutes lettres : sauter avec sa raison,
+puis ajouter l'autre hors programme.
+
+### Une recherche qui replie les accents à la main
+
+Remplacer et ajouter demandaient un sélecteur, donc une recherche dans la
+bibliothèque locale. Elle est en mémoire et pas en SQL, pour une raison qui n'est
+pas la performance : **le `LIKE` de SQLite n'ignore la casse qu'en ASCII**.
+« developpe » ne trouverait pas « Développé couché » dans une bibliothèque
+entièrement française. Replier les accents des deux côtés de la comparaison
+demande de le faire en JavaScript — et par une table écrite à la main, pas par
+`String.normalize`, dont le comportement dépend de la variante d'Hermes
+embarquée. Même arbitrage que les noms de jours en KL-28, pour la même raison :
+un repli silencieux donnerait une recherche qui marche en développement et pas
+sur le téléphone.
+
+Chaque mot du terme doit se retrouver dans le nom, dans n'importe quel ordre —
+« couché barre » trouve « Développé couché à la barre » — parce que c'est ainsi
+qu'on se souvient d'un nom d'exercice : par deux morceaux, rarement dans l'ordre.
+
+### Ce qui a été vérifié
+
+`typecheck`, `lint`, `prettier --check`, `expo export` pour Android et web (neuf
+routes, aucune fantôme), puis **123 contrôles hors React Native** — `src/session`
+bundlé pour Node, `expo-sqlite` reposé sur `node:sqlite`, la vraie migration
+appliquée. Ils exercent les corrections et leurs bornes, le pré-remplissage d'une
+série ajoutée, la suppression au milieu sans trou, le saut et sa raison, le
+remplacement et son refus, l'ajout et le retrait hors programme, la cascade, le
+document poussé, la recherche. C'est là qu'est sorti le défaut du remplacement
+effacé.
+
+Et **23 contrôles contre le vrai Symfony**, qui répondent à la seule question que
+le local ne peut pas trancher : le serveur accepte-t-il ces documents ? Un refus
+n'arriverait qu'au push, sur un réalisé déjà consigné, et la file le marquerait
+au bout de cinq essais. Réponse : oui — remplacement avec lien au programme
+conservé, exercice sans lien, série surnuméraire, saut sans aucune série, rejeu
+du même document sans doublon — et un `422` propre, avec le chemin du champ et
+sans rien écrire, quand la référence est invisible. La séance de démo, qui sert
+aussi aux exemples de `docs/api-mobile.md`, est relue au début et restaurée à la
+fin.
+
+**Le rendu n'a pas été observé sur l'appareil.** Ce qui reste à valider à l'œil :
+les deux cibles d'une ligne cochée, qui se partagent une ligne de 44 points ; la
+lisibilité du prévu affiché à côté du saisi ; la feuille d'ajustement au pouce.
+
+### Fichiers touchés
+
+Dépôt `kadens-mobile` : `src/session/deviations.ts`, `src/session/writes.ts`,
+`src/session/library.ts` (neufs), `src/session/program.ts` (type d'exercice
+unique), `src/session/log.ts` (allégé de ses briques partagées),
+`src/session/queries.ts`, `src/session/hooks.ts`, `src/session/index.ts`,
+`src/app/session/[uuid].tsx` (les trois feuilles), `CLAUDE.md`. Dépôt `kadens` :
+`docs/feature-live-tracking.md` (état, KL-30), ce journal. Aucun code serveur
+touché — le contrat couvrait déjà tout ce que les déviations produisent.
+
+**Prochain ticket : KL-31** — timer de repos, veille écran, notification.

@@ -141,7 +141,37 @@
 > marquée reste en file, donc continue de protéger sa séance. Déclenchée au
 > lancement, au retour au premier plan, au retour du réseau (`expo-network`) et à
 > la clôture d'une séance. Vérifié par 55 contrôles contre le vrai Symfony, hors
-> React Native. Prochain ticket : **KL-28** (écran Aujourd'hui).
+> React Native.
+> **KL-28 livré (04/08/2026) — le lot 4 est ouvert.** L'écran « Aujourd'hui »
+> montre enfin des séances : le jour, ses voisins J-2 à J+2, la reprise d'une
+> séance ouverte quel que soit son jour, et « Séance libre » dans une barre qui ne
+> défile pas. Le ticket a fait naître `src/session/`, où vivent désormais les
+> règles de séance que ni la base ni la synchro ne portaient — c'est là que KL-29
+> à KL-33 viendront poser cocher, dévier et clôturer. Décision structurante :
+> **ouvrir une séance n'empile aucune mutation** (le pull la protège déjà par
+> « commencée et pas terminée »), et rattraper la veille ne **déplace** jamais une
+> séance : le serveur reste l'autorité sur sa date.
+> **KL-29 livré (04/08/2026)** : l'écran Séance en cours. Le prescrit se déroule
+> bloc par bloc, les rangs de superset dérivés du préfixe **et** de la contiguïté,
+> chaque série est une ligne cochable pré-remplie, et cocher écrit son `LoggedSet`
+> **et** empile la mutation dans la même transaction — dix séries, un seul envoi.
+> La décision structurante est l'**appariement par rang, en deux files
+> (échauffement, travail)** : le contrat ne relie pas une série réalisée à sa ligne
+> prescrite, la seule règle possible est celle que `LogComparator` tient déjà, et
+> elle rend le cochage **séquentiel**. Le cardio se coche fait / pas fait, sans
+> saisie.
+> **KL-30 livré (04/08/2026)** : les déviations. On corrige une série, on en
+> ajoute, on en supprime, on saute un exercice avec sa raison, on le remplace, on
+> en ajoute un hors programme — et rien d'autre : aucun bloc réordonné, aucun
+> superset créé, aucun tour modifié. La décision structurante est que **le
+> prescrit n'ayant nulle part où accueillir une valeur revue, on ne dévie que sur
+> ce qui a été fait** : on coche aux valeurs prescrites, puis on corrige, la ligne
+> cochée offrant deux cibles (les valeurs ouvrent la feuille d'ajustement, la case
+> décoche). Le remplacement conserve le lien au programme et compte comme une
+> **déclaration**, donc survit au retrait de sa dernière série. Le hors-programme
+> cesse d'être en lecture seule : `SessionExtra` disparaît au profit d'un type
+> d'exercice unique. Vérifié par 123 contrôles hors React Native et 23 contre le
+> vrai Symfony. Prochain ticket : **KL-31** (timer de repos, veille, notification).
 
 ---
 
@@ -2206,38 +2236,294 @@ mobile, avec de vraies bascules d'`AppState` et d'`expo-network`. La carte
 ### KL-28 — Écran Aujourd'hui
 
 **Fini quand** :
-- [ ] Les séances programmées du jour, lues en local
-- [ ] Bouton « Démarrer » par séance, et « Séance libre » toujours accessible
-- [ ] Reprise d'une séance en cours si l'app a été fermée
-- [ ] Accès aux jours voisins (J-2 à J+2), pour rattraper la veille
-- [ ] État vide traité (aucune séance programmée)
+- [x] Les séances programmées du jour, lues en local
+- [x] Bouton « Démarrer » par séance, et « Séance libre » toujours accessible
+- [x] Reprise d'une séance en cours si l'app a été fermée
+- [x] Accès aux jours voisins (J-2 à J+2), pour rattraper la veille
+- [x] État vide traité (aucune séance programmée)
+
+**Livré le 04/08/2026.** Sept décisions prises en cours de route, à ne pas
+redécouvrir :
+
+1. **Un module `src/session/` est né, et c'est la vraie nouveauté du ticket.**
+   `@/db` sait écrire des lignes, `@/sync` sait échanger avec le serveur ; ni
+   l'un ni l'autre ne sait ce que « démarrer une séance » veut dire. Ces règles
+   (poser `started_at` mais pas le statut, refuser une séance close, faire naître
+   une séance libre à la date du jour) sont du **domaine** : laissées dans un
+   écran, elles seraient invisibles au suivant. KL-29, KL-30 et KL-33 y poseront
+   cocher, dévier et clôturer. Cinq fichiers : `days.ts` (arithmétique de
+   calendrier et libellés), `queries.ts` (requêtes pures), `hooks.ts` (les mêmes
+   sur `useLiveQuery`), `start.ts`, `index.ts`.
+2. **Démarrer n'empile aucune mutation.** La règle « écrire du réalisé, c'est
+   empiler sa mutation dans la même transaction » vaut pour le **réalisé** — une
+   série, une clôture — pas pour l'ouverture : rien n'a encore été fait, et le
+   pull protège déjà par son **second** critère, « commencée et pas terminée ».
+   KL-27 l'avait anticipé mot pour mot. Le gain est concret : une séance ouverte
+   puis refermée sans rien cocher ne part pas afficher un `startedAt` orphelin au
+   calendrier web, et une séance libre abandonnée n'y apparaît pas vide. **Vérifié
+   dans les deux sens** : un pull qui ignore la séance libre locale ne l'emporte
+   pas, et un pull qui renvoie la séance programmée avec `startedAt: null` ne
+   l'écrase pas.
+3. **Rattraper la veille n'est pas déplacer une séance.** Ouvrir la séance d'hier
+   pose ses bornes et rien d'autre : la `date` appartient au serveur (§4.1), la
+   séance reste datée d'hier partout, ce qui est la vérité de ce qui s'est passé.
+4. **La sélection du jour est un écart, pas une date.** L'état de l'écran est
+   `offset ∈ [-2, +2]` ; le jour affiché s'en déduit. C'est ce qui le garde juste
+   quand minuit passe pendant que l'app dort — une date absolue aurait demandé un
+   recalage à la main, donc un second état décrivant ce que le premier dit déjà.
+   `useToday()` relit la date locale au retour au premier plan.
+5. **La carte d'une séance ne peut pas annoncer « 5 exercices ».** Le programme
+   vit dans `prescribed_snapshot`, et l'invariant de la base dit que lister un
+   jour ne doit pas remonter le plus gros document qu'elle contient. Le compter
+   demanderait `json_array_length`, donc l'extension json1 sur tous les Android
+   visés, que le projet a déjà refusé de supposer. La carte montre ce que les
+   colonnes de la séance datée et le réalisé (normalisé, indexé) savent dire :
+   plan, statut, séries consignées, attente de synchronisation.
+6. **Un seul bouton primaire, et c'est le plus urgent.** Règle 2 du design
+   system : reprendre s'il y a une séance ouverte, sinon démarrer la première
+   séance actionnable du jour. Trois séances programmées le même jour donneraient
+   sinon trois rouges qui ne disent plus rien. La bande de jours n'est pas un
+   `Chip` (qui ne se tape pas, KL-23) mais un vrai contrôle, avec son plancher
+   tactile.
+7. **L'écran de vérification du socle devient `/diagnostics`.** Il occupait la
+   route `index` ; le supprimer aurait été plus propre s'il ne portait pas encore
+   la **seule déconnexion de l'app** et les seuls contrôles d'appareil du
+   chantier (API, synchro, base locale). KL-35 le remplace par les vrais réglages.
+
+Deux ajouts hors liste, jugés dans l'esprit du ticket : `src/app/session/[uuid].tsx`,
+**coquille assumée** que KL-29 remplit — « Démarrer » avait besoin d'une
+destination, et sans elle l'action ne serait pas vérifiable (même statut que
+`login.tsx` en KL-25) ; et une feuille de confirmation sur « Séance libre », avec
+titre pré-rempli et daté, parce qu'un appui malheureux créerait sinon une séance
+datée que rien ne permet encore de supprimer depuis le téléphone.
+
+**Vérification** : `typecheck`, `lint`, `prettier --check`, `expo export` pour
+Android **et** web (neuf routes statiques rendues), plus un banc d'essai de
+**44 contrôles hors React Native** — `src/session` bundlé pour Node, `expo-sqlite`
+posé sur `node:sqlite`, migration réelle appliquée. Il exerce l'arithmétique de
+calendrier (fin de mois, fin d'année, les deux changements d'heure), l'idempotence
+de la reprise, le refus d'une séance close, l'absence de mutation, les lectures de
+l'écran, et surtout l'**interaction avec le pull** décrite au point 2. **Pas de
+contrôle sur appareil** : le build natif reste bloqué par le problème de toolchain
+Kotlin/AGP de KL-48, préexistant. C'est la limite connue de ce ticket — le rendu,
+les cibles tactiles et la bascule de minuit n'ont pas été vus sur un vrai
+téléphone.
 
 ### KL-29 — Écran Séance en cours
 
 **Fini quand** :
-- [ ] Le prescrit s'affiche bloc par bloc, dans l'ordre, avec les rangs de
+- [x] Le prescrit s'affiche bloc par bloc, dans l'ordre, avec les rangs de
       superset (A1/A2) **dérivés de l'ordre**, jamais stockés
-- [ ] Chaque série est une ligne cochable, pré-remplie par le prescrit
-- [ ] Cocher une série écrit un `LoggedSet` en base locale et empile un `PUT` de
+- [x] Chaque série est une ligne cochable, pré-remplie par le prescrit
+- [x] Cocher une série écrit un `LoggedSet` en base locale et empile un `PUT` de
       la séance datée dans `mutation_queue` (les mutations d'une même séance se
       coalescent : inutile d'en empiler une par série)
-- [ ] Progression visible (séries faites sur séries prévues)
-- [ ] Les exercices cardio sont en lecture seule, cochables fait / pas fait
-- [ ] L'écran survit à une mise en arrière-plan et à une coupure réseau
-- [ ] Rien n'est jamais perdu si l'app est tuée
+- [x] Progression visible (séries faites sur séries prévues)
+- [x] Les exercices cardio sont en lecture seule, cochables fait / pas fait
+- [x] L'écran survit à une mise en arrière-plan et à une coupure réseau
+- [x] Rien n'est jamais perdu si l'app est tuée
+
+**Livré le 04/08/2026.** Huit décisions prises en cours de route, à ne pas
+redécouvrir :
+
+1. **Une série réalisée s'apparie à sa ligne prescrite par le RANG, dans deux
+   files séparées — et ce n'est pas un choix d'écran.** Le contrat ne transporte
+   **aucune** référence de la série vers la ligne : `sourcePrescribedId` vit sur
+   l'exercice, et `position` n'est même pas envoyée au serveur (« l'ordre de la
+   liste fait foi, le serveur renumérote », §6.8). La seule règle possible est
+   donc celle que `LogComparator` tient déjà (KL-05, décision 3) : le n-ième
+   réalisé de travail coche la n-ième ligne de travail, l'échauffement comptant
+   dans sa propre file. Deux files, parce qu'un échauffement prescrit mais non
+   fait — le cas courant — décalerait sinon toutes les séries de travail d'un
+   cran. **Corollaire ergonomique assumé : cocher est séquentiel.** Seule la
+   première ligne non cochée de sa file est actionnable, seule la dernière cochée
+   se décoche. Un « trou » (cocher la 3 en laissant la 1 vide) ne survivrait pas à
+   un aller-retour serveur : il repartirait comme « une série faite » et
+   reviendrait apparié à la première ligne. Mieux vaut une ligne inerte, qui dit
+   pourquoi elle l'est, qu'une coche qui se déplace toute seule. Vérifié dans les
+   deux sens : le réalisé renvoyé par le serveur avec ses positions renumérotées à
+   partir de 0 se relit **exactement** aux mêmes lignes.
+2. **`prescribed_snapshot` se lit ici, et nulle part ailleurs.** L'invariant de
+   KL-24 interdit de remonter le plus gros document de la base pour *lister* un
+   jour ; il n'a jamais interdit de le lire pour *dérouler* une séance, ce qui est
+   exactement le seul endroit où il sert. C'est la première lecture du document
+   depuis qu'il existe.
+3. **Trois lectures vives et non une.** `useLiveQuery` n'écoute que la table du
+   `from` (piège déjà relevé en KL-28) : le programme, les exercices réalisés et
+   les séries sont trois requêtes, montées sur trois tables. Une jointure unique
+   n'aurait été republiée que par sa table de tête, et le déroulé serait resté
+   figé sur les deux autres — sans erreur, ce qui est le pire cas.
+4. **Un réalisé sans rattachement vaut mieux qu'une série perdue.**
+   `logged_exercise.exercise_id` porte une clé étrangère et les clés étrangères
+   sont actives : un exercice que la bibliothèque locale ignore ferait **échouer
+   l'insertion**, donc perdre la série au moment où on la coche. Le repli met
+   `exerciseId` à `null` et garde le nom, donc le réalisé reste lisible partout ;
+   il coûte le rattachement à l'historique et aux records de cette ligne-là. C'est
+   le même problème que KL-27 avait rencontré dans l'autre sens, et la sortie
+   propre reste celle qu'il avait identifiée : retirer cette FK vers un cache
+   partiel, à traiter avec KL-35.
+5. **La progression compte des gestes, pas du volume.** L'échauffement entre donc
+   dans le total, contrairement au tonnage et aux records où il est exclu partout :
+   ce qui se lit ici, c'est ce qu'il reste à faire, et un échauffement reste à
+   faire. Un exercice cardio compte pour une unité — il n'a qu'une chose à dire —
+   et un exercice sauté sort du décompte, puisqu'il est réglé (sinon la
+   progression ne pourrait jamais atteindre son terme).
+6. **Décocher efface aussi l'exercice réalisé devenu vide, et empile quand même
+   la mutation.** Un `logged_exercise` sans série, sans note et non sauté
+   signifierait « fait, zéro série » une fois poussé. Et la mutation part même
+   quand il ne reste rien : `log: []` est ce qui efface le réalisé côté serveur,
+   ne rien empiler laisserait le pull suivant remettre la série qu'on vient de
+   retirer.
+7. **« On ne consigne que dans une séance ouverte » est une garde du domaine, pas
+   de l'écran.** Les trois écritures la franchissent, dans leur transaction :
+   terminée, on n'écrit plus (pas de reprise après clôture, §2.3 point 5) ; pas
+   commencée, on n'écrit pas non plus — un réalisé sans borne de départ décrirait
+   une séance qu'on n'a pas faite, et le pull ne protégerait même pas la séance,
+   faute de `started_at`. Même raison que pour `beginWorkout`, qui refuse déjà une
+   séance close : une règle qui ne vit que dans un composant est invisible au
+   composant suivant.
+8. **Le réalisé que le programme ne réclame pas est affiché, pas ignoré.** Une
+   série de plus qu'annoncé, un exercice hors programme : KL-29 n'en crée aucun,
+   mais le pull peut en descendre, et du réalisé invisible serait la pire
+   trahison de « rien n'est jamais perdu ». Ils se rendent en lecture, les séries
+   surnuméraires à la suite des lignes prescrites (comme le tableau du web, qui
+   peut déjà avoir plus de lignes que le prescrit), les exercices dans une
+   section « Hors programme ».
+
+Deux ajouts hors liste, jugés dans l'esprit du ticket : `src/components/units.ts`
+(le pendant natif d'`UnitFormatter` — une charge et une durée doivent se lire à
+l'identique sur le téléphone et sur `/schedule/{id}`, sinon comparer les deux
+écrans demanderait de traduire de tête), et un bandeau « Démarrer » quand on
+arrive sur une séance jamais commencée : l'écran serait sinon inerte sans dire
+pourquoi.
+
+**Pas de glyphe, une fois de plus** : la case à cocher est un carré au filet, qui
+se remplit à l'encre. Un « ✓ » dépendrait de ce que Barlow contient, et KL-23
+avait tranché « pas d'icônes tant qu'un écran n'en a pas besoin » — celui-ci n'en
+a pas eu besoin.
+
+**Vérifié** : `npm run typecheck`, `npm run lint`, `npx prettier --check .`,
+`npx expo export` pour Android **et** web, plus un banc d'essai de **97 contrôles
+hors React Native** — `src/session` bundlé pour Node, `expo-sqlite` posé sur
+`node:sqlite`, la vraie migration appliquée. Il exerce l'appariement en deux
+files, les groupes de superset (contiguïté comprise : A1/A2 puis B1/B2 ne se
+recollent pas), la coalescence (dix séries cochées, une seule mutation), le refus
+d'une ligne hors tour, la suppression en cascade de l'exercice vidé, le cardio, le
+repli sur une bibliothèque incomplète, le document poussé, la protection du pull
+(le réalisé survit, la correction du coach descend quand même) et **l'aller-retour
+serveur** décrit au point 1.
+
+**Le build natif repasse.** `npm run android` a produit l'APK et installé l'app
+sur un appareil réel : l'échec de compilation Kotlin d'`expo-dev-menu` /
+`expo-log-box`, constaté en KL-48 puis rejoué en KL-27 et KL-28, ne s'est pas
+reproduit. La limite qui plombait les trois derniers tickets est levée.
+**Limite de ce ticket** : le rendu n'a pas été observé, le téléphone étant en
+cours d'utilisation. Restent à valider à l'œil les cibles tactiles des lignes de
+série, la densité sur une séance de douze exercices et la lisibilité de la case à
+cocher à bout de bras.
 
 ### KL-30 — Déviations
 
 **Fini quand** :
-- [ ] Modifier le poids, les reps ou la durée d'une série
-- [ ] Ajouter une série à un exercice, en supprimer une
-- [ ] Marquer un exercice comme sauté (avec une raison optionnelle)
-- [ ] Remplacer un exercice par un autre de la bibliothèque locale
-- [ ] Ajouter un exercice non prévu
-- [ ] **Aucune réorganisation de blocs, aucun superset créé, aucun tour modifié**
+- [x] Modifier le poids, les reps ou la durée d'une série
+- [x] Ajouter une série à un exercice, en supprimer une
+- [x] Marquer un exercice comme sauté (avec une raison optionnelle)
+- [x] Remplacer un exercice par un autre de la bibliothèque locale
+- [x] Ajouter un exercice non prévu
+- [x] **Aucune réorganisation de blocs, aucun superset créé, aucun tour modifié**
       (§0.3 point 3). Si le besoin remonte pendant le développement, il devient
       un ticket web, pas un ticket mobile
-- [ ] Le prescrit reste visible à côté de la valeur saisie, pour voir l'écart
+- [x] Le prescrit reste visible à côté de la valeur saisie, pour voir l'écart
+
+**Livré le 04/08/2026.** Huit décisions prises en cours de route, à ne pas
+redécouvrir :
+
+1. **On ne dévie que sur ce qui a été FAIT, et ce n'est pas un choix d'écran.**
+   Le prescrit ne bouge jamais (§0.3) : `prescribed_snapshot` est remplacé en
+   entier à chaque pull, et le réalisé n'existe pas avant d'être coché. Il n'y a
+   donc **aucun endroit où écrire** « la série 3 se fera à 82,5 kg ». On coche
+   aux valeurs prescrites — le geste nominal en salle, on fait ce qui est écrit —
+   puis on corrige. La conséquence ergonomique est la forme de la ligne : non
+   cochée, elle coche d'un appui n'importe où ; cochée, elle se scinde en deux
+   cibles au plancher tactile — la zone de valeurs ouvre la feuille
+   d'ajustement, la case décoche. Un appui long aurait tenu dans une seule
+   cible, mais il ne se voit nulle part et se découvre par accident.
+2. **Le type de série ne s'édite pas.** Il décide de la **file d'appariement**
+   (échauffement ou travail) : le changer déplacerait le rang de la série et de
+   toutes les suivantes, donc la lecture prévu/réalisé de la séance entière, ici
+   comme sur `/schedule/{id}`. Pour un gain faible — le type vient du programme
+   et il est juste dans le cas normal. Le **RPE**, lui, est saisissable : le
+   modèle le porte par série, le prescrit affiche déjà une cible, et aucun autre
+   écran ne permettra jamais de le renseigner.
+3. **Supprimer une série est plus permissif que la décocher, et c'est cohérent.**
+   Le cochage séquentiel de KL-29 existe pour empêcher un **trou** — cocher la 3
+   en laissant la 1 vide produirait un réalisé qui reviendrait apparié à la
+   première ligne. Supprimer au milieu ne fait pas de trou : la file se resserre,
+   les rangs suivants remontent d'un cran, et c'est exactement ce que décrit une
+   série qu'on n'a finalement pas faite. La case ne décoche donc que la dernière,
+   la feuille supprime n'importe laquelle.
+4. **Le remplacement conserve le lien au programme, et c'est ce qui le distingue
+   d'un ajout.** `sourcePrescribedId` reste, seules la référence et le nom
+   changent : `/schedule/{id}` lit alors « prévu développé couché, fait au
+   guidé » au lieu d'un trou d'un côté et d'un intrus de l'autre. Le contrat
+   l'autorise explicitement — il vérifie que la ligne du programme appartient à
+   cette séance, pas qu'elle porte le même exercice (vérifié contre le vrai
+   serveur). Mais il est **refusé dès qu'une série est consignée** : elle a été
+   faite sur l'exercice d'origine, la rattacher à un autre la ferait entrer dans
+   l'historique et les records de la mauvaise machine. Le chemin pour ce cas-là
+   existe déjà — sauter avec sa raison, puis ajouter l'autre hors programme.
+5. **Le remplacement est une DÉCLARATION, au même titre que « sauté » et que la
+   note.** C'est le défaut que le banc d'essai a trouvé : décocher la dernière
+   série d'un exercice remplacé le rendait « vide », le nettoyage de KL-29
+   l'effaçait, et la séance repartait au serveur comme si rien n'avait été
+   substitué. La base ne peut pas voir seule qu'il y a substitution (le prescrit
+   vit dans un document JSON), donc l'appelant le passe à
+   `dropEmptyLoggedExercise`. Un exercice **hors programme** vide est épargné
+   pour la même raison : aucune ligne prescrite ne le ferait revenir.
+6. **Un seul type d'exercice, prescrit ou non.** `SessionExercise.prescribed`
+   devient nullable et `SessionExtra` disparaît. Sans ça, rendre le hors-programme
+   éditable demandait un second composant d'affichage, un second chemin
+   d'écriture et une seconde façon de compter — pour décrire la même chose. Un
+   exercice ajouté **n'entre ni au numérateur ni au dénominateur** de la
+   progression : elle dit ce qu'il reste à faire du programme, et trois séries en
+   plus ne rapprochent pas de sa fin.
+7. **La raison d'un saut et la note d'exercice sont le même champ.** Le modèle
+   n'en a qu'un (`LoggedExercise.notes`) et en inventer un second côté mobile
+   donnerait un texte que le serveur ne saurait pas où mettre. Ne plus sauter ne
+   l'efface donc pas : ce que l'athlète a écrit lui appartient, et c'est ce qui
+   fait survivre la ligne au nettoyage.
+8. **Les bornes du contrat sont tenues à l'écriture, pas au push.** `reps` 0-200,
+   charge 0-1000, durée 0-86 400, RPE 1-10 : une valeur hors bornes ne serait
+   refusée qu'au push, en `422`, sur un réalisé déjà consigné — et la file la
+   marquerait au bout de cinq essais. Une valeur impossible à saisir vaut mieux
+   qu'une séance bloquée. Même logique pour la référence d'un exercice choisi,
+   qui repasse par la garde de clé étrangère de KL-29.
+
+Un ajout hors liste, jugé nécessaire au ticket : la **recherche dans la
+bibliothèque locale** (`session/library.ts`), qui replie les accents à la main —
+`LIKE` de SQLite n'ignore la casse qu'en ASCII, « developpe » ne trouverait pas
+« Développé couché » dans une bibliothèque entièrement française, et
+`String.normalize` dépend de la variante d'Hermes embarquée (même arbitrage que
+les noms de jours en KL-28). Elle servira telle quelle à **KL-34**.
+
+**Vérifié** : `npm run typecheck`, `npm run lint`, `npx prettier --check .`,
+`npx expo export` pour Android **et** web (neuf routes, aucune fantôme), plus
+**123 contrôles hors React Native** — `src/session` bundlé pour Node,
+`expo-sqlite` posé sur `node:sqlite`, la vraie migration appliquée — et **23
+contrôles contre le vrai Symfony**. Les premiers exercent les corrections et
+leurs bornes, le pré-remplissage d'une série ajoutée, la suppression au milieu
+sans trou, le saut et sa raison, le remplacement et son refus, l'ajout et le
+retrait hors programme, la cascade, le document poussé et la recherche. Les
+seconds répondent à la seule question que le local ne peut pas trancher : le
+serveur accepte-t-il ces documents ? Oui — remplacement avec lien conservé,
+exercice sans lien, série surnuméraire, saut sans série, rejeu sans doublon — et
+il refuse bien une référence invisible en `422` avec le chemin du champ, sans
+rien écrire.
+
+**Limite de ce ticket** : le rendu n'a pas été observé sur l'appareil. Restent à
+valider à l'œil les deux cibles d'une ligne cochée (elles se partagent une ligne
+de 44 points), la lisibilité du prévu affiché à côté du saisi, et la feuille
+d'ajustement au pouce, gants aux mains.
 
 ### KL-31 — Timer de repos, veille, notification
 
