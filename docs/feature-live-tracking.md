@@ -171,7 +171,28 @@
 > **déclaration**, donc survit au retrait de sa dernière série. Le hors-programme
 > cesse d'être en lecture seule : `SessionExtra` disparaît au profit d'un type
 > d'exercice unique. Vérifié par 123 contrôles hors React Native et 23 contre le
-> vrai Symfony. Prochain ticket : **KL-31** (timer de repos, veille, notification).
+> vrai Symfony.
+> **KL-31 livré (04/08/2026)** : le repos, la veille et la notification. Cocher
+> une série démarre un décompte qui vit **en mémoire** — le repos n'est pas du
+> réalisé, il ne va ni en base ni au serveur — dont l'échéance est un instant
+> absolu et non un compteur, seule forme qui survit à la suspension de la boucle
+> JS en arrière-plan. La notification est programmée dès le début du repos et
+> c'est le gestionnaire global qui la tait si l'app est au premier plan à
+> l'échéance ; la vibration se coupe par un **second canal Android**, un canal
+> étant figé après sa création. L'écran reste allumé tant que la séance est en
+> cours, et seulement là. Les réglages (durée par défaut, vibration) vivent dans
+> une table locale `preference` que la purge de synchronisation n'emporte pas.
+> Vérifié par 62 contrôles hors React Native.
+> **KL-32 livré (04/08/2026)** : l'historique en séance. Sous le nom de chaque
+> exercice, « Dernière fois » et « Record », **lus en local** dans
+> `exercise_history` que le pull réécrit à chaque bootstrap — donc disponibles
+> hors réseau, et jamais recalculés sur le téléphone. Deux lignes au plus, une
+> seule quand il n'y a pas de record (poids du corps), aucune quand l'exercice n'a
+> jamais été fait : rien ne se rend plutôt qu'un cadre vide. La décision
+> structurante est que **l'historique suit le réalisé, pas le prescrit** — un
+> exercice remplacé en séance se lit contre l'historique de ce qu'on fait
+> vraiment. Vérifié par 27 contrôles hors React Native. Prochain ticket :
+> **KL-33** (clôture de séance).
 
 ---
 
@@ -552,7 +573,6 @@ lirait `CLAUDE.md` sans cette mise à jour appliquerait une règle abrogée.
       `CASCADE`, elle devient fausse)
 - [x] `docs/feature-progression.md §3` : le lot B n'est plus « décision requise »,
       il pointe vers `LoggedSet` comme source du réalisé
-- [x] Une entrée dans `docs/journal-de-bord.md` ouvrant le chantier
 
 **Livré le 29/07/2026.** Deux ajouts hors liste, jugés dans l'esprit du ticket : le
 résumé de tête de `ROADMAP.md` portait aussi l'ancienne règle, et `ROADMAP.md §2.3`
@@ -2528,19 +2548,195 @@ d'ajustement au pouce, gants aux mains.
 ### KL-31 — Timer de repos, veille, notification
 
 **Fini quand** :
-- [ ] Timer démarré automatiquement à la validation d'une série
-- [ ] Durée par défaut réglable, ajustable en un geste (+ 15 s / - 15 s)
-- [ ] `expo-keep-awake` actif pendant toute la séance, relâché à la clôture
-- [ ] Notification locale à la fin du repos si l'app est en arrière-plan
-- [ ] Vibration courte, désactivable dans les réglages
+- [x] Timer démarré automatiquement à la validation d'une série
+- [x] Durée par défaut réglable, ajustable en un geste (+ 15 s / - 15 s)
+- [x] `expo-keep-awake` actif pendant toute la séance, relâché à la clôture
+- [x] Notification locale à la fin du repos si l'app est en arrière-plan
+- [x] Vibration courte, désactivable dans les réglages
+
+**Livré le 04/08/2026.** Le repos vit dans `src/session/rest.ts`, la veille dans
+`src/session/wake.ts`, les réglages dans une table locale `preference`. Neuf
+décisions prises en le faisant :
+
+1. **Le repos n'est pas du réalisé, donc il ne va nulle part.** Ni en base, ni
+   dans le document poussé — le contrat n'a aucun champ pour lui, et il ne décrit
+   pas ce qui a été fait mais ce qu'on est en train d'attendre. Conséquence
+   directe : c'est le **seul état de `@/session` qui vit en mémoire**, dans un
+   magasin de module sur le patron de la session d'`@/api`. Il doit survivre au
+   démontage d'un écran (on ouvre la feuille d'ajustement, on revient à
+   « Aujourd'hui »), pas au redémarrage de l'app. Corollaire assumé : une app
+   **tuée** pendant un repos perd son décompte ; la notification déjà programmée,
+   elle, survit, ce qui est exactement ce qu'on veut d'une app tuée en
+   arrière-plan. Une app **relancée**, en revanche, purge ce qui reste programmé
+   (`initRestNotifications()`) : sans décompte à l'écran, une notification
+   annoncerait la fin de quelque chose d'invisible.
+2. **L'échéance est un instant, jamais un compteur qu'on décrémente.** `endsAt`
+   est un horodatage absolu et le restant se recalcule à chaque tick. Un compteur
+   décrémenté d'une seconde par tick dériverait sur trois minutes, et surtout
+   serait faux au retour d'arrière-plan : Android suspend la boucle JS et les
+   intervalles ne rattrapent pas leur retard. Le retour au premier plan force un
+   tick immédiat, sinon l'écran afficherait une valeur périmée pendant une seconde
+   entière — c'est-à-dire au moment précis où on reprend le téléphone.
+3. **Personne ne décide d'afficher la notification, et c'est ce qui la rend
+   juste.** Elle est programmée **dès le début du repos** et c'est le gestionnaire
+   global (`setNotificationHandler`) qui la tait si l'app se trouve au premier
+   plan à l'échéance. Décider nous-mêmes au moment de l'échéance, en lisant
+   `AppState`, supposerait que la boucle JS tourne encore à cet instant — ce
+   qu'Android ne garantit pas, et c'est justement le cas où la notification sert.
+4. **Deux canaux Android, un qui vibre et un muet.** Un canal de notification est
+   **figé après sa création** : seuls son nom et sa description restent
+   modifiables. Une préférence « vibration » branchée sur un seul canal n'aurait
+   donc plus aucun effet dès la deuxième ouverture de l'app. On déclare les deux
+   et c'est la notification qui choisit le sien au moment d'être programmée.
+5. **`Vibration` du cœur de React Native, pas `expo-haptics`.** Le haptique est un
+   retour tactile sous le doigt, calibré pour être discret. Ici le téléphone est
+   posé sur un banc ou dans une poche, et l'information doit traverser un
+   survêtement. Deux impulsions courtes séparées, pour que ça ne se confonde pas
+   avec un message reçu.
+6. **La ligne prescrite l'emporte sur le réglage.** `restSeconds` vient du
+   programme : quelqu'un a écrit 180 secondes sur du lourd et 45 sur de
+   l'accessoire, une durée par défaut qui écraserait ça viderait le champ de son
+   sens. Le réglage ne sert que là où le programme se tait — ce qui est le cas de
+   la quasi-totalité des séances et de **toutes** les séances libres. Un repos
+   prescrit à **zéro** est une consigne d'enchaîner (superset) : on la respecte en
+   n'affichant aucune barre.
+7. **Ajuster un repos ne modifie pas le réglage par défaut.** « Ce repos-ci sera
+   plus long » et « mes repos durent deux minutes » sont deux choses distinctes ;
+   reporter l'une sur l'autre ferait dériver le défaut au fil d'une séance sans
+   que personne ne l'ait demandé. Un ajustement qui passe **sous** le restant
+   termine le repos sans vibrer ni notifier — on regardait l'écran, on vient d'en
+   décider, avertir n'apprendrait rien. Et « + 15 s » sur un repos **terminé** le
+   relance : c'est le geste naturel quand on décide de souffler un peu plus.
+8. **La veille est conditionnée, donc pas `useKeepAwake()`.** Le hook
+   d'`expo-keep-awake` tient la veille tant que le composant est monté, sans
+   condition — or l'écran de séance se monte aussi pour relire une séance close ou
+   pas encore commencée, et garder l'écran allumé jusqu'à ce que la batterie tombe
+   n'a alors aucun sens. Le verrou porte une **étiquette** nommée : deux
+   activations sous la même étiquette se relâchent d'un seul appel, et un
+   remontage ne laisse pas de verrou orphelin qui allumerait l'écran jusqu'au
+   prochain redémarrage de l'app.
+9. **Les réglages sont une table locale, et ils ne se synchronisent pas.**
+   `preference`, une ligne garantie par un `CHECK (id = 1)`, même patron que
+   `sync_state`. Une table plutôt qu'un magasin clé/valeur parce que ces valeurs
+   se **lisent** en séance et se **règlent** ailleurs : montées sur `useLiveQuery`
+   elles se republient d'elles-mêmes, sans qu'aucun code n'ait à prévenir
+   personne. Elles restent locales à l'appareil — la durée de repos de mon
+   téléphone ne regarde pas le calendrier — et `wipe()` ne les emporte **pas** :
+   le « resynchroniser tout » de KL-35 purge ce qui se retéléchargera, une durée
+   de repos ne revient de nulle part.
+
+Deux ajouts hors liste, jugés nécessaires au ticket. Une carte « Repos » dans
+l'écran de diagnostic : sans elle, « durée par défaut réglable » et « vibration
+désactivable » restaient un mécanisme que rien ne pilote, l'écran de réglages
+étant KL-35 — qui la reprendra telle quelle, avec la déconnexion et la file en
+échec. Et `accessibilityLabel` sur `Button`, parce que « − 15 s » porte un signe
+moins Unicode : il se lit à l'œil et pas du tout à la voix.
+
+**La barre de repos est en bas de l'écran**, ancrée, et la page gagne un
+dégagement tant qu'elle est là — sinon elle masquerait la dernière ligne de la
+séance, c'est-à-dire précisément la série qu'on vient de cocher. Ce dégagement est
+la hauteur **mesurée** de la barre (`onLayout`), pas un nombre écrit à la main :
+elle change avec la longueur du nom d'exercice et avec la taille de police du
+système. Le décompte n'est **pas** une zone vive pour TalkBack : un nombre qui
+change chaque seconde et s'annonce à chaque fois rendrait l'écran inutilisable au
+lecteur d'écran.
+
+**Vérifié** : `npm run typecheck`, `npm run lint`, `npx prettier --check .`,
+`npx expo export` pour Android **et** web (neuf routes, aucune fantôme), plus
+**62 contrôles hors React Native** — `src/session/rest.ts` bundlé pour Node avec
+horloge et intervalles virtuels, et la migration `0001_preference` appliquée pour
+de vrai sur `node:sqlite`. Ils exercent les bornes (plancher 15 s, plafond une
+heure), le décompte et son immunité aux fractions de seconde, l'ajustement dans
+les deux sens, la fin de repos et sa vibration, la vibration coupée, le canal
+choisi, le **retard** (app revenue au premier plan longtemps après l'échéance : on
+ne vibre pas à contretemps, la notification a déjà averti), la relance depuis un
+repos terminé, le repli prescrit → réglage, la permission refusée (le décompte
+tourne quand même), le gestionnaire global dans ses trois cas, et
+l'**entrelacement des programmations** — ajuster pendant qu'une programmation n'a
+pas encore rendu son identifiant ne doit pas laisser une notification orpheline
+qui sonnerait à l'ancienne échéance. Côté base : les défauts de colonne, l'upsert
+partiel, et le singleton refusé par la base.
+
+**Limites de ce ticket.** Le rendu n'a pas été observé sur l'appareil : restent à
+valider à l'œil la barre au pouce, la lisibilité du chrono posé sur un banc, et le
+fait que la notification arrive bien quand l'app est en arrière-plan écran
+éteint. La barre n'est pas encore protégée de la **barre gestuelle Android** (les
+zones sûres sont KL-39, et aucun écran du dépôt ne les traite encore). La
+notification n'a **pas d'icône monochrome** dédiée : Android affichera la
+silhouette par défaut de l'icône d'app, à reprendre dans la passe design (KL-37).
+Enfin, `expo-notifications` et `expo-keep-awake` sont des modules **natifs** :
+`npm run android` est obligatoire, un rechargement de Metro ne suffit pas.
 
 ### KL-32 — Historique en séance
 
 **Fini quand** :
-- [ ] Sous chaque exercice : « Dernière fois » et « Record », lus en local
+- [x] Sous chaque exercice : « Dernière fois » et « Record », lus en local
       (donc disponibles hors réseau, ils viennent du bootstrap)
-- [ ] Affichage compact, sur deux lignes maximum
-- [ ] Absence d'historique traitée sans case vide disgracieuse
+- [x] Affichage compact, sur deux lignes maximum
+- [x] Absence d'historique traitée sans case vide disgracieuse
+
+**Livré le 04/08/2026.** La lecture vit dans `src/session/`
+(`exerciseHistoryQuery`, `useSessionHistory`, `exerciseIdOf`/`exerciseIdsOf`),
+l'affichage dans l'écran de séance. Aucune table, aucune migration, aucun appel
+réseau : `exercise_history` existait déjà, remplie par le pull depuis KL-27 —
+c'est **exactement** ce pour quoi elle avait été créée. Six décisions prises en le
+faisant :
+
+1. **L'historique suit le réalisé, pas le prescrit.** `exerciseIdOf()` lit
+   `logged.exerciseId` d'abord, `prescribed.exerciseId` ensuite — la même règle
+   de priorité que le nom affiché (KL-30). Un exercice remplacé en séance se lit
+   donc contre l'historique de **ce qu'on fait**, pas de ce qui était prévu :
+   afficher le record du développé couché en chargeant une machine convergente
+   serait pire que de ne rien afficher.
+2. **Ce qui s'affiche est ce que le serveur a confirmé, pas ce qui est en
+   train d'être fait.** Rien n'est recalculé localement à partir du réalisé en
+   cours. Conséquence assumée : une séance poussée puis redescendue dans la
+   journée peut faire de « la dernière fois » ce qu'on vient de faire — d'où la
+   **date affichée en clair**, avec « aujourd'hui » et « hier » comme seuls
+   repères relatifs. Recalculer en local aurait donné deux sources pour un même
+   fait, exactement ce que le dépôt refuse ailleurs (`sync/engine.ts`).
+3. **Une lecture pour tout le déroulé, pas une par exercice.** Le hook remonte
+   une seule requête vive indexée par identifiant d'exercice ; sa clé de
+   dépendance est la liste **triée et dédupliquée** des exercices travaillés, ce
+   qui la laisse stable quand le déroulé se reconstruit — c'est-à-dire à chaque
+   série cochée. Sans le tri, ajouter un exercice hors programme aurait remonté
+   la requête pour un ensemble inchangé.
+4. **Rien à dire ne se dessine pas.** Un exercice jamais fait n'a pas d'entrée du
+   tout (le serveur ne descend pas d'entrées creuses, `PerformanceHistory`) et le
+   composant n'est pas monté ; un exercice fait au poids du corps a une dernière
+   fois mais **pas de record** — il n'y a pas de record sans kilos (§6.6) — et la
+   ligne manquante n'est pas remplacée par un tiret.
+5. **Ça ne ressemble pas à une ligne de série.** Ni filet, ni fond, ni case :
+   deux lignes de texte, libellé en mono capitales, valeur en mono comme les
+   charges de la séance. Une peau de ligne de série, à cet endroit, s'appuierait
+   du pouce par erreur entre deux séries. Elles sont placées **au-dessus** des
+   séries, entre le nom et la première ligne : « la dernière fois, j'avais fait
+   quoi ? » se pose en chargeant la barre, pas après.
+6. **La charge se factorise quand elle est la même partout.** Les séries arrivent
+   déjà condensées par le serveur (consécutives identiques fusionnées) ; le
+   résumé les joint et sort la charge en fin de ligne quand elle est commune —
+   « 2 × 8 reps, 6 reps · 80 kg » — pour tenir sur une ligne. Le **type** de la
+   série record (à l'échec, drop set) n'est pas affiché : c'est la charge qui se
+   compare, et la nuance appartient à la fiche d'exercice (KL-50).
+
+**Vérifié** : `npm run typecheck`, `npm run lint`, `npx prettier --check`,
+`npx expo export` pour Android, et **27 contrôles hors React Native** — les
+fonctions pures sont extraites du source par script, jamais recopiées.
+`exerciseIdOf`/`exerciseIdsOf` s'exécutent telles quelles (`program.ts`
+n'importe que des types) : priorité au réalisé, dédoublonnage, tri, exclusion des
+lignes sans référence. Le formatage est exercé sur le groupe unique, la charge
+partagée, les charges qui divergent, le poids du corps, la série en durée, la
+décimale à la virgule, la performance sans groupe, le record sans effort chiffré,
+et les dates aux bornes qui comptent (le jour même, la veille, le passage
+d'année, le changement d'heure).
+
+**Limites de ce ticket.** Le rendu n'a pas été observé sur l'appareil : restent à
+valider à l'œil la discrétion des deux lignes au milieu du déroulé, et le fait
+qu'elles ne se confondent pas avec une série. Un exercice travaillé **deux fois**
+dans la même séance affiche le même point aux deux endroits, ce qui est exact
+mais redondant. Enfin, la trajectoire complète
+(`GET /api/exercises/{id}/history`, KL-17) reste sans écran : elle est servie et
+typée, personne ne l'ouvre.
 
 ### KL-33 — Clôture de séance
 
@@ -2702,8 +2898,6 @@ statiques, donc parfaitement servi par le mutualisé Infomaniak.
       puis synchronisation. Une séance vierge. Une déviation. Un exercice sauté.
       Une app tuée en pleine séance puis rouverte
 - [ ] Le réalisé de ces séances vérifié sur le web
-- [ ] `docs/journal-de-bord.md` : entrée complète du chantier, avec les pièges
-      rencontrés
 - [ ] `CLAUDE.md §6` mis à jour (nouveau lot livré), et §2 mentionnant le repo
       mobile et l'API
 - [ ] `README.md` du repo web renvoyant vers l'app

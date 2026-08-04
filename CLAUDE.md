@@ -283,29 +283,14 @@ toutes les vues, relation coach ↔ athlète, paramètres de compte.
 tickets, cadrage complet et invariants à ne pas casser :
 [`docs/feature-live-tracking.md`](./docs/feature-live-tracking.md).
 Historique narratif lot par lot, y compris ce chantier :
-[`docs/journal-de-bord.md`](./docs/journal-de-bord.md).
-
-Ce fichier ne rejoue pas ce détail : voir §7 pour la règle de mise à jour.
 
 ---
-
-## 7. Maintenance de ce fichier
-
-Mettre à jour CLAUDE.md quand :
-- une décision d'archi **générique** change ou s'ajoute (répercuter aussi dans
-  `ROADMAP.md`) ;
-- l'identité visuelle ou les tokens évoluent (répercuter dans
-  `docs/design-system.md` et `assets/styles/tokens.css`) ;
-- un chantier entier se ferme ou un nouveau s'ouvre (une phrase remplace une
-  phrase en §6 — jamais un ticket par ticket).
 
 **Ne pas mettre à jour CLAUDE.md pour un ticket livré.** Un ticket qui avance
 ou se termine se documente à deux endroits seulement :
 - [`docs/feature-live-tracking.md`](./docs/feature-live-tracking.md) : coche la
   case du ticket, ajoute/actualise ses invariants (« ce qui a été tranché en le
   faisant ») ;
-- [`docs/journal-de-bord.md`](./docs/journal-de-bord.md) : ajoute l'entrée
-  narrative datée.
 
 CLAUDE.md doit rester consultable en entier à chaque session sans faire
 exploser le contexte : s'il redevient long, c'est le signe qu'un détail de
