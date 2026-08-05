@@ -8399,6 +8399,85 @@ textarea.kd-inlineedit__input {
     border-top: 1px solid var(--color-divider);
 }
 
+/* Observance de l'instanciation regardée + choix de l'instanciation (KL-49) */
+.kd-prog__run {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--kd-space-6);
+    flex-wrap: wrap;
+    margin-bottom: var(--kd-space-6);
+}
+
+.kd-prog__adherence {
+    margin: 0;
+    font-size: 14px;
+    color: var(--color-text-secondary);
+}
+
+.kd-prog__adherence strong {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    color: var(--color-text-strong);
+}
+
+.kd-prog__adherencepct {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-left: var(--kd-space-2);
+}
+
+.kd-prog__adherencerest {
+    display: block;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.kd-prog__runpick {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-3);
+    flex-wrap: wrap;
+}
+
+.kd-prog__runlabel {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+}
+
+/* Légende prévu / réalisé : deux pastilles, aucune couleur métier */
+.kd-prog__legend {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-6);
+    flex-wrap: wrap;
+    margin: 0 0 var(--kd-space-8);
+}
+
+.kd-prog__key {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-3);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.kd-prog__keybar {
+    display: inline-block;
+    width: 16px;
+    height: 8px;
+    background: var(--color-border-strong);
+}
+
+.kd-prog__keybar--real {
+    width: 9px;
+    background: var(--color-text-strong);
+}
+
 .kd-prog__subtitle {
     font-family: var(--font-mono);
     font-size: 11px;
@@ -8461,19 +8540,22 @@ textarea.kd-inlineedit__input {
     min-width: 28px;
 }
 
+/* `relative` : le réalisé se POSE sur le prévu, il ne se range pas à côté.
+   Les deux barres partent du même bas, à la même échelle (calculée en PHP). */
 .kd-prog__track {
+    position: relative;
     width: 100%;
     height: 96px;
-    display: flex;
-    align-items: flex-end;
-    justify-content: center;
     background: var(--color-surface-subtle);
     border-radius: var(--kd-radius-sm);
 }
 
 .kd-prog__bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
     display: block;
-    width: 100%;
     min-height: 3px;
     border-radius: var(--kd-radius-sm);
     background: var(--color-border-strong);
@@ -8485,6 +8567,15 @@ textarea.kd-inlineedit__input {
 
 .kd-prog__bar--gym {
     background: var(--color-activity-gym);
+}
+
+/* Réalisé (KL-49) : plus étroit et en encre pleine, donc lisible par-dessus la
+   barre du prévu quelle que soit l'activité. Pas de rouge : ce n'est ni une
+   action, ni une intensité, ni un échec. */
+.kd-prog__bar--real {
+    left: 24%;
+    right: 24%;
+    background: var(--color-text-strong);
 }
 
 .kd-prog__col.is-empty .kd-prog__track {

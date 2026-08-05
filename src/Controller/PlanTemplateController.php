@@ -136,9 +136,28 @@ final class PlanTemplateController extends AbstractController
         return $this->redirectToRoute('app_plan_template_edit', ['id' => $template->getId(), 'rename' => 1]);
     }
 
+    /**
+     * La fiche d'un plan : sa trame mise à plat, puis le bloc de progression —
+     * la rampe prévue, et par-dessus elle le réalisé d'une instanciation (KL-49).
+     *
+     * **Une trame n'a pas de dates**, il faut donc choisir *quelle fois* on
+     * regarde : la plus récente par défaut, une autre par `?run=Y-m-d` quand le
+     * plan a été repassé. Un plan jamais posé au calendrier n'a pas de réalisé du
+     * tout, et le bloc reste celui du prévu seul.
+     *
+     * Portée : le propriétaire du plan, jamais l'utilisateur courant — un coach
+     * ouvre cette page pour lire le plan de son athlète, et c'est le calendrier de
+     * l'athlète qui porte le réalisé.
+     */
     #[Route('/{id}', name: 'app_plan_template_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(PlanTemplate $template, SlugGenerator $slugGenerator, PlanTemplateRepository $planTemplateRepository, ProgressionAggregator $progression): Response
-    {
+    public function show(
+        Request $request,
+        PlanTemplate $template,
+        SlugGenerator $slugGenerator,
+        PlanTemplateRepository $planTemplateRepository,
+        ScheduledWorkoutRepository $scheduledWorkoutRepository,
+        ProgressionAggregator $progression,
+    ): Response {
         $this->denyAccessUnlessGranted(PlanTemplateVoter::VIEW, $template);
         $this->ensureSlug($template, $slugGenerator);
 
@@ -146,13 +165,49 @@ final class PlanTemplateController extends AbstractController
         // de progression parcourent chaque case (anti-N+1). Même instance managée.
         $loaded = $planTemplateRepository->findWithContent($template->getId()) ?? $template;
 
+        $owner = $template->getOwner();
+        $anchors = null !== $owner ? $scheduledWorkoutRepository->findPlanAnchorsForOwner($template, $owner) : [];
+        $anchor = $this->pickAnchor($anchors, $request->query->getString('run'));
+
+        $realized = null !== $owner && [] !== $anchors
+            ? $progression->realizedRun($loaded, $scheduledWorkoutRepository->findPlanRunWithLog($template, $owner, $anchor))
+            : null;
+
         return $this->render('plan_template/show.html.twig', [
             'flat' => $this->planFlattener->flattenPlanTemplate($loaded),
             'progression' => [
-                'volume' => $progression->weeklyVolume($loaded),
-                'trajectories' => $progression->exerciseTrajectories($loaded),
+                'volume' => $progression->weeklyVolume($loaded, $realized['weeks'] ?? []),
+                'trajectories' => $progression->exerciseTrajectories($loaded, $realized['exercises'] ?? []),
+                'adherence' => $realized['adherence'] ?? null,
+                'anchors' => $anchors,
+                'anchor' => $anchor,
             ],
         ]);
+    }
+
+    /**
+     * L'instanciation regardée : celle demandée si elle existe, la plus récente
+     * sinon. `$anchors` est déjà trié du plus récent au plus ancien, l'ancre nulle
+     * (instanciation antérieure au champ) en queue.
+     *
+     * Une valeur inconnue dans l'URL retombe silencieusement sur le défaut plutôt
+     * que de lever : c'est un paramètre d'affichage, pas une ressource.
+     *
+     * @param list<\DateTimeImmutable|null> $anchors
+     */
+    private function pickAnchor(array $anchors, string $requested): ?\DateTimeImmutable
+    {
+        if ([] === $anchors) {
+            return null;
+        }
+
+        foreach ($anchors as $anchor) {
+            if (null !== $anchor && $anchor->format('Y-m-d') === $requested) {
+                return $anchor;
+            }
+        }
+
+        return $anchors[0];
     }
 
     /**

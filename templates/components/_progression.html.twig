@@ -1,14 +1,21 @@
-{# Bloc « Progression prévue » — trace ce que le plan PRESCRIT, semaine par
-   semaine (lot A de docs/feature-progression.md). Jamais de réalisé : le titre
-   le dit explicitement. Auto-suffisant, aucun AJAX post-rendu (offline-safe).
+{# Bloc « Progression » — la rampe PRÉVUE du plan, semaine par semaine, et
+   par-dessus elle le RÉALISÉ d'une instanciation quand il y en a une (KL-49).
+   Auto-suffisant, aucun AJAX post-rendu (offline-safe) : changer d'instanciation
+   est une navigation GET, pas un fragment rechargé.
 
    Attend :
-   - volume : list de séries de charge par semaine (ProgressionAggregator::weeklyVolume)
+   - volume       : list de séries de charge par semaine (ProgressionAggregator::weeklyVolume)
    - trajectories : list de trajectoires d'exercice (::exerciseTrajectories)
+   - adherence    : synthèse de l'instanciation regardée, ou null (::realizedRun)
+   - anchors      : list des ancres d'instanciation (la plus récente d'abord)
+   - anchor       : celle qu'on regarde, ou null
+   - planId       : identifiant du plan (cible du sélecteur d'instanciation)
 
    Barres proportionnelles côté serveur (mêmes tokens que .kd-obar / .kd-actbar) :
-   pas de lib de charts, cohérent AssetMapper. La couleur reste réservée aux
-   activités (course/muscu) ; une barre neutre par défaut. #}
+   pas de lib de charts, cohérent AssetMapper. Le prévu est une barre pleine
+   neutre, le réalisé une barre d'encre plus étroite POSÉE DESSUS — les deux sont
+   mises à l'échelle sur le même maximum côté PHP, c'est ce qui rend la
+   comparaison des hauteurs honnête. #}
 {% import 'components/_activity.html.twig' as activity %}
 
 {% macro bars(points, modifier, showVal) %}
@@ -20,7 +27,12 @@
                     {% if p.heightPct > 0 %}
                         <span class="kd-prog__bar{{ modifier ? ' kd-prog__bar--' ~ modifier }}"
                               style="height: {{ p.heightPct }}%"
-                              title="S{{ p.week }} · {{ p.label ?? '—' }}"></span>
+                              title="S{{ p.week }} · prévu {{ p.label ?? '—' }}"></span>
+                    {% endif %}
+                    {% if p.realHeightPct > 0 %}
+                        <span class="kd-prog__bar kd-prog__bar--real"
+                              style="height: {{ p.realHeightPct }}%"
+                              title="S{{ p.week }} · réalisé {{ p.realLabel ?? '—' }}"></span>
                     {% endif %}
                 </div>
                 <span class="kd-prog__wk">S{{ p.week }}</span>
@@ -29,12 +41,61 @@
     </div>
 {% endmacro %}
 
-{% if volume is not empty or trajectories is not empty %}
+{# `adherence` suffit à rendre le bloc : un plan dont les cases sont encore vides
+   n'a pas de rampe à tracer, mais « 3 séances tenues sur 8 » se dit quand même. #}
+{% if volume is not empty or trajectories is not empty or adherence %}
     <section class="kd-card kd-prog">
         <div class="kd-card__head">
-            <h2 class="kd-card__title">{{ ux_icon('lucide:trending-up') }} Progression prévue</h2>
+            <h2 class="kd-card__title">
+                {{ ux_icon('lucide:trending-up') }} {{ adherence ? 'Progression' : 'Progression prévue' }}
+            </h2>
         </div>
-        <p class="kd-prog__lead">Ce que le plan prescrit, semaine par semaine. Aucune donnée de réalisé.</p>
+
+        {% if adherence %}
+            <p class="kd-prog__lead">Ce que le plan prescrit et ce qui a été fait, semaine par semaine.</p>
+
+            {# Observance de l'instanciation regardée. Le décompte porte sur TOUTES
+               ses séances datées, y compris celles qui sont sorties de la trame :
+               elles ont bien été posées par ce plan. #}
+            <div class="kd-prog__run">
+                <p class="kd-prog__adherence">
+                    <strong>{{ adherence.done }}</strong> séance{{ adherence.done > 1 ? 's' }} tenue{{ adherence.done > 1 ? 's' }}
+                    sur {{ adherence.total }}
+                    <span class="kd-prog__adherencepct">{{ adherence.percent }}&nbsp;%</span>
+                    {% if adherence.missed > 0 or adherence.planned > 0 %}
+                        <span class="kd-prog__adherencerest">
+                            ({{ adherence.planned }} à venir, {{ adherence.missed }} manquée{{ adherence.missed > 1 ? 's' }})
+                        </span>
+                    {% endif %}
+                </p>
+
+                {# Un sélecteur seulement s'il y a plusieurs instanciations : un plan
+                   posé une fois n'a rien à choisir. Formulaire GET, pas de JS. #}
+                {% if anchors|length > 1 %}
+                    <form method="get" action="{{ path('app_plan_template_show', {id: planId}) }}" class="kd-prog__runpick">
+                        <label class="kd-prog__runlabel" for="prog-run">Instanciation</label>
+                        <select class="kd-planweek__select" id="prog-run" name="run">
+                            {% for a in anchors %}
+                                <option value="{{ a ? a|date('Y-m-d') : '' }}"{{ a == anchor ? ' selected' }}>
+                                    {{ a ? 'Depuis le ' ~ a|date('d/m/Y') : 'Sans date de départ' }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <button type="submit" class="kd-btn kd-btn--secondary kd-btn--sm">Voir</button>
+                    </form>
+                {% endif %}
+            </div>
+
+            <p class="kd-prog__legend">
+                <span class="kd-prog__key"><span class="kd-prog__keybar"></span> Prévu</span>
+                <span class="kd-prog__key"><span class="kd-prog__keybar kd-prog__keybar--real"></span> Réalisé</span>
+                {% if adherence.logged == 0 %}
+                    <span class="kd-prog__hint">Aucun détail série par série remonté sur cette instanciation.</span>
+                {% endif %}
+            </p>
+        {% else %}
+            <p class="kd-prog__lead">Ce que le plan prescrit, semaine par semaine. Aucune donnée de réalisé.</p>
+        {% endif %}
 
         {% if volume is not empty %}
             <div class="kd-prog__part">
@@ -84,6 +145,8 @@
                         {{ _self.bars(t.points, activity.modifier(t.exercise.activity), true) }}
                         {% if t.lowerIsBetter %}
                             <p class="kd-prog__hint">Barre haute = allure plus rapide.</p>
+                        {% elseif adherence and not t.hasRealized %}
+                            <p class="kd-prog__hint">Rien de logué sur cet exercice pour cette instanciation.</p>
                         {% endif %}
                     </figure>
                 {% endfor %}

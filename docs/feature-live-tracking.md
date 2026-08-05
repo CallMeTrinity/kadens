@@ -4126,14 +4126,56 @@ décision depuis le début.
 
 **Fini quand** :
 
-- [ ] Le réalisé se superpose à la rampe prévue, semaine par semaine
-- [ ] Indicateur de respect du plan (« 11 séances tenues sur 14 »)
-- [ ] **Une trame n'a pas de dates** : le réalisé affiché est celui de la
+- [x] Le réalisé se superpose à la rampe prévue, semaine par semaine
+- [x] Indicateur de respect du plan (« 11 séances tenues sur 14 »)
+- [x] **Une trame n'a pas de dates** : le réalisé affiché est celui de la
       **dernière instanciation** (`planAnchorDate` le plus récent). Un sélecteur
       n'apparaît que s'il y en a plusieurs
-- [ ] Un plan jamais instancié affiche le prévu seul, sans espace vide
-- [ ] `ProgressionAggregator` est étendu, pas dupliqué
-- [ ] `docs/feature-progression.md` mis à jour : le lot B est livré
+- [x] Un plan jamais instancié affiche le prévu seul, sans espace vide
+- [x] `ProgressionAggregator` est étendu, pas dupliqué
+- [x] ~~`docs/feature-progression.md` mis à jour : le lot B est livré~~ — le
+      fichier a été supprimé entre-temps (`chore: remove unused docs`) ; le lot B
+      se documente donc ici, et nulle part ailleurs
+
+**Livré.** Une méthode de plus sur l'agrégat (`ProgressionAggregator::realizedRun`),
+deux lectures de plus en base (`ScheduledWorkoutRepository::findPlanAnchorsForOwner`
+et `findPlanRunWithLog`), et **les deux lectures existantes ont pris un second
+paramètre facultatif** plutôt qu'un jumeau — `weeklyVolume($template, $realized)`,
+`exerciseTrajectories($template, $realized)`. Ce qui a été tranché en le faisant :
+
+- **Une seule échelle pour les deux barres.** Le maximum d'une série couvre le
+  prévu *et* le réalisé. Deux maximums auraient rendu chaque barre comparable
+  d'une semaine à l'autre mais plus à celle d'en face, ce qui est pourtant tout
+  l'objet du bloc.
+- **Rien n'est superposé sur ce qui ne se logue pas.** Seule la muscu écrit du
+  réalisé : les séries de distance (course, vélo, natation) et les métriques
+  d'allure n'ont pas de deuxième barre — et surtout **pas une barre à zéro**, qui
+  se lirait « rien fait » au lieu de « rien à dire ». Trois séries seulement
+  reçoivent la superposition (temps, tonnage, séries) et trois métriques de
+  trajectoire (charge, séries, durée).
+- **La case d'origine fait foi, pas la date.** La semaine d'une séance datée se
+  lit sur `sourcePlanItem.weekNumber` : déplacer une séance ne la fait pas changer
+  de semaine dans le plan qui l'a posée. Le repli sur l'écart à l'ancre ne sert
+  qu'aux séances dont la case a disparu (FK en `SET NULL`).
+- **L'observance compte toute l'instanciation**, y compris les séances sorties de
+  la trame : elles ont bien été posées par ce plan. C'est le seul chiffre du bloc
+  qui ne dépende pas du découpage en semaines.
+- **Une ancre nulle est une instanciation comme une autre.** Une instanciation
+  antérieure au champ `planAnchorDate` n'en porte pas ; l'écarter la rendrait
+  invisible. MariaDB range les `NULL` en fin de tri décroissant, donc à leur
+  place : la plus ancienne.
+- **Changer d'instanciation est une navigation, pas un fragment.** `?run=Y-m-d`
+  sur un formulaire GET, sans JS : la page de consultation reste auto-suffisante
+  (condition du cache offline). Une valeur inconnue retombe silencieusement sur le
+  défaut — c'est un paramètre d'affichage, pas une ressource.
+- **Le bloc se rend dès qu'il y a une observance**, même sans rampe : un plan dont
+  les cases sont encore vides n'a rien à tracer, mais « 3 séances tenues sur 8 »
+  se dit quand même.
+- **Portée sur `$template->getOwner()`**, jamais sur l'utilisateur courant : un
+  coach ouvre cette page pour lire le plan de son athlète, et c'est le calendrier
+  de l'athlète qui porte le réalisé.
+- **Pas de rouge.** Le réalisé est une barre d'encre pleine, plus étroite, posée
+  sur celle du prévu. Ce n'est ni une action, ni une intensité, ni un échec.
 
 ### KL-50 — Trajectoire d'un exercice
 

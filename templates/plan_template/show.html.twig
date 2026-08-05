@@ -53,5 +53,9 @@
     {{ include('components/_progression.html.twig', {
         volume: progression.volume,
         trajectories: progression.trajectories,
+        adherence: progression.adherence,
+        anchors: progression.anchors,
+        anchor: progression.anchor,
+        planId: flat.template.id,
     }) }}
 {% endblock %}

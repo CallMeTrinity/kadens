@@ -343,6 +343,77 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     }
 
     /**
+     * Les **ancres d'instanciation** d'un plan chez un utilisateur, la plus
+     * récente d'abord. Une trame n'a pas de dates : c'est l'ancre qui dit *quelle
+     * fois* on regarde quand on superpose le réalisé au prévu (KL-49).
+     *
+     * `planAnchorDate` peut être **nulle** — une instanciation antérieure au champ
+     * n'en porte pas — et cette valeur est renvoyée comme les autres : c'est une
+     * série de séances bien réelle, l'écarter la rendrait invisible. MariaDB place
+     * les NULL en fin de tri décroissant, donc au bon endroit : la plus ancienne.
+     *
+     * @return list<\DateTimeImmutable|null>
+     */
+    public function findPlanAnchorsForOwner(PlanTemplate $template, User $owner): array
+    {
+        $rows = $this->createQueryBuilder('s')
+            ->select('DISTINCT s.planAnchorDate AS anchor')
+            ->andWhere('s.sourcePlanTemplate = :template')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('template', $template)
+            ->setParameter('owner', $owner)
+            ->orderBy('anchor', 'DESC')
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_map(static function (array $row): ?\DateTimeImmutable {
+            $anchor = $row['anchor'];
+
+            return match (true) {
+                null === $anchor => null,
+                $anchor instanceof \DateTimeImmutable => $anchor,
+                default => new \DateTimeImmutable((string) $anchor),
+            };
+        }, $rows);
+    }
+
+    /**
+     * Les séances datées d'**une** instanciation, avec leur réalisé et leur case
+     * d'origine. C'est la matière de la superposition prévu/réalisé (KL-49).
+     *
+     * Seule la branche du réalisé est jointe, jamais celle du prescrit : le prévu
+     * se lit sur la trame elle-même (`PlanItem → Workout`), pas sur ses copies
+     * datées, et joindre les deux collections sœurs sous la même séance en ferait
+     * le produit cartésien (cf. `findWindowWithContentAndLog`).
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findPlanRunWithLog(PlanTemplate $template, User $owner, ?\DateTimeImmutable $anchor): array
+    {
+        $qb = $this->createQueryBuilder('s')
+            ->addSelect('le', 'ls', 'e', 'pi')
+            ->leftJoin('s.loggedExercises', 'le')
+            ->leftJoin('le.loggedSets', 'ls')
+            ->leftJoin('le.exercise', 'e')
+            ->leftJoin('s.sourcePlanItem', 'pi')
+            ->andWhere('s.sourcePlanTemplate = :template')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('template', $template)
+            ->setParameter('owner', $owner)
+            ->orderBy('s.scheduledDate', 'ASC')
+            ->addOrderBy('s.id', 'ASC');
+
+        if (null === $anchor) {
+            $qb->andWhere('s.planAnchorDate IS NULL');
+        } else {
+            $qb->andWhere('s.planAnchorDate = :anchor')
+                ->setParameter('anchor', $anchor, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
      * Plans actuellement posés sur le calendrier de l'utilisateur (au moins une
      * séance datée en provient), dédupliqués et triés par titre. Alimente le
      * retrait rapide d'un plan instancié depuis le calendrier.
