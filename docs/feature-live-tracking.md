@@ -4108,10 +4108,17 @@ ticket, et pas celui-ci.
 
 ## Lot 7 — Vues web du réalisé et coaching (après la mise en production)
 
-Ces trois tickets ne bloquent ni le mobile ni la mise en production. Ils sont
+Ces quatre tickets ne bloquent ni le mobile ni la mise en production. Ils sont
 là parce que c'est là que la donnée devient intéressante à regarder.
 **`KL-50` peut être tiré en avant à tout moment** : sa seule dépendance,
 `PerformanceHistory`, est déjà construite au lot 1.
+
+**Lot livré en entier** (KL-49, KL-50, KL-51, KL-45), dans cet ordre. Le fil qui
+les relie, et qu'aucun ne casse : **le réalisé d'un utilisateur n'appartient qu'à
+lui**. Trois écrans le lisent désormais, et chacun le scope explicitement — le
+plan sur son propriétaire, la fiche d'exercice sur l'utilisateur connecté (un
+exercice global est pratiqué par tout le monde), la fiche athlète sur l'athlète.
+Deux tests montent deux utilisateurs sur le même exercice global pour le fixer.
 
 ### KL-49 — Réalisé superposé à la progression du plan
 
