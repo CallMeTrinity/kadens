@@ -258,7 +258,33 @@
 > `statusMissed` et non `primary` (même valeur, sens différent) et les icônes
 > Lucide sont figées en local comme côté web. Vérifié par 94 contrôles hors React
 > Native ; le rendu reste à valider sur l'appareil.
-> Prochain ticket : **KL-38** (états vides, erreurs, bandeau hors ligne).
+> **KL-38 livré (05/08/2026)** : les états dégradés. Un **bandeau hors ligne**
+> monté une fois pour les trois onglets, juste au-dessus de la barre basse, qui
+> lit **deux sources** — l'état réseau du téléphone et celui du moteur — parce
+> que « pas de réseau » et « serveur muet » ne se corrigent pas pareil ; il
+> informe à l'encre faible et n'alerte pas, hors réseau étant l'état nominal en
+> salle. Les **messages d'échec cessent de porter du technique** : plus de code
+> HTTP, plus de méthode ni de chemin, plus de `error.message` anglais — le
+> `detail` du serveur passe devant, une table de statuts prend le relais, et une
+> classe `ConfigurationError` récupère le seul message local qui se perdait.
+> Enfin un **`ErrorBoundary` racine** rend l'écran blanc impossible, avec deux
+> portes de sortie (réessayer, revenir à l'accueil), et partage son dessin avec
+> l'écran de base indisponible.
+> **KL-39 livré (05/08/2026)** : l'ergonomie de salle. Une **barre basse** dans la
+> séance, qui empile le repos puis la **validation de la série courante** —
+> toujours en dernier, donc toujours à la même distance du pouce — et bascule sur
+> la clôture quand tout est coché ; la cible courante s'y **écrit** et le déroulé
+> la rejoint, donc elle ne se perd jamais. Le **premier chiffre d'une saisie** ne
+> disparaît plus (`selectTextOnFocus` posait sa sélection après la première
+> frappe), ajouter une série **n'ouvre plus de feuille**, et l'historique passe en
+> **tableau** — une phrase condensée se tronquait sur la série la plus lourde.
+> Côté contrastes, deux règles ont bougé : l'**encre faible ne porte plus de
+> texte** et le **rouge écrit** se dit `primaryOnTint`, le plein restant aux
+> aplats ; le bouton primaire pressé fonce désormais au lieu de s'éclaircir. Ce
+> que le **clavier recouvre** se mesure au lieu de se deviner, et
+> `prefers-reduced-motion` couvre les deux seuls mouvements de l'app. Vérifié par
+> 150 contrôles hors React Native ; le rendu se juge au pouce, en salle.
+> Prochain ticket : **KL-40** (signature Android).
 
 ---
 
@@ -1184,7 +1210,7 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
 - [x] **Le QR ne contient jamais de token**, seulement ce code (§0.6 règle 1)
 - [x] `POST /api/auth/pair` : `{code, deviceName}` → `{token, user}`
 - [x] **Consommation atomique** : `UPDATE pairing_code SET used_at = NOW()
-    WHERE id = ? AND used_at IS NULL`, puis vérification des lignes affectées.
+  WHERE id = ? AND used_at IS NULL`, puis vérification des lignes affectées.
       Une lecture suivie d'une écriture laisserait passer deux scans simultanés
 - [x] Un code expiré, déjà utilisé ou inconnu renvoie la **même** erreur 400
 - [x] Limiteur de débit sur `POST /api/auth/pair` (10 essais par IP et par
@@ -3372,12 +3398,94 @@ le logo du site n'est pas dans la palette non plus.
 
 **Fini quand** :
 
-- [ ] Un état vide dessiné pour chaque liste
-- [ ] Bandeau hors ligne discret et **non bloquant** : hors réseau, l'app marche,
+- [x] Un état vide dessiné pour chaque liste
+- [x] Bandeau hors ligne discret et **non bloquant** : hors réseau, l'app marche,
       le bandeau informe, il n'alerte pas
-- [ ] Les erreurs d'API se lisent en français, sans code technique
-- [ ] Aucun écran blanc possible : un `ErrorBoundary` global avec une porte de
+- [x] Les erreurs d'API se lisent en français, sans code technique
+- [x] Aucun écran blanc possible : un `ErrorBoundary` global avec une porte de
       sortie
+
+**Livré le 05/08/2026.** Comme KL-37, le ticket arrivait à moitié fait : les
+quatre listes de premier plan (le jour, l'historique, le programme d'une séance,
+la séance introuvable) avaient déjà leur état vide, posé en même temps qu'elles.
+Ce qui restait tenait dans les **listes de second plan** et dans les deux sujets
+que personne n'avait encore traités de front — ce qu'on dit d'un échec, et ce
+qu'on montre quand il n'y a plus rien à montrer. Cinq décisions.
+
+1. **Le bandeau lit deux sources, parce qu'il y a deux façons d'être hors
+   ligne.** `useOfflineNotice()` (`@/sync`) croise l'état réseau du téléphone
+   (`expo-network`, `isConnected === false` — jamais `isInternetReachable`, même
+   raison qu'en `triggers.ts`) et le drapeau `offline` du moteur, qui date du
+   dernier cycle raté. Le premier répond **sans avoir rien tenté** : c'est le
+   sous-sol de la salle, il n'y a pas à attendre un push échoué pour le dire. Le
+   second couvre l'autre moitié — du réseau, et un serveur muet : portail captif,
+   VPN, mutualisé en carafe. N'en lire qu'un donnerait, au choix, un bandeau qui
+   arrive après coup ou un bandeau qui affirme que tout va bien devant un serveur
+   injoignable. Ils ne se disent pas pareil à l'écran (« Hors réseau » contre
+   « Serveur injoignable ») parce qu'ils ne se corrigent pas pareil.
+2. **Il informe à l'encre faible, et il ne bloque rien.** Pas de rouge : hors
+   réseau est l'**état nominal** du chantier, et un rouge qui dure des heures
+   userait la seule couleur de l'identité sur un non-événement (règle 2). Pas de
+   modale, pas de superposition, aucune cible tactile — il n'y a rien à faire,
+   c'est précisément ce qu'il dit, et il ajoute ce qui attend (« 2 séances
+   repartiront au retour du réseau »). Côté accessibilité, `accessibilityLiveRegion`
+   à **`polite`** et surtout pas de rôle `alert` : TalkBack l'annonce quand il a
+   fini sa phrase, il ne coupe pas la lecture d'une série.
+3. **Il est monté une fois, dans la disposition des onglets.** Au-dessus de la
+   `TabList`, pas sous l'en-tête : en haut il aurait décalé le titre de chaque
+   écran à chaque bascule de réseau, et l'en-tête porte déjà la zone sûre du
+   haut. Ici il pousse la barre de quelques points, que rien ne recouvre — et il
+   ne prend pas l'inset du bas, la barre est en dessous et c'est elle qui le
+   prend (règle des zones sûres, KL-37). Il n'apparaît **pas** dans une séance en
+   cours : c'est un écran de pile, hors réseau y est nominal, et la place sous le
+   pouce y appartient à « valider cette série ».
+4. **Un message d'échec ne porte plus rien de technique.** Trois fuites
+   existaient et se ferment ensemble. `ApiError.userMessage` retombait sur « Le
+   serveur a répondu 502. » : le `detail` du serveur passe toujours devant (le
+   contrat le veut français et lisible — le lire n'est pas l'**analyser**, la
+   décision de comportement reste au `status`), et sans lui c'est une table de
+   statuts qui écrit la phrase, sans jamais citer le code. Sur un `422`, c'est la
+   première `violation` qui parle : le `detail` y est structurellement pauvre
+   (« Les données envoyées sont invalides. ») quand `violations` nomme le champ.
+   Et le repli de `describeError` ne rend plus `error.message` — anglais de
+   bibliothèque, méthode et chemin d'un appel — au prix assumé d'une phrase vague
+   sur un échec inconnu. Ce qui a rendu ce dernier point possible est une classe
+   de plus, `ConfigurationError` : le seul message local vraiment utile (« aucun
+   serveur appairé ») était levé en `Error` nu et se serait perdu avec le repli.
+   Un test parcourt douze statuts et vérifie qu'aucun ne laisse sortir de chiffre.
+5. **L'`ErrorBoundary` est à la racine, et il partage son dessin avec la base
+   indisponible.** `expo-router` enveloppe une route dès qu'elle exporte un
+   `ErrorBoundary`, et une erreur remonte à la frontière parente la plus proche :
+   posé sur `app/_layout.tsx`, il couvre l'app entière. Deux portes de sortie,
+   parce qu'une seule ne suffit pas : `retry()` rend la main quand l'erreur était
+   passagère, mais un rendu qui lève à chaque fois la rejouerait indéfiniment —
+   d'où le repli qui **navigue d'abord** vers l'accueil, puis réarme la frontière
+   (l'inverse rejouerait exactement la même erreur). Le composant `Fault` qu'il
+   rend est le même que celui du garde-fou des migrations, à une différence près :
+   celui-là n'a **pas** de porte de sortie, rien de ce que l'app sait faire ne
+   s'ouvrant sans base. Ce qu'aucune frontière React ne couvre reste vrai : ce qui
+   lève hors rendu, déjà pris là où il naît (le moteur ne lève jamais, les
+   écritures de séance sont transactionnelles).
+
+**Deux listes n'ont pas reçu de bloc centré, et c'est délibéré.** La file
+d'attente des réglages porte son vide dans sa ligne de résumé (« En attente —
+rien »), qui en dit plus qu'un état vide au milieu d'une carte de réglages. Et
+les « dernières fois » d'un exercice ne sont pas une liste vide quand elles
+manquent : c'est la première fois qu'on fait le mouvement, et l'écrire est du
+ressort de KL-39, qui reprend cette vue entière.
+
+**Vérifié** : `npm run typecheck`, `npm run lint`, `npm run format:check`, **104
+contrôles hors React Native** en 13 suites (dix neufs, sur la rédaction des
+échecs et sur le bandeau — deuxième composant du dépôt monté par un test, après
+`NumberStepper`, et pour la même raison : il porte une règle, pas de la mise en
+page), et `npx expo export --platform android`.
+
+**Limites.** Rien n'a été observé sur l'appareil : le bandeau au-dessus de la
+barre d'onglets, l'écran de panne et ses deux boutons se valident à l'œil, et
+provoquer les deux demande de couper le Wi-Fi et de faire lever un rendu à la
+main. La bascule de `useNetworkState()` sur Android n'a pas été chronométrée non
+plus — si le bandeau s'affiche avec un temps de retard en sortant du sous-sol,
+c'est ce hook qu'il faudra regarder, pas le moteur.
 
 ### KL-39 — Ergonomie de salle et accessibilité
 
@@ -3386,17 +3494,185 @@ le noir. Ce ticket n'est pas cosmétique.
 
 **Fini quand** :
 
-- [ ] Cible principale (valider une série) atteignable au pouce, en bas d'écran
-- [ ] Clavier qui n'osbrue pas la vue
-- [ ] fix le bug quand on entre une valeur numérique du premier chiffre qui n'est pas pris en compte
-- [ ] Ajouter une nouvelle série n'ouvre pas la modale par défaut
-- [ ] La vue des derière fois et record est amélioré et explicite (tableau, plutot que des lignes qui peuvent être tronqué)
-- [ ] Aucun geste fin requis : pas de glissement pour supprimer sans repli, pas
+- [x] Cible principale (valider une série) atteignable au pouce, en bas d'écran
+- [x] Clavier qui n'obstrue pas la vue
+- [x] Le premier chiffre d'une saisie numérique n'est plus perdu
+- [x] Ajouter une nouvelle série n'ouvre pas la modale par défaut
+- [x] La vue des dernières fois et du record est un **tableau**, explicite et sans
+      troncature
+- [x] Aucun geste fin requis : pas de glissement pour supprimer sans repli, pas
       de zone de moins de 44 points
-- [ ] Contrastes vérifiés à AA
-- [ ] Libellés d'accessibilité sur tous les contrôles
-- [ ] `prefers-reduced-motion` respecté
-- [ ] La séance en cours ne défile jamais de façon à perdre la série courante
+- [x] Contrastes vérifiés à AA
+- [x] Libellés d'accessibilité sur tous les contrôles
+- [x] `prefers-reduced-motion` respecté
+- [x] La séance en cours ne défile jamais de façon à perdre la série courante
+
+**Livré le 05/08/2026.** Le ticket disait « ce n'est pas cosmétique » et il avait
+raison : sur dix cases, une seule était de la mise en forme. Sept décisions ont
+été prises en le faisant, et deux d'entre elles ont bougé le design system.
+
+1. **La barre basse est la seule action primaire de l'écran.** `SessionDock`
+   empile ce qui vit en bas d'une séance — le repos quand il court, puis la
+   **validation, toujours en dernier**. L'ordre est le point : la cible principale
+   se retrouve à la même distance du bord qu'un repos coure ou non, et la mémoire
+   du pouce n'a pas à se rééduquer entre deux séries. Elle propose la **cible
+   courante** (`nextTarget`, `@/session`) et bascule sur la clôture quand il n'y a
+   plus rien à cocher. Conséquence assumée : le bouton « Terminer la séance »
+   resté dans le fil du déroulé passe en **secondaire** — un écran n'a qu'un
+   bouton primaire, et c'est désormais celui qu'on tape sans regarder. Les lignes
+   restent cochables une à une : la barre est le chemin court du cas nominal,
+   elle ne remplace pas le tableau qu'on lit pour rattraper une série.
+2. **La cible courante alterne dans un superset, et nulle part ailleurs.** La
+   règle de base est la première ligne cochable en descendant l'écran ; à
+   l'intérieur d'un groupe lié, c'est le membre qui a le moins de séries faites —
+   A1, A2, A1. Sans cette exception, la barre proposerait la deuxième série de A1
+   pendant qu'on est sur A2, c'est-à-dire l'inverse de ce qui se passe. Quatre
+   contrôles la tiennent, sans écran ni base : `nextTarget` est pur, comme tout
+   `program.ts`.
+3. **La série courante ne se perd jamais, par deux moyens à la fois.** Elle est
+   **écrite dans la barre** (donc lisible même déroulé jusqu'en bas), et le
+   déroulé la **rejoint** quand elle change d'exercice — jamais entre deux séries
+   du même, un écran qui se recale sous le doigt serait pire que le mal. Le calcul
+   passe par `measureInWindow` de la vue courante et de la fenêtre de lecture,
+   plutôt que par un cumul d'`onLayout` : entre la page, le bloc, le groupe et le
+   rail d'un superset, quatre `y` relatifs s'additionneraient. La hauteur de la
+   barre est une **dépendance** de l'effet, pas une constante — le repos qui
+   s'ouvre la fait grandir, et ce qu'elle vient de recouvrir se redécouvre.
+4. **Le premier chiffre perdu venait de `selectTextOnFocus`.** Android pose la
+   sélection **après** le premier rendu du champ focalisé : le chiffre tapé
+   arrivait avant elle, la sélection tombait ensuite sur ce chiffre-là, et le
+   suivant l'effaçait — « 80 » saisi donnait « 0 ». Le champ se vide donc en
+   JavaScript à la prise de focus, la valeur en place passant en invite. Aucun
+   calendrier natif dans la boucle. Deuxième correction du même composant, trouvée
+   en la faisant : un pas donné **pendant** que le champ est ouvert repartait de
+   la valeur d'avant, parce qu'appuyer sur un bouton ne relâche pas forcément le
+   champ sur Android. Le brouillon est maintenant consigné avant le pas.
+5. **Ce que le clavier recouvre se mesure, il ne se devine pas.**
+   `useKeyboardOverlap` rend `hauteur de la vue hôte − haut du clavier`, et non la
+   hauteur du clavier : sur Android, deux comportements coexistent sans que le
+   JavaScript sache lequel s'applique — la fenêtre se redimensionne
+   (`adjustResize`) ou le clavier se pose par-dessus, ce que fait une `Modal` en
+   bord à bord. Ajouter la hauteur dans le premier cas lèverait la feuille deux
+   fois. Une fenêtre déjà redimensionnée a un bas au-dessus du clavier, le
+   recouvrement vaut zéro, et la même formule est juste dans les deux cas. Deux
+   réglages vont avec, et ils comptent autant : `keyboardShouldPersistTaps` sur le
+   corps d'une feuille (sans lui, le premier appui sur un résultat ne faisait que
+   refermer le clavier — deux appuis pour un choix) et la zone sûre du bas qui
+   **cesse de s'ajouter** tant que le clavier est là, puisqu'il la recouvre déjà.
+6. **L'encre faible ne porte plus de texte, et le rouge écrit a changé de token.**
+   `--color-text-faint` tombe à 3,4:1 sur le papier et 4,2:1 sur un fond appuyé :
+   un token dont la validité dépend du fond où il atterrit est un piège, et la vue
+   qui le pose ne le sait pas. Il cède la place à `textSecondary` **partout**
+   (27 emplois). Le rouge plein, lui, plafonne à 3,6:1 sur le papier : tout rouge
+   **écrit** se dit désormais `primaryOnTint`, le plein restant aux aplats, aux
+   pastilles et aux filets — où 3:1 suffit. Deux corrections plus fines suivent :
+   la case d'une série à cocher prend l'encre secondaire (son gris de filet valait
+   1,7:1, pour la cible qu'on vise sans regarder), et **le bouton primaire pressé
+   fonce au lieu de s'éclaircir** — il ramenait le blanc de son libellé à 4,1:1, et
+   `--color-primary-hover` est justement plus sombre que l'accent côté web ;
+   l'inversion était une invention native de KL-23. Une suite de 40 contrôles tient
+   la table des couples encre/fond, avec le seuil dérivé du **rôle
+   typographique** : un rôle qui grossit ou maigrit change son propre seuil.
+7. **Le tableau d'historique remplace une phrase qui mentait.** Condensée sur une
+   ligne, une séance de quatre paliers finissait en points de suspension — donc
+   sur la série la plus lourde, celle qu'on est venu lire. Trois colonnes (séries,
+   effort, charge) ne tronquent rien et se comparent verticalement. La phrase
+   condensée n'a pas disparu pour autant : elle est devenue le **libellé
+   d'accessibilité** de la section, parce qu'un tableau se parcourt de l'œil mais
+   ne s'annonce pas colonne par colonne.
+
+**Quatre cases arrivaient déjà tenues**, et c'est le socle de KL-22/23 qui les
+tenait : aucun geste fin n'existe dans l'app (pas un `PanResponder`, pas un
+`Swipeable` — la suppression d'une série passe par sa feuille, celle d'un exercice
+par une confirmation), `layout.touchTarget` est posé sur toutes les cibles depuis
+le premier composant, et les rôles et libellés d'accessibilité étaient là. Deux
+ajouts seulement : le libellé explicite des trois onglets, et
+`accessibilityValue` sur le compteur — dont le brouillon vidé aurait sinon fait
+annoncer un champ vide. Pour le mouvement réduit, il n'y avait rien à respecter
+avant ce ticket : l'app n'anime rien (aucun `Animated`, aucun `LayoutAnimation`).
+`useReducedMotion` (`@/theme`) couvre les deux seuls mouvements qui existent — la
+montée d'une feuille, et le déroulé qui rejoint la série courante.
+
+**Vérifié** : `npm run typecheck`, `npm run lint`, `npm run format:check`, **150
+contrôles hors React Native** en 14 suites (46 neufs : la cible courante, la
+saisie du premier chiffre, et la table des contrastes), et
+`npx expo export --platform android`.
+
+**Limites.** Rien n'a été observé sur l'appareil, et c'est plus gênant ici
+qu'ailleurs — la moitié de ce ticket se juge au pouce. Trois points précis à
+regarder en salle : la **hauteur de la barre** pendant un repos (elle empile deux
+étages, ~200 points avec la zone sûre — c'est assumé, la page se dégage d'autant,
+mais c'est à voir en main) ; le **recouvrement du clavier dans une `Modal`**, dont
+tout le raisonnement du point 5 repose sur le fait qu'une feuille en bord à bord
+ne se redimensionne pas ; et le **recalage du déroulé**, dont le confort dépend
+d'un seuil (`space[8]` de marge) qui ne se règle bien qu'à l'usage. Enfin les
+contrastes sont vérifiés par le calcul, pas par l'œil : le papier `#dcdcd7` sous
+une lumière de sous-sol peut demander plus que le minimum AA, et c'est le genre de
+chose qu'aucune suite ne dira.
+
+#### Retour de salle (05/08/2026)
+
+Les limites ci-dessus disaient « la moitié de ce ticket se juge au pouce ». Un
+premier passage en main a produit cinq corrections, dont quatre touchent des
+tickets déjà livrés. Elles sont ici et pas dans leurs sections d'origine : ce qui
+les explique est commun, c'est l'usage.
+
+1. **Ajouter une série ne la consigne plus.** « + Série » écrivait une
+   `logged_set` complète : la série naissait **faite**, avant d'avoir été faite,
+   et le repos partait avec — annoncer une série de plus revenait à déclarer
+   l'avoir déjà exécutée. Elle pose maintenant une ligne **cochable de plus**,
+   pré-remplie par la précédente, qui se valide comme les autres. Décision qui
+   tient tout : cette ligne **ne va pas en base**. Une série non faite n'est ni du
+   prescrit (il ne bouge jamais, §0.3) ni du réalisé (il décrit ce qui a eu lieu),
+   elle n'a donc aucune colonne où s'écrire, et en inventer une ferait partir au
+   serveur une série qu'on n'a pas faite. Elle vit dans l'écran, par clé
+   d'exercice, et se **projette** sur le déroulé au rendu (`withDraftSets`,
+   `program.ts`, pur et testé). Conséquences : `addSet` disparaît — il n'y a plus
+   qu'un seul chemin d'écriture pour « une série a été faite », `checkSet` — les
+   compteurs ne bougent pas tant que rien n'est coché (une série qu'on décide
+   d'ajouter n'ajoute rien à ce que le **programme** réclame), une seule ligne
+   annoncée à la fois par exercice (le bouton devient « Retirer la série » tant
+   qu'elle attend), et l'app tuée avec une annonce en attente la perd — elle ne
+   portait aucune information, seulement une intention.
+2. **Le repos automatique se débranche, depuis la barre basse.** Nouveau réglage
+   `preference.auto_rest` (vrai par défaut, migration `0002`), basculé par un
+   interrupteur posé **contre le bouton de validation** — c'est en cochant une
+   série qu'on s'aperçoit qu'un décompte n'a rien à faire là (circuit mené à la
+   montre, échauffement enchaîné), et repartir chercher un écran de réglages au
+   milieu d'une séance n'arrive pas. Il ne coupe que le **démarrage automatique**
+   (`startRestAfterSet`) : un repos lancé à la main part quand même, un repos qui
+   court garde ses ajustements. Deux dessins et pas deux teintes (`timer` /
+   `timer-off`, importés d'abord côté serveur) : l'identité n'a qu'une couleur et
+   elle est prise par l'action primaire, juste à côté. Les réglages portent le
+   même interrupteur, pour qu'il soit trouvable.
+3. **La barre de repos tombe de trois étages à une ligne.** Elle prenait ~200
+   points — jauge, titre, chrono géant, rangée d'actions — et poussait vers le
+   haut ce qu'on consulte pendant un repos, le déroulé des séries. Tout tient
+   maintenant sur une ligne : `− 15 s`, le temps, `+ 15 s`, « Passer ». Ce qui a
+   sauté n'était pas de l'information (le mot « Repos », que la jauge et le chrono
+   disent déjà ; le nom de l'exercice, écrit dans la barre juste en dessous). La
+   jauge reste, à 3 points : c'est le seul élément qui se lit **sans lire**, de
+   loin. Le chrono descend de `kpi` à `inputValue`, ce qui lui fait perdre le
+   statut de « grand texte » au sens WCAG — donc le rouge d'échéance passe de
+   `primary` à `primaryOnTint`, exactement la règle posée au point 6 ci-dessus. La
+   table des contrastes suit.
+4. **Choisir des exercices, puis valider.** Le sélecteur refermait la feuille à
+   chaque choix : garnir une séance vierge de cinq exercices, c'était cinq
+   ouvertures, cinq focus du champ, cinq fois les mêmes facettes à reposer. Les
+   choix s'**accumulent** (case à droite, comme une série), le pied les ajoute
+   tous, dans l'ordre des appuis. Le coût est un appui de plus quand on n'en veut
+   qu'un ; le gain est une recherche au lieu de cinq. Le **remplacement** garde
+   l'appui unique : deux exercices ne remplacent pas une ligne du programme.
+5. **« Voir la séance » ne faisait rien dans « Aujourd'hui ».** La carte passait
+   par `beginWorkout`, qui refuse une séance close (§2.3 point 5, et c'est
+   correct), et n'ouvrait donc rien — un appui sans effet, qui se lit comme un
+   écran figé. L'historique tenait déjà la bonne règle depuis KL-37 : une séance
+   close s'ouvre par un `push` direct, sans passer par le démarrage. Les deux
+   écrans la partagent maintenant.
+
+**Vérifié** : `npm run typecheck`, `npm run lint`, `npm run format:check`, **151
+contrôles** en 14 suites (les tests d'`addSet` sont devenus ceux de la série
+annoncée, et le parcours hors réseau de bout en bout passe par elle).
 
 ---
 
@@ -3560,7 +3836,7 @@ ne se range pas sur l'entité.
 **Piste écartée pour l'instant** : afficher la dernière charge dans la palette
 du compositeur. Utile pour composer, mais c'est un autre écran et un autre
 besoin. À traiter comme un lot à part si le besoin se confirme, jamais en
-extension de ce ticket.
+extension dae ce ticket.
 
 ### KL-45 — Lecture du réalisé par le coach
 
