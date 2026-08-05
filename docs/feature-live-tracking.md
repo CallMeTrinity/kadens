@@ -308,9 +308,13 @@
 > (`app.config.ts`) : `versionCode` = `github.run_number`, `versionName` = le tag.
 > Dans la foulée, l'APK est passé de **130 Mo à 20,6 Mo** : la mesure a montré
 > que 80 % du poids était natif et qu'un tiers du dex était du Jetpack Compose
-> tiré par `@expo/ui` et jamais exécuté. Restent le workflow, qui n'a pas encore
-> tourné sur un runner, et R8, dont la recette sur l'appareil est une condition
-> de KL-44.
+> tiré par `@expo/ui` et jamais rendu. **Correctif du 05/08/2026** : exclure
+> `@expo/ui` de l'autolinking ne retirait que le natif, et `expo-router` require
+> son JS statiquement depuis `Stack` — l'app tombait au démarrage sur
+> `Cannot find native module 'ExpoUI'`. Il fallait un second verrou côté bundle
+> (alias Metro vers `stubs/expo-ui.js`) ; les deux vont par paire. Restent le
+> workflow, qui n'a pas encore tourné sur un runner, et R8, dont la recette sur
+> l'appareil est une condition de KL-44.
 > **KL-43 livré (05/08/2026)**, **avant KL-42 dont il dépendait sur le papier** :
 > la page `/app` et le contrôle de version n'avaient besoin du dépôt que pour son
 > URL, qui tient dans un paramètre. Côté web, une page **anonyme** rendue côté
@@ -3871,7 +3875,7 @@ Compose jamais exécuté**. Cinq réglages, chacun chiffré sur un build réel :
 | `reactNativeArchitectures=arm64-v8a`  | `build.yml` (drapeau Gradle)  | −74,7 Mo |
 | `useLegacyPackaging=true`             | `plugins/with-app-size.js`    | −17,2 Mo |
 | R8 + `shrinkResources`                | `plugins/with-app-size.js`    |  −7,2 Mo |
-| `@expo/ui` hors autolinking           | `package.json`                |  −6,5 Mo |
+| `@expo/ui` hors autolinking           | `package.json` + `metro.config.js` |  −6,5 Mo |
 | GIF et WebP désactivés                | `plugins/with-app-size.js`    |  −0,8 Mo |
 
 **Résultat mesuré : 20,6 Mo téléchargés, ~47 Mo installés** (contre ~130 Mo
@@ -3880,10 +3884,40 @@ installés avant). Ce qui a été tranché en le faisant :
 - **`@expo/ui` était le poids mort le plus cher, et le moins visible.** Il vient
   d'`expo-router`, qui le tire pour son *toolbar* flottant, et embarque tout
   Jetpack Compose + Material3 — 22 144 références de types dans le dex. Kadens
-  dessine sa barre d'onglets à la main (`expo-router/ui` headless) et n'importe
+  dessine sa barre d'onglets à la main (`expo-router/ui` headless) et ne **rend**
   jamais le toolbar : après exclusion, Compose tombe à **zéro référence** et rien
   d'autre ne bouge. Le leçon générale : le coût d'une dépendance ne se lit pas
   dans `package.json`, il se lit dans l'APK.
+- **Exclure de l'autolinking retire le natif, pas le JS — et il fallait les deux**
+  (corrigé le 05/08/2026, au premier rebuild après KL-41 ; l'app tombait au
+  démarrage sur `Cannot find native module 'ExpoUI'`). La formulation initiale
+  de ce ticket, « rien n'importe le toolbar », confondait *importer* et *rendre* :
+  `expo-router/build/layouts/Stack.js` **require** `StackToolbar` statiquement,
+  sans condition, et la chaîne descend jusqu'à `@expo/ui/jetpack-compose` →
+  `colors.ts` → `requireNativeModule('ExpoUI')`. Ce require-là jette **au
+  chargement du module**, pas au rendu : `import { Stack } from 'expo-router'`
+  dans `app/_layout.tsx` suffisait, sans qu'aucun écran ne touche au toolbar.
+  D'où le **second verrou**, côté JS : un alias Metro (`resolveRequest`) envoie
+  `@expo/ui` et tous ses sous-chemins vers `stubs/expo-ui.js`, et le paquet
+  n'entre plus du tout dans le bundle. Les deux verrous vont par paire — retirer
+  l'un sans l'autre casse, dans un sens (natif absent, JS présent → l'app ne
+  démarre pas) comme dans l'autre (le natif reviendrait pour rien). Corollaire
+  pour KL-42 et les montées de version : `@expo/dom-webview` n'a pas besoin de ce
+  traitement, **rien ne le `require`** ; c'est ce qui distingue les deux cas, pas
+  le fait d'être exclu.
+- **Le stub est inerte, il ne jette pas** — et ça aussi a été appris en le
+  faisant. Première version : jeter à l'appel, pour signaler franchement un usage
+  réel. Faux, parce qu'`expo-router` **appelle** `@expo/ui` au chargement d'un
+  module, hors de tout composant : `StackToolbarView/native.android.js:10`
+  construit `[fillMaxHeight()]` au niveau du module. Jeter là remplaçait un crash
+  au démarrage par un autre. Le stub renvoie donc de quoi continuer (un proxy
+  chaînable pour les fabriques, `null` pour ce qui ressemble à un rendu React) et
+  ne se manifeste que par un `console.warn`. **Prix assumé** : si un écran se met
+  à rendre `Stack.Toolbar`, il ne s'affichera pas, silencieusement — un composant
+  qui rend `null` est normal pour React. Le `warn` est le seul signal.
+  `stubs/__tests__/expo-ui.test.js` rejoue les usages réellement présents dans
+  les huit fichiers d'`expo-router` qui importent `@expo/ui` ; c'est là qu'il faut
+  ajouter un cas si une montée de version en introduit une autre forme.
 - **La restriction d'architecture est passée par le workflow, pas par le
   plugin.** `reactNativeArchitectures` est une propriété **globale** : posée dans
   `gradle.properties`, elle vaudrait aussi pour le développement, et un émulateur
@@ -3911,6 +3945,18 @@ modules exposés au JS (`ExpoSecureStore`, `ExpoSQLite`, `ExpoCamera`…) surviv
 casse le lancement, ou fait disparaître un module natif. **La recette sur
 l'appareil est une condition de KL-44**, et elle est à refaire après toute montée
 de version d'un module natif — pas une fois pour toutes.
+
+**Ce que le correctif `@expo/ui` du 05/08/2026 a coûté en vérification.** Le
+premier diagnostic (« aucun symbole `@expo/ui` n'est touché au chargement ») était
+une lecture, pas une mesure : il a tenu jusqu'à ce que l'app rejette le stub sur
+l'appareil, à cause d'un unique appel de niveau module raté à la relecture. La
+vérification qui aurait dû venir en premier, et qui est désormais la référence :
+charger les vrais modules d'`expo-router` avec le stub substitué et vérifier
+qu'aucun ne jette. Le `expo export --platform android` ne suffit pas — il prouve
+que le bundle se construit, pas qu'il s'exécute, et ces deux erreurs-là sont
+justement d'exécution. La règle vaut au-delà d'`@expo/ui` : **tout ce qui remplace
+un module natif se vérifie en chargeant ses appelants réels**, pas en relisant
+leurs imports.
 
 ### KL-43 — Page d'installation et contrôle de version
 
