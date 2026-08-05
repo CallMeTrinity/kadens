@@ -328,6 +328,34 @@
 > l'usage nominal : bandeau tapotable au-dessus de la barre d'onglets quand une
 > version existe, écran de blocage sous le plancher, et jamais rien en
 > développement ni faute de réponse.
+> **Deux correctifs sortis du premier essai sur l'appareil (05/08/2026)**, tous
+> deux des règles manquantes plutôt que des bugs de code.
+> **1. Le cardio ne descend plus.** `GET /api/bootstrap` filtrait sur la seule
+> fenêtre de dates : une sortie course arrivait sur le téléphone, occupait l'écran
+> du jour et proposait « Démarrer » pour une séance qui ne se consigne pas — elle
+> pouvait même rafler l'unique action primaire du jour à la séance de force qui la
+> méritait. La règle « le réalisé se logue en muscu, jamais en cardio » vaut
+> désormais **aussi à la descente** : une séance datée sans le moindre exercice
+> d'activité `gym` ne part pas. Le filtre est **côté serveur et nulle part
+> ailleurs** (`TrackableSchedule`) — le téléphone ne porte aucune activité sur
+> `scheduled_workout`, elle ne vit que dans le prescrit, que la liste du jour
+> refuse de charger par principe. Trois garde-fous, dont le premier est le seul qui
+> compte : **une séance qui porte du réalisé descend toujours** (la fenêtre fait
+> autorité, ce qu'elle ne contient pas est effacé — sans cette ligne, vider une
+> séance faite de sa muscu lui supprimerait son historique local) ; une séance sans
+> programme descend toujours ; une séance **mixte** descend. Conséquence assumée :
+> une séance 100 % mobilité n'est pas visible sur le téléphone.
+> **2. « Fait » sur le web n'est plus « à démarrer ».** L'app dérivait « fermée »
+> de `ended_at`, que **seul le téléphone écrit** : une séance cochée faite depuis
+> le web, donc sans réalisé, se présentait comme une séance à dérouler. Or rien ne
+> déclôture côté serveur (§4.1 du contrat), et on ne consigne pas rétroactivement
+> ce qu'on a déjà déclaré fait. `isClosed()` prend donc `status = done` en compte,
+> et **une seule définition sert partout** : la carte du jour (« Voir la séance »,
+> et exclue du choix de l'action primaire), l'écran de séance (lecture seule, sans
+> résumé — il n'y a rien à résumer) et `beginWorkout()`, qui refuse. Le bord
+> inverse est tenu : une séance ouverte **ici** et déclarée faite ailleurs pendant
+> ce temps reste reprenable, le téléphone gardant autorité sur ses propres bornes.
+>
 > Prochain ticket : **KL-42** (dépôt TNTStore auto-hébergé et publication).
 
 ---
@@ -4080,10 +4108,17 @@ ticket, et pas celui-ci.
 
 ## Lot 7 — Vues web du réalisé et coaching (après la mise en production)
 
-Ces trois tickets ne bloquent ni le mobile ni la mise en production. Ils sont
+Ces quatre tickets ne bloquent ni le mobile ni la mise en production. Ils sont
 là parce que c'est là que la donnée devient intéressante à regarder.
 **`KL-50` peut être tiré en avant à tout moment** : sa seule dépendance,
 `PerformanceHistory`, est déjà construite au lot 1.
+
+**Lot livré en entier** (KL-49, KL-50, KL-51, KL-45), dans cet ordre. Le fil qui
+les relie, et qu'aucun ne casse : **le réalisé d'un utilisateur n'appartient qu'à
+lui**. Trois écrans le lisent désormais, et chacun le scope explicitement — le
+plan sur son propriétaire, la fiche d'exercice sur l'utilisateur connecté (un
+exercice global est pratiqué par tout le monde), la fiche athlète sur l'athlète.
+Deux tests montent deux utilisateurs sur le même exercice global pour le fixer.
 
 ### KL-49 — Réalisé superposé à la progression du plan
 
@@ -4098,14 +4133,56 @@ décision depuis le début.
 
 **Fini quand** :
 
-- [ ] Le réalisé se superpose à la rampe prévue, semaine par semaine
-- [ ] Indicateur de respect du plan (« 11 séances tenues sur 14 »)
-- [ ] **Une trame n'a pas de dates** : le réalisé affiché est celui de la
+- [x] Le réalisé se superpose à la rampe prévue, semaine par semaine
+- [x] Indicateur de respect du plan (« 11 séances tenues sur 14 »)
+- [x] **Une trame n'a pas de dates** : le réalisé affiché est celui de la
       **dernière instanciation** (`planAnchorDate` le plus récent). Un sélecteur
       n'apparaît que s'il y en a plusieurs
-- [ ] Un plan jamais instancié affiche le prévu seul, sans espace vide
-- [ ] `ProgressionAggregator` est étendu, pas dupliqué
-- [ ] `docs/feature-progression.md` mis à jour : le lot B est livré
+- [x] Un plan jamais instancié affiche le prévu seul, sans espace vide
+- [x] `ProgressionAggregator` est étendu, pas dupliqué
+- [x] ~~`docs/feature-progression.md` mis à jour : le lot B est livré~~ — le
+      fichier a été supprimé entre-temps (`chore: remove unused docs`) ; le lot B
+      se documente donc ici, et nulle part ailleurs
+
+**Livré.** Une méthode de plus sur l'agrégat (`ProgressionAggregator::realizedRun`),
+deux lectures de plus en base (`ScheduledWorkoutRepository::findPlanAnchorsForOwner`
+et `findPlanRunWithLog`), et **les deux lectures existantes ont pris un second
+paramètre facultatif** plutôt qu'un jumeau — `weeklyVolume($template, $realized)`,
+`exerciseTrajectories($template, $realized)`. Ce qui a été tranché en le faisant :
+
+- **Une seule échelle pour les deux barres.** Le maximum d'une série couvre le
+  prévu *et* le réalisé. Deux maximums auraient rendu chaque barre comparable
+  d'une semaine à l'autre mais plus à celle d'en face, ce qui est pourtant tout
+  l'objet du bloc.
+- **Rien n'est superposé sur ce qui ne se logue pas.** Seule la muscu écrit du
+  réalisé : les séries de distance (course, vélo, natation) et les métriques
+  d'allure n'ont pas de deuxième barre — et surtout **pas une barre à zéro**, qui
+  se lirait « rien fait » au lieu de « rien à dire ». Trois séries seulement
+  reçoivent la superposition (temps, tonnage, séries) et trois métriques de
+  trajectoire (charge, séries, durée).
+- **La case d'origine fait foi, pas la date.** La semaine d'une séance datée se
+  lit sur `sourcePlanItem.weekNumber` : déplacer une séance ne la fait pas changer
+  de semaine dans le plan qui l'a posée. Le repli sur l'écart à l'ancre ne sert
+  qu'aux séances dont la case a disparu (FK en `SET NULL`).
+- **L'observance compte toute l'instanciation**, y compris les séances sorties de
+  la trame : elles ont bien été posées par ce plan. C'est le seul chiffre du bloc
+  qui ne dépende pas du découpage en semaines.
+- **Une ancre nulle est une instanciation comme une autre.** Une instanciation
+  antérieure au champ `planAnchorDate` n'en porte pas ; l'écarter la rendrait
+  invisible. MariaDB range les `NULL` en fin de tri décroissant, donc à leur
+  place : la plus ancienne.
+- **Changer d'instanciation est une navigation, pas un fragment.** `?run=Y-m-d`
+  sur un formulaire GET, sans JS : la page de consultation reste auto-suffisante
+  (condition du cache offline). Une valeur inconnue retombe silencieusement sur le
+  défaut — c'est un paramètre d'affichage, pas une ressource.
+- **Le bloc se rend dès qu'il y a une observance**, même sans rampe : un plan dont
+  les cases sont encore vides n'a rien à tracer, mais « 3 séances tenues sur 8 »
+  se dit quand même.
+- **Portée sur `$template->getOwner()`**, jamais sur l'utilisateur courant : un
+  coach ouvre cette page pour lire le plan de son athlète, et c'est le calendrier
+  de l'athlète qui porte le réalisé.
+- **Pas de rouge.** Le réalisé est une barre d'encre pleine, plus étroite, posée
+  sur celle du prévu. Ce n'est ni une action, ni une intensité, ni un échec.
 
 ### KL-50 — Trajectoire d'un exercice
 
@@ -4117,14 +4194,46 @@ passer par un plan, toutes séances et tous plans confondus.
 
 **Fini quand** :
 
-- [ ] Courbe de charge dans le temps, sur les séries de travail
-- [ ] Record et dernière performance, alimentés par `PerformanceHistory` (KL-04)
-- [ ] Les dix dernières séances où l'exercice apparaît, avec un lien vers leur
+- [x] Courbe de charge dans le temps, sur les séries de travail
+- [x] Record et dernière performance, alimentés par `PerformanceHistory` (KL-04)
+- [x] Les dix dernières séances où l'exercice apparaît, avec un lien vers leur
       séance datée
-- [ ] Un exercice sans historique n'affiche **rien**, pas un graphique vide
-- [ ] Un exercice de la bibliothèque globale n'affiche que **mon** historique,
+- [x] Un exercice sans historique n'affiche **rien**, pas un graphique vide
+- [x] Un exercice de la bibliothèque globale n'affiche que **mon** historique,
       jamais celui d'un autre utilisateur. Point à tester explicitement
-- [ ] Le bloc ne se rend pas sur la page publique d'un exercice
+- [x] Le bloc ne se rend pas sur la page publique d'un exercice
+
+**Livré.** Un service (`ExerciseTrajectory`), un composant
+(`components/_exercise_trajectory.html.twig`), un paramètre de plus sur
+`ExerciseController::show`. Aucune requête nouvelle : les deux lectures sont
+celles de KL-04/KL-17, déjà écrites et déjà bornées en SQL. Ce qui a été tranché
+en le faisant :
+
+- **La mise en forme n'appartient pas à `PerformanceHistory`.** Ce service sert
+  aussi le téléphone (KL-14, KL-17), où un pourcentage de hauteur de barre n'a
+  rien à faire. `ExerciseTrajectory` ne lit donc rien : il ordonne et il met à
+  l'échelle, c'est tout.
+- **Scopé sur `$this->getUser()`, et c'est délibéré** — pas un oubli de la règle
+  « scoper sur l'owner » que suit le reste des vues ouvertes au coach. Un exercice
+  de la bibliothèque globale n'a pas de propriétaire et il est pratiqué par tout
+  le monde : « est-ce que je progresse » ne peut vouloir dire que « moi ». Un test
+  monte deux utilisateurs sur le même exercice global et vérifie qu'aucun lien
+  vers la séance datée de l'autre ne sort.
+- **Moins de deux séances chargées, pas de courbe.** Un point unique n'est pas une
+  trajectoire ; le tracer ne dirait que « il y a eu une séance », ce que la liste
+  dit déjà mieux. Même esprit que le null qui masque le bloc entier.
+- **L'échelle part du minimum, pas de zéro.** Sur dix séances, l'écart de charge
+  est souvent faible devant la charge elle-même : une échelle partant de zéro
+  écraserait toute la progression en dix barres identiques.
+- **Le record est relu, la dernière performance non.** `sessions[0]` **est** la
+  dernière performance (`PerformanceHistory` le garantit) ; le record, lui, déborde
+  la fenêtre des dix séances — un record de l'an dernier reste le record.
+- **Les barres sont celles de `_progression`** (`.kd-prog__bars`), réutilisées
+  telles quelles : même dessin, même règle d'échelle. Une seconde famille de
+  classes pour le même trait aurait fini par diverger.
+- **La page publique d'un exercice n'existe pas** — `PublicShareController` ne sert
+  que les séances et les plans. La condition tient donc par construction, et le
+  composant reste inclus depuis la seule page authentifiée qui le concerne.
 
 ### KL-51 — Tri de la bibliothèque par usage réel
 
@@ -4140,19 +4249,46 @@ ne se range pas sur l'entité.
 
 **Fini quand** :
 
-- [ ] **Une seule** requête d'agrégat renvoie `[exercise_id => count, lastAt]`
+- [x] **Une seule** requête d'agrégat renvoie `[exercise_id => count, lastAt]`
       pour l'utilisateur courant, fusionnée en PHP avec la liste existante
-- [ ] **Le compteur est scopé sur l'utilisateur courant.** Un exercice de la
+- [x] **Le compteur est scopé sur l'utilisateur courant.** Un exercice de la
       bibliothèque globale est partagé : « le plus exécuté » veut dire « par
       moi », jamais « par tout le monde ». Même piège que KL-50, même test
-- [ ] Trois tris exposés : **les plus faits**, **jamais faits**, **pas fait
-      depuis** (par date de dernière exécution décroissante)
-- [ ] Le tri suit le mécanisme de filtrage client déjà en place, il ne le
+- [x] Trois tris exposés : **les plus faits**, **jamais faits**, **pas fait
+      depuis** (~~par date de dernière exécution décroissante~~ — **croissante**,
+      cf. ci-dessous)
+- [x] Le tri suit le mécanisme de filtrage client déjà en place, il ne le
       contourne pas
-- [ ] **Pas de dénormalisation** : aucun `timesPerformed` sur `Exercise`. Un
+- [x] **Pas de dénormalisation** : aucun `timesPerformed` sur `Exercise`. Un
       compteur stocké dériverait à la première suppression de séance et
       demanderait une commande de reconstruction, pour un gain nul à ce volume
-- [ ] Le compte apparaît discrètement sur la carte, sans surcharger la grille
+- [x] Le compte apparaît discrètement sur la carte, sans surcharger la grille
+
+**Livré.** Une méthode de repository (`LoggedExerciseRepository::usageForOwner`),
+deux attributs de plus sur la carte, trois options de plus dans le `<select>`
+existant. Rien sur `Exercise`, aucun contrôleur Stimulus touché. Ce qui a été
+tranché en le faisant :
+
+- **« Pas fait depuis » est un tri CROISSANT**, contrairement à ce que disait le
+  cadrage. Trié par date de dernière exécution décroissante, le premier de la
+  liste serait celui qu'on vient de faire — exactement l'inverse du libellé. Ce
+  qu'on cherche, c'est le plus ancien, donc la date la plus petite en tête.
+- **Un exercice jamais fait tombe en fin de ce tri**, pas en tête : il y ferait
+  doublon avec « jamais faits », qui existe justement pour lui. Sentinelle en dur
+  dans le template (`9999999999`), commentée sur place — le repository n'a pas à
+  connaître les conventions d'un tri client.
+- **« Fait » = une occurrence non sautée dans une séance datée.** Même définition
+  que le décompte d'exercices de `LogMetrics` — un exercice annoncé sauté n'a pas
+  été fait, et une occurrence dont l'exercice de bibliothèque a été supprimé (FK
+  en `SET NULL`) n'a plus personne à créditer. Pas de filtre sur les séries : un
+  exercice ouvert puis abandonné compte comme une tentative, et c'est ce que
+  « combien de fois je l'ai fait » veut dire ici.
+- **Les trois tris ne s'exposent que s'il y a un usage à trier.** Sur une base
+  sans réalisé, ils ne feraient rien, et un `<select>` qui ne change rien se lit
+  comme une panne.
+- **Le compteur est un repère, pas une donnée.** Poussé à droite de la ligne de
+  méta, en encre secondaire, avec la date de dernière exécution en `title`. Aucun
+  rouge : ce n'est ni une action, ni une intensité, ni un échec.
 
 **Piste écartée pour l'instant** : afficher la dernière charge dans la palette
 du compositeur. Utile pour composer, mais c'est un autre écran et un autre
@@ -4167,10 +4303,34 @@ qu'à afficher le réalisé qu'elles portent désormais.
 
 **Fini quand** :
 
-- [ ] La fiche athlète sous `/coach` montre les séances réalisées
-- [ ] Lecture seule stricte, garantie par l'attribut `LOG` de KL-06
-- [ ] La vue se scope sur `$entity->getOwner()`, jamais sur `$this->getUser()`
-- [ ] Le bloc-notes privé de l'athlète reste invisible
+- [x] La fiche athlète sous `/coach` montre les séances réalisées
+- [x] Lecture seule stricte, garantie par l'attribut `LOG` de KL-06
+- [x] La vue se scope sur `$entity->getOwner()`, jamais sur `$this->getUser()`
+- [x] Le bloc-notes privé de l'athlète reste invisible
+
+**Livré**, et le ticket avait raison : presque rien à écrire. Une lecture de plus
+(`ScheduledWorkoutRepository::findRecentLoggedForOwner`), une section de plus sur
+`coach/athlete.html.twig`. **Aucun voter touché, aucune garde ajoutée** — c'est
+précisément ce qu'on voulait vérifier. Ce qui a été tranché en le faisant :
+
+- **La lecture seule n'a rien coûté.** Le coach a déjà `VIEW` sur les séances
+  datées de son athlète, et le seul point d'écriture du réalisé côté web
+  (`_log_panel`, suppression) est gardé par `LOG`, qui lui est fermé. Un test le
+  fixe des deux côtés : le bouton n'est pas rendu, **et** l'endpoint répond 403 —
+  la garde passant avant le jeton CSRF, c'est bien elle qu'on voit refuser.
+- **Le filtre est l'existence d'un réalisé, pas le statut.** Une séance cochée
+  « faite » sans détail série par série n'apparaît pas dans cette section : il n'y
+  a rien à y lire, et elle est déjà au calendrier. À l'inverse, une séance encore
+  `PLANNED` dont la synchro a déposé des séries y est.
+- **Deux requêtes, et la première borne.** Une jointure de collection et un
+  `setMaxResults` ne se combinent pas : la limite porterait sur les séries et
+  rendrait un nombre imprévisible de séances. On borne les séances, puis on lit
+  leur réalisé. `le.exercise` est joint parce que `LogMetrics` lit les zones
+  travaillées de la définition.
+- **Le bloc-notes privé n'a demandé aucune garde nouvelle**, et c'est la preuve que
+  la double portée posée en son temps tient : `components/_private_notes.html.twig`
+  ne se rend que dans les éditeurs, pour le seul propriétaire. Ni la fiche athlète
+  ni la page de séance datée ne l'incluent.
 
 ---
 

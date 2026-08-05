@@ -3,10 +3,13 @@
 namespace App\Controller;
 
 use App\Entity\Exercise;
+use App\Entity\User;
 use App\Enum\ActivityType;
 use App\Form\ExerciseType;
 use App\Repository\ExerciseRepository;
+use App\Repository\LoggedExerciseRepository;
 use App\Security\Voter\ExerciseVoter;
+use App\Service\ExerciseTrajectory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -16,10 +19,23 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/exercise')]
 final class ExerciseController extends AbstractController
 {
+    /**
+     * La bibliothèque, chargée d'un bloc et filtrée côté client. S'y ajoute
+     * l'**usage réel** (KL-51) : une seule requête d'agrégat, fusionnée ici avec
+     * la liste, qui donne les trois tris « les plus faits / jamais faits / pas
+     * fait depuis » et le petit compteur des cartes.
+     *
+     * Rien n'est ajouté sur `Exercise` : la règle « définition réutilisable sans
+     * paramètres » tient, le compteur se lit à travers `LoggedExercise.exercise`.
+     * Un compteur stocké dériverait à la première suppression de séance et
+     * demanderait une commande de reconstruction, pour un gain nul à ce volume.
+     */
     #[Route('', name: 'app_exercise_index', methods: ['GET'])]
-    public function index(ExerciseRepository $exerciseRepository): Response
+    public function index(ExerciseRepository $exerciseRepository, LoggedExerciseRepository $loggedExerciseRepository): Response
     {
-        $exercises = $exerciseRepository->findLibraryForUser($this->getUser());
+        $user = $this->getUser();
+        $exercises = $exerciseRepository->findLibraryForUser($user);
+        $usage = $user instanceof User ? $loggedExerciseRepository->usageForOwner($user) : [];
 
         // Puces d'activité présentes (chaque exercice porte une activité).
         $counts = [];
@@ -39,6 +55,7 @@ final class ExerciseController extends AbstractController
         return $this->render('exercise/index.html.twig', [
             'exercises' => $exercises,
             'activityFacets' => $activityFacets,
+            'usage' => $usage,
         ]);
     }
 
@@ -70,13 +87,26 @@ final class ExerciseController extends AbstractController
         ]);
     }
 
+    /**
+     * La fiche d'un exercice, et sous elle **sa trajectoire** (KL-50) : record,
+     * dernière performance, courbe de charge et dix dernières séances.
+     *
+     * L'historique est scopé sur `$this->getUser()`, et c'est ici volontaire — pas
+     * un oubli du « scoper sur l'owner » que suit le reste des vues ouvertes au
+     * coach. Un exercice de la bibliothèque globale n'a pas de propriétaire, et il
+     * est pratiqué par tout le monde : « est-ce que je progresse » ne peut vouloir
+     * dire que « moi ». Personne ne lit ici le réalisé d'un autre.
+     */
     #[Route('/{id}', name: 'app_exercise_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(Exercise $exercise): Response
+    public function show(Exercise $exercise, ExerciseTrajectory $trajectory): Response
     {
         $this->denyAccessUnlessGranted(ExerciseVoter::VIEW, $exercise);
 
+        $user = $this->getUser();
+
         return $this->render('exercise/show.html.twig', [
             'exercise' => $exercise,
+            'trajectory' => $user instanceof User ? $trajectory->for($user, $exercise) : null,
         ]);
     }
 

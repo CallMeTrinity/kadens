@@ -22,6 +22,21 @@
     <div data-controller="filter">
         {% set persoCount = exercises|filter(e => e.owner is not null)|length %}
         {% set globalCount = exercises|filter(e => e.owner is null)|length %}
+
+        {# KL-51 — sentinelle de tri : « pas fait depuis » est CROISSANT (le plus
+           ancien d'abord), un exercice jamais fait n'a donc pas sa place en tête,
+           il y ferait doublon avec le tri « jamais faits ». On le renvoie tout en
+           bas avec une date impossible. #}
+        {% set neverSort = 9999999999 %}
+
+        {# Les trois tris d'usage ne s'exposent que s'il y a un usage à trier :
+           sur une base sans réalisé, ils ne feraient rien et le diraient mal. #}
+        {% set usageSorts = usage is empty ? [] : [
+            { key: 'usage', label: 'Les plus faits', dir: 'desc', numeric: true },
+            { key: 'usage', label: 'Jamais faits', dir: 'asc', numeric: true },
+            { key: 'last', label: 'Pas fait depuis', dir: 'asc', numeric: true },
+        ] %}
+
         {{ include('components/_filterbar.html.twig', {
             placeholder: 'Rechercher un exercice…',
             total: exercises|length,
@@ -30,7 +45,7 @@
                 { key: 'name', label: 'Nom (A→Z)', dir: 'asc' },
                 { key: 'name', label: 'Nom (Z→A)', dir: 'desc' },
                 { key: 'created', label: 'Plus récent', dir: 'desc', numeric: true },
-            ],
+            ]|merge(usageSorts),
             facetGroups: [
                 { group: 'activity', allLabel: 'Toutes activités', facets: activityFacets },
                 { group: 'scope', allLabel: 'Toutes portées', facets: [
@@ -52,6 +67,7 @@
             <div class="kd-grid kd-grid--3" data-filter-target="list">
                 {% for exercise in exercises %}
                     {% set mod = activity.modifier(exercise.activity)|trim %}
+                    {% set used = usage[exercise.id]|default(null) %}
                     <article class="kd-libcard{{ mod ? ' kd-libcard--' ~ mod }}"
                              data-filter-target="item"
                              data-filter-name="{{ exercise.name }}"
@@ -59,7 +75,9 @@
                              data-facet-activity="{{ exercise.activity.value }}"
                              data-facet-scope="{{ exercise.owner is null ? 'global' : 'perso' }}"
                              data-sort-name="{{ exercise.name|lower }}"
-                             data-sort-created="{{ exercise.createdAt ? exercise.createdAt|date('U') : 0 }}">
+                             data-sort-created="{{ exercise.createdAt ? exercise.createdAt|date('U') : 0 }}"
+                             data-sort-usage="{{ used ? used.count : 0 }}"
+                             data-sort-last="{{ used and used.lastAt ? used.lastAt|date('U') : neverSort }}">
                         <div class="kd-libcard__head">
                             <span class="kd-libcard__icon">{{ ux_icon(activity.icon(exercise.activity)|trim) }}</span>
                             <div class="kd-libcard__body">
@@ -77,6 +95,13 @@
                                             {{ ux_icon('lucide:user') }} Perso
                                         {% endif %}
                                     </span>
+                                    {# Usage réel, discret : le compte de MES séances, pas de tout le monde. #}
+                                    {% if used %}
+                                        <span class="kd-libcard__usage"
+                                              title="Fait {{ used.count }} fois{% if used.lastAt %}, la dernière le {{ used.lastAt|date('d/m/Y') }}{% endif %}">
+                                            {{ ux_icon('lucide:history') }} {{ used.count }}×
+                                        </span>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>

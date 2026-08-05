@@ -231,6 +231,52 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     }
 
     /**
+     * Les séances **cochées « faite » qui ne portent aucun réalisé**, avec leur
+     * prescrit fetch-joint jusqu'aux séries détaillées. C'est l'assiette de
+     * `app:log:backfill` (`LogBackfiller`), et rien d'autre ne s'en sert.
+     *
+     * Trois filtres, trois raisons :
+     *
+     * - `s.loggedExercises IS EMPTY` — une déduction ne remplace jamais un fait.
+     *   Le filtre est en DQL plutôt qu'en PHP pour ne pas descendre des milliers
+     *   de séances déjà loguées et les écarter une par une.
+     * - une jointure **INTERNE** sur `s.workout` — une séance libre n'a pas de
+     *   prescrit d'où déduire quoi que ce soit, et une séance dont la source a
+     *   été supprimée (`SET NULL`) non plus.
+     * - `s.scheduledDate <= :until` — le passé, aujourd'hui compris : une séance
+     *   cochée ce matin est aussi légitime que celle d'hier.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findDoneWithoutLog(?User $owner, ?\DateTimeImmutable $since, \DateTimeImmutable $until): array
+    {
+        $qb = $this->createQueryBuilder('s')
+            ->addSelect('w', 'b', 'pe', 'e', 'ps')
+            ->join('s.workout', 'w')
+            ->leftJoin('w.blocks', 'b')
+            ->leftJoin('b.prescribedExercises', 'pe')
+            ->leftJoin('pe.exercise', 'e')
+            ->leftJoin('pe.detailedSets', 'ps')
+            ->andWhere('s.status = :done')
+            ->andWhere('s.scheduledDate <= :until')
+            ->andWhere('s.loggedExercises IS EMPTY')
+            ->setParameter('done', \App\Enum\ScheduledStatus::DONE)
+            ->setParameter('until', $until)
+            ->orderBy('s.scheduledDate', 'ASC')
+            ->addOrderBy('s.id', 'ASC');
+
+        if (null !== $owner) {
+            $qb->andWhere('s.owner = :owner')->setParameter('owner', $owner);
+        }
+
+        if (null !== $since) {
+            $qb->andWhere('s.scheduledDate >= :since')->setParameter('since', $since);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
      * Toutes les séances datées d'un utilisateur, contenu fetch-joint
      * (blocs -> exercices prescrits -> exercice), triées par date. Alimente le flux
      * ICS « tout le calendrier » : PlanFlattener bâtit la description de chaque
@@ -340,6 +386,130 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
             ->setParameter('owner', $owner)
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Les `limit` dernières séances datées d'un utilisateur qui portent
+     * réellement du réalisé, avec tout ce réalisé joint. Alimente la fiche
+     * athlète du coach (KL-45), qui lit ce que son athlète a fait.
+     *
+     * **Deux requêtes, et la première borne.** Une jointure de collection et un
+     * `setMaxResults` ne se combinent pas : la limite porterait sur les lignes
+     * hydratées, donc sur des séries, et rendrait un nombre imprévisible de
+     * séances. On borne donc d'abord les séances (lignes distinctes), puis on lit
+     * le réalisé de celles-là seulement.
+     *
+     * Le filtre est l'existence d'un `LoggedExercise`, pas le statut : une séance
+     * simplement cochée « faite » n'a rien à montrer ici, et une séance encore
+     * `PLANNED` dont la synchro a déjà déposé des séries en a.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findRecentLoggedForOwner(User $owner, int $limit): array
+    {
+        if ($limit < 1) {
+            return [];
+        }
+
+        $sessions = $this->createQueryBuilder('s')
+            ->select('DISTINCT s.id AS id', 's.scheduledDate AS date')
+            ->join('s.loggedExercises', 'le')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('owner', $owner)
+            ->orderBy('s.scheduledDate', 'DESC')
+            ->addOrderBy('s.id', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getArrayResult();
+
+        if ([] === $sessions) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('s')
+            // `le.exercise` est joint parce que LogMetrics lit les zones
+            // travaillées de la définition : sans lui, un N+1 par exercice.
+            ->addSelect('le', 'ls', 'e')
+            ->leftJoin('s.loggedExercises', 'le')
+            ->leftJoin('le.loggedSets', 'ls')
+            ->leftJoin('le.exercise', 'e')
+            ->andWhere('s.id IN (:sessions)')
+            ->setParameter('sessions', array_map(static fn (array $row): int => (int) $row['id'], $sessions))
+            ->orderBy('s.scheduledDate', 'DESC')
+            ->addOrderBy('s.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Les **ancres d'instanciation** d'un plan chez un utilisateur, la plus
+     * récente d'abord. Une trame n'a pas de dates : c'est l'ancre qui dit *quelle
+     * fois* on regarde quand on superpose le réalisé au prévu (KL-49).
+     *
+     * `planAnchorDate` peut être **nulle** — une instanciation antérieure au champ
+     * n'en porte pas — et cette valeur est renvoyée comme les autres : c'est une
+     * série de séances bien réelle, l'écarter la rendrait invisible. MariaDB place
+     * les NULL en fin de tri décroissant, donc au bon endroit : la plus ancienne.
+     *
+     * @return list<\DateTimeImmutable|null>
+     */
+    public function findPlanAnchorsForOwner(PlanTemplate $template, User $owner): array
+    {
+        $rows = $this->createQueryBuilder('s')
+            ->select('DISTINCT s.planAnchorDate AS anchor')
+            ->andWhere('s.sourcePlanTemplate = :template')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('template', $template)
+            ->setParameter('owner', $owner)
+            ->orderBy('anchor', 'DESC')
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_map(static function (array $row): ?\DateTimeImmutable {
+            $anchor = $row['anchor'];
+
+            return match (true) {
+                null === $anchor => null,
+                $anchor instanceof \DateTimeImmutable => $anchor,
+                default => new \DateTimeImmutable((string) $anchor),
+            };
+        }, $rows);
+    }
+
+    /**
+     * Les séances datées d'**une** instanciation, avec leur réalisé et leur case
+     * d'origine. C'est la matière de la superposition prévu/réalisé (KL-49).
+     *
+     * Seule la branche du réalisé est jointe, jamais celle du prescrit : le prévu
+     * se lit sur la trame elle-même (`PlanItem → Workout`), pas sur ses copies
+     * datées, et joindre les deux collections sœurs sous la même séance en ferait
+     * le produit cartésien (cf. `findWindowWithContentAndLog`).
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findPlanRunWithLog(PlanTemplate $template, User $owner, ?\DateTimeImmutable $anchor): array
+    {
+        $qb = $this->createQueryBuilder('s')
+            ->addSelect('le', 'ls', 'e', 'pi')
+            ->leftJoin('s.loggedExercises', 'le')
+            ->leftJoin('le.loggedSets', 'ls')
+            ->leftJoin('le.exercise', 'e')
+            ->leftJoin('s.sourcePlanItem', 'pi')
+            ->andWhere('s.sourcePlanTemplate = :template')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('template', $template)
+            ->setParameter('owner', $owner)
+            ->orderBy('s.scheduledDate', 'ASC')
+            ->addOrderBy('s.id', 'ASC');
+
+        if (null === $anchor) {
+            $qb->andWhere('s.planAnchorDate IS NULL');
+        } else {
+            $qb->andWhere('s.planAnchorDate = :anchor')
+                ->setParameter('anchor', $anchor, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 
     /**

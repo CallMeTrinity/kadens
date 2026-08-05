@@ -2,12 +2,19 @@
 
 namespace App\Tests\Controller;
 
+use App\Entity\Block;
 use App\Entity\Exercise;
 use App\Entity\Goal;
 use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
+use App\Entity\PrescribedExercise;
+use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
+use App\Enum\ActivityType;
+use App\Enum\BlockRole;
+use App\Enum\PrescriptionType;
+use App\Enum\ScheduledStatus;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -23,8 +30,12 @@ final class PlanTemplateControllerTest extends WebTestCase
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine.orm.entity_manager');
 
-        // Ordre FK-safe : les plans portent la jointure vers les objectifs, ils
+        // Ordre FK-safe : les séances datées citent trame et case, elles partent
+        // en premier ; les plans portent la jointure vers les objectifs, ils
         // passent donc avant eux, et les deux avant les utilisateurs.
+        foreach ($this->em->getRepository(ScheduledWorkout::class)->findAll() as $scheduled) {
+            $this->em->remove($scheduled);
+        }
         foreach ($this->em->getRepository(PlanTemplate::class)->findAll() as $template) {
             $this->em->remove($template);
         }
@@ -246,6 +257,140 @@ final class PlanTemplateControllerTest extends WebTestCase
         $this->client->request('GET', '/plan-template/'.$template->getId());
 
         self::assertResponseStatusCodeSame(403);
+    }
+
+    /**
+     * KL-49 — un plan jamais posé au calendrier n'a pas de réalisé : le bloc reste
+     * celui du prévu seul, et il le dit, sans espace réservé à ce qui n'existe pas.
+     */
+    public function testShowWithoutInstantiationKeepsThePlannedRampAlone(): void
+    {
+        $owner = $this->createUser('owner@example.com');
+        $template = $this->createPlanTemplate($owner, 'Plan 5k', 2);
+        $template->addPlanItem(
+            (new PlanItem())->setWeekNumber(1)->setDayOfWeek(3)->setWorkout($this->createLiftWorkout($owner, 'Squat lourd'))
+        );
+        $this->em->flush();
+
+        $this->client->loginUser($owner);
+        $this->client->request('GET', '/plan-template/'.$template->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'Aucune donnée de réalisé');
+        self::assertSelectorNotExists('.kd-prog__adherence');
+        self::assertSelectorNotExists('.kd-prog__runpick');
+    }
+
+    /**
+     * Avec une instanciation, l'observance s'affiche. Une seule instanciation =
+     * pas de sélecteur : il n'y a rien à choisir.
+     */
+    public function testShowWithOneInstantiationShowsAdherenceWithoutPicker(): void
+    {
+        $owner = $this->createUser('owner@example.com');
+        $template = $this->createPlanTemplate($owner, 'Plan force', 2);
+        $workout = $this->createWorkout($owner, 'Squat lourd');
+        $item = (new PlanItem())->setWeekNumber(1)->setDayOfWeek(3)->setWorkout($workout);
+        $template->addPlanItem($item);
+        $this->em->flush();
+
+        $this->scheduleFromPlan($owner, $template, $item, '2026-03-02', '2026-03-04', ScheduledStatus::DONE);
+        $this->scheduleFromPlan($owner, $template, $item, '2026-03-02', '2026-03-06', ScheduledStatus::MISSED);
+
+        $this->client->loginUser($owner);
+        $this->client->request('GET', '/plan-template/'.$template->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.kd-prog__adherence', 'séance tenue sur 2');
+        self::assertSelectorNotExists('.kd-prog__runpick');
+    }
+
+    /**
+     * Deux instanciations : la plus récente par défaut, l'autre à une navigation
+     * GET (`?run=`). Une trame n'ayant pas de dates, c'est l'ancre qui dit quelle
+     * fois on regarde.
+     */
+    public function testShowPicksTheMostRecentRunAndOffersTheOthers(): void
+    {
+        $owner = $this->createUser('owner@example.com');
+        $template = $this->createPlanTemplate($owner, 'Plan repassé', 2);
+        $workout = $this->createWorkout($owner, 'Squat lourd');
+        $item = (new PlanItem())->setWeekNumber(1)->setDayOfWeek(3)->setWorkout($workout);
+        $template->addPlanItem($item);
+        $this->em->flush();
+
+        // Premier passage : deux séances, une seule tenue. Second : tout tenu.
+        $this->scheduleFromPlan($owner, $template, $item, '2026-01-05', '2026-01-07', ScheduledStatus::DONE);
+        $this->scheduleFromPlan($owner, $template, $item, '2026-01-05', '2026-01-09', ScheduledStatus::MISSED);
+        $this->scheduleFromPlan($owner, $template, $item, '2026-03-02', '2026-03-04', ScheduledStatus::DONE);
+
+        $this->client->loginUser($owner);
+        $this->client->request('GET', '/plan-template/'.$template->getId());
+
+        self::assertSelectorExists('.kd-prog__runpick');
+        // Par défaut, la plus récente : une séance, tenue.
+        self::assertSelectorTextContains('.kd-prog__adherence', '1');
+        self::assertSelectorTextContains('.kd-prog__adherence', 'sur 1');
+
+        $this->client->request('GET', '/plan-template/'.$template->getId().'?run=2026-01-05');
+        self::assertSelectorTextContains('.kd-prog__adherence', 'sur 2');
+
+        // Une ancre inconnue est un paramètre d'affichage, pas une ressource :
+        // elle retombe sur le défaut au lieu de lever.
+        $this->client->request('GET', '/plan-template/'.$template->getId().'?run=1999-01-01');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.kd-prog__adherence', 'sur 1');
+    }
+
+    /** Une séance qui porte réellement de la charge : sans ça, il n'y a pas de rampe à tracer. */
+    private function createLiftWorkout(User $owner, string $title): Workout
+    {
+        $exercise = (new Exercise())->setName('Squat barre')->setActivity(ActivityType::GYM);
+        $this->em->persist($exercise);
+
+        $workout = (new Workout())
+            ->setOwner($owner)
+            ->setTitle($title)
+            ->setSlug(strtolower(str_replace(' ', '-', $title)).'-'.uniqid());
+        $workout->addBlock(
+            (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(1)->addPrescribedExercise(
+                (new PrescribedExercise())
+                    ->setExercise($exercise)
+                    ->setPosition(1)
+                    ->setPrescriptionType(PrescriptionType::SETS_REPS)
+                    ->setSets(5)
+                    ->setReps(5)
+                    ->setWeightKg(100.0)
+            )
+        );
+
+        $this->em->persist($workout);
+        $this->em->flush();
+
+        return $workout;
+    }
+
+    private function scheduleFromPlan(
+        User $owner,
+        PlanTemplate $template,
+        PlanItem $item,
+        string $anchor,
+        string $date,
+        ScheduledStatus $status,
+    ): ScheduledWorkout {
+        $scheduled = (new ScheduledWorkout())
+            ->setOwner($owner)
+            ->setWorkout($item->getWorkout())
+            ->setSourcePlanTemplate($template)
+            ->setSourcePlanItem($item)
+            ->setPlanAnchorDate(new \DateTimeImmutable($anchor))
+            ->setScheduledDate(new \DateTimeImmutable($date))
+            ->setStatus($status);
+
+        $this->em->persist($scheduled);
+        $this->em->flush();
+
+        return $scheduled;
     }
 
     private function createUser(string $email): User
