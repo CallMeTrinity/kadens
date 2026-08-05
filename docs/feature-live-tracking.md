@@ -4296,10 +4296,34 @@ qu'à afficher le réalisé qu'elles portent désormais.
 
 **Fini quand** :
 
-- [ ] La fiche athlète sous `/coach` montre les séances réalisées
-- [ ] Lecture seule stricte, garantie par l'attribut `LOG` de KL-06
-- [ ] La vue se scope sur `$entity->getOwner()`, jamais sur `$this->getUser()`
-- [ ] Le bloc-notes privé de l'athlète reste invisible
+- [x] La fiche athlète sous `/coach` montre les séances réalisées
+- [x] Lecture seule stricte, garantie par l'attribut `LOG` de KL-06
+- [x] La vue se scope sur `$entity->getOwner()`, jamais sur `$this->getUser()`
+- [x] Le bloc-notes privé de l'athlète reste invisible
+
+**Livré**, et le ticket avait raison : presque rien à écrire. Une lecture de plus
+(`ScheduledWorkoutRepository::findRecentLoggedForOwner`), une section de plus sur
+`coach/athlete.html.twig`. **Aucun voter touché, aucune garde ajoutée** — c'est
+précisément ce qu'on voulait vérifier. Ce qui a été tranché en le faisant :
+
+- **La lecture seule n'a rien coûté.** Le coach a déjà `VIEW` sur les séances
+  datées de son athlète, et le seul point d'écriture du réalisé côté web
+  (`_log_panel`, suppression) est gardé par `LOG`, qui lui est fermé. Un test le
+  fixe des deux côtés : le bouton n'est pas rendu, **et** l'endpoint répond 403 —
+  la garde passant avant le jeton CSRF, c'est bien elle qu'on voit refuser.
+- **Le filtre est l'existence d'un réalisé, pas le statut.** Une séance cochée
+  « faite » sans détail série par série n'apparaît pas dans cette section : il n'y
+  a rien à y lire, et elle est déjà au calendrier. À l'inverse, une séance encore
+  `PLANNED` dont la synchro a déposé des séries y est.
+- **Deux requêtes, et la première borne.** Une jointure de collection et un
+  `setMaxResults` ne se combinent pas : la limite porterait sur les séries et
+  rendrait un nombre imprévisible de séances. On borne les séances, puis on lit
+  leur réalisé. `le.exercise` est joint parce que `LogMetrics` lit les zones
+  travaillées de la définition.
+- **Le bloc-notes privé n'a demandé aucune garde nouvelle**, et c'est la preuve que
+  la double portée posée en son temps tient : `components/_private_notes.html.twig`
+  ne se rend que dans les éditeurs, pour le seul propriétaire. Ni la fiche athlète
+  ni la page de séance datée ne l'incluent.
 
 ---
 

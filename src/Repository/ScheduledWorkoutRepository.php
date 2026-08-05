@@ -343,6 +343,59 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     }
 
     /**
+     * Les `limit` dernières séances datées d'un utilisateur qui portent
+     * réellement du réalisé, avec tout ce réalisé joint. Alimente la fiche
+     * athlète du coach (KL-45), qui lit ce que son athlète a fait.
+     *
+     * **Deux requêtes, et la première borne.** Une jointure de collection et un
+     * `setMaxResults` ne se combinent pas : la limite porterait sur les lignes
+     * hydratées, donc sur des séries, et rendrait un nombre imprévisible de
+     * séances. On borne donc d'abord les séances (lignes distinctes), puis on lit
+     * le réalisé de celles-là seulement.
+     *
+     * Le filtre est l'existence d'un `LoggedExercise`, pas le statut : une séance
+     * simplement cochée « faite » n'a rien à montrer ici, et une séance encore
+     * `PLANNED` dont la synchro a déjà déposé des séries en a.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findRecentLoggedForOwner(User $owner, int $limit): array
+    {
+        if ($limit < 1) {
+            return [];
+        }
+
+        $sessions = $this->createQueryBuilder('s')
+            ->select('DISTINCT s.id AS id', 's.scheduledDate AS date')
+            ->join('s.loggedExercises', 'le')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('owner', $owner)
+            ->orderBy('s.scheduledDate', 'DESC')
+            ->addOrderBy('s.id', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getArrayResult();
+
+        if ([] === $sessions) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('s')
+            // `le.exercise` est joint parce que LogMetrics lit les zones
+            // travaillées de la définition : sans lui, un N+1 par exercice.
+            ->addSelect('le', 'ls', 'e')
+            ->leftJoin('s.loggedExercises', 'le')
+            ->leftJoin('le.loggedSets', 'ls')
+            ->leftJoin('le.exercise', 'e')
+            ->andWhere('s.id IN (:sessions)')
+            ->setParameter('sessions', array_map(static fn (array $row): int => (int) $row['id'], $sessions))
+            ->orderBy('s.scheduledDate', 'DESC')
+            ->addOrderBy('s.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Les **ancres d'instanciation** d'un plan chez un utilisateur, la plus
      * récente d'abord. Une trame n'a pas de dates : c'est l'ancre qui dit *quelle
      * fois* on regarde quand on superpose le réalisé au prévu (KL-49).

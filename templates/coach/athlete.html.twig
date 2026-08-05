@@ -245,6 +245,56 @@
         {% endif %}
     </section>
 
+    {# ------------------------------ SON RÉALISÉ ----------------------------- #}
+    {# KL-45 : la séance datée porte désormais le réalisé, et le coach a déjà VIEW
+       dessus. Il ne restait qu'à l'afficher. **Lecture stricte** : chaque ligne
+       mène à la page de séance datée, dont le bloc de suppression du réalisé est
+       gardé par l'attribut LOG — réservé au propriétaire. Personne ne déclare à la
+       place de quelqu'un d'autre ce qu'il a soulevé.
+
+       Le bloc-notes privé de l'athlète (`Workout.notes`) n'apparaît ni ici ni
+       là-bas : il ne se rend que dans les éditeurs, et pour son seul propriétaire. #}
+    <section class="kd-section">
+        <div class="kd-pagehead kd-pagehead--sub">
+            <div>
+                <p class="kd-eyebrow kd-eyebrow--accent">Réalisé</p>
+                <h2 class="kd-title kd-title--sm">Ce qu'il a fait</h2>
+                <p class="kd-lead">Ses dernières séances consignées série par série. Lecture seule : consigner appartient à l'athlète.</p>
+            </div>
+        </div>
+
+        {% if logged is empty %}
+            <div class="kd-card kd-section__block">
+                <div class="kd-empty">
+                    {{ ux_icon('lucide:history') }}
+                    <div>Aucune séance consignée pour l'instant. Le détail série par série remonte de son téléphone.</div>
+                </div>
+            </div>
+        {% else %}
+            <div class="kd-card kd-section__block">
+                <ul class="kd-coachitems">
+                    {% for row in logged %}
+                        <li class="kd-coachitem">
+                            <span class="kd-coachitem__date">{{ row.scheduled.scheduledDate|date('d/m') }}</span>
+                            <a href="{{ path('app_scheduled_workout_show', {id: row.scheduled.id}) }}"
+                               class="kd-coachitem__name">{{ row.scheduled.displayTitle }}</a>
+                            {% if row.summary %}
+                                <span class="kd-coachitem__meta">
+                                    {{ row.summary.workingSets }} série{{ row.summary.workingSets > 1 ? 's' }}
+                                    {%- if row.summary.tonnageKg > 0 %} · {{ row.summary.tonnageKg|round|number_format(0, ',', ' ') }} kg{% endif -%}
+                                    {%- if row.summary.durationSeconds is not null %} · {{ (row.summary.durationSeconds / 60)|round }} min{% endif -%}
+                                    {%- if row.summary.averageRpe is not null %} · RPE {{ row.summary.averageRpe|number_format(1, ',', ' ') }}{% endif -%}
+                                    {%- if row.summary.skipped %} · {{ row.summary.skipped }} sauté{{ row.summary.skipped > 1 ? 's' }}{% endif -%}
+                                </span>
+                            {% endif %}
+                            <span class="kd-badge kd-badge--{{ row.scheduled.status.value }}">{{ row.scheduled.status.label }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+    </section>
+
     {# --------------------- SON PROFIL (lecture seule) ----------------------- #}
     {# Mêmes fragments que la page profil de l'athlète : sans ses 1RM, ses records
        et ses zones cardio, on ne peut pas programmer sérieusement. `own: false` :

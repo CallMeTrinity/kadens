@@ -13,6 +13,7 @@ use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
 use App\Service\CoachingResolver;
 use App\Service\HeartRateZones;
+use App\Service\LogMetrics;
 use App\Service\PlanScheduler;
 use App\Service\ProfileStats;
 use App\Service\SlugGenerator;
@@ -43,6 +44,9 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/coach')]
 final class CoachController extends AbstractController
 {
+    /** Profondeur du réalisé montré sur la fiche athlète. Au-delà, ce n'est plus une fiche. */
+    private const LOGGED_SESSIONS = 10;
+
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly CoachingResolver $coachingResolver,
@@ -51,7 +55,17 @@ final class CoachController extends AbstractController
 
     /**
      * Vue d'un athlète suivi : sa bibliothèque, ses plans, ses prochaines séances
-     * datées. C'est le point de départ de toutes les actions « pour lui ».
+     * datées, et **ce qu'il a réellement fait** (KL-45). C'est le point de départ
+     * de toutes les actions « pour lui ».
+     *
+     * Tout se scope sur `$athlete`, jamais sur `$this->getUser()` — c'est la règle
+     * de toute vue ouverte au coach, et c'est ici qu'elle est la plus visible : la
+     * page ne parle que de quelqu'un d'autre.
+     *
+     * Le réalisé est en **lecture seule**, sans rien à ajouter pour ça : la page
+     * de séance datée où mène chaque ligne n'ouvre son bloc de suppression qu'à
+     * l'attribut `LOG`, réservé au propriétaire (KL-06). Le coach programme, il ne
+     * consigne pas.
      */
     #[Route('/athlete/{id}', name: 'app_coach_athlete', methods: ['GET'], requirements: ['id' => '\d+'])]
     public function athlete(
@@ -62,16 +76,25 @@ final class CoachController extends AbstractController
         GoalRepository $goalRepository,
         ProfileStats $profileStats,
         HeartRateZones $heartRateZones,
+        LogMetrics $logMetrics,
     ): Response {
         $this->denyUnlessCoachOf($athlete);
 
         $today = new \DateTimeImmutable('today');
+
+        // Chaque séance réalisée avec sa synthèse : LogMetrics est déjà le service
+        // du réalisé côté web (KL-07), on ne recompte rien dans le template.
+        $logged = [];
+        foreach ($scheduledWorkoutRepository->findRecentLoggedForOwner($athlete, self::LOGGED_SESSIONS) as $session) {
+            $logged[] = ['scheduled' => $session, 'summary' => $logMetrics->summary($session)];
+        }
 
         return $this->render('coach/athlete.html.twig', [
             'athlete' => $athlete,
             'workouts' => $workoutRepository->findLibraryForOwner($athlete),
             'plans' => $planTemplateRepository->findBy(['owner' => $athlete], ['title' => 'ASC']),
             'upcoming' => $scheduledWorkoutRepository->findByOwnerBetween($athlete, $today, $today->modify('+8 weeks')),
+            'logged' => $logged,
             'goals' => $goalRepository->findUpcomingForOwner($athlete, 3),
             // Mêmes services que la page profil : ils prennent n'importe quel User.
             // Le coach a besoin des 1RM, records et zones cardio pour programmer.

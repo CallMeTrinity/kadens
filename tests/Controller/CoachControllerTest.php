@@ -5,6 +5,8 @@ namespace App\Tests\Controller;
 use App\Entity\Coaching;
 use App\Entity\Exercise;
 use App\Entity\Goal;
+use App\Entity\LoggedExercise;
+use App\Entity\LoggedSet;
 use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
@@ -12,6 +14,8 @@ use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\CoachingStatus;
+use App\Enum\ScheduledStatus;
+use App\Enum\SetType;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -657,6 +661,104 @@ final class CoachControllerTest extends WebTestCase
     // ---------------------------------------------------------------- helpers
 
     /** @param list<string> $roles */
+    // --- KL-45 : la lecture du réalisé par le coach --------------------------
+
+    /**
+     * La fiche athlète montre ses séances réalisées, et le lien mène à la séance
+     * datée — que le coach a le droit d'ouvrir (VIEW), pas d'effacer (LOG).
+     */
+    public function testAthletePageShowsLoggedSessions(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+
+        $exercise = $this->createExercise($athlete, 'Squat');
+        $logged = $this->logSession($athlete, $exercise, '2026-03-08', [[SetType::WARMUP, 10, 40.0], [SetType::NORMAL, 5, 100.0], [SetType::NORMAL, 5, 100.0]]);
+        // Une séance simplement cochée « faite » n'a rien à montrer ici.
+        $bare = (new ScheduledWorkout())
+            ->setOwner($athlete)
+            ->setTitle('Sortie longue')
+            ->setScheduledDate(new \DateTimeImmutable('2026-03-09'))
+            ->setStatus(ScheduledStatus::DONE);
+        $this->em->persist($bare);
+        $this->em->flush();
+
+        $this->client->loginUser($coach);
+        $this->client->request('GET', '/coach/athlete/'.$athlete->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('a[href="/schedule/'.$logged->getId().'"]');
+        self::assertSelectorNotExists('a[href="/schedule/'.$bare->getId().'"]');
+        // Deux séries de travail, 1000 kg : l'échauffement ne compte pas.
+        self::assertSelectorTextContains('body', '2 séries');
+        self::assertSelectorTextContains('body', '1 000 kg');
+    }
+
+    /**
+     * Lecture stricte : sur la séance datée de son athlète, le coach n'a aucun
+     * moyen d'effacer le réalisé. L'attribut est LOG, pas EDIT — et EDIT, lui, il
+     * l'a bien (il programme).
+     */
+    public function testCoachCannotDeleteAthleteLog(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+
+        $exercise = $this->createExercise($athlete, 'Squat');
+        $logged = $this->logSession($athlete, $exercise, '2026-03-08', [[SetType::NORMAL, 5, 100.0]]);
+
+        $this->client->loginUser($coach);
+        $this->client->request('GET', '/schedule/'.$logged->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorNotExists('.kd-logdel');
+
+        // Le jeton CSRF n'a pas à être valide : la garde LOG passe avant lui, et
+        // c'est bien elle qu'on veut voir refuser.
+        $this->client->request('POST', '/schedule/'.$logged->getId().'/log/delete', ['_token' => 'peu-importe']);
+
+        self::assertResponseStatusCodeSame(403);
+        self::assertTrue($logged->hasLog());
+    }
+
+    /**
+     * Une séance datée qui porte le réalisé d'un seul exercice.
+     *
+     * @param list<array{0: SetType, 1: int|null, 2: float|null}> $sets
+     */
+    private function logSession(User $owner, Exercise $exercise, string $date, array $sets): ScheduledWorkout
+    {
+        $scheduled = (new ScheduledWorkout())
+            ->setOwner($owner)
+            ->setTitle('Séance du '.$date)
+            ->setScheduledDate(new \DateTimeImmutable($date))
+            ->setStatus(ScheduledStatus::DONE);
+
+        $loggedExercise = (new LoggedExercise())
+            ->setExercise($exercise)
+            ->setExerciseName((string) $exercise->getName())
+            ->setPosition(1);
+
+        $position = 0;
+        foreach ($sets as $set) {
+            $loggedExercise->addLoggedSet(
+                (new LoggedSet())
+                    ->setPosition(++$position)
+                    ->setSetType($set[0])
+                    ->setReps($set[1])
+                    ->setWeightKg($set[2])
+            );
+        }
+
+        $scheduled->addLoggedExercise($loggedExercise);
+        $this->em->persist($scheduled);
+        $this->em->flush();
+
+        return $scheduled;
+    }
+
     private function createUser(string $email, array $roles = []): User
     {
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
