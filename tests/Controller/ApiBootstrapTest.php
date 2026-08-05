@@ -189,6 +189,71 @@ final class ApiBootstrapTest extends WebTestCase
         self::assertNull($this->bootstrap($this->issueToken($user))['schedule'][0]['log']);
     }
 
+    // --- Ce qui n'a pas sa place sur le téléphone -----------------------------
+
+    /**
+     * Le filtre de `TrackableSchedule` : le téléphone ne consigne que la muscu,
+     * une sortie course n'a donc rien à y faire. Une séance **mixte** reste, elle
+     * — c'est bien une séance de renforcement, son cardio s'y lit.
+     */
+    public function testASessionWithoutStrengthNeverReachesThePhone(): void
+    {
+        $user = $this->createUser('athlete@example.com');
+        $run = $this->createExercise('Footing', $user, activity: ActivityType::RUNNING);
+
+        $this->createSession($user, new \DateTimeImmutable('+1 day'), exercises: [$run]);
+        [$strength] = $this->createSession($user, new \DateTimeImmutable('+2 days'));
+        [$mixed] = $this->createSession($user, new \DateTimeImmutable('+3 days'), exercises: [
+            $this->createExercise('Squat', $user),
+            $run,
+        ]);
+
+        $uuids = array_column($this->bootstrap($this->issueToken($user))['schedule'], 'uuid');
+        sort($uuids);
+
+        $expected = [(string) $strength->getUuid(), (string) $mixed->getUuid()];
+        sort($expected);
+
+        self::assertSame($expected, $uuids);
+    }
+
+    /**
+     * **Le garde-fou qui compte.** La fenêtre fait autorité : ce qu'elle ne
+     * contient pas est effacé côté téléphone. Retirer le dernier exercice de
+     * muscu d'une séance déjà faite ne doit donc pas emporter son réalisé.
+     */
+    public function testASessionThatCarriesALogStaysEvenWithoutStrength(): void
+    {
+        $user = $this->createUser('athlete@example.com');
+
+        [$scheduled] = $this->createSession(
+            $user,
+            new \DateTimeImmutable('-1 day'),
+            logged: [[SetType::NORMAL, 8, 60.0]],
+            exercises: [$this->createExercise('Rameur', $user, activity: ActivityType::OTHER)],
+        );
+
+        $payload = $this->bootstrap($this->issueToken($user));
+
+        self::assertCount(1, $payload['schedule']);
+        self::assertSame((string) $scheduled->getUuid(), $payload['schedule'][0]['uuid']);
+    }
+
+    /**
+     * Une coquille encore vide descend : il n'y a rien à écarter, et c'est
+     * précisément la séance qu'on garnit barre en main (KL-34).
+     */
+    public function testASessionWithoutAnyPrescribedLineStillReachesThePhone(): void
+    {
+        $user = $this->createUser('athlete@example.com');
+        [$empty] = $this->createSession($user, new \DateTimeImmutable('+1 day'), exercises: []);
+
+        $payload = $this->bootstrap($this->issueToken($user));
+
+        self::assertCount(1, $payload['schedule']);
+        self::assertSame((string) $empty->getUuid(), $payload['schedule'][0]['uuid']);
+    }
+
     // --- Le delta -------------------------------------------------------------
 
     /**
@@ -513,12 +578,16 @@ final class ApiBootstrapTest extends WebTestCase
         $this->em->flush();
     }
 
-    private function createExercise(string $name, ?User $owner, bool $flush = true): Exercise
-    {
+    private function createExercise(
+        string $name,
+        ?User $owner,
+        bool $flush = true,
+        ActivityType $activity = ActivityType::GYM,
+    ): Exercise {
         $exercise = (new Exercise())
             ->setOwner($owner)
             ->setName($name)
-            ->setActivity(ActivityType::GYM);
+            ->setActivity($activity);
         $this->em->persist($exercise);
 
         if ($flush) {

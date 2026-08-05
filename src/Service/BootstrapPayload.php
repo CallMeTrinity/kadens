@@ -41,6 +41,16 @@ use App\Repository\ScheduledWorkoutRepository;
  * console, surtout — et elle, elle a un horodatage fiable. C'est donc elle, et
  * elle seule, que le delta allège.
  *
+ * ## Ce que la fenêtre ne contient pas
+ *
+ * Les séances qui ne se consignent pas — celles sans le moindre exercice de
+ * renforcement. La règle « le réalisé se logue en muscu, jamais en cardio » vaut
+ * aussi à la descente, et le tri se fait ici parce que c'est ici qu'on a les
+ * exercices sous la main. Ce qui reste dedans quoi qu'il arrive est écrit dans
+ * `TrackableSchedule` — la première ligne, « une séance qui porte du réalisé
+ * descend toujours », est ce qui empêche le corollaire ci-dessous de manger un
+ * historique.
+ *
  * **Corollaire pour le client** : la fenêtre est rendue en clair (`window`), et
  * ce qu'elle contient fait autorité. Une séance datée que le téléphone garde
  * dans cet intervalle et qui n'est pas dans la réponse n'existe plus — déplacée
@@ -67,6 +77,7 @@ final class BootstrapPayload
         private readonly CoachingRepository $coachings,
         private readonly PerformanceHistory $history,
         private readonly ScheduledWorkoutPayload $scheduledWorkouts,
+        private readonly TrackableSchedule $trackable,
     ) {
     }
 
@@ -83,6 +94,15 @@ final class BootstrapPayload
 
         $schedule = [];
         foreach ($this->schedule->findWindowWithContentAndLog($user, $from, $to) as $scheduled) {
+            // Le cardio ne descend pas : l'app de suivi ne consigne que la muscu,
+            // et une sortie course y occuperait l'écran du jour sans rien pouvoir
+            // y écrire. Le filtre est écrit une fois, dans `TrackableSchedule`,
+            // qui dit aussi ce qui descend malgré tout — le réalisé déjà écrit et
+            // les séances sans prescrit.
+            if (!$this->trackable->includes($scheduled)) {
+                continue;
+            }
+
             $schedule[] = $this->scheduledWorkouts->build($scheduled);
         }
 
