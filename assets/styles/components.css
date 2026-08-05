@@ -9120,3 +9120,147 @@ a.kd-coachitem__name:hover {
         width: 100%;
     }
 }
+
+/* ============================================================================
+   PAGE D'INSTALLATION DE L'APP — /app (KL-43)
+   ========================================================================== */
+
+/* La marque en tête, hors connexion seulement : sans header applicatif, la page
+   arriverait sinon sans rien qui la rattache au site. */
+.kd-install__brand {
+    margin-bottom: var(--kd-space-9);
+}
+
+.kd-install__feats dd {
+    max-width: 66ch;
+}
+
+/* Le numéro de build est une précision, pas la version : même ligne, encre
+   secondaire, et c'est le numéro lisible qui garde le poids. */
+.kd-install__version span {
+    color: var(--color-text-soft);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+}
+
+/* Même disposition que le panneau d'appairage — QR à gauche, marche à suivre à
+   droite — parce que c'est le même geste, fait au même endroit, avec le même
+   téléphone. */
+.kd-install__repo {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--kd-space-10);
+}
+
+/* Cadre blanc, et il le reste : la « quiet zone » du motif fait partie de
+   l'image que la caméra lit, un fond teinté dessous la casserait. */
+.kd-install__qr {
+    flex: none;
+    padding: var(--kd-space-3);
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border-strong);
+}
+
+.kd-install__qr svg {
+    display: block;
+    width: 240px;
+    height: auto;
+    max-width: 100%;
+}
+
+.kd-install__aside {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-5);
+    min-width: 0;
+}
+
+.kd-install__steps {
+    margin: 0;
+    padding-left: var(--kd-space-8);
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--color-text-secondary);
+    max-width: 66ch;
+}
+
+.kd-install__steps strong {
+    color: var(--color-text);
+    font-weight: var(--kd-weight-semibold);
+}
+
+.kd-install__label {
+    margin: var(--kd-space-2) 0 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-text-soft);
+}
+
+/* L'adresse et l'empreinte se recopient : mono, cadre qui les désigne comme des
+   valeurs à saisir, `user-select: all` pour les prendre d'un geste. Elles ne se
+   coupent qu'à l'affichage (`overflow-wrap`), jamais dans la valeur copiée. */
+.kd-install__url,
+.kd-install__fingerprint {
+    margin: 0;
+    padding: var(--kd-space-4) var(--kd-space-6);
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    font-family: var(--font-mono);
+    color: var(--color-text);
+    user-select: all;
+    overflow-wrap: anywhere;
+}
+
+.kd-install__url {
+    font-size: 15px;
+    font-weight: var(--kd-weight-medium);
+}
+
+/* 64 caractères hexadécimaux : plus petit, interligne serré, c'est une valeur
+   qu'on compare du regard, pas une phrase qu'on lit. */
+.kd-install__fingerprint {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+}
+
+.kd-install__acts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--kd-space-5);
+    margin-top: var(--kd-space-7);
+}
+
+/* Le rappel de bas de section : ce qu'il faut savoir avant de cliquer, à l'encre
+   secondaire. Pas de rouge — une source non listée n'est pas un échec (§5
+   règle 2). */
+.kd-install__note {
+    margin: var(--kd-space-7) 0 0;
+    padding-left: var(--kd-space-6);
+    border-left: 2px solid var(--color-cat-3);
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--color-text-soft);
+    max-width: 66ch;
+}
+
+/* Doit rester APRÈS les règles de base ci-dessus : une @media n'ajoute aucune
+   spécificité (cf. docs/design-system.md §5). */
+@media (max-width: 560px) {
+    .kd-install__repo {
+        flex-direction: column;
+        gap: var(--kd-space-7);
+    }
+
+    .kd-install__qr {
+        align-self: center;
+    }
+
+    /* Un APK se télécharge depuis le téléphone : les deux liens prennent la
+       largeur plutôt que de se serrer à deux sur une ligne. */
+    .kd-install__acts .kd-btn {
+        width: 100%;
+    }
+}

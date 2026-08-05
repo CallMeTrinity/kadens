@@ -7,6 +7,35 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    # KL-43 — la version publiée de l'app Android. Déclarée ici et nulle part
+    # ailleurs : c'est ce que sert `GET /api/app-version` et ce qu'affiche `/app`.
+    #
+    # **Publier une version, c'est deux gestes** : pousser un tag `vX.Y.Z` sur
+    # `kadens-mobile` (le workflow produit l'APK et la release), puis reporter ici
+    # les deux numéros annoncés par le résumé du build. Rien ne les synchronise —
+    # le pourquoi est écrit en tête de `src/Service/MobileRelease.php`.
+    #
+    # `0` / `0.0.0` = aucune version publiée : ni lien d'APK sur la page, ni
+    # bandeau de mise à jour dans l'app. C'est l'état tant que le workflow de
+    # build n'a pas tourné sur un tag.
+    app.mobile.version_code: 0
+    app.mobile.version_name: '0.0.0'
+
+    # En dessous, l'app se bloque d'elle-même. Ne monte **que** si le format de
+    # synchronisation change : c'est un garde-fou, pas un levier de mise à jour.
+    app.mobile.minimum_version_code: 0
+
+    # Le dépôt qui héberge les releases. L'APK en téléchargement direct s'en
+    # dérive, avec le nom de fichier composé par `.github/workflows/build.yml`.
+    app.mobile.repository: 'CallMeTrinity/kadens-mobile'
+
+    # Le dépôt TNTStore (KL-42), qui ne référence que ces releases et n'héberge
+    # aucun binaire. Cette URL est ce que la page affiche et ce que le QR encode :
+    # elle doit être **exactement** celle qui se colle dans le store, fragment de
+    # vérification compris. L'empreinte, elle, est celle de la clé qui signe
+    # l'index (KL-40), donnée à recouper à la main.
+    app.mobile.store_url: 'https://store.antoninpamart.fr'
+    app.mobile.store_fingerprint: 'b59214699a2ae99286473398e7e43b8f50922ba82b07b23a199264e6ed725b74'
 
 services:
     # default configuration for services in *this* file
@@ -21,3 +50,14 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+
+    # Des scalaires ne s'autowirent pas : la définition explicite remplace celle
+    # produite par `App\:` juste au-dessus (la dernière gagne).
+    App\Service\MobileRelease:
+        arguments:
+            $versionCode: '%app.mobile.version_code%'
+            $versionName: '%app.mobile.version_name%'
+            $minimumVersionCode: '%app.mobile.minimum_version_code%'
+            $repository: '%app.mobile.repository%'
+            $storeUrl: '%app.mobile.store_url%'
+            $storeFingerprint: '%app.mobile.store_fingerprint%'

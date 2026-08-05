@@ -14,8 +14,8 @@ chaque décision vit ailleurs et n'est pas recopié ici :
 
 Tous les exemples `curl` de ce fichier ont été **réellement exécutés** contre le
 serveur de développement (`https://127.0.0.1:8000`, compte
-`demo-api@kadens.test`) le 2 août 2026, et les réponses sont collées telles
-quelles — seules les clés secrètes sont raccourcies. Le `-k` des exemples
+`demo-api@kadens.test`) le 2 août 2026 — le 5 août pour §6.10, ajouté par KL-43 —
+et les réponses sont collées telles quelles — seules les clés secrètes sont raccourcies. Le `-k` des exemples
 n'existe que pour le certificat auto-signé du serveur local : en production, il
 n'a rien à faire là.
 
@@ -59,10 +59,10 @@ Authorization: Bearer 9873ffbd6e6138c252ba375ae54c72052341d72977c86d35d9f914acdc
   n'y a ni session ni CSRF à gérer côté client.
 
 **Contrat à respecter : ne jamais envoyer d'en-tête `Authorization` sur
-`POST /api/auth/login` ni `POST /api/auth/pair`.** L'authenticator se déclenche
-sur la seule présence d'un `Bearer`, quelle que soit la route : un jeton périmé
-présenté là ferait échouer la requête **avant** le contrôleur, et la reconnexion
-serait impossible. Le flux de reconnexion est donc :
+`POST /api/auth/login`, `POST /api/auth/pair` ni `GET /api/app-version`.**
+L'authenticator se déclenche sur la seule présence d'un `Bearer`, quelle que soit
+la route : un jeton périmé présenté là ferait échouer la requête **avant** le
+contrôleur, et la reconnexion serait impossible. Le flux de reconnexion est donc :
 
 ```
 401 → effacer le jeton local → POST /api/auth/login (sans en-tête)
@@ -118,6 +118,7 @@ provoque.
 | 6.7 | `GET` | `/api/schedule/{uuid}` | oui | KL-15 |
 | 6.8 | `PUT` | `/api/schedule/{uuid}` | oui | KL-16 |
 | 6.9 | `DELETE` | `/api/schedule/{uuid}` | oui | KL-16 |
+| 6.10 | `GET` | `/api/app-version` | **non** | KL-43 |
 
 Deux routes **web** complètent le protocole d'appairage — elles vivent hors de
 `^/api`, sur la session du navigateur, et le mobile ne les appelle jamais :
@@ -842,6 +843,50 @@ $ curl -sk "https://127.0.0.1:8000/api/bootstrap?since=2026-08-02T21:00:00Z" -H 
 | `403` | Séance d'un autre. La garde est `LOG`, pas `DELETE` : ce que le téléphone efface, c'est du réalisé. |
 | `404` | Uuid inconnu — ou déjà supprimé, ce qui rend le `DELETE` sûr à rejouer une fois qu'on traite le 404 comme un succès. |
 
+### 6.10 `GET /api/app-version`
+
+Ce que le serveur attend comme version d'app (KL-43). **Le seul endpoint anonyme
+qui ne serve pas à obtenir un jeton** : le plancher doit se lire avant la
+connexion, et le jour où l'ancien format n'est plus servi, se connecter est
+précisément ce qui ne marche plus.
+
+```console
+$ curl -s http://127.0.0.1:8000/api/app-version
+{"versionCode":0,"versionName":"0.0.0","minimumVersionCode":0,"apkUrl":null,
+ "storeUrl":"https:\/\/store.antoninpamart.fr","installUrl":"http:\/\/127.0.0.1:8000\/app"}
+```
+
+Réponse **réellement obtenue le 5 août 2026**, sur un serveur local servi en
+clair — d'où l'absence de `-k`, et un `installUrl` en `http`. Aucun jeton dans la
+commande : c'est le contrat, pas un raccourci.
+
+| Champ | Rôle |
+|---|---|
+| `versionCode` | La dernière version **publiée**, au sens Android (`android.versionCode`). Supérieure à la sienne : proposer une mise à jour, sans jamais l'imposer. |
+| `versionName` | Son numéro lisible, sans le `v` du tag. À afficher plutôt que le `versionCode`. |
+| `minimumVersionCode` | Le **plancher supporté**. En dessous, le client doit s'arrêter : c'est la seule porte de sortie prévue si le format de synchronisation change, et il ne monte qu'à cette occasion. |
+| `apkUrl` | L'APK en téléchargement direct, ou `null` tant que rien n'est publié. Secours : il installe, il ne prévient de rien ensuite. |
+| `storeUrl` | Le dépôt TNTStore, qui ne référence que les releases GitHub et n'héberge aucun binaire. |
+| `installUrl` | La page d'installation du site (`/app`), en absolu. C'est ce qu'un bandeau de mise à jour ouvre. |
+
+**Zéro veut dire « rien de publié »**, et c'est l'élément neutre des deux
+comparaisons : rien n'est plus récent que soi, rien n'est sous le plancher. Un
+client n'a donc aucun cas particulier à écrire pour l'état d'avant la première
+release.
+
+Trois règles côté client :
+
+1. **Appeler sans en-tête `Authorization`** (§1). L'endpoint est anonyme, mais un
+   `Bearer` périmé ferait échouer la requête avant le contrôleur.
+2. **Persister la réponse.** Un plancher qui ne tiendrait que le temps d'un appel
+   réussi disparaîtrait au premier lancement hors réseau, c'est-à-dire là où il
+   protège.
+3. **Ne rien bloquer faute de réponse.** Ne pas savoir n'est pas « trop vieux ».
+
+Les deux nombres sont **déclarés** côté serveur (`config/services.yaml`), pas lus
+chez GitHub à chaque appel : cet endpoint doit répondre même quand le tiers qui
+héberge les binaires ne répond pas.
+
 ---
 
 ## 7. Limites connues
@@ -879,6 +924,7 @@ Les gardes décrites ici sont tenues par des tests, pas par la bonne volonté :
 | `tests/Controller/ApiScheduleTest.php` | La lecture, l'upsert, l'idempotence à trois envois, le partage d'autorité. |
 | `tests/Controller/ApiExerciseHistoryTest.php` | L'historique : périmètre, bornage, portée. |
 | `tests/Controller/ApiErrorResponseTest.php` | La forme RFC 9457 et l'absence de fuite interne. |
+| `tests/Controller/ApiAppVersionTest.php` | `GET /api/app-version` : répond sans jeton (l'inverse de la matrice, d'où un fichier à part), refuse quand même un `Bearer` inconnu, ne pose aucun cookie. |
 
 ```console
 $ php vendor/bin/phpunit tests/Controller

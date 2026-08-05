@@ -56,6 +56,11 @@ security:
         # un jeton, exiger d'en avoir un serait circulaire. Tout le reste de
         # l'API demande un utilisateur, donc un Bearer valide.
         - { path: ^/api/auth, roles: PUBLIC_ACCESS }
+        # ^/api/app-version aussi, et pour une raison voisine : le plancher de
+        # version doit se lire **avant** la connexion (KL-43). Le jour où un
+        # ancien format n'est plus servi, se connecter est précisément ce qui ne
+        # marche plus — un endpoint authentifié ne dirait alors jamais pourquoi.
+        - { path: ^/api/app-version, roles: PUBLIC_ACCESS }
         - { path: ^/api, roles: ROLE_USER }
         - { path: ^/exercise, roles: ROLE_USER }
         - { path: ^/workout, roles: ROLE_USER }

@@ -284,7 +284,47 @@
 > que le **clavier recouvre** se mesure au lieu de se deviner, et
 > `prefers-reduced-motion` couvre les deux seuls mouvements de l'app. Vérifié par
 > 150 contrôles hors React Native ; le rendu se juge au pouce, en salle.
-> Prochain ticket : **KL-40** (signature Android).
+> **KL-40 livré (05/08/2026)** : les clés de signature. Deux clés RSA 4096
+> distinctes — l'APK d'un côté, l'index du dépôt de l'autre, parce qu'un index ne
+> contient aucun binaire et que la clé qui resigne un catalogue à chaque
+> publication n'a rien à faire sur une application. Elles vivent dans
+> `~/.keystores/kadens/`, hors de toute arborescence git, et leurs sept secrets
+> sont posés sur le dépôt mobile. Deux choses tranchées à l'essai plutôt qu'à la
+> doc : le format reste **JKS** malgré l'avertissement de `keytool`, parce que
+> PKCS12 ignore `-keypass` et ferait échouer `jarsigner` — les « trois mots de
+> passe » du ticket n'existent qu'en JKS ; et un **secret GitHub n'est pas une
+> sauvegarde**, l'API n'exposant que l'écriture. Chaque clé a été vérifiée en
+> signant réellement, contrôle négatif compris.
+> **KL-41 livré (05/08/2026)** : le workflow de build. `android/` n'étant pas
+> versionné, la `signingConfig` de release est **injectée par un plugin** — écrite
+> à la main, elle disparaîtrait au prochain `prebuild` et l'APK sortirait signé en
+> debug, ce qui ne se voit qu'au moment d'installer. Le plugin jette si le gabarit
+> React Native a bougé, les secrets passent par l'environnement (jamais par
+> `~/.gradle/gradle.properties`, que le cache du runner emporterait), et le
+> workflow **recoupe l'empreinte du certificat de l'APK produit** : c'est ce
+> contrôle, pas le plugin, qui interdit une release mal signée. `ci.yml` devient
+> appelable et passe en `needs` du build — « pas de release verte sur du rouge »
+> cesse d'être une intention. Les deux numéros de version quittent le dépôt
+> (`app.config.ts`) : `versionCode` = `github.run_number`, `versionName` = le tag.
+> Dans la foulée, l'APK est passé de **130 Mo à 20,6 Mo** : la mesure a montré
+> que 80 % du poids était natif et qu'un tiers du dex était du Jetpack Compose
+> tiré par `@expo/ui` et jamais exécuté. Restent le workflow, qui n'a pas encore
+> tourné sur un runner, et R8, dont la recette sur l'appareil est une condition
+> de KL-44.
+> **KL-43 livré (05/08/2026)**, **avant KL-42 dont il dépendait sur le papier** :
+> la page `/app` et le contrôle de version n'avaient besoin du dépôt que pour son
+> URL, qui tient dans un paramètre. Côté web, une page **anonyme** rendue côté
+> serveur (QR du dépôt compris) et `GET /api/app-version`, le **seul endpoint
+> anonyme qui ne serve pas à obtenir un jeton** — le plancher doit se lire avant
+> la connexion. Les deux numéros y sont **déclarés** dans `config/services.yaml`,
+> pas lus chez GitHub : cet endpoint doit répondre quand le tiers qui héberge les
+> binaires ne répond pas, et `0` y vaut « rien de publié », élément neutre des
+> deux comparaisons. Côté app, un contrôle au lancement dont le verdict est
+> **persisté** — sinon il ne tient pas un lancement en mode avion, c'est-à-dire
+> l'usage nominal : bandeau tapotable au-dessus de la barre d'onglets quand une
+> version existe, écran de blocage sous le plancher, et jamais rien en
+> développement ni faute de réponse.
+> Prochain ticket : **KL-42** (dépôt TNTStore auto-hébergé et publication).
 
 ---
 
@@ -293,7 +333,7 @@
 ### 0.1 Ce qu'on construit
 
 Une **app mobile Android native** (Expo / React Native), distribuée par un
-**dépôt F-Droid personnel** hébergé sur `kadens.antoninpamart.fr`, qui permet de :
+**dépôt TNT Store personnel** hébergé sur `store.antoninpamart.fr`, qui permet de :
 
 1. dérouler une séance **programmée ce jour** et en dévier (poids, reps, séries,
    exercice sauté ou remplacé) ;
@@ -360,7 +400,7 @@ Trois corollaires à ne pas casser :
 - **L'édition du réalisé depuis le web** (cf. §0.3 point 1). Un réalisé erroné se
   supprime, il ne se corrige pas en v1.
 - **Les mises à jour OTA** (`expo-updates` auto-hébergé). Une nouvelle version
-  passe par le dépôt F-Droid, comme n'importe quelle app.
+  passe par le dépôt TNTstore, comme n'importe quelle app.
 - **Le Play Store.** L'app est distribuée en APK signé sur un dépôt personnel.
   C'est un choix, pas un repli.
 
@@ -375,10 +415,10 @@ Trois corollaires à ne pas casser :
 | Connexion     | Appairage par QR depuis le desktop (§0.6)    | Le deep link « Se connecter avec Kadens » demande des App Links vérifiés, PKCE et un Custom Tab, pour un geste trimestriel.                               |
 | Sérialisation | `symfony/serializer` (déjà installé) + DTO   | API Platform impose un modèle CRUD-ish qui colle mal, et contredit l'esprit « pas de surcouche » du projet.                                               |
 | Build         | `expo prebuild` + Gradle dans GitHub Actions | EAS Build ajoute une dépendance à un service tiers pour un besoin que Gradle couvre.                                                                      |
-| Distribution  | Dépôt F-Droid statique auto-hébergé          | Cohérent avec la philosophie du projet. Obtainium sur GitHub Releases reste le repli documenté.                                                           |
+| Distribution  | Dépôt TNTStore statique auto-hébergé         | Cohérent avec la philosophie du projet. Obtainium sur GitHub Releases reste le repli documenté.                                                           |
 
 **Deux gains à noter** : une app native n'est pas un navigateur, donc **aucune
-configuration CORS**. Et un dépôt F-Droid n'accepte que des **APK**, pas des AAB.
+configuration CORS**. Et un dépôt TNTStore n'accepte que des **APK**, pas des AAB.
 
 ### 0.6 La connexion se fait par appairage, pas par mot de passe
 
@@ -483,7 +523,7 @@ Ne rien réimplémenter de cette liste.
 - **`tools/fetch-fonts.sh`** — source des polices. À étendre pour produire aussi
   les `.ttf` dont React Native a besoin (il ne lit pas le `woff2`).
 - **`.github/workflows/deploy.yml`** — le patron rsync vers le mutualisé, avec
-  gate manuel. Le workflow de publication du dépôt F-Droid le copie.
+  gate manuel. Le workflow de publication du dépôt TNTStore le copie.
 
 ---
 
@@ -628,7 +668,7 @@ soirée ou deux, L = un week-end.
 | KL-39 | Ergonomie de salle + accessibilité                   | 5   | M      | KL-37                      |
 | KL-40 | Signature Android                                    | 6   | M      | KL-21                      |
 | KL-41 | Workflow de build APK                                | 6   | L      | KL-40, KL-36               |
-| KL-42 | Dépôt F-Droid auto-hébergé + publication             | 6   | L      | KL-41                      |
+| KL-42 | Dépôt TNTStore auto-hébergé + publication            | 6   | L      | KL-41                      |
 | KL-43 | Page d'installation + contrôle de version in-app     | 6   | M      | KL-42                      |
 | KL-44 | Recette finale et documentation                      | 6   | M      | KL-43, KL-39               |
 | KL-49 | Réalisé superposé à la progression du plan           | 7   | L      | KL-05, KL-07               |
@@ -1210,7 +1250,7 @@ Ce que le ticket pose, et qu'il ne faut pas casser :
 - [x] **Le QR ne contient jamais de token**, seulement ce code (§0.6 règle 1)
 - [x] `POST /api/auth/pair` : `{code, deviceName}` → `{token, user}`
 - [x] **Consommation atomique** : `UPDATE pairing_code SET used_at = NOW()
-  WHERE id = ? AND used_at IS NULL`, puis vérification des lignes affectées.
+WHERE id = ? AND used_at IS NULL`, puis vérification des lignes affectées.
       Une lecture suivie d'une écriture laisserait passer deux scans simultanés
 - [x] Un code expiré, déjà utilisé ou inconnu renvoie la **même** erreur 400
 - [x] Limiteur de débit sur `POST /api/auth/pair` (10 essais par IP et par
@@ -3132,7 +3172,7 @@ diagnostic, qui portait ces morceaux depuis KL-25 faute d'un endroit à eux.
   pas** diverger du binaire installé, donc `Constants.expoConfig` dit la vérité
   sans ajouter un module natif (donc un rebuild) pour une valeur qu'on a déjà. La
   question se reposera avec un vrai besoin quand KL-43 comparera cette version à
-  celle du dépôt F-Droid. Deux corollaires : `android.versionCode` est désormais
+  celle du dépôt TNTStore. Deux corollaires : `android.versionCode` est désormais
   **déclaré** dans `app.json` (sinon « build » serait une devinette), et en
   développement l'écran affiche « développement » plutôt qu'un numéro qui ferait
   croire à une version distribuée.
@@ -3682,12 +3722,65 @@ annoncée, et le parcours hors réseau de bout en bout passe par elle).
 
 **Fini quand** :
 
-- [ ] Keystore de release généré et **sauvegardé hors du dépôt** (perdre cette
+- [x] Keystore de release généré et **sauvegardé hors du dépôt** (perdre cette
       clé rend toute mise à jour de l'app impossible : il faudrait désinstaller
       et réinstaller, en perdant les données locales)
-- [ ] Keystore en base64 dans les secrets GitHub, avec ses trois mots de passe
-- [ ] Une deuxième clé, distincte, pour signer l'index du dépôt F-Droid
-- [ ] Procédure de restauration écrite dans le README du repo mobile
+- [x] Keystore en base64 dans les secrets GitHub, avec ses trois mots de passe
+- [x] Une deuxième clé, distincte, pour signer l'index du dépôt TNTStore
+- [x] Procédure de restauration écrite dans le README du repo mobile
+
+**Livré le 05/08/2026.** Deux clés RSA 4096 dans `~/.keystores/kadens/`
+(`chmod 700`, hors de toute arborescence git), sept secrets sur
+`CallMeTrinity/kadens-mobile`, et la procédure de restauration dans
+`kadens-mobile/README.md` § « Signature et restauration du keystore ». Ce qui a
+été tranché en le faisant :
+
+- **Le format est JKS, contre l'avertissement de `keytool`.** La recommandation
+  PKCS12 a été suivie en premier, puis abandonnée sur essai : en PKCS12, Java
+  **ignore** `-keypass` et aligne le mot de passe de la clé sur celui du
+  keystore. `keytool` le dit en avertissement, `jarsigner` le paie ensuite en
+  `key associated with <alias> not a private key`. Les « trois mots de passe » du
+  ticket n'existent donc qu'en JKS — sinon deux secrets sur trois portent la même
+  valeur, et l'un des deux ne veut plus rien dire. La porte de sortie reste
+  ouverte tant qu'on a le fichier (`keytool -importkeystore -deststoretype
+  pkcs12`), elle est écrite dans le README.
+- **Un secret GitHub n'est pas une sauvegarde.** L'API n'expose que l'écriture :
+  ni l'interface, ni `gh`, ni un workflow ne relisent `ANDROID_KEYSTORE_BASE64`.
+  C'est une copie de travail à sens unique, et le README l'écrit en tête de
+  section — c'est exactement le genre de chose qu'on suppose acquise jusqu'au
+  jour où on a perdu la machine.
+- **Les deux clés sont séparées parce que l'index n'est pas un binaire.**
+  L'index déclare quelles versions existent et où les prendre, il n'en contient
+  aucune. Une clé commune ferait de la clé qui tourne le plus souvent — celle
+  qui resigne un catalogue à chaque publication — une clé de signature
+  d'application. Séparées, compromettre l'index laisse republier un catalogue,
+  pas une fausse app ; et l'inverse.
+- **Quatre secrets pour l'APK, trois pour l'index**, alors que le ticket n'en
+  demandait que pour l'APK : KL-42 publiera l'index depuis Actions comme le
+  reste, et la clé y sera attendue. Poser les sept d'un coup évite de rouvrir un
+  dossier de clés deux fois.
+- **Chaque clé a été vérifiée en signant réellement**, pas en supposant que
+  `keytool` avait bien travaillé : `jarsigner` sur un jar jetable, avec les vrais
+  mots de passe, plus un contrôle négatif (mauvais `keypass` → refus). Idem pour
+  l'aller-retour base64, qui ne se serait vu qu'au premier build sinon.
+- Les mots de passe sont générés par `openssl rand -hex 24` et écrits
+  directement sur disque : ils ne sont jamais passés par une sortie de terminal.
+  `CREDENTIALS.txt` est un **intermédiaire** vers le gestionnaire de mots de
+  passe, pas un lieu de stockage.
+
+Empreinte SHA-256 du certificat de release (à recouper avec un APK) :
+`50:D9:67:98:97:80:48:3B:13:82:3E:72:DE:0E:EA:DB:72:2F:EE:98:5D:76:7D:37:53:52:1B:A8:A9:67:BF:50`.
+Empreinte du dépôt TNTStore, au format qui part dans `?fingerprint=` :
+`b59214699a2ae99286473398e7e43b8f50922ba82b07b23a199264e6ed725b74`. Les deux
+certificats expirent le **26/07/2066** — échéance de build, pas d'app : une
+expiration bloque la signature d'un nouvel APK, elle n'invalide pas les
+installations en place.
+
+**Reste à faire, et c'est KL-41.** `android/` n'étant pas versionné, la
+`signingConfig` de release ne peut pas être écrite à la main : elle passera par
+un plugin déclaré dans `app.json` ou par un `gradle.properties` injecté par le
+workflow. Rien n'a encore consommé les secrets — ils sont posés, pas éprouvés par
+un build.
 
 ### KL-41 — Workflow de build APK
 
@@ -3695,36 +3788,129 @@ annoncée, et le parcours hors réseau de bout en bout passe par elle).
 
 **Fini quand** :
 
-- [ ] Sur push : installation, lint, tests, `expo prebuild --platform android`,
+- [x] Sur push : installation, lint, tests, `expo prebuild --platform android`,
       `./gradlew assembleRelease`
-- [ ] **APK, pas AAB** : un dépôt F-Droid ne distribue que des APK
-- [ ] `versionCode` dérivé de `github.run_number`, `versionName` du tag
-- [ ] APK signé avec le keystore des secrets
-- [ ] Artefact publié en GitHub Release sur un tag `v*`
-- [ ] Le workflow échoue si les tests échouent (pas de release verte sur du rouge)
+- [x] \*\*APK, pas AAB
+- [x] `versionCode` dérivé de `github.run_number`, `versionName` du tag
+- [x] APK signé avec le keystore des secrets
+- [x] Artefact publié en GitHub Release sur un tag `v*`
+- [x] Le workflow échoue si les tests échouent (pas de release verte sur du rouge)
 
-### KL-42 — Dépôt F-Droid auto-hébergé
+**Livré le 05/08/2026.** Trois pièces dans le dépôt mobile —
+`plugins/with-release-signing.js`, `app.config.ts`, `.github/workflows/build.yml`
+— et un `ci.yml` devenu appelable. Ce qui a été tranché en le faisant :
 
-**Où** : `.github/workflows/publish.yml` (repo mobile), `public/fdroid/` (serveur)
+- **La `signingConfig` est un plugin, parce qu'`android/` n'existe pas.** C'était
+  la question laissée ouverte par KL-40. Une signature écrite à la main dans
+  `android/app/build.gradle` survit au premier build et disparaît au suivant, sans
+  bruit : l'APK sort alors signé par la clé de **debug**, et ça ne se voit qu'au
+  moment d'installer par-dessus une version existante — refus sans message utile.
+  Le plugin injecte le bloc à chaque `prebuild`, et **jette** si les deux ancres
+  du gabarit React Native ont bougé (`signingConfigs {`, et le
+  `signingConfig signingConfigs.debug` du type de build `release`, qu'il faut
+  distinguer de celui du type `debug`). Un gabarit qui change casse le build au
+  lieu de produire un APK inerte.
+- **Les secrets passent par l'environnement, pas par une propriété Gradle.**
+  `~/.gradle/gradle.properties` est le chemin que documente React Native ; il est
+  refusé ici parce que le cache Gradle du runner emporterait les mots de passe.
+  L'environnement ne s'écrit nulle part et Actions le masque. La propriété reste
+  lue en repli, pour un build de release sur le poste.
+- **Sans clé, la release retombe sur la signature de debug** au lieu d'échouer :
+  `npx expo run:android --variant release` doit marcher sans secret. Ce repli est
+  précisément ce qui rend le contrôle suivant obligatoire.
+- **Le workflow recoupe l'empreinte du certificat de l'APK produit** avec celle
+  du certificat de release notée plus haut (`apksigner verify --print-certs`).
+  C'est ce contrôle, et pas le plugin, qui interdit une release signée en debug ou
+  un secret manquant. Il tient en dix lignes et ferme le seul trou du dispositif.
+- **`ci.yml` est appelé, pas recopié.** Il perd son déclencheur `push` et gagne
+  `workflow_call` ; `build.yml` le pose en `needs`. Deux définitions des mêmes
+  contrôles divergeraient, et c'est celle du build qui se ferait oublier. Effet de
+  bord voulu : « pas de release verte sur du rouge » n'est plus une intention,
+  c'est une dépendance de job.
+- **Les deux numéros de version quittent le dépôt** (`app.config.ts`, qui étend
+  `app.json` sans le remplacer). `versionCode` vient de `github.run_number` —
+  monotone, mais **propre au fichier de workflow** : renommer `build.yml` le
+  remettrait à zéro et produirait un APK que rien ne peut installer par-dessus le
+  précédent. C'est la seule façon de casser la règle, elle est écrite dans le
+  README. Un `KADENS_VERSION_CODE` mal formé **échoue le build** plutôt que de
+  retomber sur `1` en silence : le défaut ne se verrait qu'à la version suivante.
+- **Le tag est validé avant de compiler** (`vX.Y.Z` strict). Dix minutes de Gradle
+  pour découvrir qu'on a poussé `1.2.0` sans le `v` n'apprennent rien.
+- **Un build de branche produit quand même un artefact** (14 jours). C'est ce qui
+  permet d'installer un état intermédiaire sans publier une version, et ça évite
+  la tentation de tagger pour tester.
 
-**Quoi** : le store perso. Un dépôt F-Droid est un ensemble de fichiers
-statiques, donc parfaitement servi par le mutualisé Infomaniak.
+**Vérifié en réel, pas en lecture** : le plugin appliqué au vrai
+`android/app/build.gradle` (transformation exacte, idempotente) ; `expo prebuild`
+de bout en bout avec les variables de version (`versionCode 42`,
+`versionName "1.2.0"`) ; `:app:signingReport` dans les **deux** branches — clé
+jetable présente, `Variant: release → Config: release` ; absente,
+`Config: debug` ; puis un `assembleRelease` complet, APK signé, empreinte
+recoupée par `apksigner`. Plus `typecheck`, `lint`, `format:check` et les 151
+contrôles existants. **Cinq builds** au total, dont quatre pour chiffrer les
+leviers de taille un par un plutôt que de les estimer.
 
-**Fini quand** :
+**Limites.** Le workflow lui-même n'a jamais tourné sur un runner : le SDK
+Android préinstallé, le cache Gradle et `gh release create` sont vérifiés par
+lecture, pas par exécution. Le premier `push` est donc la vraie recette, et la
+première publication demande un tag. Rien n'a été installé sur le téléphone
+depuis cet APK — l'app y tourne en build de développement, signée en debug : la
+première release imposera une désinstallation, donc la perte de la base locale.
+À faire quand rien n'attend d'être synchronisé.
 
-- [ ] `fdroidserver` exécuté en CI (image Docker officielle, elle embarque le SDK
-      Android dont `fdroid update` a besoin)
-- [ ] L'APK de la release est ajouté au dépôt, l'index régénéré et signé
-- [ ] Publication par **rsync sur le mutualisé**, en copiant le patron de
-      `deploy.yml` (clé SSH en secret, `-rlptz` et non `-a`, gate manuel)
-- [ ] Le dépôt est servi sur `https://kadens.antoninpamart.fr/fdroid/repo`
-- [ ] **`.htaccess` déclarant le type MIME des APK**
-      (`AddType application/vnd.android.package-archive .apk`), sinon Android
-      refuse l'installation du fichier téléchargé
-- [ ] Métadonnées renseignées : nom, description, captures, licence
-- [ ] Le dépôt s'ajoute dans le client F-Droid et propose la mise à jour
-- [ ] Repli documenté dans le README : Obtainium pointé sur les GitHub Releases,
-      si le dépôt F-Droid pose problème
+#### De 130 Mo à 20,6 Mo
+
+Le premier APK pesait **130 Mo** pour une app qui déroule une séance et écrit des
+séries. La mesure — pas l'intuition — a montré que presque rien de ce poids
+n'était du code de Kadens : **80 % de bibliothèques natives**, dont deux tranches
+x86 qui ne servent qu'aux émulateurs, et un dex dont **35 % était du Jetpack
+Compose jamais exécuté**. Cinq réglages, chacun chiffré sur un build réel :
+
+| Levier                                | Où                            |    Gain |
+| ------------------------------------- | ----------------------------- | ------: |
+| `reactNativeArchitectures=arm64-v8a`  | `build.yml` (drapeau Gradle)  | −74,7 Mo |
+| `useLegacyPackaging=true`             | `plugins/with-app-size.js`    | −17,2 Mo |
+| R8 + `shrinkResources`                | `plugins/with-app-size.js`    |  −7,2 Mo |
+| `@expo/ui` hors autolinking           | `package.json`                |  −6,5 Mo |
+| GIF et WebP désactivés                | `plugins/with-app-size.js`    |  −0,8 Mo |
+
+**Résultat mesuré : 20,6 Mo téléchargés, ~47 Mo installés** (contre ~130 Mo
+installés avant). Ce qui a été tranché en le faisant :
+
+- **`@expo/ui` était le poids mort le plus cher, et le moins visible.** Il vient
+  d'`expo-router`, qui le tire pour son *toolbar* flottant, et embarque tout
+  Jetpack Compose + Material3 — 22 144 références de types dans le dex. Kadens
+  dessine sa barre d'onglets à la main (`expo-router/ui` headless) et n'importe
+  jamais le toolbar : après exclusion, Compose tombe à **zéro référence** et rien
+  d'autre ne bouge. Le leçon générale : le coût d'une dépendance ne se lit pas
+  dans `package.json`, il se lit dans l'APK.
+- **La restriction d'architecture est passée par le workflow, pas par le
+  plugin.** `reactNativeArchitectures` est une propriété **globale** : posée dans
+  `gradle.properties`, elle vaudrait aussi pour le développement, et un émulateur
+  sur une machine Intel est en x86_64. Elle n'a de sens que pour l'APK publié.
+- **`useLegacyPackaging` est un compromis assumé, pas un gain net** : −17,2 Mo au
+  téléchargement, mais Android extrait les `.so` à l'installation, donc +9,2 Mo
+  sur le téléphone. Retenu parce que le dépôt auto-hébergé n'a **pas de mise à
+  jour différentielle** — chaque version se retélécharge en entier.
+- **R8 impose de publier le `mapping.txt`.** La minification renomme les classes,
+  et il n'y a pas de Play Console pour en garder une copie : sans ce fichier, une
+  trace de crash est illisible. Il part donc avec l'APK, à chaque release,
+  compressé (38 Mo → 4 Mo). Publié plus tard, il ne servirait à rien : il doit
+  correspondre exactement à son `versionCode`.
+- **Le plancher est autour de 32 Mo avant compression** : 26 Mo de natif
+  irréductible (React Native 6,7, ML Kit du scanner de QR 4,7, Hermes 2,4,
+  SQLite 1,8, Reanimated 1,4…), 4,7 Mo de dex minifié, 2,8 Mo de bundle JS.
+  `react-native-reanimated` n'est importé nulle part dans `src/` mais reste une
+  dépendance dure d'`expo-router` : le retirer casse la navigation. Couper le
+  scanner de QR (`expo.camera.barcode-scanner-enabled=false`) rendrait 5,6 Mo,
+  mais ce serait défaire KL-47/KL-48 — un choix produit, pas une optimisation.
+
+**R8 est le seul levier qui n'est pas prouvé.** Le build passe, les 14 noms de
+modules exposés au JS (`ExpoSecureStore`, `ExpoSQLite`, `ExpoCamera`…) survivent
+à la minification, mais une règle ProGuard manquante ne casse pas le build : elle
+casse le lancement, ou fait disparaître un module natif. **La recette sur
+l'appareil est une condition de KL-44**, et elle est à refaire après toute montée
+de version d'un module natif — pas une fois pour toutes.
 
 ### KL-43 — Page d'installation et contrôle de version
 
@@ -3732,14 +3918,99 @@ statiques, donc parfaitement servi par le mutualisé Infomaniak.
 
 **Fini quand** :
 
-- [ ] Une page `/app` sur le site : à quoi sert l'app, comment ajouter le dépôt
-      F-Droid, QR code de l'URL du dépôt, lien APK direct en secours
-- [ ] Page rendue dans l'identité Presse, accessible sans être connecté
-- [ ] `GET /api/app-version` renvoie la dernière `versionCode` publiée
-- [ ] L'app compare au lancement et affiche un bandeau non bloquant quand une
+- [x] Une page `/app` sur le site : à quoi sert l'app, comment ajouter le dépôt
+      store.antoninpamart.fr (TNTStore ne référence que les release github, il n'herberge rien), QR code de l'URL du dépôt, lien APK direct en secours
+- [x] Page rendue dans l'identité Presse, accessible sans être connecté
+- [x] `GET /api/app-version` renvoie la dernière `versionCode` publiée
+- [x] L'app compare au lancement et affiche un bandeau non bloquant quand une
       mise à jour existe, avec un lien vers le dépôt
-- [ ] Un champ « version minimale supportée » qui, lui, bloque : c'est la seule
+- [x] Un champ « version minimale supportée » qui, lui, bloque : c'est la seule
       porte de sortie si un jour le format de synchronisation change
+
+**Livré le 05/08/2026**, et **avant KL-42** dont il dépendait au tableau : la page
+et le contrôle n'ont besoin du dépôt que pour son **URL**, qui tient dans un
+paramètre. Six pièces côté web (`MobileRelease`, `QrSvg`, `AppInstallController`,
+`Api\AppVersionController`, `templates/app/install.html.twig`, les paramètres de
+`config/services.yaml`), quatre côté mobile (`sync/version.ts`, `UpdateBanner`,
+le garde du layout racine, quatre colonnes sur `sync_state`). Ce qui a été tranché
+en le faisant :
+
+- **Le serveur déclare, il ne va pas lire.** Le binaire vit dans une GitHub
+  Release, le dépôt TNTStore ne fait que la référencer. Interroger l'un ou
+  l'autre à chaque appel ferait dépendre `GET /api/app-version` d'un tiers, alors
+  que c'est justement l'endpoint qui doit répondre pour que l'app sache si elle a
+  le droit de synchroniser : un mutualisé sans réseau sortant ou une API GitHub
+  qui limite, et le garde-fou tombe en même temps que ce qu'il protège. Les deux
+  numéros sont donc **versionnés** dans `config/services.yaml`. Le prix est un
+  report à faire à la main après chaque tag — il est écrit dans le README du dépôt
+  mobile, § « Publier une version » — et il se paie en « pas de bandeau », jamais
+  en synchronisation cassée.
+- **Zéro est l'état d'aujourd'hui, et c'est l'élément neutre.** Aucune release
+  n'existe encore (le workflow de KL-41 n'a pas tourné sur un tag). `versionCode:
+  0` ne fait ni proposer ni bloquer, et la page dit « aucune version publiée » au
+  lieu d'offrir un lien en 404. Un `1` de complaisance aurait publié un
+  téléchargement cassé.
+- **Le seul endpoint anonyme qui ne serve pas à obtenir un jeton.** Le plancher
+  doit se lire **avant** la connexion : le jour où l'ancien format n'est plus
+  servi, se connecter est précisément ce qui ne marchera plus, et un endpoint
+  authentifié ne dirait alors jamais pourquoi. Corollaire imposé au client :
+  l'appeler **sans** en-tête (`auth: false`), l'authenticator se déclenchant sur
+  la seule présence d'un `Bearer` — un jeton périmé échouerait avant le
+  contrôleur. C'est pour ça qu'il n'est pas dans `ApiEndpointMatrixTest`, dont la
+  garde principale est l'inverse exact : il a son fichier, qui tient les deux
+  règles qui le concernent.
+- **Le verdict est persisté, sinon il ne garde rien.** Quatre colonnes sur
+  `sync_state` (migration `0003_app_version`). Un plancher qui ne vivrait qu'en
+  mémoire disparaîtrait au premier lancement sans réseau — c'est-à-dire dans le
+  mode où cette app s'ouvre le plus souvent, et où elle écrirait du réalisé
+  qu'elle ne pourra jamais pousser. Dans l'autre sens, un plancher **redescend**
+  aussi : le serveur garde la main, un blocage posé par erreur se relâche à la
+  publication suivante, sans rien à désinstaller.
+- **Deux choses ne bloquent jamais : ne pas savoir, et le développement.** Tant
+  qu'aucun appel n'a abouti, les colonnes sont nulles et le verdict est `ok` —
+  « on ignore » n'est pas « c'est trop vieux ». Et le manifeste servi par Metro
+  porte le `versionCode` d'`app.json`, c'est-à-dire `1` : sans exception, le
+  premier plancher au-dessus de 1 bloquerait tout build de développement sur une
+  version qui n'a jamais été distribuée. `installedVersionCode()` rend donc `null`
+  hors APK, ce qui répond au passage à la question laissée ouverte par KL-35 — pas
+  besoin d'`expo-application`, le manifeste embarqué ne peut pas diverger du
+  binaire.
+- **Le bandeau est le premier de l'app à porter une cible.** `OfflineBanner`
+  n'offre rien à toucher parce qu'il n'y a rien à faire ; ici il y a une page à
+  ouvrir, donc la bande entière est tapotable, à la hauteur tactile. Et les deux
+  ne s'affichent **jamais ensemble** : hors réseau, la page d'installation ne
+  s'ouvrira pas, proposer ce qui ne peut pas aboutir n'aide personne. Aucun des
+  deux n'entre en séance — la place sous le pouce y appartient à « valider cette
+  série ».
+- **L'écran de blocage réutilise `Fault`.** Ce n'est pas une panne, mais c'en est
+  la forme : un écran qui remplace l'app entière, avec une seule porte de sortie.
+  Le texte dit ce qui compte à ce moment-là — le réalisé déjà consigné est
+  intact et repartira sous la version suivante.
+- **Le QR est devenu un service à part** (`QrSvg`). Il y en a deux maintenant
+  (appairage, dépôt), lus dans les mêmes conditions ; deux appels au `Builder`
+  auraient fini par diverger sur la taille ou le niveau de correction.
+  `PairingQr` garde ce qui lui est propre : la charge utile.
+- **Le lien d'APK est dérivé, pas déclaré.** Nom de fichier composé par
+  `build.yml` (`kadens-<name>-<code>.apk`), tag `v<name>` : deux numéros suffisent
+  à l'écrire, et le lien ne peut donc pas désigner une autre version que celle
+  annoncée juste à côté. Contrepartie assumée : renommer l'APK côté workflow casse
+  ce lien.
+
+**Vérifié** : 425 tests côté web (dont `ApiAppVersionTest`, `AppInstallPageTest`,
+`MobileReleaseTest` — celui-ci construit ses instances plutôt que de lire les
+paramètres, sinon il deviendrait faux à la première publication), et côté mobile
+`typecheck`, `lint`, `format:check`, **169 contrôles** en 16 suites plus un
+`expo export` Android. La réponse d'`/api/app-version` collée dans
+`docs/api-mobile.md §6.10` a réellement été obtenue du serveur de développement.
+
+**Limites.** La page n'a pas été jugée à l'écran, seulement rendue (200, QR
+présent, aucune requête après chargement). L'**URL exacte du dépôt** est un
+paramètre posé à `https://store.antoninpamart.fr` : c'est KL-42 qui la fixera pour
+de bon, avec son éventuel chemin et son fragment de vérification, et c'est la
+seule ligne à changer. Le blocage est **côté client** : le serveur ne connaît pas
+la version de son appelant, un client modifié pourrait donc l'ignorer. Le rendre
+opposable demanderait que l'app annonce sa version à chaque requête — un autre
+ticket, et pas celui-ci.
 
 ### KL-44 — Recette finale et documentation
 
@@ -3748,6 +4019,10 @@ statiques, donc parfaitement servi par le mutualisé Infomaniak.
 - [ ] **Recette réelle en salle** : une séance programmée complète en mode avion,
       puis synchronisation. Une séance vierge. Une déviation. Un exercice sauté.
       Une app tuée en pleine séance puis rouverte
+- [ ] **Sur un APK de release minifié**, pas sur le build de développement : R8
+      renomme les classes et une règle ProGuard manquante ne se voit qu'à
+      l'exécution (KL-41). À refaire après toute montée de version d'un module
+      natif
 - [ ] Le réalisé de ces séances vérifié sur le web
 - [ ] `CLAUDE.md §6` mis à jour (nouveau lot livré), et §2 mentionnant le repo
       mobile et l'API
