@@ -4242,19 +4242,46 @@ ne se range pas sur l'entité.
 
 **Fini quand** :
 
-- [ ] **Une seule** requête d'agrégat renvoie `[exercise_id => count, lastAt]`
+- [x] **Une seule** requête d'agrégat renvoie `[exercise_id => count, lastAt]`
       pour l'utilisateur courant, fusionnée en PHP avec la liste existante
-- [ ] **Le compteur est scopé sur l'utilisateur courant.** Un exercice de la
+- [x] **Le compteur est scopé sur l'utilisateur courant.** Un exercice de la
       bibliothèque globale est partagé : « le plus exécuté » veut dire « par
       moi », jamais « par tout le monde ». Même piège que KL-50, même test
-- [ ] Trois tris exposés : **les plus faits**, **jamais faits**, **pas fait
-      depuis** (par date de dernière exécution décroissante)
-- [ ] Le tri suit le mécanisme de filtrage client déjà en place, il ne le
+- [x] Trois tris exposés : **les plus faits**, **jamais faits**, **pas fait
+      depuis** (~~par date de dernière exécution décroissante~~ — **croissante**,
+      cf. ci-dessous)
+- [x] Le tri suit le mécanisme de filtrage client déjà en place, il ne le
       contourne pas
-- [ ] **Pas de dénormalisation** : aucun `timesPerformed` sur `Exercise`. Un
+- [x] **Pas de dénormalisation** : aucun `timesPerformed` sur `Exercise`. Un
       compteur stocké dériverait à la première suppression de séance et
       demanderait une commande de reconstruction, pour un gain nul à ce volume
-- [ ] Le compte apparaît discrètement sur la carte, sans surcharger la grille
+- [x] Le compte apparaît discrètement sur la carte, sans surcharger la grille
+
+**Livré.** Une méthode de repository (`LoggedExerciseRepository::usageForOwner`),
+deux attributs de plus sur la carte, trois options de plus dans le `<select>`
+existant. Rien sur `Exercise`, aucun contrôleur Stimulus touché. Ce qui a été
+tranché en le faisant :
+
+- **« Pas fait depuis » est un tri CROISSANT**, contrairement à ce que disait le
+  cadrage. Trié par date de dernière exécution décroissante, le premier de la
+  liste serait celui qu'on vient de faire — exactement l'inverse du libellé. Ce
+  qu'on cherche, c'est le plus ancien, donc la date la plus petite en tête.
+- **Un exercice jamais fait tombe en fin de ce tri**, pas en tête : il y ferait
+  doublon avec « jamais faits », qui existe justement pour lui. Sentinelle en dur
+  dans le template (`9999999999`), commentée sur place — le repository n'a pas à
+  connaître les conventions d'un tri client.
+- **« Fait » = une occurrence non sautée dans une séance datée.** Même définition
+  que le décompte d'exercices de `LogMetrics` — un exercice annoncé sauté n'a pas
+  été fait, et une occurrence dont l'exercice de bibliothèque a été supprimé (FK
+  en `SET NULL`) n'a plus personne à créditer. Pas de filtre sur les séries : un
+  exercice ouvert puis abandonné compte comme une tentative, et c'est ce que
+  « combien de fois je l'ai fait » veut dire ici.
+- **Les trois tris ne s'exposent que s'il y a un usage à trier.** Sur une base
+  sans réalisé, ils ne feraient rien, et un `<select>` qui ne change rien se lit
+  comme une panne.
+- **Le compteur est un repère, pas une donnée.** Poussé à droite de la ligne de
+  méta, en encre secondaire, avec la date de dernière exécution en `title`. Aucun
+  rouge : ce n'est ni une action, ni une intensité, ni un échec.
 
 **Piste écartée pour l'instant** : afficher la dernière charge dans la palette
 du compositeur. Utile pour composer, mais c'est un autre écran et un autre

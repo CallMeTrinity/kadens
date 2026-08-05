@@ -1105,6 +1105,18 @@ a.kd-libcard__name:hover {
     margin: 0 2px;
 }
 
+/* Usage réel (KL-51) : un repère, pas une donnée à lire — poussé à droite de la
+   ligne de méta, dans l'encre secondaire. Aucun rouge : ce n'est ni une action,
+   ni une intensité, ni un échec. */
+.kd-libcard__usage {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-1);
+    margin-left: auto;
+    color: var(--color-text-secondary);
+    flex: 0 0 auto;
+}
+
 .kd-libcard__foot {
     margin-top: auto;
     display: flex;

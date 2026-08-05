@@ -12,6 +12,8 @@ use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
+use App\Repository\LoggedExerciseRepository;
+use Doctrine\Bundle\DoctrineBundle\Middleware\BacktraceDebugDataHolder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -197,12 +199,129 @@ final class ExerciseControllerTest extends WebTestCase
         self::assertSelectorNotExists('a[href="/schedule/'.$theirs->getId().'"]');
     }
 
+    // --- KL-51 : le tri de la bibliothèque par usage réel ---------------------
+
+    /**
+     * Sans aucun réalisé, les trois tris d'usage ne s'exposent pas : ils ne
+     * feraient rien, et le diraient mal.
+     */
+    public function testIndexHidesUsageSortsWithoutAnyLog(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $this->createExercise($user, 'Squat');
+
+        $this->client->loginUser($user);
+        $this->client->request('GET', '/exercise');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextNotContains('.kd-sort', 'Les plus faits');
+        self::assertSelectorNotExists('.kd-libcard__usage');
+    }
+
+    /** Les trois tris, les attributs qui les alimentent, et le compteur discret. */
+    public function testIndexExposesUsageSortsAndCounters(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $done = $this->createExercise($user, 'Squat');
+        $never = $this->createExercise($user, 'Fentes');
+
+        $this->log($user, $done, '2026-03-01', [[SetType::NORMAL, 5, 100.0]]);
+        $this->log($user, $done, '2026-03-08', [[SetType::NORMAL, 5, 105.0]]);
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/exercise');
+
+        self::assertResponseIsSuccessful();
+        $sorts = $crawler->filter('.kd-sort option')->each(static fn ($node): string => $node->text());
+        self::assertContains('Les plus faits', $sorts);
+        self::assertContains('Jamais faits', $sorts);
+        self::assertContains('Pas fait depuis', $sorts);
+
+        $card = $crawler->filter('[data-filter-name="Squat"]');
+        self::assertSame('2', $card->attr('data-sort-usage'));
+        self::assertSame((string) (new \DateTimeImmutable('2026-03-08'))->getTimestamp(), $card->attr('data-sort-last'));
+        self::assertStringContainsString('2×', $card->filter('.kd-libcard__usage')->text());
+
+        // Jamais fait : compteur à zéro, et renvoyé en fin du tri « pas fait
+        // depuis », qui est croissant — sinon il ferait doublon avec « jamais faits ».
+        $unused = $crawler->filter('[data-filter-name="Fentes"]');
+        self::assertSame('0', $unused->attr('data-sort-usage'));
+        self::assertSame('9999999999', $unused->attr('data-sort-last'));
+        self::assertCount(0, $unused->filter('.kd-libcard__usage'));
+    }
+
+    /**
+     * Même piège que KL-50 : un exercice de la bibliothèque globale est partagé.
+     * « Le plus exécuté » veut dire « par moi », jamais « par tout le monde ».
+     */
+    public function testUsageCountIsScopedToTheCurrentUser(): void
+    {
+        $mine = $this->createUser('me@example.com');
+        $other = $this->createUser('other@example.com');
+
+        $exercise = (new Exercise())->setName('Soulevé de terre')->setActivity(ActivityType::GYM);
+        $this->em->persist($exercise);
+        $this->em->flush();
+
+        $this->log($mine, $exercise, '2026-03-08', [[SetType::NORMAL, 5, 90.0]]);
+        foreach (['2026-03-01', '2026-03-03', '2026-03-05'] as $date) {
+            $this->log($other, $exercise, $date, [[SetType::NORMAL, 5, 180.0]]);
+        }
+
+        $this->client->loginUser($mine);
+        $crawler = $this->client->request('GET', '/exercise');
+
+        self::assertSame('1', $crawler->filter('[data-filter-name="Soulevé de terre"]')->attr('data-sort-usage'));
+    }
+
+    /**
+     * Un exercice sauté n'a pas été fait : il ne compte pas, et une séance où il
+     * n'apparaît que sauté ne devient pas sa dernière exécution.
+     */
+    public function testSkippedOccurrencesDoNotCount(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise($user, 'Squat');
+
+        $this->log($user, $exercise, '2026-03-01', [[SetType::NORMAL, 5, 100.0]]);
+        $this->log($user, $exercise, '2026-03-08', [[SetType::NORMAL, 5, 100.0]], skipped: true);
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/exercise');
+
+        $card = $crawler->filter('[data-filter-name="Squat"]');
+        self::assertSame('1', $card->attr('data-sort-usage'));
+        self::assertSame((string) (new \DateTimeImmutable('2026-03-01'))->getTimestamp(), $card->attr('data-sort-last'));
+    }
+
+    /**
+     * L'index charge toute la bibliothèque en une fois : l'usage doit tenir en
+     * **une** requête d'agrégat, sinon c'est un N+1 pour un affichage discret.
+     */
+    public function testUsageIsReadInASingleAggregateQuery(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        for ($i = 1; $i <= 8; ++$i) {
+            $exercise = $this->createExercise($user, 'Exercice '.$i);
+            $this->log($user, $exercise, sprintf('2026-03-%02d', $i), [[SetType::NORMAL, 5, 50.0 + $i]]);
+        }
+
+        $holder = static::getContainer()->get('doctrine.debug_data_holder');
+        self::assertInstanceOf(BacktraceDebugDataHolder::class, $holder);
+        $holder->reset();
+
+        $usage = static::getContainer()->get(LoggedExerciseRepository::class)->usageForOwner($user);
+
+        self::assertCount(1, $holder->getData()['default'] ?? []);
+        self::assertCount(8, $usage);
+    }
+
     /**
      * Une séance datée qui porte le réalisé d'un seul exercice.
      *
      * @param list<array{0: SetType, 1: int|null, 2: float|null}> $sets
      */
-    private function log(User $owner, Exercise $exercise, string $date, array $sets): ScheduledWorkout
+    private function log(User $owner, Exercise $exercise, string $date, array $sets, bool $skipped = false): ScheduledWorkout
     {
         $scheduled = (new ScheduledWorkout())
             ->setOwner($owner)
@@ -213,7 +332,8 @@ final class ExerciseControllerTest extends WebTestCase
         $logged = (new LoggedExercise())
             ->setExercise($exercise)
             ->setExerciseName((string) $exercise->getName())
-            ->setPosition(1);
+            ->setPosition(1)
+            ->setSkipped($skipped);
 
         $position = 0;
         foreach ($sets as $set) {
