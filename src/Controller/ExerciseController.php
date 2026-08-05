@@ -3,10 +3,12 @@
 namespace App\Controller;
 
 use App\Entity\Exercise;
+use App\Entity\User;
 use App\Enum\ActivityType;
 use App\Form\ExerciseType;
 use App\Repository\ExerciseRepository;
 use App\Security\Voter\ExerciseVoter;
+use App\Service\ExerciseTrajectory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -70,13 +72,26 @@ final class ExerciseController extends AbstractController
         ]);
     }
 
+    /**
+     * La fiche d'un exercice, et sous elle **sa trajectoire** (KL-50) : record,
+     * dernière performance, courbe de charge et dix dernières séances.
+     *
+     * L'historique est scopé sur `$this->getUser()`, et c'est ici volontaire — pas
+     * un oubli du « scoper sur l'owner » que suit le reste des vues ouvertes au
+     * coach. Un exercice de la bibliothèque globale n'a pas de propriétaire, et il
+     * est pratiqué par tout le monde : « est-ce que je progresse » ne peut vouloir
+     * dire que « moi ». Personne ne lit ici le réalisé d'un autre.
+     */
     #[Route('/{id}', name: 'app_exercise_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(Exercise $exercise): Response
+    public function show(Exercise $exercise, ExerciseTrajectory $trajectory): Response
     {
         $this->denyAccessUnlessGranted(ExerciseVoter::VIEW, $exercise);
 
+        $user = $this->getUser();
+
         return $this->render('exercise/show.html.twig', [
             'exercise' => $exercise,
+            'trajectory' => $user instanceof User ? $trajectory->for($user, $exercise) : null,
         ]);
     }
 

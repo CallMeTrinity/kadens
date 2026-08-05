@@ -8665,6 +8665,79 @@ textarea.kd-inlineedit__input {
 }
 
 /* ============================================================================
+   Trajectoire d'un exercice (exercise/show) — record, dernière performance,
+   courbe de charge, dernières séances. Les barres sont celles de `.kd-prog__*` :
+   même dessin, même règle d'échelle, une seule famille de classes.
+   Voir components/_exercise_trajectory.html.twig.
+   ========================================================================== */
+.kd-extraj {
+    margin-top: var(--kd-space-11);
+}
+
+.kd-extraj__lead {
+    margin: 0 0 var(--kd-space-8);
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.kd-extraj__part + .kd-extraj__part {
+    margin-top: var(--kd-space-11);
+    padding-top: var(--kd-space-9);
+    border-top: 1px solid var(--color-divider);
+}
+
+.kd-extraj__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.kd-extraj__item {
+    display: flex;
+    align-items: baseline;
+    gap: var(--kd-space-4) var(--kd-space-6);
+    flex-wrap: wrap;
+    padding: var(--kd-space-5) 0;
+    border-bottom: 1px solid var(--color-divider);
+}
+
+.kd-extraj__item:last-child {
+    border-bottom: 0;
+}
+
+.kd-extraj__date {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text-strong);
+    flex: 0 0 auto;
+    min-width: 76px;
+}
+
+.kd-extraj__sets {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-3) var(--kd-space-6);
+    flex-wrap: wrap;
+    flex: 1 1 auto;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.kd-extraj__group {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+}
+
+.kd-extraj__vol {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-left: auto;
+    flex: 0 0 auto;
+}
+
+/* ============================================================================
    COACHING — relation coach ↔ athlète (page unique /coaching, fiche de travail
    par athlète sous /coach).
    Aucune couleur métier propre : le statut de relation réutilise les tokens de

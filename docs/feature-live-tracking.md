@@ -4187,14 +4187,46 @@ passer par un plan, toutes séances et tous plans confondus.
 
 **Fini quand** :
 
-- [ ] Courbe de charge dans le temps, sur les séries de travail
-- [ ] Record et dernière performance, alimentés par `PerformanceHistory` (KL-04)
-- [ ] Les dix dernières séances où l'exercice apparaît, avec un lien vers leur
+- [x] Courbe de charge dans le temps, sur les séries de travail
+- [x] Record et dernière performance, alimentés par `PerformanceHistory` (KL-04)
+- [x] Les dix dernières séances où l'exercice apparaît, avec un lien vers leur
       séance datée
-- [ ] Un exercice sans historique n'affiche **rien**, pas un graphique vide
-- [ ] Un exercice de la bibliothèque globale n'affiche que **mon** historique,
+- [x] Un exercice sans historique n'affiche **rien**, pas un graphique vide
+- [x] Un exercice de la bibliothèque globale n'affiche que **mon** historique,
       jamais celui d'un autre utilisateur. Point à tester explicitement
-- [ ] Le bloc ne se rend pas sur la page publique d'un exercice
+- [x] Le bloc ne se rend pas sur la page publique d'un exercice
+
+**Livré.** Un service (`ExerciseTrajectory`), un composant
+(`components/_exercise_trajectory.html.twig`), un paramètre de plus sur
+`ExerciseController::show`. Aucune requête nouvelle : les deux lectures sont
+celles de KL-04/KL-17, déjà écrites et déjà bornées en SQL. Ce qui a été tranché
+en le faisant :
+
+- **La mise en forme n'appartient pas à `PerformanceHistory`.** Ce service sert
+  aussi le téléphone (KL-14, KL-17), où un pourcentage de hauteur de barre n'a
+  rien à faire. `ExerciseTrajectory` ne lit donc rien : il ordonne et il met à
+  l'échelle, c'est tout.
+- **Scopé sur `$this->getUser()`, et c'est délibéré** — pas un oubli de la règle
+  « scoper sur l'owner » que suit le reste des vues ouvertes au coach. Un exercice
+  de la bibliothèque globale n'a pas de propriétaire et il est pratiqué par tout
+  le monde : « est-ce que je progresse » ne peut vouloir dire que « moi ». Un test
+  monte deux utilisateurs sur le même exercice global et vérifie qu'aucun lien
+  vers la séance datée de l'autre ne sort.
+- **Moins de deux séances chargées, pas de courbe.** Un point unique n'est pas une
+  trajectoire ; le tracer ne dirait que « il y a eu une séance », ce que la liste
+  dit déjà mieux. Même esprit que le null qui masque le bloc entier.
+- **L'échelle part du minimum, pas de zéro.** Sur dix séances, l'écart de charge
+  est souvent faible devant la charge elle-même : une échelle partant de zéro
+  écraserait toute la progression en dix barres identiques.
+- **Le record est relu, la dernière performance non.** `sessions[0]` **est** la
+  dernière performance (`PerformanceHistory` le garantit) ; le record, lui, déborde
+  la fenêtre des dix séances — un record de l'an dernier reste le record.
+- **Les barres sont celles de `_progression`** (`.kd-prog__bars`), réutilisées
+  telles quelles : même dessin, même règle d'échelle. Une seconde famille de
+  classes pour le même trait aurait fini par diverger.
+- **La page publique d'un exercice n'existe pas** — `PublicShareController` ne sert
+  que les séances et les plans. La condition tient donc par construction, et le
+  composant reste inclus depuis la seule page authentifiée qui le concerne.
 
 ### KL-51 — Tri de la bibliothèque par usage réel
 

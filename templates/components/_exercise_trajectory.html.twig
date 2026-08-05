@@ -1,0 +1,104 @@
+{# Bloc « Ma trajectoire » sur la fiche d'un exercice (KL-50) : record, dernière
+   performance, courbe de charge et dix dernières séances.
+
+   Attend `trajectory` = sortie de ExerciseTrajectory::for(), ou null. **Null =
+   rien** : un exercice jamais fait n'affiche pas un cadre vide, il n'affiche pas
+   de bloc. C'est la seule condition de rendu, et elle est ici.
+
+   L'historique montré est celui de l'utilisateur connecté, jamais celui d'un
+   autre : un exercice de la bibliothèque globale est pratiqué par tout le monde.
+   Le contrôleur en est garant, le lead le dit à l'écran.
+
+   Barres réutilisées telles quelles de `_progression` (`.kd-prog__bars`) : c'est
+   le même dessin, servi par la même règle d'échelle. Une deuxième famille de
+   classes pour le même trait finirait par diverger. #}
+{% import 'components/_set_type.html.twig' as settype %}
+
+{% if trajectory %}
+    <section class="kd-card kd-extraj">
+        <div class="kd-card__head">
+            <h2 class="kd-card__title">{{ ux_icon('lucide:activity') }} Ma trajectoire</h2>
+        </div>
+        <p class="kd-extraj__lead">Ce que tu as réellement fait sur cet exercice, toutes séances et tous plans confondus. Ton historique seul.</p>
+
+        <dl class="kd-wk__kpis kd-wk__kpis--logged">
+            {% if trajectory.best %}
+                <div class="kd-wk__kpi kd-wk__kpi--accent">
+                    <dt>Record</dt>
+                    <dd>{{ trajectory.best.weightKg|round|number_format(0, ',', ' ') }}<span class="kd-wk__unit"> kg</span></dd>
+                    <p class="kd-wk__kpimeta">
+                        {{ trajectory.best.detail }} ·
+                        <a href="{{ path('app_scheduled_workout_show', {id: trajectory.best.scheduledWorkoutId}) }}">{{ trajectory.best.date|date('d/m/Y') }}</a>
+                    </p>
+                </div>
+            {% endif %}
+
+            <div class="kd-wk__kpi">
+                <dt>Dernière fois</dt>
+                <dd>{{ trajectory.last.workingSets }}<span class="kd-wk__unit"> série{{ trajectory.last.workingSets > 1 ? 's' }}</span></dd>
+                <p class="kd-wk__kpimeta">
+                    {{ trajectory.last.date|date('d/m/Y') }}
+                    {%- if trajectory.last.topWeightKg is not null %} · top {{ trajectory.last.topWeightKg|round|number_format(0, ',', ' ') }} kg{% endif %}
+                </p>
+            </div>
+
+            <div class="kd-wk__kpi">
+                <dt>Séances</dt>
+                <dd>{{ trajectory.sessions|length }}</dd>
+                <p class="kd-wk__kpimeta">dernières séances où il apparaît</p>
+            </div>
+        </dl>
+
+        {# Pas de courbe sous deux séances chargées : un point unique n'est pas une
+           trajectoire, et la liste ci-dessous le dit déjà mieux. #}
+        {% if trajectory.points is not empty %}
+            <div class="kd-extraj__part">
+                <div class="kd-prog__trajhead">
+                    <h3 class="kd-prog__subtitle">Charge dans le temps</h3>
+                    {% if trajectory.direction != 'flat' %}
+                        <span class="kd-prog__trend kd-prog__trend--{{ trajectory.direction }}">
+                            {{ ux_icon(trajectory.direction == 'up' ? 'lucide:trending-up' : 'lucide:trending-down') }}
+                            {{ trajectory.firstLabel }} → {{ trajectory.lastLabel }}
+                        </span>
+                    {% endif %}
+                </div>
+
+                <div class="kd-prog__bars">
+                    {% for p in trajectory.points %}
+                        <div class="kd-prog__col">
+                            <span class="kd-prog__val">{{ p.label }}</span>
+                            <div class="kd-prog__track">
+                                <span class="kd-prog__bar" style="height: {{ p.heightPct }}%"
+                                      title="{{ p.date|date('d/m/Y') }} · {{ p.label }}"></span>
+                            </div>
+                            <span class="kd-prog__wk">{{ p.date|date('d/m') }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+                <p class="kd-prog__hint">Meilleure série de travail de chaque séance. L'échauffement n'y entre pas.</p>
+            </div>
+        {% endif %}
+
+        <div class="kd-extraj__part">
+            <h3 class="kd-prog__subtitle">Les dernières séances</h3>
+            <ul class="kd-extraj__list">
+                {% for session in trajectory.sessions %}
+                    <li class="kd-extraj__item">
+                        <a href="{{ path('app_scheduled_workout_show', {id: session.scheduledWorkoutId}) }}"
+                           class="kd-extraj__date">{{ session.date|date('d/m/Y') }}</a>
+                        <span class="kd-extraj__sets">
+                            {% for group in session.sets %}
+                                <span class="kd-extraj__group">
+                                    {{ settype.badge(group.type) }}{{ group.count }} × {{ group.detail }}
+                                </span>
+                            {% endfor %}
+                        </span>
+                        {% if session.tonnageKg > 0 %}
+                            <span class="kd-extraj__vol">{{ session.tonnageKg|round|number_format(0, ',', ' ') }} kg</span>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </section>
+{% endif %}

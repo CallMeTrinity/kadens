@@ -75,4 +75,9 @@
             </dd>
         </dl>
     </div>
+
+    {# KL-50 : la seule page qui réponde à « est-ce que je progresse sur cet
+       exercice ? » sans passer par un plan. Rien du tout quand il n'a jamais été
+       fait — le composant en est garant. #}
+    {{ include('components/_exercise_trajectory.html.twig', {trajectory: trajectory}) }}
 {% endblock %}
