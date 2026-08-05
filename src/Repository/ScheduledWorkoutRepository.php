@@ -231,6 +231,52 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     }
 
     /**
+     * Les séances **cochées « faite » qui ne portent aucun réalisé**, avec leur
+     * prescrit fetch-joint jusqu'aux séries détaillées. C'est l'assiette de
+     * `app:log:backfill` (`LogBackfiller`), et rien d'autre ne s'en sert.
+     *
+     * Trois filtres, trois raisons :
+     *
+     * - `s.loggedExercises IS EMPTY` — une déduction ne remplace jamais un fait.
+     *   Le filtre est en DQL plutôt qu'en PHP pour ne pas descendre des milliers
+     *   de séances déjà loguées et les écarter une par une.
+     * - une jointure **INTERNE** sur `s.workout` — une séance libre n'a pas de
+     *   prescrit d'où déduire quoi que ce soit, et une séance dont la source a
+     *   été supprimée (`SET NULL`) non plus.
+     * - `s.scheduledDate <= :until` — le passé, aujourd'hui compris : une séance
+     *   cochée ce matin est aussi légitime que celle d'hier.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findDoneWithoutLog(?User $owner, ?\DateTimeImmutable $since, \DateTimeImmutable $until): array
+    {
+        $qb = $this->createQueryBuilder('s')
+            ->addSelect('w', 'b', 'pe', 'e', 'ps')
+            ->join('s.workout', 'w')
+            ->leftJoin('w.blocks', 'b')
+            ->leftJoin('b.prescribedExercises', 'pe')
+            ->leftJoin('pe.exercise', 'e')
+            ->leftJoin('pe.detailedSets', 'ps')
+            ->andWhere('s.status = :done')
+            ->andWhere('s.scheduledDate <= :until')
+            ->andWhere('s.loggedExercises IS EMPTY')
+            ->setParameter('done', \App\Enum\ScheduledStatus::DONE)
+            ->setParameter('until', $until)
+            ->orderBy('s.scheduledDate', 'ASC')
+            ->addOrderBy('s.id', 'ASC');
+
+        if (null !== $owner) {
+            $qb->andWhere('s.owner = :owner')->setParameter('owner', $owner);
+        }
+
+        if (null !== $since) {
+            $qb->andWhere('s.scheduledDate >= :since')->setParameter('since', $since);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
      * Toutes les séances datées d'un utilisateur, contenu fetch-joint
      * (blocs -> exercices prescrits -> exercice), triées par date. Alimente le flux
      * ICS « tout le calendrier » : PlanFlattener bâtit la description de chaque
