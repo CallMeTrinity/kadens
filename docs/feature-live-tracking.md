@@ -328,6 +328,34 @@
 > l'usage nominal : bandeau tapotable au-dessus de la barre d'onglets quand une
 > version existe, écran de blocage sous le plancher, et jamais rien en
 > développement ni faute de réponse.
+> **Deux correctifs sortis du premier essai sur l'appareil (05/08/2026)**, tous
+> deux des règles manquantes plutôt que des bugs de code.
+> **1. Le cardio ne descend plus.** `GET /api/bootstrap` filtrait sur la seule
+> fenêtre de dates : une sortie course arrivait sur le téléphone, occupait l'écran
+> du jour et proposait « Démarrer » pour une séance qui ne se consigne pas — elle
+> pouvait même rafler l'unique action primaire du jour à la séance de force qui la
+> méritait. La règle « le réalisé se logue en muscu, jamais en cardio » vaut
+> désormais **aussi à la descente** : une séance datée sans le moindre exercice
+> d'activité `gym` ne part pas. Le filtre est **côté serveur et nulle part
+> ailleurs** (`TrackableSchedule`) — le téléphone ne porte aucune activité sur
+> `scheduled_workout`, elle ne vit que dans le prescrit, que la liste du jour
+> refuse de charger par principe. Trois garde-fous, dont le premier est le seul qui
+> compte : **une séance qui porte du réalisé descend toujours** (la fenêtre fait
+> autorité, ce qu'elle ne contient pas est effacé — sans cette ligne, vider une
+> séance faite de sa muscu lui supprimerait son historique local) ; une séance sans
+> programme descend toujours ; une séance **mixte** descend. Conséquence assumée :
+> une séance 100 % mobilité n'est pas visible sur le téléphone.
+> **2. « Fait » sur le web n'est plus « à démarrer ».** L'app dérivait « fermée »
+> de `ended_at`, que **seul le téléphone écrit** : une séance cochée faite depuis
+> le web, donc sans réalisé, se présentait comme une séance à dérouler. Or rien ne
+> déclôture côté serveur (§4.1 du contrat), et on ne consigne pas rétroactivement
+> ce qu'on a déjà déclaré fait. `isClosed()` prend donc `status = done` en compte,
+> et **une seule définition sert partout** : la carte du jour (« Voir la séance »,
+> et exclue du choix de l'action primaire), l'écran de séance (lecture seule, sans
+> résumé — il n'y a rien à résumer) et `beginWorkout()`, qui refuse. Le bord
+> inverse est tenu : une séance ouverte **ici** et déclarée faite ailleurs pendant
+> ce temps reste reprenable, le téléphone gardant autorité sur ses propres bornes.
+>
 > Prochain ticket : **KL-42** (dépôt TNTStore auto-hébergé et publication).
 
 ---

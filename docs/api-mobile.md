@@ -516,9 +516,28 @@ qu'il a descendu.
 | `since` | L'écho du paramètre reçu, ou `null`. |
 | `window` | `{from, to}` — J-30 → J+14. **Fait autorité** (§4.5). |
 | `exercises` | La bibliothèque visible : la sienne, la globale, celle de ses coachs et de ses athlètes acceptés. |
-| `schedule` | Les séances datées de la fenêtre, structure du §6.7. |
+| `schedule` | Les séances datées de la fenêtre **qui se consignent**, structure du §6.7. Voir juste en dessous. |
 | `history` | Dernière performance et record par exercice. **Toujours une liste**, jamais un objet indexé par identifiant. |
 | `deleted` | `{exercises: [id], schedule: [uuid]}` — ce que la base locale doit oublier. |
+
+**La fenêtre n'est pas tout le calendrier.** Le réalisé se logue en muscu, jamais
+en cardio : une séance datée dont le programme ne contient **aucun exercice
+d'activité `gym`** ne descend pas. Elle occuperait l'écran du jour sans rien
+pouvoir y écrire. Trois exceptions, dans cet ordre :
+
+1. **Une séance qui porte du réalisé descend toujours.** La fenêtre fait autorité
+   (§4.5) : ce qu'elle ne contient pas est effacé côté client. Sans cette règle,
+   retirer le dernier exercice de muscu d'une séance déjà faite lui supprimerait
+   son réalisé.
+2. **Une séance sans programme descend toujours** — séance libre du téléphone,
+   coquille encore vide posée sur le web.
+3. Une séance **mixte** (renforcement puis footing de retour au calme) descend :
+   il suffit d'un exercice de muscu.
+
+Corollaire client : une séance qui disparaît de la fenêtre d'un pull à l'autre
+peut avoir été supprimée, déplacée hors fenêtre, **ou vidée de sa muscu**. Le
+geste local est le même dans les trois cas. `GET /api/schedule/{uuid}` (§6.7), lui,
+ne filtre rien : il rend ce qu'on lui désigne.
 
 ```console
 $ curl -sk "https://127.0.0.1:8000/api/bootstrap" -H "Authorization: Bearer $TOKEN"
