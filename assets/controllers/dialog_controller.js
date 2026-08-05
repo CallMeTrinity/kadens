@@ -17,6 +17,26 @@ import { Controller } from '@hotwired/stimulus';
 export default class extends Controller {
     static targets = ['dialog'];
 
+    /*
+     * Turbo met la page en cache **avant** de naviguer, et `showModal()` laisse un
+     * attribut `open` dans le DOM. Un instantané pris modale ouverte la restaure
+     * donc au retour arrière — mais hors top-layer : elle s'affiche dans le flux,
+     * sans fond, sans piège au clavier, et l'échappement ne la ferme pas. On la
+     * ferme sur `turbo:before-cache`, juste avant la prise d'instantané, plutôt
+     * que de nettoyer l'état restauré après coup.
+     *
+     * L'écoute est sur `document` (l'événement n'est pas émis sur l'élément), donc
+     * elle se démonte explicitement.
+     */
+    connect() {
+        this.closeBeforeCache = () => this.close();
+        document.addEventListener('turbo:before-cache', this.closeBeforeCache);
+    }
+
+    disconnect() {
+        document.removeEventListener('turbo:before-cache', this.closeBeforeCache);
+    }
+
     open() {
         this.dialogTarget.showModal();
     }
@@ -39,6 +59,7 @@ export default class extends Controller {
     }
 
     close() {
+        if (!this.hasDialogTarget) return;
         this.dialogTarget.close();
     }
 
