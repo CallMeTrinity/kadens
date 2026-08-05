@@ -1,0 +1,141 @@
+{% extends 'base.html.twig' %}
+
+{# La page d'installation de l'app Android (KL-43).
+
+   Anonyme : on y arrive depuis un téléphone qui n'a pas encore l'app, donc sans
+   session. D'où la marque en tête, rendue seulement hors connexion — connecté,
+   c'est le header applicatif qui la porte déjà (base.html.twig).
+
+   Elle ne fait aucune requête après chargement, QR compris (rendu côté serveur).
+   `release` est le service MobileRelease : la version publiée est déclarée dans
+   `config/services.yaml`, pas lue chez GitHub à chaque affichage. #}
+
+{% block title %}L'app Android — Kadens{% endblock %}
+{% block meta_description %}Kadens sur Android : dérouler la séance du jour et consigner chaque série, hors réseau. Installation par le dépôt store.antoninpamart.fr ou par APK direct.{% endblock %}
+
+{% block body %}
+    {% if not app.user %}
+        <a href="{{ path('app_login') }}" class="kd-brand kd-install__brand">
+            <span class="kd-brand__mark">K</span> Kadens
+        </a>
+    {% endif %}
+
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow kd-eyebrow--accent">Android</p>
+            <h1 class="kd-title">L'app Kadens</h1>
+            <p class="kd-lead">Elle déroule la séance du jour et consigne ce qui a vraiment été fait, série par série, sans réseau. Tout le reste (bibliothèque, séances, plans, calendrier) se compose ici, sur le site.</p>
+        </div>
+    </div>
+
+    <div class="kd-editform">
+        <section class="kd-card kd-formsection">
+            <header class="kd-formsection__head">
+                <span class="kd-formsection__icon">{{ ux_icon('lucide:smartphone') }}</span>
+                <div>
+                    <h2 class="kd-formsection__title">Ce qu'elle fait</h2>
+                    <p class="kd-formsection__hint">Une app de salle, pas une seconde version du site. Elle sait quatre choses, et elle les fait avec le téléphone en mode avion.</p>
+                </div>
+            </header>
+
+            <dl class="kd-deflist kd-install__feats">
+                <dt>La séance du jour</dt>
+                <dd>Ce qui est programmé au calendrier arrive sur le téléphone, bloc par bloc, avec les charges et les repos prévus.</dd>
+
+                <dt>Le réalisé</dt>
+                <dd>Chaque série se coche avec ses vraies valeurs. Une charge changée, une série de plus, un exercice sauté ou remplacé : la déviation se note, elle ne se cache pas.</dd>
+
+                <dt>Hors réseau</dt>
+                <dd>Tout s'écrit sur le téléphone. Ce qui a été fait repart au serveur au retour du réseau, sans rien perdre si l'app a été tuée en route.</dd>
+
+                <dt>Une séance vierge</dt>
+                <dd>Rien de programmé ? La séance se remplit au fur et à mesure, et se range au calendrier comme les autres.</dd>
+            </dl>
+
+            <p class="kd-install__note">Elle ne suit ni la course, ni le vélo, ni la natation. Une sortie se coche « faite » et rien de plus. Le cardio est déjà couvert ailleurs, et le refaire à moitié n'intéresse personne.</p>
+        </section>
+
+        <section class="kd-card kd-formsection">
+            <header class="kd-formsection__head">
+                <span class="kd-formsection__icon">{{ ux_icon('lucide:qr-code') }}</span>
+                <div>
+                    <h2 class="kd-formsection__title">Installer par le dépôt</h2>
+                    <p class="kd-formsection__hint">C'est le chemin recommandé : c'est le seul qui prévienne des mises à jour. Kadens n'est pas sur le Play Store.</p>
+                </div>
+            </header>
+
+            <div class="kd-install__repo">
+                {# Le cadre blanc fait partie du motif : la « quiet zone » est ce
+                   qu'un décodeur cherche en premier. #}
+                <div class="kd-install__qr">{{ storeQr|raw }}</div>
+
+                <div class="kd-install__aside">
+                    <ol class="kd-install__steps">
+                        <li>Installe <strong>TNT Store</strong> sur le téléphone. Ce magasin ne stocke aucune application : il référence des versions publiées ailleurs, ici les releases GitHub de Kadens.</li>
+                        <li>Ajoute ce dépôt, en scannant le QR ou en collant l'adresse.</li>
+                        <li>Kadens y apparaît. Installe depuis là, et les mises à jour suivantes s'y annonceront.</li>
+                    </ol>
+
+                    <p class="kd-install__label">Adresse du dépôt</p>
+                    <p class="kd-install__url">{{ release.storeUrl }}</p>
+
+                    <p class="kd-install__label">Empreinte de la clé du dépôt</p>
+                    {# À recouper à la main : c'est ce qui distingue ce dépôt d'un
+                       homonyme servi par quelqu'un d'autre. Coupée en deux à
+                       l'affichage par `overflow-wrap`, jamais dans la valeur. #}
+                    <p class="kd-install__fingerprint">{{ release.storeFingerprint }}</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="kd-card kd-formsection">
+            <header class="kd-formsection__head">
+                <span class="kd-formsection__icon">{{ ux_icon('lucide:file-down') }}</span>
+                <div>
+                    <h2 class="kd-formsection__title">Version publiée</h2>
+                    <p class="kd-formsection__hint">Le téléchargement direct est un secours : il installe, il ne prévient de rien ensuite.</p>
+                </div>
+            </header>
+
+            {% if release.isPublished %}
+                <dl class="kd-deflist kd-install__feats">
+                    <dt>Version</dt>
+                    <dd class="kd-install__version">{{ release.versionName }} <span>(build {{ release.versionCode }})</span></dd>
+                    <dt>Compatibilité</dt>
+                    <dd>Android arm64 uniquement, ce qui couvre tout téléphone vendu depuis 2016. Pas de version iOS.</dd>
+                </dl>
+
+                <div class="kd-install__acts">
+                    <a class="kd-btn kd-btn--primary" href="{{ release.apkUrl }}" rel="noopener">
+                        {{ ux_icon('lucide:file-down') }} Télécharger l'APK
+                    </a>
+                    <a class="kd-btn kd-btn--ghost" href="{{ release.releaseUrl }}" rel="noopener">
+                        {{ ux_icon('lucide:external-link') }} Notes de version
+                    </a>
+                </div>
+
+                <p class="kd-install__note">Android demandera d'autoriser l'installation depuis cette source : l'app est signée par une clé personnelle, pas par le Play Store. Une mise à jour installée par-dessus garde toutes les données de l'appareil.</p>
+            {% else %}
+                <p class="kd-install__note">Aucune version n'est publiée pour l'instant. Le dépôt et cette page sont en place, l'app arrive.</p>
+            {% endif %}
+        </section>
+
+        <section class="kd-card kd-formsection">
+            <header class="kd-formsection__head">
+                <span class="kd-formsection__icon">{{ ux_icon('lucide:link') }}</span>
+                <div>
+                    <h2 class="kd-formsection__title">Connecter le téléphone</h2>
+                    <p class="kd-formsection__hint">Une fois l'app installée, elle se connecte en scannant un QR affiché ici, pas en tapant un mot de passe.</p>
+                </div>
+            </header>
+
+            <ol class="kd-install__steps">
+                <li>Ouvre <a href="{{ path('app_profile_settings') }}">tes paramètres de compte</a> sur un ordinateur, section « Connecter un téléphone ».</li>
+                <li>Affiche le QR : il porte l'adresse du serveur et un code à usage unique, valable deux minutes.</li>
+                <li>Dans l'app, choisis « Scanner un QR » et vise l'écran. Le code de secours se tape à la main si la caméra refuse.</li>
+            </ol>
+
+            <p class="kd-install__note">Le QR ne contient aucun accès permanent. Un appareil connecté se révoque depuis ces mêmes paramètres, et il perd tout de suite le droit de synchroniser.</p>
+        </section>
+    </div>
+{% endblock %}

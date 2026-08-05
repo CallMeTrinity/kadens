@@ -7,7 +7,9 @@ use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
+use Symfony\Component\Uid\Uuid;
 
 /**
  * @extends ServiceEntityRepository<ScheduledWorkout>
@@ -20,10 +22,25 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     }
 
     /**
+     * Retrouve une séance datée par son identifiant client, sans son contenu.
+     * Les endpoints de l'API, eux, passent par `findByUuidWithContentAndLog()` :
+     * ils rendent le document complet, et le charger en une fois est ce qui leur
+     * évite un N+1 par exercice.
+     */
+    public function findByUuid(Uuid $uuid): ?ScheduledWorkout
+    {
+        return $this->findOneBy(['uuid' => $uuid]);
+    }
+
+    /**
      * Séances planifiées d'un utilisateur dans une fenêtre de dates (bornes
      * incluses). Sert au rendu d'une grille de calendrier : on charge d'un coup
      * tout ce que couvre le mois affiché (débords des semaines compris) et on
      * jointe la séance pour éviter N requêtes au rendu.
+     *
+     * `leftJoin` et non `join` : une séance datée peut n'avoir aucune source
+     * (séance libre, ou séance de bibliothèque supprimée depuis). Une jointure
+     * interne la ferait disparaître du calendrier au lieu de la montrer.
      *
      * @return list<ScheduledWorkout>
      */
@@ -31,7 +48,7 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('s')
             ->addSelect('w')
-            ->join('s.workout', 'w')
+            ->leftJoin('s.workout', 'w')
             ->andWhere('s.owner = :owner')
             ->andWhere('s.scheduledDate BETWEEN :start AND :end')
             ->setParameter('owner', $owner)
@@ -41,6 +58,109 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
             ->addOrderBy('s.id', 'ASC')
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * La fenêtre du bootstrap mobile (KL-14) : les séances datées d'un
+     * utilisateur entre deux dates, **avec tout leur prescrit ET tout leur
+     * réalisé**, sans N+1.
+     *
+     * **Deux requêtes et pas une seule**, et c'est structurel : le prescrit
+     * (`w → b → pe → ps`) et le réalisé (`le → ls`) sont deux collections
+     * **sœurs** sous la même séance datée. Les joindre dans la même requête en
+     * ferait le produit cartésien — quinze séries prescrites et douze séries
+     * réalisées donneraient cent quatre-vingts lignes à hydrater pour un seul
+     * exercice. Chaque branche est en revanche une **chaîne**, donc sans risque :
+     * on peut y descendre aussi profond qu'on veut. La seconde requête retombe
+     * sur les mêmes entités gérées, Doctrine les complète en place.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findWindowWithContentAndLog(User $owner, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $prescribed = $this->withPrescribed($this->windowQueryBuilder($owner, $from, $to))
+            ->getQuery()
+            ->getResult();
+
+        // Même fenêtre, branche sœur : le résultat est ignoré, il ne sert qu'à
+        // remplir les collections des entités déjà gérées ci-dessus.
+        $this->withLog($this->windowQueryBuilder($owner, $from, $to))
+            ->getQuery()
+            ->getResult();
+
+        return $prescribed;
+    }
+
+    /**
+     * La même chose pour **une** séance datée, désignée par son identifiant
+     * client : ce que rend `GET /api/schedule/{uuid}` (KL-15) et ce que relit
+     * `PUT /api/schedule/{uuid}` (KL-16).
+     *
+     * Les deux jointures sont celles de la fenêtre, au mot près, parce qu'elles
+     * sont écrites une seule fois (`withPrescribed` / `withLog`). Deux
+     * définitions de « avec tout son contenu » auraient fini par diverger, et la
+     * promesse de KL-15 — *structure identique à celle du bootstrap* — se serait
+     * dégradée en N+1 plutôt qu'en erreur.
+     */
+    public function findByUuidWithContentAndLog(Uuid $uuid): ?ScheduledWorkout
+    {
+        $found = $this->withPrescribed($this->uuidQueryBuilder($uuid))
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        if (null === $found) {
+            return null;
+        }
+
+        $this->withLog($this->uuidQueryBuilder($uuid))
+            ->getQuery()
+            ->getResult();
+
+        return $found;
+    }
+
+    private function windowQueryBuilder(User $owner, \DateTimeImmutable $from, \DateTimeImmutable $to): QueryBuilder
+    {
+        return $this->createQueryBuilder('s')
+            ->andWhere('s.owner = :owner')
+            ->andWhere('s.scheduledDate BETWEEN :from AND :to')
+            ->setParameter('owner', $owner)
+            ->setParameter('from', $from, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE)
+            ->setParameter('to', $to, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE)
+            ->orderBy('s.scheduledDate', 'ASC')
+            ->addOrderBy('s.id', 'ASC')
+        ;
+    }
+
+    private function uuidQueryBuilder(Uuid $uuid): QueryBuilder
+    {
+        return $this->createQueryBuilder('s')
+            ->andWhere('s.uuid = :uuid')
+            ->setParameter('uuid', $uuid)
+        ;
+    }
+
+    /** La branche du PRESCRIT : une chaîne, donc aussi profonde qu'on veut. */
+    private function withPrescribed(QueryBuilder $qb): QueryBuilder
+    {
+        return $qb
+            ->addSelect('w', 'b', 'pe', 'ps', 'e')
+            ->leftJoin('s.workout', 'w')
+            ->leftJoin('w.blocks', 'b')
+            ->leftJoin('b.prescribedExercises', 'pe')
+            ->leftJoin('pe.detailedSets', 'ps')
+            ->leftJoin('pe.exercise', 'e')
+        ;
+    }
+
+    /** La branche SŒUR, le réalisé. Jamais dans la même requête que l'autre. */
+    private function withLog(QueryBuilder $qb): QueryBuilder
+    {
+        return $qb
+            ->addSelect('le', 'ls')
+            ->leftJoin('s.loggedExercises', 'le')
+            ->leftJoin('le.loggedSets', 'ls')
+        ;
     }
 
     /**
@@ -98,7 +218,7 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('s')
             ->addSelect('w', 'b', 'pe', 'e')
-            ->join('s.workout', 'w')
+            ->leftJoin('s.workout', 'w')
             ->leftJoin('w.blocks', 'b')
             ->leftJoin('b.prescribedExercises', 'pe')
             ->leftJoin('pe.exercise', 'e')
@@ -122,7 +242,7 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('s')
             ->addSelect('w', 'b', 'pe', 'e')
-            ->join('s.workout', 'w')
+            ->leftJoin('s.workout', 'w')
             ->leftJoin('w.blocks', 'b')
             ->leftJoin('b.prescribedExercises', 'pe')
             ->leftJoin('pe.exercise', 'e')
@@ -145,7 +265,7 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('s')
             ->addSelect('w', 'b', 'pe', 'e')
-            ->join('s.workout', 'w')
+            ->leftJoin('s.workout', 'w')
             ->leftJoin('w.blocks', 'b')
             ->leftJoin('b.prescribedExercises', 'pe')
             ->leftJoin('pe.exercise', 'e')
@@ -213,7 +333,7 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('s')
             ->addSelect('w')
-            ->join('s.workout', 'w')
+            ->leftJoin('s.workout', 'w')
             ->andWhere('s.sourcePlanTemplate = :template')
             ->andWhere('s.owner = :owner')
             ->setParameter('template', $template)

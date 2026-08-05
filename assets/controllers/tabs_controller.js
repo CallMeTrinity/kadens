@@ -14,7 +14,7 @@ import { Controller } from '@hotwired/stimulus';
  * boutons inertes.
  *
  * Markup attendu :
- *   <div data-controller="tabs">
+ *   <div data-controller="tabs" data-tabs-default-value="a">
  *     <div data-tabs-target="list" hidden>
  *       <button data-tabs-target="tab" data-tabs-panel-param="a">…</button>
  *     </div>
@@ -22,9 +22,15 @@ import { Controller } from '@hotwired/stimulus';
  *       <h2 data-tabs-target="panelTitle">…</h2>
  *     </section>
  *   </div>
+ *
+ * `default` nomme le panneau ouvert à l'arrivée. C'est le SERVEUR qui le décide,
+ * jamais ce contrôleur : sur une séance datée, l'onglet d'ouverture dépend du
+ * statut (une séance faite ouvre sur son réalisé, une séance à venir sur son
+ * programme). Absent ou introuvable, on retombe sur le premier panneau.
  */
 export default class extends Controller {
     static targets = ['list', 'tab', 'panel', 'panelTitle'];
+    static values = { default: String };
 
     connect() {
         if (this.tabTargets.length < 2) {
@@ -61,7 +67,15 @@ export default class extends Controller {
             title.hidden = true;
         });
 
-        this.#select(0);
+        this.#select(this.#defaultIndex());
+    }
+
+    #defaultIndex() {
+        const index = this.tabTargets.findIndex(
+            (tab) => tab.dataset.tabsPanelParam === this.defaultValue,
+        );
+
+        return index === -1 ? 0 : index;
     }
 
     #panelFor(tab) {

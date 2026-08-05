@@ -1,55 +1,80 @@
 {% extends 'base.html.twig' %}
 
-{% set workout = flat.workout %}
-
-{% block title %}{{ workout.title }} — {{ scheduled.scheduledDate|date('d/m/Y') }}{% endblock %}
+{% block title %}{{ scheduled.displayTitle }} — {{ scheduled.scheduledDate|date('d/m/Y') }}{% endblock %}
 
 {% block body %}
     {# Séance dans son contexte daté. La page de bibliothèque (app_workout_show)
        montre la même séance mais ne connaît aucune date : c'est ici, et seulement
        ici, que se boucle le « prévu vs réalisé ».
 
-       Même composant de lecture que la page de bibliothèque et la page publique,
-       en `embed` pour pouvoir remplir le bloc `actions` du hero.
+       `flat` est **null** quand la séance datée n'a pas de source : séance libre,
+       ou séance de bibliothèque supprimée depuis (la FK est en SET NULL, une
+       séance réellement faite ne disparaît pas avec sa source). Il n'y a alors
+       aucun programme à rendre, seulement le titre snapshot, la date, le statut —
+       et le réalisé, qui est tout entier « hors programme ». #}
+    {% if flat %}
+        {# Même composant de lecture que la page de bibliothèque et la page
+           publique, en `embed` pour pouvoir remplir le bloc `actions` du hero.
 
-       `only` isole le composant : ce que le bloc `actions` utilise doit être
-       passé ici explicitement, la portée du template appelant n'y entre pas. #}
-    {% embed 'components/_workout_read.html.twig' with {
-        flat: flat, summary: summary, blockStats: blockStats,
-        scheduled: scheduled
-    } only %}
-        {% block actions %}
-            <div class="kd-wk__bar">
-                <a href="{{ path('app_calendar_index') }}" class="kd-wk__back">
-                    {{ ux_icon('lucide:arrow-left') }} Calendrier
-                </a>
+           `only` isole le composant : ce que le bloc `actions` utilise doit être
+           passé ici explicitement, la portée du template appelant n'y entre pas.
 
-                <div class="kd-wk__baractions">
-                    {{ include('components/_scheduled_badge.html.twig', {scheduled: scheduled}) }}
-                    {% if is_granted('WORKOUT_EDIT', flat.workout) %}
-                        <a href="{{ path('app_workout_edit', {id: flat.workout.id}) }}"
-                           class="kd-btn kd-btn--sm kd-btn--onink">
-                            {{ ux_icon('lucide:square-pen') }} Éditer
-                        </a>
-                    {% endif %}
+           `comparison` / `logSummary` / `defaultTab` sont les trois paramètres du
+           réalisé, et cette page est la SEULE à les passer : la bibliothèque et la
+           page publique rendent le même composant à l'identique sans eux. #}
+        {% embed 'components/_workout_read.html.twig' with {
+            flat: flat, summary: summary, blockStats: blockStats,
+            scheduled: scheduled,
+            comparison: comparison, logSummary: logSummary, defaultTab: defaultTab
+        } only %}
+            {% block actions %}
+                {{ include('scheduled_workout/_hero_actions.html.twig', {
+                    scheduled: scheduled, workout: flat.workout
+                }) }}
+            {% endblock %}
+        {% endembed %}
+    {% else %}
+        <article class="kd-wk">
+            <header class="kd-wk__hero">
+                <div class="kd-wk__heroinner">
+                    {{ include('scheduled_workout/_hero_actions.html.twig', {
+                        scheduled: scheduled, workout: null
+                    }) }}
+
+                    <div class="kd-wk__herobody">
+                        <div class="kd-wk__herotitle">
+                            <p class="kd-wk__eyebrow">Séance libre</p>
+                            <h1 class="kd-wk__title">{{ scheduled.displayTitle }}</h1>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </header>
 
-            {# Noms français en dur, comme le calendrier : twig/intl-extra n'est
-               pas installé et l'app est monolingue. #}
-            {% set dayNames = {1: 'Lundi', 2: 'Mardi', 3: 'Mercredi', 4: 'Jeudi', 5: 'Vendredi', 6: 'Samedi', 7: 'Dimanche'} %}
-            {% set monthNames = {1: 'janvier', 2: 'février', 3: 'mars', 4: 'avril', 5: 'mai', 6: 'juin',
-                                 7: 'juillet', 8: 'août', 9: 'septembre', 10: 'octobre', 11: 'novembre', 12: 'décembre'} %}
-            {% set d = scheduled.scheduledDate %}
-            <p class="kd-wk__date">
-                {{ ux_icon('lucide:calendar-days') }}
-                {{ dayNames[d|date('N')] }} {{ d|date('j') }} {{ monthNames[d|date('n')] }} {{ d|date('Y') }}
-            </p>
-        {% endblock %}
-    {% endembed %}
+            {# Sans source, il n'y a rien à comparer : pas de colonne « Prévu »,
+               seulement le réalisé — le tableau la fait tomber de lui-même quand
+               aucune ligne n'a de prescrit en face. Pas d'onglets non plus, il n'y
+               a qu'une lecture possible. #}
+            {% if comparison is not empty %}
+                <section class="kd-wk__panel" aria-labelledby="wk-panel-realise">
+                    <h2 class="kd-wk__paneltitle" id="wk-panel-realise">Réalisé</h2>
+                    {{ include('components/_log_panel.html.twig', {
+                        scheduled: scheduled, flat: null,
+                        comparison: comparison, logSummary: logSummary
+                    }, with_context = false) }}
+                </section>
+            {% else %}
+                <div class="kd-card kd-empty">
+                    {{ ux_icon('lucide:clipboard-list') }}
+                    <div>Cette séance n'a pas de programme prévu.</div>
+                </div>
+            {% endif %}
+        </article>
+    {% endif %}
 
-    {# Boucle prévu vs réalisé. Sortie en composant : c'est la cible du Turbo
-       Stream renvoyé par le changement de statut. #}
+    {# Boucler la séance : programmer, pas consigner. Bascule de statut, note
+       d'écart léger, déplacement, retrait — tout ce que le coach fait aussi.
+       Sortie en composant : c'est la cible du Turbo Stream renvoyé par le
+       changement de statut. #}
     {% if is_granted('SCHEDULED_WORKOUT_EDIT', scheduled) %}
         {{ include('components/_scheduled_done.html.twig', {scheduled: scheduled}) }}
     {% endif %}

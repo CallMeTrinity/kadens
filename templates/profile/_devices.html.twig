@@ -1,0 +1,78 @@
+{# Section « Appareils connectés » de /profile/settings (KL-12).
+
+   Un jeton qu'on ne peut pas révoquer depuis le web est un trou : l'échéance
+   d'un `ApiToken` glisse à chaque usage, donc un téléphone qui s'en sert ne se
+   déconnecte jamais tout seul. C'est ici qu'on coupe.
+
+   Contexte : devices (list<ApiToken>). #}
+<section class="kd-card kd-formsection" id="devices-panel">
+    <header class="kd-formsection__head">
+        <span class="kd-formsection__icon">{{ ux_icon('lucide:tablet-smartphone') }}</span>
+        <div>
+            <h2 class="kd-formsection__title">Appareils connectés</h2>
+            <p class="kd-formsection__hint">Les téléphones qui accèdent à ton compte par l'app. Révoquer coupe l'accès tout de suite : il faudra un nouveau QR pour reconnecter l'appareil.</p>
+        </div>
+    </header>
+
+    {% if devices is empty %}
+        <p class="kd-devices__empty">Aucun appareil connecté. Le QR ci-dessus en connecte un.</p>
+    {% else %}
+        <ul class="kd-devices">
+            {% for device in devices %}
+                {# Le nom vient du téléphone : Twig l'échappe, il n'est jamais
+                   assemblé en HTML ailleurs. #}
+                <li class="kd-device{% if device.isExpired %} kd-device--expired{% endif %}">
+                    <div class="kd-device__id">
+                        <p class="kd-device__name">{{ device.deviceName }}</p>
+                        <dl class="kd-device__meta">
+                            <div>
+                                <dt>Appairé</dt>
+                                <dd>{{ device.createdAt|date('d/m/Y') }}</dd>
+                            </div>
+                            <div>
+                                <dt>Dernier usage</dt>
+                                {# Null tant que l'appareil n'a rien demandé après
+                                   son appairage : `lastUsedAt` est écrit par
+                                   l'authenticator, à chaque requête réelle. #}
+                                <dd>{{ device.lastUsedAt ? device.lastUsedAt|date('d/m/Y') : 'jamais' }}</dd>
+                            </div>
+                            <div>
+                                {# Distincte du dernier usage : un téléphone peut
+                                   pinguer tous les jours sans resynchroniser. #}
+                                <dt>Dernière synchro</dt>
+                                <dd>{{ device.lastBootstrapAt ? device.lastBootstrapAt|date('d/m/Y') : 'jamais' }}</dd>
+                            </div>
+                            <div>
+                                <dt>{{ device.isExpired ? 'Expiré depuis' : 'Expire le' }}</dt>
+                                <dd>{{ device.expiresAt|date('d/m/Y') }}</dd>
+                            </div>
+                        </dl>
+                    </div>
+
+                    <form method="post" class="kd-device__act"
+                          action="{{ path('app_profile_device_revoke', {id: device.id}) }}"
+                          onsubmit="return confirm('Révoquer « {{ device.deviceName|e('js') }} » ? L\'app se déconnectera à sa prochaine requête, et il faudra un nouveau QR pour la reconnecter.');">
+                        <input type="hidden" name="_token" value="{{ csrf_token('revoke_device' ~ device.id) }}">
+                        <button type="submit" class="kd-btn kd-btn--ghost kd-btn--danger kd-btn--sm">
+                            {{ ux_icon('lucide:unlink') }} Révoquer
+                        </button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+
+        {# À partir de deux appareils seulement : avec un seul, « tout révoquer »
+           ne serait qu'un second bouton pour le geste d'à côté. #}
+        {% if devices|length > 1 %}
+            <form method="post" class="kd-devices__all"
+                  action="{{ path('app_profile_devices_revoke_all') }}"
+                  onsubmit="return confirm('Révoquer les {{ devices|length }} appareils ? Chacun devra être reconnecté par un nouveau QR.');">
+                <input type="hidden" name="_token" value="{{ csrf_token('revoke_devices') }}">
+                <button type="submit" class="kd-btn kd-btn--ghost kd-btn--danger kd-btn--sm">
+                    {{ ux_icon('lucide:unlink') }} Tout révoquer
+                </button>
+                <span class="kd-devices__hint">Utile si tu ne reconnais pas un appareil de la liste.</span>
+            </form>
+        {% endif %}
+    {% endif %}
+</section>

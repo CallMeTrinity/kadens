@@ -12,6 +12,8 @@ use App\Repository\WorkoutRepository;
 use App\Security\Voter\PlanTemplateVoter;
 use App\Security\Voter\ScheduledWorkoutVoter;
 use App\Security\Voter\WorkoutVoter;
+use App\Service\LogComparator;
+use App\Service\LogMetrics;
 use App\Service\PlanFlattener;
 use App\Service\PlanScheduler;
 use App\Service\WorkoutMetrics;
@@ -127,21 +129,58 @@ final class ScheduledWorkoutController extends AbstractController
      * prévu vs réalisé, et c'est la cible du clic sur une pastille du calendrier.
      *
      * Contexte de rendu identique à WorkoutController::show (même composant de
-     * lecture, mêmes services) : la vue ne calcule rien.
+     * lecture, mêmes services), plus les trois entrées du réalisé — que cette
+     * page est la SEULE à passer au composant : c'est la portée, et non une
+     * condition d'affichage, qui garde le réalisé hors de la bibliothèque, de la
+     * page publique, de l'export Excel et du flux ICS. Le réalisé n'entre jamais
+     * dans PlanFlattener ; il est lu par LogComparator et LogMetrics, appelés
+     * ici et nulle part ailleurs.
      */
     #[Route('/{id}', name: 'app_scheduled_workout_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(ScheduledWorkout $scheduled, PlanFlattener $planFlattener, WorkoutMetrics $metrics): Response
-    {
+    public function show(
+        ScheduledWorkout $scheduled,
+        PlanFlattener $planFlattener,
+        WorkoutMetrics $metrics,
+        LogComparator $comparator,
+        LogMetrics $logMetrics,
+    ): Response {
         $this->denyAccessUnlessGranted(ScheduledWorkoutVoter::VIEW, $scheduled);
 
         $workout = $scheduled->getWorkout();
 
+        // Vide quand la séance ne porte aucun réalisé : la colonne « Réalisé » et
+        // son onglet n'apparaissent pas, plutôt que d'apparaître vides.
+        $comparison = $comparator->compare($scheduled);
+
+        // Séance libre, ou séance de bibliothèque supprimée depuis : il n'y a pas
+        // de prescrit à rendre, la page se réduit à sa date, son statut, son titre
+        // (snapshot) et son réalisé. Le contexte de lecture passe donc à null.
         return $this->render('scheduled_workout/show.html.twig', [
             'scheduled' => $scheduled,
-            'flat' => $planFlattener->flattenWorkout($workout),
-            'summary' => $metrics->summary($workout),
-            'blockStats' => $metrics->blockBreakdown($workout),
+            'flat' => null === $workout ? null : $planFlattener->flattenWorkout($workout),
+            'summary' => null === $workout ? null : $metrics->summary($workout),
+            'blockStats' => null === $workout ? [] : $metrics->blockBreakdown($workout),
+            'comparison' => $comparison,
+            'logSummary' => $logMetrics->summary($scheduled),
+            'defaultTab' => $this->defaultTab($scheduled, $comparison),
         ]);
+    }
+
+    /**
+     * Quel panneau s'ouvre à l'arrivée. Même URL, même page : c'est le STATUT qui
+     * décide de la lecture. Une séance faite s'ouvre sur ce qui a été fait, une
+     * séance à venir sur ce qu'il y a à faire — et une séance manquée aussi, il
+     * n'y a rien à y lire du côté du réalisé.
+     *
+     * @param list<array<string, mixed>> $comparison sortie de LogComparator::compare
+     */
+    private function defaultTab(ScheduledWorkout $scheduled, array $comparison): string
+    {
+        if ([] !== $comparison && ScheduledStatus::DONE === $scheduled->getStatus()) {
+            return 'realise';
+        }
+
+        return 'programme';
     }
 
     /**
@@ -171,8 +210,9 @@ final class ScheduledWorkoutController extends AbstractController
     /**
      * Boucle « prévu vs réalisé » (Phase 7) : marque une séance planifiée comme
      * faite / manquée / à nouveau prévue, avec une note d'écart léger optionnelle.
-     * Pas de log détaillé de séries — Strava fait le suivi, ici on ne fait que
-     * boucler sur la prévision.
+     * C'est **programmer**, pas consigner (d'où EDIT, ouvert au coach) : le détail
+     * série par série vit à côté, en LoggedExercise / LoggedSet, et ne s'écrit
+     * qu'avec l'attribut LOG (cf. deleteLog et ScheduledWorkoutVoter).
      */
     #[Route('/{id}/status', name: 'app_scheduled_workout_status', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function updateStatus(Request $request, ScheduledWorkout $scheduled, PlanFlattener $planFlattener): Response
@@ -280,9 +320,12 @@ final class ScheduledWorkoutController extends AbstractController
         $overdue = ScheduledStatus::PLANNED === $scheduled->getStatus()
             && $scheduled->getScheduledDate() < $today;
 
+        $workout = $scheduled->getWorkout();
+
         return $this->render('calendar/stream/cal_event.stream.html.twig', [
             'scheduled' => $scheduled,
-            'fw' => $planFlattener->flattenWorkout($scheduled->getWorkout()),
+            // null pour une séance sans source : la pastille retombe sur son titre.
+            'fw' => null === $workout ? null : $planFlattener->flattenWorkout($workout),
             'statuses' => ScheduledStatus::cases(),
             'detailed' => (bool) $request->getPayload()->getInt('detailed'),
             'overdue' => $overdue,
@@ -334,6 +377,42 @@ final class ScheduledWorkoutController extends AbstractController
         ));
 
         return $redirect;
+    }
+
+    /**
+     * Efface le RÉALISÉ d'une séance datée, et lui seul : la séance reste au
+     * planning, avec sa date et son statut. C'est la seule écriture du réalisé
+     * côté web — le mobile est la seule source de sa saisie, le web l'affiche et
+     * le supprime, il ne l'édite pas.
+     *
+     * L'attribut est **LOG**, jamais EDIT. EDIT suffirait syntaxiquement et
+     * donnerait la main au coach : il programme, il ne consigne pas, et il
+     * n'efface donc pas ce que son athlète a déclaré avoir soulevé (KL-06).
+     */
+    #[Route('/{id}/log/delete', name: 'app_scheduled_workout_log_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function deleteLog(Request $request, ScheduledWorkout $scheduled): Response
+    {
+        $this->denyAccessUnlessGranted(ScheduledWorkoutVoter::LOG, $scheduled);
+
+        if ($this->isCsrfTokenValid('log_delete'.$scheduled->getId(), $request->getPayload()->getString('_token'))) {
+            // orphanRemoval sur la collection : retirer l'élément suffit à
+            // supprimer la ligne et ses LoggedSet en cascade.
+            foreach ($scheduled->getLoggedExercises()->toArray() as $logged) {
+                $scheduled->removeLoggedExercise($logged);
+            }
+
+            // Les bornes d'exécution décrivaient ce réalisé : sans lui, elles ne
+            // mesurent plus rien. Le statut et la note d'écart, eux, relèvent de la
+            // programmation (EDIT) et ne bougent pas — effacer le détail des séries
+            // n'annule pas le fait que la séance a été faite.
+            $scheduled->setStartedAt(null);
+            $scheduled->setEndedAt(null);
+            $this->entityManager->flush();
+
+            $this->addFlash('success', 'Réalisé supprimé. La séance reste au planning.');
+        }
+
+        return $this->redirectToRoute('app_scheduled_workout_show', ['id' => $scheduled->getId()]);
     }
 
     #[Route('/{id}/delete', name: 'app_scheduled_workout_delete', methods: ['POST'], requirements: ['id' => '\d+'])]

@@ -98,7 +98,7 @@
                         {% for scheduled in day.scheduled %}
                             {{ include('components/_cal_event.html.twig', {
                                 scheduled: scheduled,
-                                fw: flattened[scheduled.workout.id],
+                                fw: scheduled.workout ? flattened[scheduled.workout.id] : null,
                                 statuses: statuses,
                                 detailed: true,
                                 overdue: day.isPast and scheduled.status.value == 'planned',

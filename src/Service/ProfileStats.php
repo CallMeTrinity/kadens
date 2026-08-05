@@ -130,6 +130,10 @@ final class ProfileStats
     {
         $counts = [];
         foreach ($this->scheduled->findDoneWithContentForOwner($user) as $sw) {
+            // Séance libre ou source supprimée : rien de prescrit à analyser.
+            if (null === $sw->getWorkout()) {
+                continue;
+            }
             foreach ($this->metrics->distinctActivities($sw->getWorkout()) as $activity) {
                 $counts[$activity->value] = ($counts[$activity->value] ?? 0) + 1;
             }
@@ -163,6 +167,10 @@ final class ProfileStats
         ];
 
         foreach ($this->scheduled->findDoneWithContentForOwner($user) as $sw) {
+            // Séance libre ou source supprimée : rien de prescrit à agréger.
+            if (null === $sw->getWorkout()) {
+                continue;
+            }
             $v = $this->metrics->volume($sw->getWorkout());
             $tonnage += $v['gym']['tonnageKg'];
             $gymSets += $v['gym']['totalSets'];

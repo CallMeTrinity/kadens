@@ -7,8 +7,6 @@ namespace App\Service;
 use App\Entity\Block;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
-use App\Enum\TargetArea;
-use App\Enum\TargetRegion;
 
 /**
  * Repères dérivés du contenu d'une séance (aucun stockage) : activités
@@ -19,10 +17,14 @@ use App\Enum\TargetRegion;
  * - les cartes de la palette de séances de l'éditeur de trame ;
  * - PlanVolumeAggregator (agrégat de charge par semaine).
  *
+ * Pendant réalisé : LogMetrics, qui produit la MÊME forme de summary à partir
+ * des LoggedExercise d'une séance datée.
+ *
+ * @phpstan-import-type RegionShare from RegionBreakdown
+ *
  * @phpstan-type GymVolume array{setsByArea: array<string, int>, tonnageKg: float, totalSets: int}
  * @phpstan-type EnduranceVolume array{meters: int, seconds: int}
  * @phpstan-type WorkoutVolume array{gym: GymVolume, running: EnduranceVolume, cycling: EnduranceVolume, swimming: EnduranceVolume}
- * @phpstan-type RegionShare array{region: TargetRegion, sets: int, percent: float}
  * @phpstan-type TopLift array{exercise: string, weightKg: float, sets: int}
  * @phpstan-type WorkoutSummary array{tonnageKg: float, workingSets: int, exerciseCount: int, blockCount: int, supersets: int, circuits: int, averageRpe: float|null, topLift: TopLift|null, regions: list<RegionShare>}
  * @phpstan-type BlockStat array{block: Block, exerciseCount: int, workingSets: int, tonnageKg: float, seconds: int}
@@ -32,6 +34,7 @@ final class WorkoutMetrics
     public function __construct(
         private readonly WorkoutEstimator $estimator,
         private readonly SupersetGrouper $supersets,
+        private readonly RegionBreakdown $regions,
     ) {
     }
 
@@ -101,58 +104,8 @@ final class WorkoutMetrics
             'topLift' => null !== $topWeight && null !== $topExercise
                 ? ['exercise' => $topExercise, 'weightKg' => $topWeight, 'sets' => $topSets]
                 : null,
-            'regions' => $this->regionShares($volume['gym']['setsByArea']),
+            'regions' => $this->regions->shares($volume['gym']['setsByArea']),
         ];
-    }
-
-    /**
-     * Répartition du volume de renforcement par grande région anatomique, en
-     * part des séries attribuées. Voir TargetRegion : ventiler les 17 zones de
-     * TargetArea donnerait une barre illisible.
-     *
-     * Attention, le total des séries par zone dépasse le nombre de séries
-     * réelles (une série compte pour CHAQUE zone ciblée). Le pourcentage se
-     * calcule donc sur ce total attribué, pas sur `totalSets`.
-     *
-     * @param array<string, int> $setsByArea
-     *
-     * @return list<RegionShare>
-     */
-    private function regionShares(array $setsByArea): array
-    {
-        $byRegion = [];
-        $total = 0;
-
-        foreach ($setsByArea as $areaValue => $sets) {
-            $area = TargetArea::tryFrom($areaValue);
-            if (null === $area) {
-                continue;
-            }
-
-            $region = TargetRegion::of($area);
-            $byRegion[$region->value] = ($byRegion[$region->value] ?? 0) + $sets;
-            $total += $sets;
-        }
-
-        if (0 === $total) {
-            return [];
-        }
-
-        $shares = [];
-        foreach (TargetRegion::cases() as $region) {
-            $sets = $byRegion[$region->value] ?? 0;
-            if ($sets > 0) {
-                $shares[] = [
-                    'region' => $region,
-                    'sets' => $sets,
-                    'percent' => round($sets / $total * 100, 1),
-                ];
-            }
-        }
-
-        usort($shares, static fn (array $a, array $b): int => $b['sets'] <=> $a['sets']);
-
-        return $shares;
     }
 
     /**

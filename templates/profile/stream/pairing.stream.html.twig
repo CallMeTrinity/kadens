@@ -1,0 +1,11 @@
+{# Réponse à l'émission d'un code (KL-47) : on remplace tout le panneau, pas
+   seulement le QR — le passage de l'état « aucun code » à l'état « code affiché »
+   change aussi le libellé du bouton, le décompte et la cible du polling.
+   `replace` et non `update` : le conteneur porte le `data-controller`, et c'est
+   sa disparition qui appelle le `disconnect()` où les deux timers s'arrêtent.
+   Contexte : pairing, pairingCode, pairingQr. #}
+<turbo-stream action="replace" target="pairing-panel">
+    <template>
+        {{ include('profile/_pairing.html.twig') }}
+    </template>
+</turbo-stream>

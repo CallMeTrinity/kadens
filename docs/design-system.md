@@ -145,10 +145,13 @@ est qu'une prolongation (drop set). La lettre identifie, la couleur tranche.
 ### Statuts prévu / réalisé
 Alignés sur `ScheduledStatus`. Sémantiques, donc distincts de l'échelle
 catégorielle. Le rouge de `MISSED` est cohérent avec son usage « écart, échec ».
+Ce sont des tokens **dédiés** : les employer ne consomme pas le budget « une
+seule couleur » de la règle 2 — la marque « séance manquée » du hero en vit, et
+l'accent rouge reste disponible pour l'exercice sauté du réalisé.
 
 | Token | Valeur | Statut |
 |---|---|---|
-| `--color-status-done` | `#0b0b0b` | `DONE` — fait |
+| `--color-status-done` | `#006d14` | `DONE` — fait |
 | `--color-status-planned` | `#8a8a82` | `PLANNED` — prévu |
 | `--color-status-missed` | `#d8261e` | `MISSED` — manqué |
 
@@ -194,6 +197,10 @@ sont dans `assets/fonts/` (subsets latin + latin-ext), les `@font-face` dans
 > et graisses vivent dans le tableau `FAMILIES` en tête du script — c'est la
 > seule chose à modifier. `fonts.css` est **généré**, ne jamais l'éditer à la
 > main.
+
+Le même script dépose un `.ttf` par famille et par graisse dans `public/fonts/` :
+`expo-font` ne lit pas le `woff2`. Ces fichiers ne servent **pas** au web — ils
+sont publiés pour l'app mobile, comme `design-tokens.json` (cf. §9).
 
 ---
 
@@ -332,10 +339,15 @@ décomposé en `_workout_program`, `_workout_sets_table`, `_workout_analysis`.
   condensé, repères en colonnes séparées par des filets. Le bloc `actions` du
   composant accueille la barre du propriétaire — la page publique le laisse
   vide, ce qui garantit qu'aucune commande ne peut y fuiter.
-- **Bandeau de KPI** (`.kd-wk__kpis`) : grille auto-fit, filets verticaux
-  devenant horizontaux sur téléphone. Jauge d'intensité à **10 crans**, à
-  l'échelle du RPE, pour éviter toute conversion mentale.
-- **Onglets** (`.kd-wk__tab`) : filet bas sur l'onglet actif.
+- **Bandeau de KPI** (`.kd-wk__kpis`, `components/_workout_kpis.html.twig`) :
+  grille auto-fit, filets verticaux devenant horizontaux sur téléphone. Jauge
+  d'intensité à **10 crans**, à l'échelle du RPE, pour éviter toute conversion
+  mentale. Le composant sert **le prescrit et le réalisé** (`kd-wk__kpis--logged`)
+  — les deux services de métriques rendent la même forme exprès. Une seule tuile
+  diffère : le prescrit annonce ses enchaînements, le réalisé sa durée réelle.
+- **Onglets** (`.kd-wk__tab`) : filet bas sur l'onglet actif. L'onglet ouvert à
+  l'arrivée est **nommé par le serveur** (`data-tabs-default-value`), jamais
+  deviné : sur une séance datée il dépend du statut.
 - **Bloc en accordéon** (`.kd-block`) : `<details open>`, numéro en gris clair,
   rôle en condensé capitales, résumé mono poussé à droite.
 - **Tableau de séries** (`.kd-settable`) : en-tête en aplat encre, série de
@@ -349,6 +361,31 @@ décomposé en `_workout_program`, `_workout_sets_table`, `_workout_analysis`.
   plusieurs centaines de pixels. Sous 560px il se comprime au lieu de défiler :
   un défilement horizontal imbriqué dans une page qui ne défile pas n'a aucun
   repère visuel, on rate des colonnes sans savoir qu'elles existent.
+- **Tableau de séries en comparaison** (`.kd-settable--compared`) : le **même**
+  composant, un paramètre de plus. Trois colonnes — Série / Prévu / Réalisé — et
+  la charge rejoint sa cellule d'effort (« 8 × 80 kg » se lit d'un bloc, et c'est
+  ce qu'on compare) ; le « % du max » cède sa largeur. La colonne « Prévu » tombe
+  quand rien n'était prescrit en face (séance libre, exercice hors programme) :
+  une colonne de tirets ne dit rien. Plafond porté à **42rem**, deux des trois
+  colonnes portant une valeur composée.
+- **Écart prévu vs réalisé** (`.kd-dev`, `components/_log_deviation.html.twig`) :
+  pastille sigle + libellé sur une ligne d'exercice, **pictogramme seul** dans une
+  cellule de série (un libellé par ligne noierait les valeurs qu'on est venu
+  comparer ; le libellé reste au `title`/`aria-label`). **Tout à l'encre** : un
+  écart est de l'information, pas un échec. Une seule sortie de rouge,
+  `.kd-dev--skipped`, la seule ligne où l'athlète déclare avoir renoncé. `HELD`
+  n'affiche rien du tout.
+- **Prescrit atténué** (`.kd-exrow--logged`, `.kd-setrow__planned`) : dès qu'un
+  réalisé existe, les *paramètres* prescrits passent à l'encre faible — ils
+  cessent d'être ce qu'on lit en premier sans cesser d'être lisibles. Le **nom**
+  de l'exercice ne s'atténue jamais : ce n'est pas un paramètre, c'est le sujet.
+  Piège de cascade à ne pas réintroduire : `.kd-setrow--normal td` remet l'encre
+  pleine sur toutes ses cellules, d'où la reprise explicite de
+  `.kd-setrow__planned` — sans elle, la série de travail serait la seule dont le
+  prescrit ne s'atténue pas.
+- **Séance manquée** (`.kd-wk__missed`) : une marque en clair dans le hero, pas
+  seulement une pastille. Une pastille se survole, elle ne se lit pas, et une date
+  passée sans réalisé a exactement l'allure d'une séance à venir.
 - **Analyse** (`.kd-analysis`) : barre empilée + légende, barres horizontales,
   timeline de durée. Rendu 100 % serveur, aucune bibliothèque de graphiques.
 
@@ -365,3 +402,44 @@ décomposé en `_workout_program`, `_workout_sets_table`, `_workout_analysis`.
    sémantique. On n'expose jamais une primitive directement aux vues.
 4. **Le condensé capitales ne touche pas au contenu saisi** (cf. §3).
 5. **Toute évolution se répercute** ici et dans `CLAUDE.md` (§5 Design system).
+6. **Une valeur ajoutée à `tokens.css` doit être réexportée** :
+   `php bin/console app:tokens:export` (cf. §9). Un test échoue sinon.
+
+---
+
+## 9. Export vers le mobile
+
+L'app Android (Kadens Live) partage cette identité mais ne lit pas de CSS. Les
+tokens lui sont donc **publiés**, jamais recopiés :
+
+```
+php bin/console app:tokens:export   →   public/design-tokens.json
+```
+
+La commande lit `tokens.css`, résout les `var()` et rend deux objets,
+`primitives` et `semantic`, dans l'ordre du fichier. Trois choses à savoir :
+
+- Elle **ne traduit pas**. Une pile de polices reste une pile de polices,
+  `--color-scrim` reste un `color-mix()`. L'adaptation aux API natives vit dans
+  le générateur TypeScript du repo mobile ; ici, on reste fidèle à la source,
+  c'est ce qui rend l'export vérifiable.
+- Le JSON est **généré et versionné**, comme `fonts.css` : ne jamais l'éditer à
+  la main, relancer la commande. `ExportDesignTokensCommandTest` compare le
+  fichier versionné à ce que la feuille produit et échoue à la moindre
+  divergence.
+- Seuls les blocs `:root` sont lus. Une propriété personnalisée posée sur un
+  sélecteur de composant est une variable locale, pas un token.
+
+Les polices suivent le même canal : `tools/fetch-fonts.sh` dépose les `.ttf`
+dans `public/fonts/` (cf. §3).
+
+Côté mobile, la reprise est symétrique : `npm run sync:tokens` traduit le JSON en
+`src/theme/tokens.ts` et `npm run sync:fonts` rapatrie les `.ttf`. C'est là que
+vivent les conversions que cette commande refuse de faire — `color-mix()` vers
+un `rgba()`, une pile de polices vers une famille, les `px` et les `em` vers des
+nombres — et **toute valeur non traduisible arrête la génération**. Deux
+conséquences pour qui touche à `tokens.css` : une nouvelle famille de tokens
+sémantiques doit être classée côté mobile avant d'y arriver, et un rayon ou une
+ombre non nuls demandent une décision explicite (ils sont vérifiés, pas
+recopiés). L'échelle typographique, elle, n'est pas tokenisée ici : le mobile la
+transpose à la main depuis §3.

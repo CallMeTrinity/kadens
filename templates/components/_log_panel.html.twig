@@ -1,0 +1,96 @@
+{# ============================== LE RÉALISÉ ==============================
+   Le contenu du panneau « Réalisé » de /schedule/{id}, et la seule vue du projet
+   qui montre des `LoggedExercise`. Auto-suffisant : tout est rendu par le
+   serveur, aucun AJAX post-chargement (condition du cache offline).
+
+   Attendus :
+     scheduled   ScheduledWorkout (requis)
+     comparison  list<ComparedExercise> de LogComparator (requis, non vide)
+     flat        sortie de PlanFlattener::flattenWorkout, ou null (séance libre)
+     logSummary  sortie de LogMetrics::summary, ou null
+
+   ---- Pourquoi ce panneau contient le programme ----
+
+   La comparaison se lit **en place** : ce panneau ne re-liste pas le réalisé à
+   côté du prescrit, il rend le MÊME programme (mêmes blocs, mêmes supersets, même
+   `_workout_program`) avec une colonne de plus dans chaque tableau de séries. Ce
+   qui distingue ce panneau de l'onglet « Programme », ce n'est donc pas son
+   contenu, c'est son paramètre : ici `comparedById` est rempli, là-bas il est
+   vide. Deux lectures du même programme, l'intention et le fait.
+
+   Les statistiques de bloc (`statsByIndex`) restent volontairement à vide : elles
+   estiment le prescrit, et sous une colonne « Réalisé » elles se liraient comme
+   du mesuré.
+
+   ---- Ce qui n'entre pas ici ----
+
+   Le réalisé n'entre **jamais** dans `PlanFlattener` : il n'est lu que par
+   LogComparator et LogMetrics, tous deux appelés par le seul contrôleur de cette
+   page. C'est ce qui garantit qu'aucune page publique, aucun export Excel et
+   aucun flux ICS ne peut le laisser fuiter. #}
+{% set flat = flat|default(null) %}
+{% set logSummary = logSummary|default(null) %}
+
+{# Où va chaque entrée dans le DOM : celles qui ont une ligne de programme se
+   rendent DANS leur bloc (retrouvées par id de PrescribedExercise), les autres à
+   la suite. Un rangement, pas un calcul.
+
+   PIÈGE — les clés sont **préfixées**, et elles doivent l'être : le filtre Twig
+   `merge` est `array_merge()`, qui **renumérote les clés entières**. Un id 42
+   atterrirait à l'index 0, et l'appariement se ferait au hasard de l'ordre de la
+   collection. Une clé alphanumérique, elle, est préservée. (Le `statsByIndex` de
+   `_workout_read` s'en sort par chance : ses clés sont déjà 0..n-1, donc la
+   renumérotation les reproduit à l'identique.) #}
+{% set comparedById = {} %}
+{% for entry in comparison|filter(e => e.prescribedId is not null) %}
+    {% set comparedById = comparedById|merge({ ('p' ~ entry.prescribedId): entry }) %}
+{% endfor %}
+{% set unplanned = comparison|filter(e => e.prescribedId is null) %}
+
+{% if logSummary %}
+    {{ include('components/_workout_kpis.html.twig', {summary: logSummary, logged: true}) }}
+{% endif %}
+
+{% if logSummary and logSummary.loggedAt %}
+    <p class="kd-logmeta">
+        {{ ux_icon('lucide:timer') }}
+        Consigné le {{ logSummary.loggedAt|date('d/m/Y') }} à {{ logSummary.loggedAt|date('H\\hi') }}
+    </p>
+{% endif %}
+
+{% if flat %}
+    {{ include('components/_workout_program.html.twig', {
+        blocks: flat.blocks, statsByIndex: {}, comparedById: comparedById
+    }, with_context = false) }}
+{% endif %}
+
+{% if unplanned is not empty %}
+    <section class="kd-logextra">
+        {# Sur une séance libre il n'y a pas de « hors » programme : tout EST la
+           séance. Le titre suit. #}
+        <h3 class="kd-logextra__title">
+            {{ flat ? 'Hors programme' : 'Exercices réalisés' }}
+        </h3>
+        <ol class="kd-exlist">
+            {% for entry in unplanned %}
+                {{ include('components/_log_exrow.html.twig', {entry: entry}, with_context = false) }}
+            {% endfor %}
+        </ol>
+    </section>
+{% endif %}
+
+{# Suppression du réalisé, et de lui seul : la séance datée reste au planning,
+   avec sa date et son statut. L'attribut est LOG et non EDIT — le coach
+   programme, il ne consigne pas, et il n'efface donc pas ce que son athlète a
+   déclaré avoir soulevé (KL-06). #}
+{% if is_granted('SCHEDULED_WORKOUT_LOG', scheduled) %}
+    <form method="post" class="kd-logdel"
+          action="{{ path('app_scheduled_workout_log_delete', {id: scheduled.id}) }}"
+          onsubmit="return confirm('Supprimer tout le réalisé de cette séance ? La séance reste au planning, seules les séries consignées disparaissent.');">
+        <input type="hidden" name="_token" value="{{ csrf_token('log_delete' ~ scheduled.id) }}">
+        <button type="submit" class="kd-btn kd-btn--ghost kd-btn--danger kd-btn--sm">
+            {{ ux_icon('lucide:trash-2') }} Supprimer le réalisé
+        </button>
+        <span class="kd-logdel__hint">La séance et sa date restent au planning.</span>
+    </form>
+{% endif %}

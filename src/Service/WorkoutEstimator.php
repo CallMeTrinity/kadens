@@ -22,7 +22,7 @@ use App\Enum\PrescriptionType;
 final class WorkoutEstimator
 {
     private const SECONDS_PER_REP = 6;        // 10 reps ≈ 1 min
-    private const DEFAULT_REST_SECONDS = 120; // 2 min de repos si non renseigné
+    private const DEFAULT_REST_SECONDS = 180; // 3 min de repos si non renseigné
 
     public function estimateSeconds(Workout $workout): int
     {

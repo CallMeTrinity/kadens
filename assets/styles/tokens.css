@@ -85,7 +85,7 @@
   --kd-cat-4: #c9c9c2;
 
   /* Statuts prévu / réalisé — sémantiques, donc distincts de l'échelle
-     catégorielle : fait = encre pleine, prévu = gris, manqué = rouge (le rouge
+     catégorielle : fait = vert, prévu = gris, manqué = rouge (le rouge
      signale l'écart au plan, cohérent avec son usage « intensité / échec »). */
   --kd-status-done: #006d14; /* fait */
   --kd-status-planned: #8a8a82; /* prévu */

@@ -1,0 +1,88 @@
+{# Bandeau de KPI d'une séance. Sert le PRESCRIT (WorkoutMetrics::summary) comme
+   le RÉALISÉ (LogMetrics::summary) : les deux services rendent volontairement la
+   même forme, et c'est précisément ce qui permet à ce composant de se paramétrer
+   au lieu de se dupliquer (cf. docs/feature-live-tracking.md, KL-03).
+
+   Attendus :
+     summary  sortie de WorkoutMetrics::summary ou de LogMetrics::summary (requis)
+     logged   true quand `summary` décrit du réalisé (optionnel, défaut false)
+
+   Une seule tuile diffère, et elle ne peut pas ne pas différer : le prescrit
+   annonce ses **enchaînements** (une intention), le réalisé sa **durée réelle**
+   (un fait). Le réalisé est plat — LogMetrics rend `supersets` et `circuits` à 0
+   parce qu'un superset ne s'observe pas après coup —, afficher « séance à plat »
+   sur une séance justement faite en supersets serait donc faux.
+
+   L'appelant garde la responsabilité de ne pas rendre un bandeau vide : côté
+   prescrit c'est `summary.workingSets > 0`, côté réalisé c'est le null de
+   LogMetrics::summary(). #}
+{% set logged = logged|default(false) %}
+
+<dl class="kd-wk__kpis{{ logged ? ' kd-wk__kpis--logged' }}">
+    <div class="kd-wk__kpi">
+        <dt>Volume total</dt>
+        <dd>{{ summary.tonnageKg|round|number_format(0, ',', ' ') }}<span class="kd-wk__unit"> kg</span></dd>
+        <p class="kd-wk__kpimeta">{{ summary.workingSets }} série{{ summary.workingSets > 1 ? 's' }} de travail</p>
+    </div>
+
+    {% if logged %}
+        <div class="kd-wk__kpi">
+            {# Les bornes d'exécution viennent du mobile : elles peuvent manquer
+               (saisie a posteriori). On retombe alors sur le décompte
+               d'exercices plutôt que d'inventer une durée. #}
+            {% if summary.durationSeconds is not null %}
+                <dt>Durée réelle</dt>
+                <dd>{{ (summary.durationSeconds / 60)|round }}<span class="kd-wk__unit"> min</span></dd>
+                <p class="kd-wk__kpimeta">{{ summary.exerciseCount }} exercice{{ summary.exerciseCount > 1 ? 's' }} réalisé{{ summary.exerciseCount > 1 ? 's' }}</p>
+            {% else %}
+                <dt>Exercices</dt>
+                <dd>{{ summary.exerciseCount }}</dd>
+                <p class="kd-wk__kpimeta">Durée non enregistrée</p>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="kd-wk__kpi">
+            <dt>Enchaînements</dt>
+            <dd>{{ summary.supersets + summary.circuits }}</dd>
+            <p class="kd-wk__kpimeta">
+                {%- if summary.supersets %}{{ summary.supersets }} superset{{ summary.supersets > 1 ? 's' }}{% endif -%}
+                {%- if summary.supersets and summary.circuits %} · {% endif -%}
+                {%- if summary.circuits %}{{ summary.circuits }} circuit{{ summary.circuits > 1 ? 's' }}{% endif -%}
+                {%- if not summary.supersets and not summary.circuits %}Séance à plat{% endif -%}
+            </p>
+        </div>
+    {% endif %}
+
+    {% if summary.averageRpe is not null %}
+        <div class="kd-wk__kpi kd-wk__kpi--accent">
+            <dt>Intensité moyenne</dt>
+            <dd>RPE {{ summary.averageRpe|number_format(1, ',', ' ') }}</dd>
+            {# Jauge de 10 crans : le RPE se lit sur 1..10, une jauge
+               à cette échelle évite toute conversion mentale. #}
+            <p class="kd-wk__gauge" role="img"
+               aria-label="RPE moyen {{ summary.averageRpe|number_format(1, ',', ' ') }} sur 10">
+                {% for i in 1..10 %}
+                    <span class="kd-wk__gaugetick{{ i <= summary.averageRpe|round ? ' is-on' }}"></span>
+                {% endfor %}
+            </p>
+        </div>
+    {% endif %}
+
+    {% if summary.topLift %}
+        <div class="kd-wk__kpi">
+            <dt>Charge la plus lourde</dt>
+            <dd>{{ summary.topLift.weightKg|round|number_format(0, ',', ' ') }}<span class="kd-wk__unit"> kg</span></dd>
+            <p class="kd-wk__kpimeta">{{ summary.topLift.exercise }}</p>
+        </div>
+    {% endif %}
+
+    {# Un exercice sauté est une déclaration de l'athlète, pas un trou : elle a sa
+       place dans le résumé, et nulle part ailleurs on ne la compte. #}
+    {% if logged and summary.skipped %}
+        <div class="kd-wk__kpi">
+            <dt>Sautés</dt>
+            <dd>{{ summary.skipped }}</dd>
+            <p class="kd-wk__kpimeta">exercice{{ summary.skipped > 1 ? 's' }} annoncé{{ summary.skipped > 1 ? 's' }} sauté{{ summary.skipped > 1 ? 's' }}</p>
+        </div>
+    {% endif %}
+</dl>

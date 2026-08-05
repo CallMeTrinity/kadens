@@ -1,0 +1,13 @@
+{# Réponse à une révocation (KL-12) : on remplace le panneau entier, pas la seule
+   ligne retirée — « tout révoquer » vide la liste, et le bouton global disparaît
+   dès qu'il ne reste qu'un appareil. Une cible par ligne aurait obligé à décrire
+   ces deux effets de bord ailleurs.
+
+   `replace` et non `update` : la cible `#devices-panel` est portée par la section
+   elle-même, comme pour le panneau d'appairage.
+   Contexte : devices. #}
+<turbo-stream action="replace" target="devices-panel">
+    <template>
+        {{ include('profile/_devices.html.twig') }}
+    </template>
+</turbo-stream>

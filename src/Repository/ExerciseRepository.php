@@ -64,6 +64,55 @@ class ExerciseRepository extends ServiceEntityRepository
     }
 
     /**
+     * Même bibliothèque, bornée aux exercices modifiés depuis `$since` (null = le
+     * jeu complet). C'est le delta de `GET /api/bootstrap` (KL-14).
+     *
+     * Le filtre porte sur **`COALESCE(updatedAt, createdAt)`** et non sur
+     * `updatedAt` seul : celui-ci n'est écrit qu'au `preUpdate`, il reste donc
+     * null tant qu'un exercice n'a jamais été retouché — c'est-à-dire pour la
+     * quasi-totalité de la bibliothèque globale importée en console. Un filtre
+     * naïf les ferait tous disparaître du delta, et un exercice créé après le
+     * dernier bootstrap n'arriverait jamais sur le téléphone.
+     *
+     * @param list<User> $users
+     *
+     * @return Exercise[]
+     */
+    public function findLibraryForUsersChangedSince(array $users, ?\DateTimeImmutable $since): array
+    {
+        $qb = $this->createLibraryQueryBuilder($users);
+
+        if (null !== $since) {
+            $qb
+                ->andWhere('COALESCE(e.updatedAt, e.createdAt) >= :since')
+                ->setParameter('since', $since)
+            ;
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Les seuls identifiants de la bibliothèque visible, sans hydrater d'entité.
+     * Sert l'historique du bootstrap (KL-14), qui porte sur la bibliothèque
+     * entière même quand la réponse ne transporte qu'un delta.
+     *
+     * @param list<User> $users
+     *
+     * @return list<int>
+     */
+    public function libraryIdsForUsers(array $users): array
+    {
+        $rows = $this->createLibraryQueryBuilder($users)
+            ->select('e.id')
+            ->getQuery()
+            ->getScalarResult()
+        ;
+
+        return array_map(static fn (array $row): int => (int) $row['id'], $rows);
+    }
+
+    /**
      * QueryBuilder de la bibliothèque visible : la globale (owner null) plus les
      * exercices perso des membres donnés.
      *

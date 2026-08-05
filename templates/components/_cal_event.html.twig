@@ -2,11 +2,19 @@
    Pastille de séance datée + modale d'édition — partagée par la vue mois
    (`calendar/index`) et la vue semaine (`calendar/week`).
 
-   Trois zones cliquables : gauche = cycle rapide du statut (prévu → fait →
-   manqué) ; centre = la séance datée ; droite = un œil vers la même page.
-   Filet gauche = statut (seul cas où la couleur code l'état, pas l'activité).
+   Trois zones cliquables : la séance datée, le cycle rapide du statut (prévu →
+   fait → manqué) et un œil vers la même page. Filet gauche = statut (seul cas où
+   la couleur code l'état, pas l'activité).
 
-   Le centre est un **lien** vers /schedule/{id}, intercepté par `dialog#openFine`
+   **Disposition** : le contenu prend la case entière, les deux actions passent en
+   rangée dessous. Sur ordinateur une colonne de calendrier est plus étroite que
+   l'écran d'un téléphone — trois zones côte à côte ne laissaient au titre qu'une
+   quarantaine de pixels. Sous 560px, où l'agenda vertical rend la pleine largeur,
+   le CSS repasse en ligne. L'ordre du DOM suit la disposition par défaut
+   (contenu, puis ses actions) ; c'est la disposition en ligne qui déplace le
+   bouton de statut par `order`.
+
+   Le contenu est un **lien** vers /schedule/{id}, intercepté par `dialog#openFine`
    au pointeur fin uniquement : sur ordinateur il ouvre la modale rapide (statut /
    déplacer / retirer), au doigt il navigue. L'œil, lui, n'est jamais intercepté —
    c'est le chemin vers la séance entière, y compris sur ordinateur. Le lien reste
@@ -17,12 +25,23 @@
 
    Attend :
      - scheduled : ScheduledWorkout
-     - fw        : PlanFlattener::flattenWorkout(scheduled.workout) (aperçu + méta)
+     - fw        : PlanFlattener::flattenWorkout(scheduled.workout) (aperçu + méta),
+                   **null** si la séance datée n'a pas de source (séance libre, ou
+                   séance de bibliothèque supprimée) : il n'y a alors ni aperçu ni
+                   méta, le titre retombe sur le snapshot `displayTitle` et la
+                   pastille porte la marque « Libre »
      - statuses  : ScheduledStatus::cases()
      - detailed  : bool (optionnel) — carte haute de la vue semaine (méta + note)
      - overdue   : bool (optionnel) — séance passée encore « prévue »
    ============================================================================ #}
 {% import 'components/_activity.html.twig' as activity %}
+{% set fw = fw|default(null) %}
+{% set workout = scheduled.workout %}
+{# Séance datée sans source : séance libre montée au fil de l'eau, ou séance de
+   bibliothèque supprimée depuis. Rien à annoncer d'un programme — et c'est
+   justement l'information à porter. #}
+{% set freeform = workout is null %}
+{% set title = scheduled.displayTitle %}
 {% set st = scheduled.status.value %}
 {% set nextStatus = scheduled.status.next %}
 {% set detailed = detailed|default(false) %}
@@ -31,7 +50,36 @@
 <div id="cal-event-{{ scheduled.id }}" class="kd-calevent kd-calevent--{{ st }}{{ detailed ? ' kd-calevent--detailed' }}{{ overdue ? ' is-overdue' }}"
      data-controller="dialog preview"
      data-action="mouseenter->preview#show mouseleave->preview#hide">
-    {# Zone gauche : cycle rapide du statut (prévue → faite → manquée). #}
+    {# La séance datée. Modale au pointeur fin, navigation au doigt. #}
+    <a href="{{ path('app_scheduled_workout_show', {id: scheduled.id}) }}"
+       class="kd-calevent__open" data-action="dialog#openFine" title="{{ title }}">
+        <span class="kd-calevent__title">{{ title }}</span>
+        {% if freeform %}
+            <span class="kd-calevent__meta">
+                {{ include('components/_freeform_mark.html.twig') }}
+            </span>
+        {% elseif fw and (fw.activities|length or workout.estimatedDurationMinutes) %}
+            <span class="kd-calevent__meta">
+                {% for act in fw.activities %}
+                    <span class="kd-calevent__act kd-calevent__act--{{ activity.modifier(act) ?: 'neutral' }}"
+                          title="{{ act.label }}">{{ ux_icon(activity.icon(act)|trim) }}</span>
+                {% endfor %}
+                {% if workout.estimatedDurationMinutes %}
+                    <span class="kd-calevent__dur">{{ ux_icon('lucide:clock') }}{{ workout.estimatedDurationMinutes }}′</span>
+                {% endif %}
+                {% if detailed and fw.exerciseCount %}
+                    <span class="kd-calevent__exos">{{ fw.exerciseCount }} exo{{ fw.exerciseCount > 1 ? 's' }}</span>
+                {% endif %}
+            </span>
+        {% endif %}
+        {% if detailed and overdue %}
+            <span class="kd-calevent__flag">{{ ux_icon('lucide:calendar-clock') }} En retard</span>
+        {% endif %}
+    </a>
+
+    {# Rangée d'actions. Cycle rapide du statut (prévue → faite → manquée), puis
+       l'œil : voir la séance en entier. L'œil n'est jamais intercepté — c'est le
+       seul chemin vers le programme complet depuis le calendrier. #}
     <form method="post" action="{{ path('app_scheduled_workout_cycle_status', {id: scheduled.id}) }}" class="kd-calevent__statusform">
         <input type="hidden" name="_token" value="{{ csrf_token('cycle' ~ scheduled.id) }}">
         {# Vue courante : permet au flux Turbo de re-rendre la pastille à l'identique. #}
@@ -45,33 +93,8 @@
         </button>
     </form>
 
-    {# Zone centrale : la séance datée. Modale au pointeur fin, navigation au doigt. #}
     <a href="{{ path('app_scheduled_workout_show', {id: scheduled.id}) }}"
-       class="kd-calevent__open" data-action="dialog#openFine" title="{{ scheduled.workout.title }}">
-        <span class="kd-calevent__title">{{ scheduled.workout.title }}</span>
-        {% if fw.activities|length or scheduled.workout.estimatedDurationMinutes %}
-            <span class="kd-calevent__meta">
-                {% for act in fw.activities %}
-                    <span class="kd-calevent__act kd-calevent__act--{{ activity.modifier(act) ?: 'neutral' }}"
-                          title="{{ act.label }}">{{ ux_icon(activity.icon(act)|trim) }}</span>
-                {% endfor %}
-                {% if scheduled.workout.estimatedDurationMinutes %}
-                    <span class="kd-calevent__dur">{{ ux_icon('lucide:clock') }}{{ scheduled.workout.estimatedDurationMinutes }}′</span>
-                {% endif %}
-                {% if detailed and fw.exerciseCount %}
-                    <span class="kd-calevent__exos">{{ fw.exerciseCount }} exo{{ fw.exerciseCount > 1 ? 's' }}</span>
-                {% endif %}
-            </span>
-        {% endif %}
-        {% if detailed and overdue %}
-            <span class="kd-calevent__flag">{{ ux_icon('lucide:calendar-clock') }} En retard</span>
-        {% endif %}
-    </a>
-
-    {# Zone droite : voir la séance en entier. Jamais intercepté — c'est le seul
-       chemin vers le programme complet depuis le calendrier. #}
-    <a href="{{ path('app_scheduled_workout_show', {id: scheduled.id}) }}"
-       class="kd-calevent__eye" aria-label="Voir « {{ scheduled.workout.title }} » en entier">
+       class="kd-calevent__eye" aria-label="Voir « {{ title }} » en entier">
         {{ ux_icon('lucide:eye') }}
     </a>
 
@@ -79,7 +102,7 @@
         <div class="kd-modal__card">
             <div class="kd-modal__head">
                 <div>
-                    <h2 class="kd-modal__title">{{ scheduled.workout.title }}</h2>
+                    <h2 class="kd-modal__title">{{ title }}</h2>
                     <p class="kd-modal__sub">{{ scheduled.scheduledDate|date('d/m/Y') }}</p>
                 </div>
                 <button type="button" class="kd-modal__close" data-action="dialog#close" aria-label="Fermer">
@@ -89,9 +112,15 @@
 
             <div class="kd-modal__meta">
                 <span class="kd-badge kd-badge--{{ st }}"><span class="kd-badge__dot"></span>{{ scheduled.status.label }}</span>
-                <a class="kd-btn kd-btn--ghost kd-btn--sm" href="{{ path('app_workout_show', {id: scheduled.workout.id}) }}">
-                    {{ ux_icon('lucide:external-link') }} Voir la séance
-                </a>
+                {% if workout %}
+                    <a class="kd-btn kd-btn--ghost kd-btn--sm" href="{{ path('app_workout_show', {id: workout.id}) }}">
+                        {{ ux_icon('lucide:external-link') }} Voir la séance
+                    </a>
+                {% else %}
+                    {# Sans source, il n'y a aucune séance de bibliothèque à ouvrir :
+                       la marque prend la place du lien plutôt que de le laisser vide. #}
+                    {{ include('components/_freeform_mark.html.twig') }}
+                {% endif %}
             </div>
 
             {# Prévu vs réalisé : marquer fait/manqué en un clic + noter un écart léger. #}
@@ -137,5 +166,8 @@
         </div>
     </dialog>
 
-    {{ include('components/_plan_preview.html.twig', {fw: fw}) }}
+    {# Sans source, il n'y a aucun programme à prévisualiser. #}
+    {% if fw %}
+        {{ include('components/_plan_preview.html.twig', {fw: fw}) }}
+    {% endif %}
 </div>

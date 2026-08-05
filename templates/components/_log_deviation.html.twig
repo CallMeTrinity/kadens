@@ -1,0 +1,42 @@
+{# Marque d'écart prévu vs réalisé (LogDeviation, cf. LogComparator).
+
+   **L'écart se lit à l'encre.** Un écart n'est pas un échec : soulever plus
+   lourd, ou moins, c'est de l'information, et la règle 2 du design system
+   réserve le rouge aux actions primaires, à l'intensité et à l'échec. Une seule
+   sortie de rouge ici : l'exercice **sauté**, la seule ligne où l'athlète
+   déclare avoir renoncé à ce qui était prévu.
+
+   HELD ne s'affiche jamais. « Tenu » se lit déjà dans le tableau : les deux
+   colonnes y portent les mêmes valeurs. Une pastille verte sur chaque ligne
+   d'une séance parfaitement tenue ne dirait rien de plus et noierait les trois
+   lignes qui, elles, ont quelque chose à dire.
+
+   Usage : {% import 'components/_log_deviation.html.twig' as dev %}
+           {{ dev.chip(status) }}   → pastille sigle + libellé (ligne d'exercice)
+           {{ dev.mark(status) }}   → pictogramme seul (cellule de série) #}
+{% macro icon(status) %}
+    {%- set icons = {
+        'held': 'lucide:check',
+        'exceeded': 'lucide:trending-up',
+        'lightened': 'lucide:trending-down',
+        'skipped': 'lucide:x',
+        'not_logged': 'lucide:minus',
+        'unplanned': 'lucide:plus',
+    } -%}
+    {{- ux_icon(icons[status.value] ?? 'lucide:minus') -}}
+{% endmacro %}
+
+{% macro chip(status) %}
+    {% import _self as dev %}
+    {%- if status.isDeviation -%}
+        <span class="kd-dev kd-dev--{{ status.value }}">{{ dev.icon(status) }}{{ status.label }}</span>
+    {%- endif -%}
+{% endmacro %}
+
+{% macro mark(status) %}
+    {% import _self as dev %}
+    {%- if status.isDeviation -%}
+        <span class="kd-dev__mark kd-dev__mark--{{ status.value }}" role="img"
+              title="{{ status.label }}" aria-label="{{ status.label }}">{{ dev.icon(status) }}</span>
+    {%- endif -%}
+{% endmacro %}

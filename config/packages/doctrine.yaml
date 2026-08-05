@@ -7,6 +7,13 @@ doctrine:
         #server_version: '16'
 
         profiling_collect_backtrace: '%kernel.debug%'
+
+        types:
+            # Redéfinit le type `uuid` de symfony/uid pour stocker en CHAR(36)
+            # au lieu de BINARY(16) : un identifiant de séance datée ou de série
+            # doit rester lisible en base et recopiable dans une URL d'API.
+            # Voir App\Doctrine\UuidCharType pour le détail.
+            uuid: App\Doctrine\UuidCharType
     orm:
         validate_xml_mapping: true
         naming_strategy: doctrine.orm.naming_strategy.underscore

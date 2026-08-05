@@ -6,6 +6,13 @@
 # assets/styles/fonts.css. Ne garde que les subsets latin + latin-ext : le
 # projet est francophone, le vietnamien et le cyrillique n'ont pas à peser.
 #
+# Produit aussi, dans public/fonts/, un .ttf par famille et par graisse (KL-20) :
+# React Native ne lit pas le woff2, et expo-font veut un fichier par graisse. Ils
+# sont publiés au même titre que design-tokens.json — le repo mobile s'y sert,
+# plutôt que de recevoir une copie manuelle qui finirait par diverger. Ces
+# fichiers-là ne sont PAS subsettés : Google ne sert le ttf qu'entier, et un
+# téléphone n'a pas de budget de première peinture à tenir.
+#
 # Usage :  ./tools/fetch-fonts.sh
 #
 # Les familles et graisses vivent dans le tableau FAMILIES ci-dessous — c'est
@@ -16,6 +23,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FONT_DIR="$ROOT/assets/fonts"
+TTF_DIR="$ROOT/public/fonts"
 OUT="$ROOT/assets/styles/fonts.css"
 
 # UA moderne : sans lui, Google Fonts sert du ttf au lieu du woff2.
@@ -30,8 +38,8 @@ FAMILIES=(
 
 SUBSETS="latin latin-ext"
 
-rm -f "$FONT_DIR"/*.woff2
-mkdir -p "$FONT_DIR"
+mkdir -p "$FONT_DIR" "$TTF_DIR"
+rm -f "$FONT_DIR"/*.woff2 "$TTF_DIR"/*.ttf
 
 {
   echo "/* ============================================================================"
@@ -82,7 +90,21 @@ for entry in "${FAMILIES[@]}"; do
         echo "}"
       } >> "$OUT"
     done
+
+    # Le ttf pour le mobile. Même requête, mais SANS l'UA moderne : c'est
+    # exactement ce qui fait basculer Google Fonts du woff2 au truetype. La
+    # réponse ne porte alors qu'un seul @font-face, sans unicode-range.
+    ttf="$(curl -sf "https://fonts.googleapis.com/css2?family=${query}:wght@${weight}&display=swap" \
+      | sed -n "s/.*src: url(\([^)]*\.ttf\)).*/\1/p")"
+
+    if [ -z "$ttf" ]; then
+      echo "!! ttf introuvable pour $family $weight" >&2
+      exit 1
+    fi
+
+    curl -sf -o "$TTF_DIR/${slug}-${weight}.ttf" "$ttf"
   done
 done
 
-echo "OK — $(ls -1 "$FONT_DIR" | wc -l | tr -d ' ') woff2 dans assets/fonts/, fonts.css régénéré."
+echo "OK — $(ls -1 "$FONT_DIR" | wc -l | tr -d ' ') woff2 dans assets/fonts/, \
+$(ls -1 "$TTF_DIR" | wc -l | tr -d ' ') ttf dans public/fonts/, fonts.css régénéré."

@@ -39,6 +39,12 @@
             </dl>
         </section>
 
+        {# Hors du formulaire de mot de passe : leurs boutons postent ailleurs,
+           et un <form> ne s'imbrique pas. L'ordre suit le cycle de vie d'un
+           appareil : on le connecte, puis on le gère. #}
+        {{ include('profile/_pairing.html.twig') }}
+        {{ include('profile/_devices.html.twig') }}
+
         {{ form_start(form, {attr: {class: 'kd-editform'}}) }}
             <section class="kd-card kd-formsection">
                 <header class="kd-formsection__head">

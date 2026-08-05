@@ -62,7 +62,6 @@ final class IcsCalendarBuilder
     private function event(ScheduledWorkout $scheduled, string $stamp): array
     {
         $date = $scheduled->getScheduledDate();
-        $workout = $scheduled->getWorkout();
 
         // Événement journée entière : DTEND est exclusif (le lendemain).
         $start = $date->format('Ymd');
@@ -82,7 +81,8 @@ final class IcsCalendarBuilder
             'DTSTAMP:'.$stamp,
             'DTSTART;VALUE=DATE:'.$start,
             'DTEND;VALUE=DATE:'.$end,
-            'SUMMARY:'.$this->escape($prefix.(string) $workout->getTitle()),
+            // Séance libre ou source supprimée : le snapshot de titre prend le relais.
+            'SUMMARY:'.$this->escape($prefix.$scheduled->getDisplayTitle()),
         ];
 
         $description = $this->describe($scheduled);
@@ -105,12 +105,37 @@ final class IcsCalendarBuilder
     private function describe(ScheduledWorkout $scheduled): string
     {
         $workout = $scheduled->getWorkout();
-        $flat = $this->planFlattener->flattenWorkout($workout);
-
         $parts = [];
-        if (null !== $workout->getEstimatedDurationMinutes()) {
-            $parts[] = 'Durée estimée : '.$workout->getEstimatedDurationMinutes().' min';
+
+        // Séance libre (ou source supprimée) : il n'y a pas de programme à
+        // décrire, seule la note d'écart subsiste. Le réalisé n'entre jamais ici.
+        if (null !== $workout) {
+            $flat = $this->planFlattener->flattenWorkout($workout);
+
+            if (null !== $workout->getEstimatedDurationMinutes()) {
+                $parts[] = 'Durée estimée : '.$workout->getEstimatedDurationMinutes().' min';
+            }
+
+            $parts = [...$parts, ...$this->describeBlocks($flat)];
         }
+
+        if (null !== $scheduled->getCompletionNotes() && '' !== trim($scheduled->getCompletionNotes())) {
+            $parts[] = "\nNote : ".trim($scheduled->getCompletionNotes());
+        }
+
+        return implode("\n", $parts);
+    }
+
+    /**
+     * Lignes de description des blocs d'une séance mise à plat.
+     *
+     * @param array<string, mixed> $flat sortie de PlanFlattener::flattenWorkout
+     *
+     * @return list<string>
+     */
+    private function describeBlocks(array $flat): array
+    {
+        $parts = [];
 
         foreach ($flat['blocks'] as $flatBlock) {
             $block = $flatBlock['block'];
@@ -135,11 +160,7 @@ final class IcsCalendarBuilder
             }
         }
 
-        if (null !== $scheduled->getCompletionNotes() && '' !== trim($scheduled->getCompletionNotes())) {
-            $parts[] = "\nNote : ".trim($scheduled->getCompletionNotes());
-        }
-
-        return implode("\n", $parts);
+        return $parts;
     }
 
     /**
