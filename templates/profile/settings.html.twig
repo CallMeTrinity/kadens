@@ -39,6 +39,27 @@
             </dl>
         </section>
 
+        {# Son propre <form> : un <form> ne s'imbrique pas, et ce réglage n'a rien
+           à voir avec le mot de passe. Placé avant l'appairage parce qu'il touche
+           ce qu'on lit à chaque écran, pas un appareil qu'on connecte une fois. #}
+        {{ form_start(display) }}
+            <section class="kd-card kd-formsection">
+                <header class="kd-formsection__head">
+                    <span class="kd-formsection__icon">{{ ux_icon('lucide:languages') }}</span>
+                    <div>
+                        <h2 class="kd-formsection__title">Affichage</h2>
+                        <p class="kd-formsection__hint">La langue des noms d'exercices, partout dans l'app : bibliothèque, séances, plans, historique. Un exercice sans nom anglais reste affiché en français.</p>
+                    </div>
+                </header>
+                <div class="kd-formgrid kd-formgrid--full">
+                    {{ form_row(display.exerciseLanguage) }}
+                </div>
+                <div class="kd-formactions">
+                    <button type="submit" class="kd-btn kd-btn--primary">Enregistrer</button>
+                </div>
+            </section>
+        {{ form_end(display) }}
+
         {# Hors du formulaire de mot de passe : leurs boutons postent ailleurs,
            et un <form> ne s'imbrique pas. L'ordre suit le cycle de vie d'un
            appareil : on le connecte, puis on le gère. #}

@@ -16,7 +16,10 @@
 
 <li class="kd-exrow kd-exrow--logged">
     <div class="kd-exrow__head">
-        <span class="kd-exrow__name">{{ entry.name }}</span>
+        {# Le nom VIVANT tant que la référence existe, le snapshot en repli :
+           l'historique doit suivre la langue choisie, et le snapshot ne peut pas
+           porter les deux. Il reprend la main dès que l'exercice est supprimé. #}
+        <span class="kd-exrow__name">{{ exercise_name(entry.exercise, entry.name) }}</span>
         {{ dev.chip(entry.status) }}
     </div>
 

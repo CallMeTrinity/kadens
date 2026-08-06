@@ -123,7 +123,7 @@
                     <select class="kd-planweek__select" aria-label="Choisir un exercice"
                             data-progression-target="select" data-action="progression#change">
                         {% for t in trajectories %}
-                            <option value="{{ t.exercise.id }}">{{ t.exercise.name }}</option>
+                            <option value="{{ t.exercise.id }}">{{ exercise_name(t.exercise) }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -133,7 +133,7 @@
                             data-progression-exercise="{{ t.exercise.id }}">
                         <figcaption class="kd-prog__caption">
                             {{ activity.badge(t.exercise.activity, false) }}
-                            <span class="kd-prog__exname">{{ t.exercise.name }}</span>
+                            <span class="kd-prog__exname">{{ exercise_name(t.exercise) }}</span>
                             <span class="kd-prog__metric">{{ t.metricLabel }}</span>
                             {% if t.direction != 'flat' %}
                                 <span class="kd-prog__trend kd-prog__trend--{{ t.direction }}">

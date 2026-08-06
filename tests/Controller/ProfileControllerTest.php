@@ -9,6 +9,8 @@ use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
+use App\Enum\ActivityType;
+use App\Enum\ExerciseLanguage;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -146,6 +148,69 @@ final class ProfileControllerTest extends WebTestCase
         // Symfony rend un formulaire invalide en 422 (contrat Turbo).
         self::assertResponseStatusCodeSame(422);
         self::assertStringContainsString('différent de l\'actuel', $crawler->html());
+    }
+
+    // --- Préférences d'affichage ---------------------------------------------
+
+    public function testTheExerciseLanguageIsSavedAndApplied(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = (new Exercise())
+            ->setOwner($user)
+            ->setName('Curl marteau')
+            ->setNameEn('Hammer curl')
+            ->setActivity(ActivityType::GYM);
+        $this->em->persist($exercise);
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $this->submitDisplayForm(ExerciseLanguage::EN);
+
+        self::assertResponseRedirects('/profile/settings');
+
+        $this->em->clear();
+        self::assertSame(
+            ExerciseLanguage::EN,
+            $this->em->getRepository(User::class)->findOneBy(['email' => 'owner@example.com'])?->getExerciseLanguage(),
+        );
+
+        // Le réglage doit se voir, pas seulement se stocker.
+        $crawler = $this->client->request('GET', '/exercise/'.$exercise->getId());
+        self::assertSame('Hammer curl', trim($crawler->filter('h1.kd-title')->text()));
+    }
+
+    /**
+     * Deux formulaires sur la même route. Celui d'affichage est mappé sur `User` :
+     * s'il lisait la requête à chaque POST, un changement de mot de passe
+     * réécrirait la langue avec la valeur par défaut de l'enum, en silence.
+     */
+    public function testChangingThePasswordLeavesTheLanguageAlone(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $user->setExerciseLanguage(ExerciseLanguage::EN);
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $this->submitPasswordForm(self::CURRENT_PASSWORD, 'nouveau-mot-de-passe', 'nouveau-mot-de-passe');
+
+        self::assertResponseRedirects('/profile/settings');
+
+        $this->em->clear();
+        self::assertSame(
+            ExerciseLanguage::EN,
+            $this->em->getRepository(User::class)->findOneBy(['email' => 'owner@example.com'])?->getExerciseLanguage(),
+        );
+    }
+
+    private function submitDisplayForm(ExerciseLanguage $language): Crawler
+    {
+        $crawler = $this->client->request('GET', '/profile/settings');
+        self::assertResponseIsSuccessful();
+
+        $form = $crawler->filter('form[name="display_settings"]')->form();
+        $form['display_settings[exerciseLanguage]'] = $language->value;
+
+        return $this->client->submit($form);
     }
 
     private function submitPasswordForm(string $current, string $first, string $second): Crawler

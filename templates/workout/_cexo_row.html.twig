@@ -35,9 +35,9 @@
         {% if groupLabel %}
             <span class="kd-cexo__rank" title="{{ groupKind == 'circuit' ? 'Circuit' : 'Superset' }} — enchaîné sans repos">{{ groupLabel }}</span>
         {% endif %}
-        <span class="kd-cexo__code{{ mod ? ' kd-cexo__code--' ~ mod }}">{{ ex ? ex.name|slice(0, 2)|upper : '??' }}</span>
+        <span class="kd-cexo__code{{ mod ? ' kd-cexo__code--' ~ mod }}">{{ ex ? exercise_name(ex)|slice(0, 2)|upper : '??' }}</span>
         <span class="kd-cexo__body">
-            <span class="kd-cexo__name">{{ ex ? ex.name : 'Exercice supprimé' }}</span>
+            <span class="kd-cexo__name">{{ ex ? exercise_name(ex) : 'Exercice supprimé' }}</span>
 
             {% if detailed %}
                 {# Résumé compact des séries détaillées : compteur + badges des types
@@ -72,7 +72,7 @@
     </button>
 
     <details class="kd-kebab kd-kebab--row" data-controller="dismiss">
-        <summary class="kd-kebab__trigger kd-kebab__trigger--plain" aria-label="Actions sur {{ ex ? ex.name : 'l\'exercice' }}">
+        <summary class="kd-kebab__trigger kd-kebab__trigger--plain" aria-label="Actions sur {{ ex ? exercise_name(ex) : 'l\'exercice' }}">
             {{ ux_icon('lucide:ellipsis') }}
         </summary>
         <div class="kd-kebab__panel">

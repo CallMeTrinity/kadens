@@ -70,11 +70,17 @@
                     {% set used = usage[exercise.id]|default(null) %}
                     <article class="kd-libcard{{ mod ? ' kd-libcard--' ~ mod }}"
                              data-filter-target="item"
-                             data-filter-name="{{ exercise.name }}"
-                             data-filter-text="{{ exercise.name }} {{ exercise.activity.label }} {% for area in exercise.targetAreas %}{{ area.label }} {% endfor %}"
+                             {# `data-filter-name` = le libellé AFFICHÉ (il pilote le palier
+                                exact/préfixe), `data-filter-text` = tout le reste, les DEUX
+                                noms compris : « lat pulldown » et « tirage vertical » doivent
+                                trouver la même carte quelle que soit la langue choisie. #}
+                             data-filter-name="{{ exercise_name(exercise) }}"
+                             data-filter-text="{{ exercise_search_text(exercise) }} {{ exercise.activity.label }} {% for area in exercise.targetAreas %}{{ area.label }} {% endfor %}"
                              data-facet-activity="{{ exercise.activity.value }}"
                              data-facet-scope="{{ exercise.owner is null ? 'global' : 'perso' }}"
-                             data-sort-name="{{ exercise.name|lower }}"
+                             {# Le tri alphabétique suit le libellé affiché, sinon « Nom (A→Z) »
+                                donnerait un ordre qui ne correspond à rien à l'écran. #}
+                             data-sort-name="{{ exercise_name(exercise)|lower }}"
                              data-sort-created="{{ exercise.createdAt ? exercise.createdAt|date('U') : 0 }}"
                              data-sort-usage="{{ used ? used.count : 0 }}"
                              data-sort-last="{{ used and used.lastAt ? used.lastAt|date('U') : neverSort }}">
@@ -82,9 +88,9 @@
                             <span class="kd-libcard__icon">{{ ux_icon(activity.icon(exercise.activity)|trim) }}</span>
                             <div class="kd-libcard__body">
                                 {% if is_granted('VIEW', exercise) %}
-                                    <a class="kd-libcard__name" href="{{ path('app_exercise_show', {id: exercise.id}) }}">{{ exercise.name }}</a>
+                                    <a class="kd-libcard__name" href="{{ path('app_exercise_show', {id: exercise.id}) }}">{{ exercise_name(exercise) }}</a>
                                 {% else %}
-                                    <span class="kd-libcard__name">{{ exercise.name }}</span>
+                                    <span class="kd-libcard__name">{{ exercise_name(exercise) }}</span>
                                 {% endif %}
                                 <div class="kd-libcard__meta">
                                     {{ exercise.activity.label }}

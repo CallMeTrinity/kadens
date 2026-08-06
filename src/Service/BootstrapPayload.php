@@ -61,7 +61,7 @@ use App\Repository\ScheduledWorkoutRepository;
  * @phpstan-import-type ApiScheduledWorkout from ScheduledWorkoutPayload
  * @phpstan-import-type ApiHistoryEntry from PerformanceHistoryPayload
  *
- * @phpstan-type ApiExercise array{id: int|null, name: string|null, description: string|null, activity: string|null, targetAreas: list<string>, mediaUrl: string|null, global: bool, updatedAt: string|null}
+ * @phpstan-type ApiExercise array{id: int|null, name: string|null, nameEn: string|null, description: string|null, activity: string|null, targetAreas: list<string>, mediaUrl: string|null, global: bool, updatedAt: string|null}
  * @phpstan-type ApiBootstrap array{serverTime: string, since: string|null, window: array{from: string, to: string}, exercises: list<ApiExercise>, schedule: list<ApiScheduledWorkout>, history: list<ApiHistoryEntry>, deleted: array{exercises: list<int>, schedule: list<string>}}
  */
 final class BootstrapPayload
@@ -187,6 +187,11 @@ final class BootstrapPayload
         return [
             'id' => $exercise->getId(),
             'name' => $exercise->getName(),
+            // Le nom anglais, `null` quand le français EST déjà l'anglais
+            // (« Dips », « Fartlek »). Additif : un client qui ne le connaît pas
+            // l'ignore et continue d'afficher `name`. Le téléphone ne le
+            // consomme pas encore.
+            'nameEn' => $exercise->getNameEn(),
             'description' => $exercise->getDescription(),
             'activity' => $exercise->getActivity()?->value,
             'targetAreas' => $areas,

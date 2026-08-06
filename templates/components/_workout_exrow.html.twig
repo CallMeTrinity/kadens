@@ -17,7 +17,7 @@
 <li class="kd-exrow{{ compared ? ' kd-exrow--logged' }}">
     <div class="kd-exrow__head">
         {% if ex.groupLabel %}<span class="kd-exrow__rank">{{ ex.groupLabel }}</span>{% endif %}
-        <span class="kd-exrow__name">{{ ex.exercise ? ex.exercise.name : '—' }}</span>
+        <span class="kd-exrow__name">{{ exercise_name(ex.exercise) }}</span>
 
         {# Dès qu'il y a un tableau de séries dessous, l'en-tête n'en donne que le
            compte : répéter « 3 × 15 @ 130 kg » juste au-dessus des trois lignes

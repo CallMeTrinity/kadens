@@ -34,8 +34,8 @@
                         {% if supersetLabels[prescribed.id]|default(null) %}
                             <span class="kd-cexo__rank" title="Enchaîné sans repos">{{ supersetLabels[prescribed.id] }}</span>
                         {% endif %}
-                        <span class="kd-cexo__code{{ mod ? ' kd-cexo__code--' ~ mod }}">{{ ex ? ex.name|slice(0, 2)|upper : '??' }}</span>
-                        <span class="kd-quickexo__name">{{ ex ? ex.name : 'Exercice supprimé' }}</span>
+                        <span class="kd-cexo__code{{ mod ? ' kd-cexo__code--' ~ mod }}">{{ ex ? exercise_name(ex)|slice(0, 2)|upper : '??' }}</span>
+                        <span class="kd-quickexo__name">{{ ex ? exercise_name(ex) : 'Exercice supprimé' }}</span>
                         {% if summaries[prescribed.id]|default('') is not empty %}
                             <span class="kd-cexo__pill">{{ summaries[prescribed.id] }}</span>
                         {% endif %}

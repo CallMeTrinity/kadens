@@ -138,13 +138,18 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   d'endurance (bornée), tout passe par des agrégats scalaires — sans quoi
   « depuis le début » remonterait l'historique entier à chaque affichage.
   **Ce qui entre dans le volume de salle est défini une fois**, par
-  `LoggedSet::countsAsWorking()` et son pendant SQL `LoggedSetRepository::measured()`
-  (les deux bougent ensemble) : type de travail (échauffement exclu) **et** série
-  chiffrée — au moins une répétition ou au moins une seconde. Une série cochée
+  `LoggedSet::countsAsWorking()`, son pendant SQL `LoggedSetRepository::measured()`
+  et son pendant mobile `isMeasured()` (`kadens-mobile/src/session/summary.ts`) —
+  trois écritures d'une seule règle, elles bougent ensemble : type de travail
+  (échauffement exclu) **et** série chiffrée — au moins une répétition ou au
+  moins une seconde. Une série cochée
   sans valeur (« ? ») a eu lieu mais ne mesure rien ; la charge seule ne la sauve
-  pas (140 kg × 0 rep n'est pas un record). Frontière assumée : `LogComparator`
-  la compte quand même, parce qu'il compare ce qui a été fait à ce qui était
-  prévu, et l'en retirer ferait passer une séance tenue pour « allégée ».
+  pas (140 kg × 0 rep n'est pas un record). Frontière assumée, des deux côtés :
+  `LogComparator` et son pendant mobile `exerciseOutcome()` la comptent quand
+  même, parce qu'ils comparent ce qui a été fait à ce qui était prévu, et l'en
+  retirer ferait passer une séance tenue pour « allégée ». À l'écran de clôture,
+  elle se dit en légende (« + 1 sans valeur »), comme l'échauffement : hors du
+  chiffre, mais jamais escamotée.
 - **Progression = fork à la pose (règle ajustée).** Poser une séance dans un plan en
   crée une **copie privée** (`Workout.planLocal = true`), portée par le `PlanItem`.
   Éditer une séance placée (progression) ne touche ni la séance de bibliothèque ni
@@ -235,6 +240,20 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   identifiant fixe côté console.
 - **Aucune IA dans l'app.** Le remplissage de la biblio passe par une commande
   d'import JSON (Phase 3), pas d'API en prod.
+- **Un exercice a une identité (`refKey`) et des libellés (`name`, `nameEn`),
+  et ce sont deux choses.** `app:import-exercises` apparie sur la clé, pas sur le
+  nom : renommer une entrée de `data/exercises.json` la **met à jour** au lieu
+  d'en créer une seconde — ce qui détacherait tout l'historique, qui indexe sur
+  `Exercise.id`. La clé est réservée à la globale (unique en base, donc jamais
+  posée en `--owner`) et **ne change plus une fois posée**. Le nom anglais n'est
+  pas de l'i18n Symfony mais une donnée métier : l'UI reste française en dur,
+  seuls les noms d'exercices suivent `User.exerciseLanguage`, et l'anglais
+  retombe sur le français quand `nameEn` est vide. **Un seul endroit décide du
+  libellé** — `ExerciseNaming`, via `exercise_name()` en Twig ; écrire
+  `exercise.name` dans un template court-circuite la préférence. Cadrage complet,
+  règles d'adoption (`formerNames`), parité `TextNormalizer` ↔ `assets/search.js`
+  et marche à suivre en prod :
+  [`docs/feature-exercise-naming.md`](./docs/feature-exercise-naming.md).
 
 ---
 

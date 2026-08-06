@@ -3,15 +3,20 @@
 namespace App\Tests\Controller;
 
 use App\Entity\Block;
+use App\Entity\Coaching;
 use App\Entity\Exercise;
+use App\Entity\LoggedExercise;
 use App\Entity\PlanTemplate;
 use App\Entity\PrescribedExercise;
 use App\Entity\PrescribedSet;
+use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\BlockRole;
+use App\Enum\CoachingStatus;
 use App\Enum\PrescriptionType;
+use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -28,6 +33,14 @@ final class WorkoutControllerTest extends WebTestCase
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine.orm.entity_manager');
 
+        // Ordre FK-safe : les séances datées portent le réalisé et citent tout
+        // le reste, elles partent en premier.
+        foreach ($this->em->getRepository(ScheduledWorkout::class)->findAll() as $scheduled) {
+            $this->em->remove($scheduled);
+        }
+        foreach ($this->em->getRepository(Coaching::class)->findAll() as $coaching) {
+            $this->em->remove($coaching);
+        }
         foreach ($this->em->getRepository(PlanTemplate::class)->findAll() as $template) {
             $this->em->remove($template);
         }
@@ -397,6 +410,79 @@ final class WorkoutControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(403);
     }
 
+    // --- Palette du compositeur : ordre et recherche --------------------------
+
+    /**
+     * L'ordre de la palette vient du serveur : ce qu'on fait le plus souvent
+     * d'abord. Une bibliothèque de 300 entrées classée A→Z fait défiler pour
+     * rien, et c'est l'écran qu'on utilise debout entre deux séries.
+     */
+    public function testTheComposerPaletteLeadsWithWhatIsDoneMost(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $rare = $this->createExercise($user, 'Abduction des hanches');
+        $often = $this->createExercise($user, 'Zottman curl');
+        $workout = $this->createWorkout($user, 'Séance');
+
+        // « Zottman » est dernier dans l'alphabet : sans le tri par usage, il
+        // resterait en queue de palette.
+        $this->logTimes($user, $often, 3);
+        $this->logTimes($user, $rare, 1);
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId().'/edit');
+
+        $names = $crawler->filter('.kd-libx__name')->each(static fn ($node): string => trim($node->text()));
+        self::assertSame(['Zottman curl', 'Abduction des hanches'], $names);
+    }
+
+    /**
+     * La portée est le PROPRIÉTAIRE de la séance, pas l'utilisateur courant :
+     * quand un coach compose pour son athlète, c'est l'historique de l'athlète
+     * qui rend l'ordre utile.
+     */
+    public function testThePaletteOrderFollowsTheWorkoutOwnerNotTheCoach(): void
+    {
+        $athlete = $this->createUser('athlete@example.com');
+        $coach = $this->createUser('coach@example.com');
+        $this->em->persist(
+            (new Coaching())
+                ->setCoach($coach)
+                ->setAthlete($athlete)
+                ->setStatus(CoachingStatus::ACCEPTED)
+                ->setRequestedBy($coach)
+        );
+
+        $first = $this->createExercise($athlete, 'Abduction des hanches');
+        $second = $this->createExercise($athlete, 'Zottman curl');
+        $workout = $this->createWorkout($athlete, 'Séance');
+
+        // L'athlète fait surtout le second ; le coach, lui, n'a rien fait.
+        $this->logTimes($athlete, $second, 2);
+        $this->em->flush();
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId().'/edit');
+
+        $names = $crawler->filter('.kd-libx__name')->each(static fn ($node): string => trim($node->text()));
+        self::assertSame(['Zottman curl', 'Abduction des hanches'], $names);
+        self::assertSame($first->getName(), 'Abduction des hanches');
+    }
+
+    public function testThePaletteSearchTextCarriesBothNames(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $this->createExercise($user, 'Tirage vertical poitrine', 'Lat pulldown');
+        $workout = $this->createWorkout($user, 'Séance');
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId().'/edit');
+
+        $card = $crawler->filter('[data-composer-target="libcard"]')->first();
+        self::assertSame('Tirage vertical poitrine', $card->attr('data-filter-name'));
+        self::assertStringContainsString('Lat pulldown', (string) $card->attr('data-filter-text'));
+    }
+
     private function createUser(string $email): User
     {
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
@@ -460,17 +546,44 @@ final class WorkoutControllerTest extends WebTestCase
         self::assertSame(6, $reloaded->getSets());
     }
 
-    private function createExercise(User $owner, string $name): Exercise
+    private function createExercise(User $owner, string $name, ?string $nameEn = null): Exercise
     {
         $exercise = (new Exercise())
             ->setOwner($owner)
             ->setName($name)
+            ->setNameEn($nameEn)
             ->setActivity(ActivityType::GYM);
 
         $this->em->persist($exercise);
         $this->em->flush();
 
         return $exercise;
+    }
+
+    /**
+     * Une séance datée « faite » qui logue un exercice `$times` fois — le
+     * matériau de `LoggedExerciseRepository::usageForOwner()`.
+     */
+    private function logTimes(User $owner, Exercise $exercise, int $times): void
+    {
+        for ($i = 1; $i <= $times; ++$i) {
+            $scheduled = (new ScheduledWorkout())
+                ->setOwner($owner)
+                ->setTitle('Séance du '.$i)
+                ->setScheduledDate(new \DateTimeImmutable(\sprintf('2026-04-%02d', $i)))
+                ->setStatus(ScheduledStatus::DONE);
+
+            $scheduled->addLoggedExercise(
+                (new LoggedExercise())
+                    ->setExercise($exercise)
+                    ->setExerciseName((string) $exercise->getName())
+                    ->setPosition(0)
+            );
+
+            $this->em->persist($scheduled);
+        }
+
+        $this->em->flush();
     }
 
     private function makePrescribed(Exercise $exercise, int $position): PrescribedExercise

@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\ExerciseLanguage;
 use App\Enum\Sex;
 use App\Enum\TrainingGoal;
 use App\Repository\UserRepository;
@@ -48,6 +49,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     // public par slug), d'où l'entropie (32 octets → 64 hex) et l'unicité.
     #[ORM\Column(length: 64, unique: true, nullable: true)]
     private ?string $calendarFeedToken = null;
+
+    // --- Préférences d'affichage --------------------------------------------
+
+    // La langue des NOMS D'EXERCICES, et rien d'autre : ce n'est pas un `locale`
+    // et l'app n'a pas d'i18n (cf. ExerciseLanguage). Non nullable avec un
+    // défaut, parce qu'un affichage n'a pas de « non renseigné » — le reste de
+    // la fiche athlète est nullable, ce champ-là ne peut pas l'être.
+    #[ORM\Column(enumType: ExerciseLanguage::class, options: ['default' => 'fr'])]
+    private ExerciseLanguage $exerciseLanguage = ExerciseLanguage::FR;
 
     // --- Fiche athlète : identité -------------------------------------------
 
@@ -290,6 +300,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getUpdatedAt(): ?\DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    public function getExerciseLanguage(): ExerciseLanguage
+    {
+        return $this->exerciseLanguage;
+    }
+
+    public function setExerciseLanguage(ExerciseLanguage $exerciseLanguage): static
+    {
+        $this->exerciseLanguage = $exerciseLanguage;
+
+        return $this;
     }
 
     public function getCalendarFeedToken(): ?string

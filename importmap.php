@@ -24,6 +24,9 @@
  */
 return [
     'app' => ['path' => './assets/app.js', 'entrypoint' => true],
+    // Le moteur de recherche partagé par `filter` et `composer`. Pas un
+    // entrypoint : il n'est chargé que par les contrôleurs qui l'importent.
+    'search' => ['path' => './assets/search.js'],
     '@hotwired/stimulus' => ['version' => '3.2.2'],
     '@symfony/stimulus-bundle' => ['path' => './vendor/symfony/stimulus-bundle/assets/dist/loader.js'],
     '@hotwired/turbo' => ['version' => '8.0.23'],

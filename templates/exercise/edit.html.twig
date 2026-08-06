@@ -1,16 +1,16 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Éditer {{ exercise.name }}{% endblock %}
+{% block title %}Éditer {{ exercise_name(exercise) }}{% endblock %}
 
 {% block body %}
     <a href="{{ path('app_exercise_show', {id: exercise.id}) }}" class="kd-backlink">
-        {{ ux_icon('lucide:arrow-left') }} {{ exercise.name }}
+        {{ ux_icon('lucide:arrow-left') }} {{ exercise_name(exercise) }}
     </a>
 
     <div class="kd-pagehead">
         <div>
             <p class="kd-eyebrow">Bibliothèque</p>
-            <h1 class="kd-title">Éditer « {{ exercise.name }} »</h1>
+            <h1 class="kd-title">Éditer « {{ exercise_name(exercise) }} »</h1>
         </div>
     </div>
 

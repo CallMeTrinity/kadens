@@ -10,6 +10,7 @@ use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
+use App\Enum\ExerciseLanguage;
 use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
 use App\Repository\LoggedExerciseRepository;
@@ -316,6 +317,95 @@ final class ExerciseControllerTest extends WebTestCase
         self::assertCount(8, $usage);
     }
 
+    // --- Noms bilingues ------------------------------------------------------
+
+    /**
+     * Le texte cherché porte les DEUX noms quelle que soit la langue affichée :
+     * c'est ce qui fait que « lat pulldown » et « tirage vertical » trouvent la
+     * même carte. Le filtre lui-même est client (`assets/search.js`), on vérifie
+     * ici ce qu'on lui donne à manger.
+     */
+    public function testTheSearchTextCarriesBothNames(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $this->createExercise($user, 'Tirage vertical poitrine', 'Lat pulldown');
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/exercise');
+
+        $card = $crawler->filter('[data-filter-target="item"]')->first();
+        self::assertSame('Tirage vertical poitrine', $card->attr('data-filter-name'));
+        self::assertStringContainsString('Tirage vertical poitrine', (string) $card->attr('data-filter-text'));
+        self::assertStringContainsString('Lat pulldown', (string) $card->attr('data-filter-text'));
+    }
+
+    public function testTheDisplayedNameFollowsTheChosenLanguage(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $user->setExerciseLanguage(ExerciseLanguage::EN);
+        // Sans nom anglais : le repli français doit tenir dans le même écran.
+        $this->createExercise($user, 'Tirage vertical poitrine', 'Lat pulldown');
+        $this->createExercise($user, 'Dips');
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/exercise');
+
+        $names = $crawler->filter('.kd-libcard__name')->each(static fn ($node): string => trim($node->text()));
+
+        self::assertContains('Lat pulldown', $names);
+        self::assertNotContains('Tirage vertical poitrine', $names);
+        self::assertContains('Dips', $names);
+    }
+
+    /**
+     * Le tri « Nom (A→Z) » doit suivre le libellé AFFICHÉ : classé sur le nom
+     * français pendant qu'on lit l'anglais, il donnerait un ordre qui ne
+     * correspond à rien à l'écran.
+     */
+    public function testTheAlphabeticalSortKeyFollowsTheDisplayedName(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $user->setExerciseLanguage(ExerciseLanguage::EN);
+        $this->createExercise($user, 'Tirage vertical poitrine', 'Lat pulldown');
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/exercise');
+
+        self::assertSame(
+            'lat pulldown',
+            $crawler->filter('[data-filter-target="item"]')->first()->attr('data-sort-name'),
+        );
+    }
+
+    /**
+     * La fiche d'un exercice est le seul écran qui montre les deux noms : c'est
+     * là qu'on vérifie qu'on nomme bien la même chose.
+     */
+    public function testTheExercisePageShowsBothNames(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise($user, 'Curl marteau', 'Hammer curl');
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/exercise/'.$exercise->getId());
+
+        self::assertSame('Curl marteau', trim($crawler->filter('h1.kd-title')->text()));
+        self::assertSame('Hammer curl', trim($crawler->filter('.kd-altname')->text()));
+    }
+
+    public function testThereIsNoSecondNameWhenThereIsNothingToAdd(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise($user, 'Dips');
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/exercise/'.$exercise->getId());
+
+        self::assertCount(0, $crawler->filter('.kd-altname'));
+    }
+
     /**
      * Une séance datée qui porte le réalisé d'un seul exercice.
      *
@@ -366,11 +456,12 @@ final class ExerciseControllerTest extends WebTestCase
         return $user;
     }
 
-    private function createExercise(User $owner, string $name): Exercise
+    private function createExercise(User $owner, string $name, ?string $nameEn = null): Exercise
     {
         $exercise = (new Exercise())
             ->setOwner($owner)
             ->setName($name)
+            ->setNameEn($nameEn)
             ->setActivity(ActivityType::GYM);
 
         $this->em->persist($exercise);

@@ -12,6 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: ExerciseRepository::class)]
+#[ORM\UniqueConstraint(name: 'uniq_exercise_ref_key', columns: ['ref_key'])]
 #[ORM\HasLifecycleCallbacks]
 class Exercise
 {
@@ -23,10 +24,43 @@ class Exercise
     #[ORM\ManyToOne(inversedBy: 'exercises')]
     private ?User $owner = null;
 
+    /**
+     * L'identité **stable** d'une entrée de la bibliothèque globale, séparée de
+     * son libellé. C'est ce qui rend `app:import-exercises` rejouable : la
+     * commande apparie là-dessus, donc renommer un exercice dans
+     * `data/exercises.json` le met à jour au lieu d'en créer un second avec un
+     * nouvel `id`. Or `LoggedExercise.exercise`, `PrescribedExercise.exercise`
+     * et le cache mobile indexent tous sur cet `id` — un doublon coûterait
+     * l'historique.
+     *
+     * **Réservée à la globale.** Un exercice perso n'en porte pas : la contrainte
+     * est unique sur toute la table, et deux utilisateurs important le même
+     * fichier la violeraient. MariaDB laisse passer plusieurs `NULL` sous un
+     * index unique, c'est exactement ce qu'on lui demande ici.
+     *
+     * **Immuable une fois posée.** La changer reviendrait à réintroduire le
+     * problème qu'elle résout.
+     */
+    #[ORM\Column(length: 128, nullable: true)]
+    #[Assert\Length(max: 128)]
+    private ?string $refKey = null;
+
     #[ORM\Column(length: 255)]
     #[Assert\NotBlank(message: 'Le nom est obligatoire.')]
     #[Assert\Length(max: 255)]
     private ?string $name = null;
+
+    /**
+     * Le nom anglais, facultatif. Ce n'est **pas** une traduction au sens
+     * Symfony (l'app n'a aucun catalogue, toute l'UI est en français en dur) :
+     * c'est une donnée métier, parce que les mouvements de salle se nomment
+     * couramment en anglais et qu'on veut pouvoir les chercher des deux côtés.
+     *
+     * Absent, l'affichage en anglais retombe sur `name` — jamais de trou.
+     */
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Assert\Length(max: 255)]
+    private ?string $nameEn = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $description = null;
@@ -92,6 +126,18 @@ class Exercise
         return $this;
     }
 
+    public function getRefKey(): ?string
+    {
+        return $this->refKey;
+    }
+
+    public function setRefKey(?string $refKey): static
+    {
+        $this->refKey = $refKey;
+
+        return $this;
+    }
+
     public function getName(): ?string
     {
         return $this->name;
@@ -100,6 +146,18 @@ class Exercise
     public function setName(string $name): static
     {
         $this->name = $name;
+
+        return $this;
+    }
+
+    public function getNameEn(): ?string
+    {
+        return $this->nameEn;
+    }
+
+    public function setNameEn(?string $nameEn): static
+    {
+        $this->nameEn = $nameEn;
 
         return $this;
     }

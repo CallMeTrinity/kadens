@@ -19,13 +19,6 @@ namespace App\Service;
  * lignes ici. Le prix est un oubli possible ; il se paie en « pas de bandeau de
  * mise à jour », jamais en synchronisation cassée.
  *
- * ## Zéro veut dire « rien de publié »
- *
- * `versionCode = 0` est l'état du jour : le workflow de build (KL-41) n'a encore
- * produit aucune release. C'est l'élément neutre des deux comparaisons du
- * client — rien n'est jamais plus récent que soi, rien n'est jamais en dessous du
- * minimum — donc l'app ne propose rien et ne bloque personne tant que la valeur
- * n'a pas bougé. Un `1` de complaisance, lui, aurait publié un lien d'APK en 404.
  */
 final class MobileRelease
 {
