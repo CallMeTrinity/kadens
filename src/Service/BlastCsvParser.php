@@ -9,7 +9,7 @@ use App\Enum\SetType;
 /**
  * La lecture des exports CSV de Blast, et **rien d'autre** : ce service ne
  * connaît ni Doctrine, ni la bibliothèque d'exercices, ni le mapping. Il rend
- * une structure plate que `BlastImporter` transforme en entités.
+ * une structure plate que `TrainingHistoryImporter` transforme en entités.
  *
  * La séparation n'est pas cosmétique. Le CSV est la partie irrégulière du
  * problème (trois fichiers, deux séparateurs, des lignes qu'on ne sait pas
@@ -95,6 +95,7 @@ final class BlastCsvParser
      *     title: string,
      *     startedAt: \DateTimeImmutable,
      *     endedAt: \DateTimeImmutable|null,
+     *     loggedAt: \DateTimeImmutable,
      *     date: \DateTimeImmutable,
      *     entries: list<array{
      *         key: string,
@@ -134,6 +135,9 @@ final class BlastCsvParser
                 'title' => trim($row['Entraînement'] ?? '') ?: 'Séance importée',
                 'startedAt' => $started,
                 'endedAt' => $this->endOf($started, $row["Durée de l'Entraînement"] ?? null),
+                // Blast horodate ses séances : l'instant dont ses séries héritent
+                // est le vrai départ, pas une convention (cf. `FitNotesCsvParser`).
+                'loggedAt' => $started,
                 // Le jour tel qu'il a été vécu, donc lu dans le fuseau local
                 // avant que `$started` ne bascule en UTC.
                 'date' => new \DateTimeImmutable(substr($sourceKey, 0, 10), $tz),

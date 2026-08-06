@@ -378,7 +378,7 @@
         "mediaUrl": null
     },
     {
-        "name": "Extension mollets presse 45",
+        "name": "Extension mollets leg presse",
         "description": "Sur la presse à 45°, plante des pieds en bas du plateau, pousser en extension de cheville pour cibler les mollets.",
         "activity": "gym",
         "targetAreas": ["calves"],
@@ -2034,6 +2034,76 @@
         "description": "Tirage d'un élastique vers le visage, coudes hauts, en écartant les mains en fin de course. Version transportable du face pull, utile à l'échauffement d'épaule.",
         "activity": "gym",
         "targetAreas": ["shoulders", "back", "traps"],
+        "mediaUrl": null
+    },
+    {
+        "name": "Rotation externe d'épaule à l'élastique (bras pliés)",
+        "description": "Coudes au corps fléchis à 90°, écarter les avant-bras vers l'extérieur contre un élastique. Renforce les rotateurs externes, à charge très légère et en contrôle.",
+        "activity": "gym",
+        "targetAreas": ["shoulders"],
+        "mediaUrl": null
+    },
+    {
+        "name": "Rotation d'épaule à l'élastique (bras tendus)",
+        "description": "Bras tendus devant soi, écarter les mains contre un élastique en gardant les coudes verrouillés. Complément du travail coudes fléchis, sur une amplitude plus large.",
+        "activity": "gym",
+        "targetAreas": ["shoulders"],
+        "mediaUrl": null
+    },
+    {
+        "name": "Traction assistée à la machine",
+        "description": "Traction sur machine à contrepoids : la charge affichée est l'aide apportée, plus elle est lourde plus le mouvement est facile. Palier avant la traction stricte.",
+        "activity": "gym",
+        "targetAreas": ["back", "biceps"],
+        "mediaUrl": null
+    },
+    {
+        "name": "Traction négative (excentrique)",
+        "description": "Départ menton au-dessus de la barre, descente freinée sur plusieurs secondes, remontée par saut ou marchepied. Travaille la phase où l'on est le plus fort quand la traction complète n'est pas encore accessible.",
+        "activity": "gym",
+        "targetAreas": ["back", "biceps"],
+        "mediaUrl": null
+    },
+    {
+        "name": "V-ups (Relevé buste et jambes)",
+        "description": "Allongé au sol, monter simultanément le buste et les jambes tendues pour venir toucher les pieds, corps en V. Sollicite la sangle abdominale sur toute sa longueur.",
+        "activity": "gym",
+        "targetAreas": ["abs"],
+        "mediaUrl": null
+    },
+    {
+        "name": "Gainage planche dynamique",
+        "description": "Planche sur les avant-bras alternée avec un passage bras tendus, en gardant le bassin stable. La transition ajoute une contrainte anti-rotation au gainage classique.",
+        "activity": "gym",
+        "targetAreas": ["abs", "shoulders"],
+        "mediaUrl": null
+    },
+    {
+        "name": "Demi-chaise au mur",
+        "description": "Dos plaqué au mur, cuisses à mi-course entre la position debout et la parallèle. Variante moins profonde que la chaise complète, tenue ou répétée en protocole de renforcement.",
+        "activity": "gym",
+        "targetAreas": ["quadriceps", "shins"],
+        "mediaUrl": null
+    },
+    {
+        "name": "Renforcement des fibulaires à l'élastique",
+        "description": "Pied ancré dans un élastique, pousser le bord externe vers l'extérieur puis revenir en freinant. Renforce les péroniers latéraux, souvent travaillés en prévention de la périostite tibiale.",
+        "activity": "gym",
+        "targetAreas": ["shins", "calves"],
+        "mediaUrl": null
+    },
+    {
+        "name": "Port de sandbag (Sandbag carry)",
+        "description": "Marcher sur une distance donnée en portant un sac lesté contre la poitrine ou sur l'épaule. La charge instable ajoute au port de charge une contrainte de gainage permanente.",
+        "activity": "gym",
+        "targetAreas": ["full_body"],
+        "mediaUrl": null
+    },
+    {
+        "name": "Mobilité : Étirements des jambes",
+        "description": "Enchaînement d'étirements des chaînes avant et arrière de la jambe (quadriceps, ischio-jambiers, mollets), tenus en respiration calme. Séquence de fin de séance ou de jour de repos.",
+        "activity": "mobility",
+        "targetAreas": ["quadriceps", "hamstrings", "calves"],
         "mediaUrl": null
     }
 ]

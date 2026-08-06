@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Service;
 
-use App\Service\BlastImporter;
+use App\Service\TrainingHistoryImporter;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -13,16 +13,16 @@ use PHPUnit\Framework\TestCase;
  * mais elle a une valeur à figer — la changer réimporterait tout en double, sans
  * rien casser de visible au moment du changement.
  */
-final class BlastImporterTest extends TestCase
+final class TrainingHistoryImporterTest extends TestCase
 {
     public function testUuidOnlyDependsOnTheSourceKey(): void
     {
         self::assertTrue(
-            BlastImporter::uuidFor('2026-01-02 11:37:07')->equals(BlastImporter::uuidFor('2026-01-02 11:37:07')),
+            TrainingHistoryImporter::uuidFor('2026-01-02 11:37:07')->equals(TrainingHistoryImporter::uuidFor('2026-01-02 11:37:07')),
         );
 
         self::assertFalse(
-            BlastImporter::uuidFor('2026-01-02 11:37:07')->equals(BlastImporter::uuidFor('2026-01-02 11:37:08')),
+            TrainingHistoryImporter::uuidFor('2026-01-02 11:37:07')->equals(TrainingHistoryImporter::uuidFor('2026-01-02 11:37:08')),
         );
     }
 
@@ -35,7 +35,7 @@ final class BlastImporterTest extends TestCase
     {
         self::assertSame(
             '1923d15a-7427-54ec-85b2-3956fb520d4b',
-            BlastImporter::uuidFor('2026-01-02 11:37:07')->toRfc4122(),
+            TrainingHistoryImporter::uuidFor('2026-01-02 11:37:07')->toRfc4122(),
         );
     }
 }

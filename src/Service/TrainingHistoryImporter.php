@@ -17,6 +17,11 @@ use Symfony\Component\Uid\Uuid;
  * une séance de l'export devient une **séance datée cochée « Faite »**, portant
  * son réalisé série par série.
  *
+ * Le service ne connaît **aucun format de fichier**. Il consomme la structure
+ * plate que rendent les parseurs (`BlastCsvParser`, `FitNotesCsvParser`), et
+ * c'est ce qui lui permet de servir plusieurs sources sans se dédoubler : ce qui
+ * change d'une application à l'autre, c'est la lecture, pas l'écriture.
+ *
  * ## Une séance libre, pas une séance de bibliothèque
  *
  * Chaque séance importée est créée avec `workout = null` et son titre en
@@ -43,11 +48,19 @@ use Symfony\Component\Uid\Uuid;
  * complété, sur un export élargi. Elle ne doit pas empiler 300 séances de plus.
  *
  * Les identifiants sont donc **déterministes** : un UUIDv5 dérivé d'un namespace
- * fixe et de la clé source (l'horodatage de la séance, répété à l'identique sur
- * toutes ses lignes par Blast). La même séance retombe sur le même `uuid`, et
- * l'unicité de `uniq_scheduled_workout_uuid` devient une garantie plutôt qu'un
- * obstacle. C'est le même mécanisme qui rend `PUT /api/schedule/{uuid}`
- * idempotent pour le téléphone, appliqué à une source qui n'émet pas d'uuid.
+ * fixe et de la clé source — ce que l'export répète à l'identique sur toutes les
+ * lignes d'une même séance (son horodatage chez Blast, son jour chez FitNotes).
+ * La même séance retombe sur le même `uuid`, et l'unicité de
+ * `uniq_scheduled_workout_uuid` devient une garantie plutôt qu'un obstacle.
+ * C'est le même mécanisme qui rend `PUT /api/schedule/{uuid}` idempotent pour le
+ * téléphone, appliqué à une source qui n'émet pas d'uuid.
+ *
+ * Le namespace étant **commun à toutes les sources**, une clé source porte le nom
+ * de la sienne (`fitnotes|2025-09-24`) : deux applications qui numéroteraient
+ * leurs séances pareil se marcheraient dessus sinon, et l'import de la seconde
+ * effacerait l'historique de la première sans rien dire. Blast fait exception et
+ * garde son horodatage nu — le préfixer aujourd'hui changerait tous ses uuid,
+ * donc réimporterait son historique en double au lieu de le remplacer.
  *
  * Une séance déjà importée est **remplacée**, jamais dupliquée, et le
  * remplacement se fait en deux temps : `purge()` efface et flushe, `import()`
@@ -70,9 +83,23 @@ use Symfony\Component\Uid\Uuid;
  *   `LogMetrics` sous-compte ces séries, tandis que `PerformanceHistory` et
  *   `ExerciseTrajectory` restent justes puisque l'unilatéral est mappé sur une
  *   entrée distincte de la bibliothèque.
- * - **Le RPE.** La colonne existe et vaut zéro partout. Elle reste `null`.
+ * - **Le RPE.** Blast exporte la colonne et elle vaut zéro partout, FitNotes ne
+ *   l'a pas. Elle reste `null`.
+ *
+ * ## Les notes, et ce qu'elles rattrapent
+ *
+ * Un parseur peut poser un texte libre sur une entrée (`entries[].notes`), qui
+ * atterrit dans `LoggedExercise.notes` et s'affiche tel quel
+ * (`components/_log_exrow.html.twig`). C'est le fourre-tout de ce que l'export
+ * porte et que le modèle n'a **pas de colonne** pour tenir : le commentaire que
+ * l'utilisateur a écrit ce jour-là, la distance d'un port de charge
+ * (`LoggedSet` n'a ni distance ni allure). Écrit en toutes lettres, ce n'est pas
+ * exploitable statistiquement, mais c'est lisible — et l'alternative était de le
+ * jeter. À ne pas confondre avec `Workout.notes` / `PlanTemplate.notes`, qui sont
+ * le bloc-notes privé du propriétaire (`CLAUDE.md` §3) : ici on ne fait que
+ * recopier ce que la source dit déjà.
  */
-final class BlastImporter
+final class TrainingHistoryImporter
 {
     /**
      * Namespace des uuid dérivés. Une constante arbitraire mais **figée** : la
@@ -128,15 +155,16 @@ final class BlastImporter
      * @param array{
      *     sourceKey: string,
      *     title: string,
-     *     startedAt: \DateTimeImmutable,
+     *     startedAt: \DateTimeImmutable|null,
      *     endedAt: \DateTimeImmutable|null,
+     *     loggedAt: \DateTimeImmutable,
      *     date: \DateTimeImmutable,
-     *     entries: list<array{key: string, name: string, equipment: string, execution: string, sets: list<array{setType: \App\Enum\SetType, reps: int|null, weightKg: float|null, durationSeconds: int|null}>}>
+     *     entries: list<array{key: string, name: string, notes?: string|null, sets: list<array{setType: \App\Enum\SetType, reps: int|null, weightKg: float|null, durationSeconds: int|null}>}>
      * } $session
      *
      * @return array{workout: ScheduledWorkout, exercises: int, sets: int}|null
      */
-    public function import(array $session, BlastExerciseMap $map): ?array
+    public function import(array $session, ImportedExerciseMap $map): ?array
     {
         $workout = (new ScheduledWorkout(self::uuidFor($session['sourceKey'])))
             ->setOwner($map->getOwner())
@@ -164,7 +192,10 @@ final class BlastImporter
                 // c'est ce que l'utilisateur lira, et ce qui restera cohérent
                 // avec le reste de son historique si l'exercice disparaît.
                 ->setExerciseName((string) $exercise->getName())
-                ->setPosition($exercises);
+                ->setPosition($exercises)
+                // Le texte que la source portait et que le modèle ne sait pas
+                // ranger ailleurs (cf. l'en-tête de classe). Absent chez Blast.
+                ->setNotes(('' === trim((string) ($entry['notes'] ?? ''))) ? null : trim((string) $entry['notes']));
 
             foreach ($entry['sets'] as $index => $set) {
                 $logged->addLoggedSet(
@@ -175,8 +206,13 @@ final class BlastImporter
                         ->setWeightKg($set['weightKg'])
                         ->setDurationSeconds($set['durationSeconds'])
                         // L'export ne date pas ses séries, seulement la séance.
-                        // Inventer une progression dans l'heure serait faux.
-                        ->setCompletedAt($session['startedAt']),
+                        // Inventer une progression dans l'heure serait faux, d'où
+                        // un instant unique pour toute la séance. C'est `loggedAt`
+                        // et pas `startedAt` parce qu'une source peut n'exporter
+                        // aucune heure (FitNotes) : il faut alors quand même un
+                        // instant pour `LogMetrics::loggedAt()`, sans pour autant
+                        // prétendre savoir à quelle heure la séance a commencé.
+                        ->setCompletedAt($session['loggedAt']),
                 );
 
                 ++$sets;
