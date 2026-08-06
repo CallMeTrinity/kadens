@@ -1,0 +1,36 @@
+{# Sélecteur de fenêtre des statistiques.
+
+   Trois liens et un formulaire GET, rien d'autre : la fenêtre est un paramètre
+   d'URL (`?range=`), donc chaque vue a son lien, la page reste auto-suffisante
+   et le sélecteur fonctionne sans une ligne de JS. Le `<select>` de mois est
+   dans son propre formulaire parce qu'un mois ne se choisit pas d'un clic —
+   c'est la seule fenêtre paramétrée.
+
+   Paramètres :
+   - period : StatsPeriod courant (porte `range`, `queryValue`, `label`)
+   - ranges : list de StatsRange cliquables (StatsRange::pickable())
+   - months : list de {value, label}, le plus récent d'abord #}
+
+<div class="kd-rangepick">
+    <div class="kd-rangepick__tabs" role="group" aria-label="Fenêtre de temps">
+        {% for range in ranges %}
+            <a href="{{ path('app_profile_stats', {range: range.value}) }}"
+               class="kd-rangetab{{ period.queryValue == range.value ? ' is-active' }}"
+               {{ period.queryValue == range.value ? 'aria-current="page"' : '' }}>
+                {{ range.shortLabel }}
+            </a>
+        {% endfor %}
+    </div>
+
+    {% if months|length > 1 %}
+        <form method="get" action="{{ path('app_profile_stats') }}" class="kd-rangepick__month">
+            <label class="kd-rangepick__label" for="stats-month">Un mois</label>
+            <select class="kd-rangepick__select" id="stats-month" name="range">
+                {% for month in months %}
+                    <option value="{{ month.value }}"{{ period.monthKey == month.value ? ' selected' }}>{{ month.label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="kd-btn kd-btn--secondary kd-btn--sm">Voir</button>
+        </form>
+    {% endif %}
+</div>

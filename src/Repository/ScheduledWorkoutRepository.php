@@ -173,18 +173,7 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
      */
     public function countByStatusForOwnerBetween(User $owner, \DateTimeImmutable $start, \DateTimeImmutable $end): array
     {
-        $rows = $this->createQueryBuilder('s')
-            ->select('s.status AS status', 'COUNT(s.id) AS cnt')
-            ->andWhere('s.owner = :owner')
-            ->andWhere('s.scheduledDate BETWEEN :start AND :end')
-            ->setParameter('owner', $owner)
-            ->setParameter('start', $start, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE)
-            ->setParameter('end', $end, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE)
-            ->groupBy('s.status')
-            ->getQuery()
-            ->getResult();
-
-        return $this->mapStatusCounts($rows);
+        return $this->countByStatusForOwnerIn($owner, $start, $end);
     }
 
     /**
@@ -196,15 +185,91 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
      */
     public function countByStatusForOwner(User $owner): array
     {
-        $rows = $this->createQueryBuilder('s')
+        return $this->countByStatusForOwnerIn($owner, null, null);
+    }
+
+    /**
+     * La forme générale des deux lectures ci-dessus : les bornes sont
+     * **facultatives**, parce qu'une fenêtre de statistiques peut ne pas en
+     * avoir (« depuis le début »). Une seule définition de « compter par
+     * statut », donc aucun risque que la fenêtre du mois et celle des six mois
+     * comptent différemment.
+     *
+     * @return array<string, int>
+     */
+    public function countByStatusForOwnerIn(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
+    {
+        $qb = $this->createQueryBuilder('s')
             ->select('s.status AS status', 'COUNT(s.id) AS cnt')
             ->andWhere('s.owner = :owner')
             ->setParameter('owner', $owner)
-            ->groupBy('s.status')
-            ->getQuery()
-            ->getResult();
+            ->groupBy('s.status');
 
-        return $this->mapStatusCounts($rows);
+        $this->applyDateWindow($qb, $start, $end);
+
+        return $this->mapStatusCounts($qb->getQuery()->getResult());
+    }
+
+    /**
+     * Les dates des séances FAITES d'un utilisateur sur une fenêtre, une ligne
+     * par séance (donc deux lignes pour un jour à deux séances). Projection
+     * scalaire : ce que coûte « depuis le début » ici, c'est un tableau de
+     * dates, pas un historique hydraté.
+     *
+     * C'est la matière de toute la régularité — nombre de séances, jours
+     * actifs, séances par semaine, série de semaines tenues, meilleur mois —
+     * calculée en PHP sur ce seul tableau plutôt qu'en cinq requêtes qui
+     * finiraient par ne plus compter la même chose.
+     *
+     * @return list<\DateTimeImmutable> triées du plus ancien au plus récent
+     */
+    public function doneDatesForOwner(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
+    {
+        $qb = $this->createQueryBuilder('s')
+            ->select('s.scheduledDate AS date')
+            ->andWhere('s.owner = :owner')
+            ->andWhere('s.status = :done')
+            ->setParameter('owner', $owner)
+            ->setParameter('done', \App\Enum\ScheduledStatus::DONE)
+            ->orderBy('s.scheduledDate', 'ASC');
+
+        $this->applyDateWindow($qb, $start, $end);
+
+        return array_map(
+            static fn (array $row): \DateTimeImmutable => $row['date'] instanceof \DateTimeImmutable
+                ? $row['date']
+                : new \DateTimeImmutable((string) $row['date']),
+            $qb->getQuery()->getArrayResult(),
+        );
+    }
+
+    /**
+     * Première et dernière date planifiée d'un utilisateur, tous statuts
+     * confondus. Deux usages, une requête : borner la fenêtre « depuis le
+     * début » (dont la durée est celle de l'historique réel) et remplir la
+     * liste des mois du sélecteur.
+     *
+     * @return array{first: \DateTimeImmutable, last: \DateTimeImmutable}|null null si l'utilisateur n'a jamais rien planifié
+     */
+    public function dateBoundsForOwner(User $owner): ?array
+    {
+        /** @var array{first: mixed, last: mixed}|null $row */
+        $row = $this->createQueryBuilder('s')
+            ->select('MIN(s.scheduledDate) AS first', 'MAX(s.scheduledDate) AS last')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('owner', $owner)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        if (null === $row || null === $row['first'] || null === $row['last']) {
+            return null;
+        }
+
+        $toDate = static fn (mixed $v): \DateTimeImmutable => $v instanceof \DateTimeImmutable
+            ? $v
+            : new \DateTimeImmutable((string) $v);
+
+        return ['first' => $toDate($row['first']), 'last' => $toDate($row['last'])];
     }
 
     /**
@@ -212,11 +277,18 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
      * (blocs -> exercices prescrits -> exercice), pour agréger le volume réalisé
      * sur l'historique (tonnage, distances) sans N+1. Alimente ProfileStats.
      *
+     * **Le seul chemin hydratant des statistiques**, et le seul qui doive rester
+     * bornable : il porte le volume d'endurance, qui ne se logue jamais (règle du
+     * projet) et se lit donc sur le prescrit des séances cochées faites. Le reste
+     * — tonnage, séries, records — passe par les agrégats scalaires de
+     * LoggedSetRepository. Ses appelants n'en font qu'UNE passe et en tirent
+     * toutes leurs lectures.
+     *
      * @return list<ScheduledWorkout>
      */
-    public function findDoneWithContentForOwner(User $owner): array
+    public function findDoneWithContentForOwner(User $owner, ?\DateTimeImmutable $start = null, ?\DateTimeImmutable $end = null): array
     {
-        return $this->createQueryBuilder('s')
+        $qb = $this->createQueryBuilder('s')
             ->addSelect('w', 'b', 'pe', 'e')
             ->leftJoin('s.workout', 'w')
             ->leftJoin('w.blocks', 'b')
@@ -225,9 +297,11 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
             ->andWhere('s.owner = :owner')
             ->andWhere('s.status = :done')
             ->setParameter('owner', $owner)
-            ->setParameter('done', \App\Enum\ScheduledStatus::DONE)
-            ->getQuery()
-            ->getResult();
+            ->setParameter('done', \App\Enum\ScheduledStatus::DONE);
+
+        $this->applyDateWindow($qb, $start, $end);
+
+        return $qb->getQuery()->getResult();
     }
 
     /**
@@ -332,9 +406,9 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
      *
      * @return list<array{planId: int|null, planTitle: string|null, counts: array<string, int>}>
      */
-    public function statusCountsByPlanForOwner(User $owner): array
+    public function statusCountsByPlanForOwner(User $owner, ?\DateTimeImmutable $start = null, ?\DateTimeImmutable $end = null): array
     {
-        $rows = $this->createQueryBuilder('s')
+        $qb = $this->createQueryBuilder('s')
             ->select(
                 'IDENTITY(s.sourcePlanTemplate) AS planId',
                 'p.title AS planTitle',
@@ -346,9 +420,11 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
             ->setParameter('owner', $owner)
             ->groupBy('planId')
             ->addGroupBy('p.title')
-            ->addGroupBy('s.status')
-            ->getQuery()
-            ->getResult();
+            ->addGroupBy('s.status');
+
+        $this->applyDateWindow($qb, $start, $end);
+
+        $rows = $qb->getQuery()->getResult();
 
         // Regroupe les lignes (planId, status, cnt) en un bucket par plan.
         $byPlan = [];
@@ -546,6 +622,30 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
             ->setParameter('item', $item)
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Ajoute les bornes de date d'une fenêtre de statistiques, chacune
+     * indépendamment facultative.
+     *
+     * Deux clauses `>=` / `<=` plutôt qu'un `BETWEEN` : la fenêtre « depuis le
+     * début » n'a pas de borne basse, et un `BETWEEN` obligerait à lui inventer
+     * une date de départ. Le type DATE_IMMUTABLE est passé explicitement — sans
+     * lui, Doctrine sérialiserait l'heure et une séance du jour même, comparée à
+     * une fin de journée à 23:59:59, tomberait du bon côté par chance plutôt que
+     * par contrat.
+     */
+    private function applyDateWindow(QueryBuilder $qb, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): void
+    {
+        if (null !== $start) {
+            $qb->andWhere('s.scheduledDate >= :windowStart')
+                ->setParameter('windowStart', $start, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE);
+        }
+
+        if (null !== $end) {
+            $qb->andWhere('s.scheduledDate <= :windowEnd')
+                ->setParameter('windowEnd', $end, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE);
+        }
     }
 
     /**

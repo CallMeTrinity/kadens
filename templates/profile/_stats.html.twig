@@ -17,6 +17,14 @@
             <p class="kd-eyebrow kd-eyebrow--accent">Statistiques</p>
             <h2 class="kd-title kd-title--sm">{{ own ? 'Ce que tu as accompli' : 'Ce qui a été accompli' }}</h2>
         </div>
+        {# Réservé au propriétaire : /profile/stats se scope sur l'utilisateur
+           connecté, le lien n'aurait aucun sens sur la fiche d'un athlète suivi
+           — il mènerait aux stats du coach. #}
+        {% if own %}
+            <a href="{{ path('app_profile_stats') }}" class="kd-btn kd-btn--ghost">
+                {{ ux_icon('lucide:chart-column') }} Toutes les statistiques
+            </a>
+        {% endif %}
     </div>
 
     <div class="kd-grid kd-grid--2 kd-section__block">

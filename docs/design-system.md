@@ -389,6 +389,31 @@ décomposé en `_workout_program`, `_workout_sets_table`, `_workout_analysis`.
 - **Analyse** (`.kd-analysis`) : barre empilée + légende, barres horizontales,
   timeline de durée. Rendu 100 % serveur, aucune bibliothèque de graphiques.
 
+### Page de statistiques (`/profile/stats`)
+Même principe que l'analyse d'une séance, à l'échelle d'une fenêtre de temps :
+aucun graphique dessiné en JS, des `div` proportionnelles dont les hauteurs
+arrivent **déjà calculées** du service (le template ne fait pas d'arithmétique
+de mise à l'échelle). Elle réutilise tel quel `.kd-stack`, `.kd-legend`,
+`.kd-obar`, `.kd-actbar`, `.kd-prog__bars`, `.kd-metric` et `.kd-profile__tile`
+— une barre inventée pour l'occasion aurait fini par diverger de celle qui
+affiche déjà la même donnée ailleurs.
+
+- **Sélecteur de fenêtre** (`.kd-rangepick`, `.kd-rangetab`) : trois **liens**
+  (4 semaines / 6 mois / tout) plus un `<select>` de mois dans un formulaire
+  **GET**. Jamais de fragment rechargé — la page reste auto-suffisante, donc
+  cachable hors ligne, et chaque fenêtre a son URL partageable. L'onglet actif
+  est en **aplat encre**, pas en rouge : c'est un état, pas une action.
+- **Classement** (`.kd-ranklist`) : rang en mono, nom d'exercice en Barlow casse
+  normale (contenu saisi, cf. §3), valeur en mono. Le seul rouge de la page est
+  la flèche d'un record battu — de l'intensité, pas une catégorie.
+- **Observance par plan** (`.kd-planbar`) : reprend `.kd-obar`, la même barre
+  faite/manquée/prévue que la synthèse générale, simplement ventilée.
+- **Rampe de volume** (`.kd-statbars`) : le graphique **déborde** dans son
+  propre conteneur `overflow-x` plutôt que de se comprimer — vingt-quatre barres
+  de trois pixels ne se lisent pas, et le `body` ne défile jamais
+  horizontalement (§5). Doublée d'un tableau `.kd-sr-only` : une barre
+  proportionnelle n'a rien à dire à un lecteur d'écran.
+
 ---
 
 ## 8. Règles

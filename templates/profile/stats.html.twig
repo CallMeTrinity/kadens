@@ -1,0 +1,410 @@
+{% extends 'base.html.twig' %}
+{% import 'components/_activity.html.twig' as activity %}
+
+{# Statistiques détaillées sur une fenêtre de temps choisie.
+
+   Rendu 100 % serveur, aucune bibliothèque de graphiques : des div
+   proportionnelles suffisent, restent imprimables et ne coûtent rien à
+   AssetMapper. Les hauteurs/largeurs viennent déjà calculées de TrainingStats —
+   le template ne fait aucune arithmétique de mise à l'échelle.
+
+   Un principe de lecture tient toute la page : chaque chiffre dit d'où il
+   vient. Le tonnage vient du RÉALISÉ (séries loguées), les distances du
+   PRESCRIT des séances faites (le cardio ne se logue jamais), l'observance des
+   statuts. Une séance d'avant Kadens Live compte donc en régularité sans porter
+   de tonnage — c'est exact, et la page le dit plutôt que de le combler. #}
+
+{% block title %}Statistiques — Kadens{% endblock %}
+
+{% block body %}
+    {% set vol = stats.volume %}
+    {% set reg = stats.regularity %}
+    {% set prog = stats.progression %}
+
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow kd-eyebrow--accent">Statistiques</p>
+            <h1 class="kd-title">Ce que tu as fait</h1>
+            <p class="kd-pagehead__lead">{{ period.label }}</p>
+        </div>
+        <a href="{{ path('app_profile') }}" class="kd-btn kd-btn--ghost">
+            {{ ux_icon('lucide:arrow-left') }} Retour au profil
+        </a>
+    </div>
+
+    {{ include('profile/_stats_range.html.twig', {period: period, ranges: ranges, months: months}) }}
+
+    {# ============================== BANDEAU DE TÊTE ========================= #}
+    {# Les quatre repères qu'on lit avant tout le reste. Volontairement mêlés :
+       une séance, une observance, un tonnage, des séries — trois sources, un
+       seul coup d'œil. #}
+    <div class="kd-grid kd-grid--4 kd-section__block">
+        {% set headline = [
+            {icon: 'lucide:calendar-check', value: reg.sessions, label: 'séance' ~ (reg.sessions > 1 ? 's') ~ ' faite' ~ (reg.sessions > 1 ? 's')},
+            {icon: 'lucide:target', value: stats.adherence.adherence is null ? '—' : (stats.adherence.adherence * 100)|round ~ ' %', label: 'observance'},
+            {icon: 'lucide:dumbbell', value: vol.gym.tonnageLabel, label: 'tonnage soulevé'},
+            {icon: 'lucide:layers', value: vol.gym.workingSets, label: 'série' ~ (vol.gym.workingSets > 1 ? 's') ~ ' de travail'},
+        ] %}
+        {% for m in headline %}
+            <div class="kd-metric">
+                <span class="kd-metric__icon">{{ ux_icon(m.icon) }}</span>
+                <div>
+                    <div class="kd-metric__value">{{ m.value }}</div>
+                    <div class="kd-metric__label">{{ m.label }}</div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    {# ========================== OBSERVANCE + RÉGULARITÉ ===================== #}
+    <section class="kd-section">
+        <div class="kd-pagehead kd-pagehead--sub">
+            <div>
+                <p class="kd-eyebrow kd-eyebrow--accent">Assiduité</p>
+                <h2 class="kd-title kd-title--sm">Tenu, manqué, à venir</h2>
+            </div>
+        </div>
+
+        <div class="kd-grid kd-grid--2 kd-section__block">
+            <section class="kd-card">
+                <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:target') }} Observance</h3>
+                {{ include('components/_status_stats.html.twig', {stats: stats.adherence, hero: true}) }}
+            </section>
+
+            <section class="kd-card">
+                <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:calendar-days') }} Régularité</h3>
+                {% if reg.sessions == 0 %}
+                    <div class="kd-empty">
+                        {{ ux_icon('lucide:calendar-off') }}
+                        <div>Aucune séance faite sur cette période.</div>
+                    </div>
+                {% else %}
+                    {# Grille dt/dd à plat : .kd-deflist EST la grille, un
+                       conteneur par ligne en casserait l'alignement. #}
+                    <dl class="kd-deflist">
+                        {% if reg.perWeek is not null %}
+                            <dt>Rythme</dt>
+                            <dd><strong>{{ reg.perWeek|number_format(1, ',', ' ') }}</strong> séance{{ reg.perWeek > 1 ? 's' }} par semaine</dd>
+                        {% endif %}
+                        <dt>Jours actifs</dt>
+                        <dd>{{ reg.activeDays }} jour{{ reg.activeDays > 1 ? 's' }}</dd>
+                        {# Deux séries, deux choses différentes : le record de la
+                           période, et celle qui court encore. #}
+                        <dt>Série en cours</dt>
+                        <dd>
+                            {% if reg.currentStreak > 0 %}
+                                <strong>{{ reg.currentStreak }}</strong> semaine{{ reg.currentStreak > 1 ? 's' }} d'affilée
+                            {% else %}
+                                Interrompue
+                            {% endif %}
+                        </dd>
+                        <dt>Meilleure série</dt>
+                        <dd>{{ reg.bestStreak }} semaine{{ reg.bestStreak > 1 ? 's' }} d'affilée</dd>
+                        {% if reg.bestWeek %}
+                            <dt>Meilleure semaine</dt>
+                            <dd>{{ reg.bestWeek.sessions }} séance{{ reg.bestWeek.sessions > 1 ? 's' }} <span class="kd-deflist__note">({{ reg.bestWeek.label }})</span></dd>
+                        {% endif %}
+                        {% if reg.bestMonth and period.range.value != 'month' %}
+                            <dt>Meilleur mois</dt>
+                            <dd>{{ reg.bestMonth.sessions }} séance{{ reg.bestMonth.sessions > 1 ? 's' }} <span class="kd-deflist__note">({{ reg.bestMonth.label }})</span></dd>
+                        {% endif %}
+                    </dl>
+                {% endif %}
+            </section>
+        </div>
+    </section>
+
+    {# =============================== VOLUME ================================= #}
+    <section class="kd-section">
+        <div class="kd-pagehead kd-pagehead--sub">
+            <div>
+                <p class="kd-eyebrow kd-eyebrow--accent">Volume</p>
+                <h2 class="kd-title kd-title--sm">Ce qui a été déplacé</h2>
+            </div>
+        </div>
+
+        <div class="kd-grid kd-grid--1 kd-section__block">
+            <section class="kd-card">
+                <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:dumbbell') }} Salle</h3>
+                {% if vol.gym.sessions == 0 %}
+                    <div class="kd-empty">
+                        {{ ux_icon('lucide:dumbbell') }}
+                        <div>Aucune série loguée sur cette période.</div>
+                        <p class="kd-empty__hint">Le tonnage se lit sur le réalisé : une séance cochée « faite » sans séries loguées compte en assiduité, pas en volume.</p>
+                    </div>
+                {% else %}
+                    <div class="kd-profile__tiles">
+                        <div class="kd-profile__tile">
+                            <span class="kd-profile__tileicon">{{ ux_icon('lucide:weight') }}</span>
+                            <div class="kd-stat__value">{{ vol.gym.tonnageLabel }}</div>
+                            <div class="kd-stat__label">Tonnage · {{ vol.gym.workingSets }} série{{ vol.gym.workingSets > 1 ? 's' }}</div>
+                        </div>
+                        <div class="kd-profile__tile">
+                            <span class="kd-profile__tileicon">{{ ux_icon('lucide:repeat') }}</span>
+                            <div class="kd-stat__value">{{ vol.gym.sessions }}</div>
+                            <div class="kd-stat__label">Séance{{ vol.gym.sessions > 1 ? 's' }} loguée{{ vol.gym.sessions > 1 ? 's' }}</div>
+                        </div>
+                        {% if vol.gym.perSessionSets is not null %}
+                            <div class="kd-profile__tile">
+                                <span class="kd-profile__tileicon">{{ ux_icon('lucide:layers') }}</span>
+                                <div class="kd-stat__value">{{ vol.gym.perSessionSets|number_format(1, ',', ' ') }}</div>
+                                <div class="kd-stat__label">Séries par séance · {{ vol.gym.perSessionTonnageLabel }}</div>
+                            </div>
+                        {% endif %}
+                        {% if vol.gym.averageRpe is not null %}
+                            <div class="kd-profile__tile">
+                                <span class="kd-profile__tileicon">{{ ux_icon('lucide:flame') }}</span>
+                                <div class="kd-stat__value">{{ vol.gym.averageRpe|number_format(1, ',', ' ') }}</div>
+                                <div class="kd-stat__label">RPE moyen</div>
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </section>
+
+            <section class="kd-card">
+                <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:footprints') }} Endurance</h3>
+                {% set endurance = [
+                    {key: 'running', icon: 'lucide:footprints', label: 'Course'},
+                    {key: 'cycling', icon: 'lucide:bike', label: 'Vélo'},
+                    {key: 'swimming', icon: 'lucide:waves', label: 'Natation'},
+                ]|filter(e => vol[e.key].meters > 0 or vol[e.key].seconds > 0) %}
+                {% if endurance is empty %}
+                    <div class="kd-empty">
+                        {{ ux_icon('lucide:footprints') }}
+                        <div>Aucune sortie sur cette période.</div>
+                    </div>
+                {% else %}
+                    <div class="kd-profile__tiles">
+                        {% for e in endurance %}
+                            <div class="kd-profile__tile">
+                                <span class="kd-profile__tileicon">{{ ux_icon(e.icon) }}</span>
+                                <div class="kd-stat__value">{{ vol[e.key].distanceLabel }}</div>
+                                <div class="kd-stat__label">{{ e.label }} · {{ vol[e.key].durationLabel }} · {{ vol[e.key].sessions }} sortie{{ vol[e.key].sessions > 1 ? 's' }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <p class="kd-card__note">Lu sur le prescrit des séances faites : le cardio ne se logue pas.</p>
+                {% endif %}
+            </section>
+        </div>
+
+        {# Ventilation par région : même barre empilée que l'analyse d'une séance
+           (kd-stack + kd-legend), même service (RegionBreakdown). #}
+        {% if stats.regions is not empty %}
+            <section class="kd-card kd-section__block">
+                <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:pie-chart') }} Où part le volume</h3>
+                <p class="kd-card__note">Part des séries de travail attribuées à chaque région. Une série compte pour chaque zone qu'elle cible.</p>
+
+                <div class="kd-stack" role="img"
+                     aria-label="{% for r in stats.regions %}{{ r.region.label }} {{ r.percent|number_format(0) }} %{{ not loop.last ? ', ' }}{% endfor %}">
+                    {% for r in stats.regions %}
+                        <span class="kd-stack__seg kd-cat--{{ r.region.rank }}" style="width: {{ r.percent }}%"></span>
+                    {% endfor %}
+                </div>
+
+                <ul class="kd-legend">
+                    {% for r in stats.regions %}
+                        <li class="kd-legend__item">
+                            <span class="kd-legend__key kd-cat--{{ r.region.rank }}" aria-hidden="true"></span>
+                            {{ r.region.label }}
+                            <span class="kd-legend__val">{{ r.sets }} série{{ r.sets > 1 ? 's' }} · {{ r.percent|number_format(0) }} %</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </section>
+        {% endif %}
+    </section>
+
+    {# ============================= PROGRESSION ============================== #}
+    {% if prog.points is not empty %}
+        <section class="kd-section">
+            <div class="kd-pagehead kd-pagehead--sub">
+                <div>
+                    <p class="kd-eyebrow kd-eyebrow--accent">Progression</p>
+                    <h2 class="kd-title kd-title--sm">
+                        {{ prog.granularity == 'week' ? 'Semaine par semaine' : 'Mois par mois' }}
+                    </h2>
+                </div>
+            </div>
+
+            <section class="kd-card kd-section__block">
+                {% if not prog.hasVolume %}
+                    <div class="kd-empty">
+                        {{ ux_icon('lucide:trending-up') }}
+                        <div>Rien à tracer : aucune série loguée sur cette période.</div>
+                    </div>
+                {% else %}
+                    <p class="kd-card__note">
+                        Tonnage de salle par {{ prog.granularity == 'week' ? 'semaine' : 'mois' }}.
+                        {% if prog.truncated %}Les 24 dernières seulement — au-delà, les barres ne se lisent plus.{% endif %}
+                        Les périodes vides sont conservées : un trou est une information.
+                    </p>
+
+                    <div class="kd-statbars">
+                        <div class="kd-prog__bars">
+                            {% for p in prog.points %}
+                                <div class="kd-prog__col{{ p.tonnageHeightPct == 0 ? ' is-empty' }}">
+                                    <div class="kd-prog__track">
+                                        {% if p.tonnageHeightPct > 0 %}
+                                            <span class="kd-prog__bar kd-prog__bar--gym"
+                                                  style="height: {{ p.tonnageHeightPct }}%"
+                                                  title="{{ p.label }} · {{ p.tonnageLabel }} · {{ p.sessions }} séance{{ p.sessions > 1 ? 's' }}"></span>
+                                        {% endif %}
+                                    </div>
+                                    <span class="kd-prog__wk">{{ p.short }}</span>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    {# Le graphique n'est pas lisible au lecteur d'écran : la même
+                       série est donnée en tableau, masqué visuellement. #}
+                    <table class="kd-sr-only">
+                        <caption>Tonnage par {{ prog.granularity == 'week' ? 'semaine' : 'mois' }}</caption>
+                        <thead><tr><th>Période</th><th>Tonnage</th><th>Séances</th></tr></thead>
+                        <tbody>
+                            {% for p in prog.points %}
+                                <tr><td>{{ p.label }}</td><td>{{ p.tonnageLabel }}</td><td>{{ p.sessions }}</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% endif %}
+            </section>
+        </section>
+    {% endif %}
+
+    {# =============================== RECORDS ================================ #}
+    {% if stats.records.top is not empty %}
+        <section class="kd-section">
+            <div class="kd-pagehead kd-pagehead--sub">
+                <div>
+                    <p class="kd-eyebrow kd-eyebrow--accent">Charges</p>
+                    <h2 class="kd-title kd-title--sm">Le plus lourd</h2>
+                </div>
+            </div>
+
+            <div class="kd-grid kd-grid--2 kd-section__block">
+                <section class="kd-card">
+                    <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:trophy') }} Top charges</h3>
+                    <ul class="kd-ranklist">
+                        {% for lift in stats.records.top %}
+                            <li class="kd-ranklist__row">
+                                <span class="kd-ranklist__rank">{{ '%02d'|format(loop.index) }}</span>
+                                <span class="kd-ranklist__name">{{ lift.name }}</span>
+                                <span class="kd-ranklist__val">{{ lift.weightLabel }}</span>
+                                <span class="kd-ranklist__note">{{ lift.workingSets }} série{{ lift.workingSets > 1 ? 's' }} · {{ lift.sessions }} séance{{ lift.sessions > 1 ? 's' }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+
+                <section class="kd-card">
+                    <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:medal') }} Nouveaux records</h3>
+                    {% if not stats.records.comparable %}
+                        {# « Depuis le début » n'a pas de passé antérieur : tous ses
+                           maximums sont des records par construction. On le dit
+                           plutôt que d'afficher une liste de faux exploits. #}
+                        <div class="kd-empty">
+                            {{ ux_icon('lucide:infinity') }}
+                            <div>Pas de « nouveau » record sur toute l'histoire.</div>
+                            <p class="kd-empty__hint">Choisis une fenêtre bornée pour voir ce qui a été battu.</p>
+                        </div>
+                    {% elseif stats.records.new is empty %}
+                        <div class="kd-empty">
+                            {{ ux_icon('lucide:medal') }}
+                            <div>Aucune charge battue sur cette période.</div>
+                        </div>
+                    {% else %}
+                        <ul class="kd-ranklist">
+                            {% for pr in stats.records.new %}
+                                <li class="kd-ranklist__row">
+                                    <span class="kd-ranklist__rank kd-ranklist__rank--pr">{{ ux_icon('lucide:arrow-up') }}</span>
+                                    <span class="kd-ranklist__name">{{ pr.name }}</span>
+                                    <span class="kd-ranklist__val">{{ pr.weightLabel }}</span>
+                                    <span class="kd-ranklist__note">avant {{ pr.previousLabel }} · +{{ pr.gainLabel }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </section>
+            </div>
+        </section>
+    {% endif %}
+
+    {# ====================== ACTIVITÉS + OBSERVANCE PAR PLAN ================= #}
+    <section class="kd-section">
+        <div class="kd-pagehead kd-pagehead--sub">
+            <div>
+                <p class="kd-eyebrow kd-eyebrow--accent">Répartition</p>
+                <h2 class="kd-title kd-title--sm">Par activité et par plan</h2>
+            </div>
+        </div>
+
+        <div class="kd-grid kd-grid--2 kd-section__block">
+            <section class="kd-card">
+                <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:activity') }} Activités</h3>
+                {% if stats.activityCounts is empty %}
+                    <div class="kd-empty">
+                        {{ ux_icon('lucide:activity') }}
+                        <div>Aucune séance faite sur cette période.</div>
+                    </div>
+                {% else %}
+                    {% set maxSessions = stats.activityCounts|reduce((m, r) => max(m, r.sessions), 0) %}
+                    <ul class="kd-actbars">
+                        {% for row in stats.activityCounts %}
+                            <li class="kd-actbar">
+                                <div class="kd-actbar__head">
+                                    {{ activity.badge(row.activity) }}
+                                    <span class="kd-actbar__count">{{ row.sessions }} séance{{ row.sessions > 1 ? 's' }}</span>
+                                </div>
+                                <div class="kd-actbar__track">
+                                    <span class="kd-actbar__fill kd-actbar__fill--{{ activity.modifier(row.activity) ?: 'neutral' }}"
+                                          style="width:{{ maxSessions > 0 ? (row.sessions / maxSessions * 100)|round : 0 }}%"></span>
+                                </div>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </section>
+
+            <section class="kd-card">
+                <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:layers') }} Par plan</h3>
+                {% if stats.plans is empty %}
+                    <div class="kd-empty">
+                        {{ ux_icon('lucide:layers') }}
+                        <div>Aucune séance planifiée sur cette période.</div>
+                    </div>
+                {% else %}
+                    <ul class="kd-planbars">
+                        {% for plan in stats.plans %}
+                            <li class="kd-planbar">
+                                <div class="kd-planbar__head">
+                                    {% if plan.planId %}
+                                        <a class="kd-planbar__name" href="{{ path('app_plan_template_show', {id: plan.planId}) }}">{{ plan.planTitle }}</a>
+                                    {% else %}
+                                        <span class="kd-planbar__name kd-planbar__name--loose">{{ plan.planTitle }}</span>
+                                    {% endif %}
+                                    <span class="kd-planbar__pct">{{ plan.adherence is null ? '—' : (plan.adherence * 100)|round ~ ' %' }}</span>
+                                </div>
+                                <div class="kd-obar" role="img"
+                                     aria-label="{{ plan.done }} faites, {{ plan.missed }} manquées, {{ plan.planned }} prévues">
+                                    {% for key, count in {'done': plan.done, 'missed': plan.missed, 'planned': plan.planned} %}
+                                        {% if count > 0 %}
+                                            <span class="kd-obar__seg kd-obar__seg--{{ key }}" style="flex:{{ count }}"></span>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                <p class="kd-planbar__note">
+                                    {{ plan.done }} faite{{ plan.done > 1 ? 's' }} ·
+                                    {{ plan.missed }} manquée{{ plan.missed > 1 ? 's' }} ·
+                                    {{ plan.planned }} à venir
+                                </p>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </section>
+        </div>
+    </section>
+{% endblock %}

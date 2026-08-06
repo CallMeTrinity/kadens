@@ -141,6 +141,158 @@ class LoggedSetRepository extends ServiceEntityRepository
     }
 
     /**
+     * Le volume de SALLE réalisé, agrégé par jour de séance : c'est la matière
+     * de toutes les statistiques de force de `/profile/stats` — tonnage,
+     * séries, durée sous tension, RPE moyen, et la rampe semaine par semaine
+     * qu'on en déduit en PHP.
+     *
+     * **Aucune entité hydratée, une requête, quelle que soit la fenêtre.** C'est
+     * ce qui rend « depuis le début » aussi tenable que « quatre semaines » : le
+     * résultat grossit en nombre de jours d'entraînement, pas en nombre de
+     * séries. L'ancienne lecture, qui remontait tout l'historique de séances
+     * fetch-joint pour le sommer en PHP, ne tenait que parce qu'elle n'était
+     * appelée qu'une fois.
+     *
+     * Le RPE revient en somme + effectif plutôt qu'en moyenne : des moyennes de
+     * moyennes ne se recomposent pas, et l'appelant a besoin de la moyenne sur
+     * la fenêtre entière comme sur chaque semaine.
+     *
+     * Périmètre : celui de `workingSetScope()` — échauffement exclu, exercice
+     * sauté exclu, statut de la séance non filtré (le réalisé est un fait dès
+     * qu'il est écrit).
+     *
+     * @return list<array{date: \DateTimeImmutable, sessions: int, workingSets: int, tonnageKg: float, seconds: int, rpeSum: int, rpeCount: int}>
+     */
+    public function gymTotalsByDateForOwner(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
+    {
+        $qb = $this->workingSetWindow($owner, $start, $end)
+            ->select(
+                's.scheduledDate AS date',
+                'COUNT(DISTINCT s.id) AS sessions',
+                'COUNT(ls.id) AS workingSets',
+                'SUM(CASE WHEN ls.reps IS NOT NULL AND ls.weightKg IS NOT NULL THEN ls.reps * ls.weightKg ELSE 0 END) AS tonnage',
+                'SUM(COALESCE(ls.durationSeconds, 0)) AS seconds',
+                'SUM(COALESCE(ls.rpe, 0)) AS rpeSum',
+                'SUM(CASE WHEN ls.rpe IS NOT NULL THEN 1 ELSE 0 END) AS rpeCount',
+            )
+            ->groupBy('s.scheduledDate')
+            ->orderBy('s.scheduledDate', 'ASC');
+
+        return array_map(static fn (array $row): array => [
+            'date' => $row['date'] instanceof \DateTimeImmutable
+                ? $row['date']
+                : new \DateTimeImmutable((string) $row['date']),
+            'sessions' => (int) $row['sessions'],
+            'workingSets' => (int) $row['workingSets'],
+            'tonnageKg' => (float) $row['tonnage'],
+            'seconds' => (int) $row['seconds'],
+            'rpeSum' => (int) $row['rpeSum'],
+            'rpeCount' => (int) $row['rpeCount'],
+        ], $qb->getQuery()->getArrayResult());
+    }
+
+    /**
+     * Le même volume, agrégé par exercice : d'où sortent la ventilation par
+     * groupe musculaire (l'appelant croise `exerciseId` avec les `targetAreas`
+     * de la bibliothèque) et le classement des charges de la fenêtre.
+     *
+     * Le regroupement porte sur l'identifiant **et** le nom figé : un
+     * `LoggedExercise` dont la définition a été supprimée (SET NULL) n'a plus
+     * que son nom, et l'écarter ferait disparaître du volume réellement
+     * soulevé. L'appelant replie les lignes de même exercice.
+     *
+     * @return list<array{exerciseId: int|null, name: string, workingSets: int, tonnageKg: float, topWeightKg: float|null, sessions: int}>
+     */
+    public function gymTotalsByExerciseForOwner(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
+    {
+        $qb = $this->workingSetWindow($owner, $start, $end)
+            ->select(
+                'IDENTITY(le.exercise) AS exerciseId',
+                'le.exerciseName AS name',
+                'COUNT(ls.id) AS workingSets',
+                'SUM(CASE WHEN ls.reps IS NOT NULL AND ls.weightKg IS NOT NULL THEN ls.reps * ls.weightKg ELSE 0 END) AS tonnage',
+                'MAX(ls.weightKg) AS topWeight',
+                'COUNT(DISTINCT s.id) AS sessions',
+            )
+            ->groupBy('exerciseId')
+            ->addGroupBy('le.exerciseName')
+            ->orderBy('workingSets', 'DESC');
+
+        return array_map(static fn (array $row): array => [
+            'exerciseId' => null !== $row['exerciseId'] ? (int) $row['exerciseId'] : null,
+            'name' => (string) $row['name'],
+            'workingSets' => (int) $row['workingSets'],
+            'tonnageKg' => (float) $row['tonnage'],
+            'topWeightKg' => null !== $row['topWeight'] ? (float) $row['topWeight'] : null,
+            'sessions' => (int) $row['sessions'],
+        ], $qb->getQuery()->getArrayResult());
+    }
+
+    /**
+     * La charge maximale soulevée sur chaque exercice **avant** une date : la
+     * référence contre laquelle se juge un record de la fenêtre.
+     *
+     * Un record est un fait relatif à un passé. Sans borne haute il n'y a pas
+     * de passé à comparer, et la méthode n'a rien à dire : l'appelant ne
+     * l'appelle donc que sur une fenêtre bornée (« depuis le début » n'a pas de
+     * *nouveaux* records, il n'a que des records).
+     *
+     * @return array<int, float> charge max, indexée par identifiant d'exercice
+     */
+    public function maxWeightByExerciseBefore(User $owner, \DateTimeImmutable $before): array
+    {
+        $rows = $this->workingSetWindow($owner, null, null)
+            ->select('IDENTITY(le.exercise) AS exerciseId', 'MAX(ls.weightKg) AS topWeight')
+            ->andWhere('le.exercise IS NOT NULL')
+            ->andWhere('ls.weightKg IS NOT NULL')
+            ->andWhere('s.scheduledDate < :before')
+            ->setParameter('before', $before, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE)
+            ->groupBy('exerciseId')
+            ->getQuery()
+            ->getArrayResult();
+
+        $max = [];
+        foreach ($rows as $row) {
+            $max[(int) $row['exerciseId']] = (float) $row['topWeight'];
+        }
+
+        return $max;
+    }
+
+    /**
+     * Le périmètre des agrégats : « les séries de travail de cet utilisateur »,
+     * éventuellement bornées dans le temps. Mêmes filtres que
+     * `workingSetScope()` au mot près — échauffement et exercice sauté exclus —
+     * mais sans restriction d'exercice : ici on lit tout ce qui a été fait.
+     *
+     * Les bornes sont facultatives et indépendantes, comme partout dans les
+     * statistiques : « depuis le début » n'a pas de borne basse.
+     */
+    private function workingSetWindow(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): \Doctrine\ORM\QueryBuilder
+    {
+        $qb = $this->createQueryBuilder('ls')
+            ->join('ls.loggedExercise', 'le')
+            ->join('le.scheduledWorkout', 's')
+            ->andWhere('s.owner = :owner')
+            ->andWhere('le.skipped = false')
+            ->andWhere('ls.setType != :warmup')
+            ->setParameter('owner', $owner)
+            ->setParameter('warmup', SetType::WARMUP->value);
+
+        if (null !== $start) {
+            $qb->andWhere('s.scheduledDate >= :windowStart')
+                ->setParameter('windowStart', $start, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE);
+        }
+
+        if (null !== $end) {
+            $qb->andWhere('s.scheduledDate <= :windowEnd')
+                ->setParameter('windowEnd', $end, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE);
+        }
+
+        return $qb;
+    }
+
+    /**
      * Socle commun des lectures de performance : les séries de travail d'un
      * utilisateur sur un jeu d'exercices, en projection scalaire (aucune entité
      * hydratée).

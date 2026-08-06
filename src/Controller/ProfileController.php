@@ -6,6 +6,7 @@ use App\Entity\ApiToken;
 use App\Entity\PairingCode;
 use App\Entity\User;
 use App\Form\ChangePasswordType;
+use App\Enum\StatsRange;
 use App\Form\ProfileType;
 use App\Repository\ApiTokenRepository;
 use App\Repository\CoachingRepository;
@@ -14,6 +15,8 @@ use App\Repository\PairingCodeRepository;
 use App\Service\HeartRateZones;
 use App\Service\PairingQr;
 use App\Service\ProfileStats;
+use App\Service\StatsPeriod;
+use App\Service\TrainingStats;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Bundle\SecurityBundle\Security;
@@ -67,6 +70,35 @@ final class ProfileController extends AbstractController
             // la page d'accueil, pas seulement dans /coaching.
             'coachingReceived' => $coachingRepository->findPendingReceivedBy($user),
             'coachingActive' => $coachingRepository->findAcceptedCoaches($user),
+        ]);
+    }
+
+    /**
+     * Statistiques détaillées, sur une fenêtre de temps choisie.
+     *
+     * **La fenêtre est un paramètre d'URL, et la page se rend entièrement.** Pas
+     * de fragment rechargé : la page de consultation reste auto-suffisante (la
+     * condition du cache offline), fonctionne sans JS, et chaque fenêtre a son
+     * lien — « mes stats de juillet » se partage et se met en favori. Turbo
+     * Drive fait la transition sans clignotement, il n'y a rien à câbler pour ça.
+     *
+     * La valeur brute n'est jamais validée ici : StatsPeriod la lit et retombe
+     * sur la fenêtre par défaut si elle ne veut rien dire. Un lien périmé doit
+     * afficher des statistiques, pas une 404.
+     */
+    #[Route('/profile/stats', name: 'app_profile_stats', methods: ['GET'])]
+    public function stats(Request $request, TrainingStats $training): Response
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $period = StatsPeriod::resolve($request->query->getString('range'));
+
+        return $this->render('profile/stats.html.twig', [
+            'stats' => $training->over($user, $period),
+            'period' => $period,
+            'ranges' => StatsRange::pickable(),
+            'months' => $training->availableMonths($user),
         ]);
     }
 
