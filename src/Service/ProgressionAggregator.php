@@ -469,7 +469,8 @@ final class ProgressionAggregator
      * Le réalisé d'une séance, ventilé par exercice, cumulé sur la semaine.
      *
      * Mêmes règles que partout ailleurs : un exercice sauté n'apporte rien,
-     * l'échauffement n'entre ni dans la charge ni dans le décompte. La charge
+     * l'échauffement et la série cochée sans valeur n'entrent ni dans la charge
+     * ni dans le décompte (LoggedSet::countsAsWorking). La charge
      * retenue est la plus lourde de la semaine (top set, comme le prescrit) ;
      * séries et durée se cumulent.
      *
@@ -486,7 +487,7 @@ final class ProgressionAggregator
             $slot = $exercises[$id][$week] ?? ['weight' => null, 'sets' => null, 'duration' => null];
 
             foreach ($logged->getLoggedSets() as $set) {
-                if (!$set->getSetType()->countsAsWorking()) {
+                if (!$set->countsAsWorking()) {
                     continue;
                 }
 

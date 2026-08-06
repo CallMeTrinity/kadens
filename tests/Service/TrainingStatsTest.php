@@ -156,9 +156,27 @@ final class TrainingStatsTest extends KernelTestCase
     }
 
     /**
+     * Une série cochée sans aucune valeur ne mesure rien : elle n'entre ni dans
+     * le décompte de séries, ni dans la moyenne par séance, ni dans le
+     * classement des charges — la barre était pourtant à 140 kg dans la
+     * fixture, ce qui en ferait un record si le filtre lâchait. Le SQL des
+     * agrégats et `LoggedSet::countsAsWorking()` disent bien la même chose.
+     */
+    public function testUnmeasuredSetIsExcludedFromEveryGymFigure(): void
+    {
+        $stats = $this->stats->over($this->user, StatsPeriod::month(2026, 7));
+        $gym = $stats['volume']['gym'];
+
+        self::assertSame(2, $gym['workingSets']);
+        self::assertSame(1600.0, $gym['tonnageKg']);
+        self::assertSame(2.0, $gym['perSessionSets']);
+        self::assertSame(100.0, $stats['records']['top'][0]['weightKg'], 'Une barre chargée mais non soulevée n\'est pas une performance.');
+    }
+
+    /**
      * La ventilation par région se lit sur les zones de la DÉFINITION en
      * bibliothèque, croisées avec les séries réellement loguées. L'échauffement
-     * en est exclu comme partout.
+     * en est exclu comme partout, la série non chiffrée aussi.
      */
     public function testRegionBreakdownUsesLoggedWorkingSets(): void
     {
@@ -285,11 +303,14 @@ final class TrainingStatsTest extends KernelTestCase
         // --- Juillet, salle : prescrit 3×8×80 (1920 kg), réalisé 2×8×100
         //     (1600 kg) plus un échauffement qui ne compte pas. Les deux
         //     chiffres DOIVENT différer, c'est tout l'objet du test.
+        //     La quatrième série est cochée sans aucune valeur, la barre chargée
+        //     à 140 : elle ne doit RIEN peser nulle part, pas même en record.
         $july = $this->gymWorkout($bench, 'Haut du corps');
         $this->schedule($july, '2026-07-15', ScheduledStatus::DONE, [
             [SetType::WARMUP, 10, 40.0],
             [SetType::NORMAL, 8, 100.0],
             [SetType::NORMAL, 8, 100.0],
+            [SetType::NORMAL, null, 140.0],
         ], $plan);
 
         // --- Juillet, course : faite, jamais loguée. 5 km en 25 min.
@@ -342,7 +363,7 @@ final class TrainingStatsTest extends KernelTestCase
     }
 
     /**
-     * @param list<array{SetType, int, float}> $sets
+     * @param list<array{SetType, int|null, float|null}> $sets
      */
     private function schedule(Workout $workout, string $date, ScheduledStatus $status, array $sets = [], ?PlanTemplate $plan = null): ScheduledWorkout
     {

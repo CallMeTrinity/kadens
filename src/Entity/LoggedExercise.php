@@ -200,13 +200,14 @@ class LoggedExercise
 
     /**
      * Nombre de séries de TRAVAIL réalisées : l'échauffement est exclu du volume,
-     * comme partout ailleurs dans le projet (cf. SetType::countsAsWorking).
+     * comme partout ailleurs dans le projet, et la série non chiffrée aussi
+     * (cf. LoggedSet::countsAsWorking).
      */
     public function getWorkingSetCount(): int
     {
         $count = 0;
         foreach ($this->loggedSets as $set) {
-            if ($set->getSetType()->countsAsWorking()) {
+            if ($set->countsAsWorking()) {
                 ++$count;
             }
         }
