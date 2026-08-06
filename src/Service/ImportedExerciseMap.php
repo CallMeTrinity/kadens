@@ -12,19 +12,26 @@ use App\Repository\ExerciseRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
- * La correspondance entre les exercices de l'export Blast et la bibliothèque
+ * La correspondance entre les exercices d'un export tiers et la bibliothèque
  * Kadens. C'est **la pièce manuelle** de l'import, et la seule qui décide de sa
  * valeur.
  *
+ * Le service est indépendant de la source : il ne voit que des clés, celles que
+ * le parseur du format a fabriquées (`BlastCsvParser::key()` croise nom +
+ * équipement + exécution, `FitNotesCsvParser` n'a que le nom). Un fichier de
+ * correspondance par export, un service pour tous.
+ *
  * ## Pourquoi c'est écrit à la main
  *
- * Sur les 127 clés des trois exports, huit seulement retombent sur un nom de la
- * bibliothèque globale par simple normalisation : les formulations diffèrent
- * (`Curl marteau` contre `Curl marteau (Hammer curl)`, `Extension de mollet
- * assis` contre `Extension des mollets assis à la machine`). Aucun appariement
- * automatique par similarité ne tient sur ce volume, et un faux positif est bien
- * pire qu'un trou : il attribuerait des séries à un mouvement jamais fait, dans
- * un historique qu'on ne relira plus jamais ligne à ligne.
+ * Sur les 127 clés des trois exports Blast, huit seulement retombent sur un nom
+ * de la bibliothèque globale par simple normalisation : les formulations
+ * diffèrent (`Curl marteau` contre `Curl marteau (Hammer curl)`, `Extension de
+ * mollet assis` contre `Extension des mollets assis à la machine`). FitNotes est
+ * pire encore, ses libellés étant en anglais (`Lat Pulldown`, `Seated Cable
+ * Row`) sur une bibliothèque francophone. Aucun appariement automatique par
+ * similarité ne tient sur ce volume, et un faux positif est bien pire qu'un
+ * trou : il attribuerait des séries à un mouvement jamais fait, dans un
+ * historique qu'on ne relira plus jamais ligne à ligne.
  *
  * Le service propose donc des candidats (`suggestionsFor`), il n'en choisit
  * aucun. Le fichier reste versionné dans `data/`, comme `exercises.json`.
@@ -40,7 +47,7 @@ use Doctrine\ORM\EntityManagerInterface;
  *
  * ## Le format
  *
- * Un objet JSON dont chaque clé est celle produite par `BlastCsvParser::key()`.
+ * Un objet JSON dont chaque clé est celle produite par le parseur de la source.
  * Quatre valeurs possibles, et l'ambiguïté est exclue par construction :
  *
  * - `"Nom exact d'un exercice"` — appariement à la bibliothèque ;
@@ -64,7 +71,7 @@ use Doctrine\ORM\EntityManagerInterface;
  * Une clé absente du fichier vaut `""` : ajouter un export ne doit pas passer
  * ses nouveaux exercices à la trappe.
  */
-final class BlastExerciseMap
+final class ImportedExerciseMap
 {
     /** Non tranché : présent dans l'export, pas encore décidé. */
     public const string UNRESOLVED = '';
