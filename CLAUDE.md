@@ -124,6 +124,19 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   une sortie course, vélo ou natation se contente du `ScheduledStatus`. Cadrage
   complet, principes et invariants à ne pas casser :
   [`docs/feature-live-tracking.md`](./docs/feature-live-tracking.md) §0.2-0.3.
+- **Statistiques : chaque chiffre vient de la source qui fait autorité sur lui.**
+  `TrainingStats` est le moteur unique (fenêtre de temps = `StatsPeriod`), et
+  `ProfileStats` n'en est que le résumé « depuis le début » — le profil et
+  `/profile/stats` ne peuvent donc pas afficher deux tonnages différents. La
+  **salle** se lit sur le RÉALISÉ (`LoggedSet`) : tonnage, séries, régions,
+  records. L'**endurance** se lit sur le PRESCRIT des séances faites, et ce n'est
+  pas un repli — le cardio ne se logue jamais, son prescrit est sa seule trace.
+  L'**observance** se lit sur le statut. Corollaire à ne pas « corriger » : une
+  séance cochée faite sans réalisé compte en assiduité et ne porte aucun
+  tonnage ; le combler avec le prescrit ferait passer une intention pour un
+  fait. Contrainte de coût qui va avec : hors de cette unique passe hydratante
+  d'endurance (bornée), tout passe par des agrégats scalaires — sans quoi
+  « depuis le début » remonterait l'historique entier à chaque affichage.
 - **Progression = fork à la pose (règle ajustée).** Poser une séance dans un plan en
   crée une **copie privée** (`Workout.planLocal = true`), portée par le `PlanItem`.
   Éditer une séance placée (progression) ne touche ni la séance de bibliothèque ni

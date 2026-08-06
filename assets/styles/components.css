@@ -9440,3 +9440,283 @@ a.kd-coachitem__name:hover {
         width: 100%;
     }
 }
+
+/* ============================================================================
+   Statistiques d'entraînement (/profile/stats)
+   ----------------------------------------------------------------------------
+   Aucun graphique dessiné en JS : des div proportionnelles, comme partout
+   ailleurs (analyse de séance, progression de plan). Les classes réutilisées
+   telles quelles ne sont pas redéfinies ici — .kd-stack, .kd-legend, .kd-obar,
+   .kd-actbar, .kd-prog__bars, .kd-metric, .kd-profile__tile.
+
+   La couleur ne code rien de nouveau : le rouge reste l'action primaire,
+   l'intensité et l'échec ; les catégories passent par --color-cat-1..4.
+   ============================================================================ */
+
+/* Chapeau de page : la fenêtre regardée, sous le titre. */
+.kd-pagehead__lead {
+    margin: var(--kd-space-2) 0 0;
+    font-family: var(--font-body);
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+/* Note de bas de carte : d'où vient le chiffre, ce qu'il ne dit pas. Toujours
+   secondaire — une note qui crie autant que sa donnée n'est plus une note. */
+.kd-card__note {
+    margin: var(--kd-space-3) 0 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--color-text-soft);
+}
+
+.kd-empty__hint {
+    margin: var(--kd-space-3) auto 0;
+    max-width: 42ch;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--color-text-placeholder);
+}
+
+.kd-deflist__note {
+    color: var(--color-text-soft);
+}
+
+/* ----------------------------------------------------------------------------
+   Sélecteur de fenêtre
+   Des liens, pas des boutons : chaque fenêtre est une URL. Le formulaire du
+   mois est à part parce qu'il porte une valeur, pas un choix binaire.
+   ---------------------------------------------------------------------------- */
+.kd-rangepick {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--kd-space-7);
+    margin-bottom: var(--kd-space-11);
+    padding-bottom: var(--kd-space-7);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.kd-rangepick__tabs {
+    display: flex;
+    gap: var(--kd-space-2);
+}
+
+.kd-rangetab {
+    display: inline-flex;
+    align-items: center;
+    padding: var(--kd-space-3) var(--kd-space-7);
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    text-decoration: none;
+    color: var(--color-text-secondary);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    transition: border-color .12s ease, background-color .12s ease, color .12s ease;
+}
+
+.kd-rangetab:hover {
+    border-color: var(--color-border-strong);
+    background: var(--color-surface-raised);
+    color: var(--color-text-strong);
+}
+
+/* L'onglet actif est en encre pleine, pas en rouge : ce n'est pas une action,
+   c'est un état. Le rouge reste au primaire. */
+.kd-rangetab.is-active {
+    color: var(--color-on-ink);
+    background: var(--color-surface-ink);
+    border-color: var(--color-surface-ink);
+}
+
+.kd-rangepick__month {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-3);
+}
+
+.kd-rangepick__label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-text-faint);
+}
+
+.kd-rangepick__select {
+    font-family: var(--font-body);
+    font-size: 12px;
+    padding: var(--kd-space-2) var(--kd-space-3);
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--kd-radius-sm);
+    background: var(--color-surface-raised);
+    color: var(--color-text);
+}
+
+/* ----------------------------------------------------------------------------
+   Rampe de volume
+   Le graphique déborde plutôt qu'il ne se comprime : vingt-quatre barres de
+   trois pixels ne se lisent pas. Le débordement est confiné ici, jamais sur
+   le body (cf. docs/design-system.md §responsive).
+   ---------------------------------------------------------------------------- */
+.kd-statbars {
+    overflow-x: auto;
+    padding-bottom: var(--kd-space-2);
+}
+
+.kd-statbars .kd-prog__bars {
+    min-width: 320px;
+}
+
+/* ----------------------------------------------------------------------------
+   Classement (top charges, records battus)
+   ---------------------------------------------------------------------------- */
+.kd-ranklist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.kd-ranklist__row {
+    display: grid;
+    grid-template-columns: 28px 1fr auto;
+    align-items: baseline;
+    gap: var(--kd-space-2) var(--kd-space-5);
+    padding: var(--kd-space-5) 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.kd-ranklist__row:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.kd-ranklist__rank {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: var(--kd-weight-semibold);
+    color: var(--color-text-soft);
+}
+
+/* Un record battu : la seule flèche rouge de la page, et elle code bien de
+   l'intensité — pas une catégorie. */
+.kd-ranklist__rank--pr {
+    color: var(--color-primary-on-tint);
+}
+
+.kd-ranklist__rank--pr svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Nom d'exercice = contenu saisi, donc casse normale (règle 4 du design
+   system). Pas de condensé capitales ici. */
+.kd-ranklist__name {
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: var(--color-text-strong);
+}
+
+.kd-ranklist__val {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: var(--kd-weight-semibold);
+    color: var(--color-text-strong);
+    white-space: nowrap;
+}
+
+.kd-ranklist__note {
+    grid-column: 2 / -1;
+    font-size: 11px;
+    color: var(--color-text-soft);
+}
+
+/* ----------------------------------------------------------------------------
+   Observance par plan
+   Réutilise .kd-obar (barre faite/manquée/prévue) : c'est la même donnée que
+   la synthèse générale, ventilée. Une seconde barre inventée ici les aurait
+   fait diverger.
+   ---------------------------------------------------------------------------- */
+.kd-planbars {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.kd-planbar + .kd-planbar {
+    margin-top: var(--kd-space-9);
+}
+
+.kd-planbar__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--kd-space-5);
+    margin-bottom: var(--kd-space-3);
+}
+
+.kd-planbar__name {
+    font-family: var(--font-body);
+    font-size: 14px;
+    color: var(--color-text-strong);
+    text-decoration: none;
+    border-bottom: 1px solid var(--color-border-strong);
+}
+
+.kd-planbar__name:hover {
+    border-bottom-color: var(--color-primary);
+}
+
+/* « Hors plan » n'est pas un plan : pas de lien, pas de soulignement. */
+.kd-planbar__name--loose {
+    color: var(--color-text-secondary);
+    border-bottom: 0;
+    font-style: italic;
+}
+
+.kd-planbar__pct {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: var(--kd-weight-semibold);
+    color: var(--color-text-strong);
+}
+
+.kd-planbar__note {
+    margin: var(--kd-space-3) 0 0;
+    font-size: 11px;
+    color: var(--color-text-soft);
+}
+
+/* Doit rester APRÈS les règles de base ci-dessus : une @media n'ajoute aucune
+   spécificité (cf. docs/design-system.md §5). */
+@media (max-width: 560px) {
+    .kd-rangepick {
+        align-items: stretch;
+    }
+
+    .kd-rangepick__tabs {
+        width: 100%;
+    }
+
+    /* Trois cibles tactiles qui se partagent la largeur plutôt que de se
+       serrer à gauche. */
+    .kd-rangetab {
+        flex: 1 1 0;
+        justify-content: center;
+        padding-inline: var(--kd-space-2);
+    }
+
+    .kd-rangepick__month {
+        width: 100%;
+    }
+
+    .kd-rangepick__select {
+        flex: 1 1 auto;
+        min-width: 0;
+    }
+}

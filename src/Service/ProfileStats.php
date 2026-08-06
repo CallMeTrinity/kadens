@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Entity\User;
-use App\Enum\ActivityType;
 use App\Enum\Sex;
 use App\Repository\ExerciseRepository;
 use App\Repository\PlanTemplateRepository;
@@ -13,15 +12,22 @@ use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
 
 /**
- * Agrège les stats générales de la page profil. Compose l'existant sans
- * réimplémenter la moindre mise à plat/volume :
- * - compteurs de bibliothèque (comme l'ancienne page d'accueil) ;
- * - observance du mois et « tous temps » (ScheduledWorkoutRepository) ;
- * - répartition par activité + volume réalisé sur l'historique des séances FAITES
- *   (WorkoutMetrics::volume, formaté par UnitFormatter).
+ * Le RÉSUMÉ de la page profil : ce qu'on voit sans avoir rien demandé, sur la
+ * page d'accueil et sur la fiche athlète du coach.
  *
- * Le volume itère les séances DONE (fetch-jointes) : c'est le seul point un peu
- * coûteux, assumé pour le mode « complet » choisi.
+ * Il ne calcule plus rien lui-même côté entraînement — c'est TrainingStats qui
+ * porte le moteur, sur une fenêtre de temps, et ce service en prend la fenêtre
+ * « depuis le début ». La conséquence recherchée : le résumé du profil et le
+ * détail de `/profile/stats` sont **le même agrégat**, ils ne peuvent pas
+ * afficher deux tonnages différents.
+ *
+ * Ce qui lui reste en propre est ce que TrainingStats n'a pas à connaître :
+ * les compteurs de bibliothèque, la fiche athlète (mesures saisies, records
+ * déclarés) et le score DOTS qui s'en déduit.
+ *
+ * Rappel de périmètre, hérité de TrainingStats : le tonnage vient du RÉALISÉ
+ * (LoggedSet), les distances du PRESCRIT des séances faites — le cardio ne se
+ * logue jamais.
  */
 final class ProfileStats
 {
@@ -30,7 +36,7 @@ final class ProfileStats
         private readonly WorkoutRepository $workouts,
         private readonly PlanTemplateRepository $plans,
         private readonly ExerciseRepository $exercises,
-        private readonly WorkoutMetrics $metrics,
+        private readonly TrainingStats $training,
         private readonly UnitFormatter $units,
     ) {
     }
@@ -45,6 +51,7 @@ final class ProfileStats
         $monthEnd = $now->modify('last day of this month')->setTime(23, 59, 59);
 
         $dots = $this->dots($user);
+        $allTime = $this->training->over($user, StatsPeriod::allTime($now));
 
         return [
             'counts' => [
@@ -53,11 +60,38 @@ final class ProfileStats
                 'exercises' => \count($this->exercises->findLibraryForUser($user)),
             ],
             'month' => $this->buildStats($this->scheduled->countByStatusForOwnerBetween($user, $monthStart, $monthEnd)),
-            'allTime' => $this->buildStats($this->scheduled->countByStatusForOwner($user)),
-            'activityCounts' => $this->activityCounts($user),
-            'volume' => $this->lifetimeVolume($user),
+            'allTime' => $allTime['adherence'],
+            'activityCounts' => $allTime['activityCounts'],
+            'volume' => $this->summaryVolume($allTime['volume']),
             'dots' => $dots,
             'athlete' => $this->athleteCard($user, $dots),
+        ];
+    }
+
+    /**
+     * Met le volume de TrainingStats à la forme attendue par
+     * `profile/_stats.html.twig` (tonnage à plat, endurance par activité).
+     *
+     * Les clés `tonnageKg` / `gymSets` sont conservées telles quelles : elles
+     * datent de la page d'origine et ce fragment est aussi rendu sur la fiche
+     * athlète du coach.
+     *
+     * @param array<string, mixed> $volume
+     *
+     * @return array<string, mixed>
+     */
+    private function summaryVolume(array $volume): array
+    {
+        /** @var array{tonnageKg: float, tonnageLabel: string, workingSets: int} $gym */
+        $gym = $volume['gym'];
+
+        return [
+            'tonnageKg' => $gym['tonnageKg'],
+            'tonnageLabel' => $gym['tonnageLabel'],
+            'gymSets' => $gym['workingSets'],
+            'running' => $volume['running'],
+            'cycling' => $volume['cycling'],
+            'swimming' => $volume['swimming'],
         ];
     }
 
@@ -117,83 +151,6 @@ final class ProfileStats
             'endurance' => $endurance,
             'bio' => $user->getBio(),
             'hasAny' => $hasAny || null !== $user->getBio(),
-        ];
-    }
-
-    /**
-     * Répartition des séances FAITES par activité (une séance multi-activités
-     * compte dans chacune), triée par fréquence décroissante.
-     *
-     * @return list<array{activity: ActivityType, sessions: int}>
-     */
-    private function activityCounts(User $user): array
-    {
-        $counts = [];
-        foreach ($this->scheduled->findDoneWithContentForOwner($user) as $sw) {
-            // Séance libre ou source supprimée : rien de prescrit à analyser.
-            if (null === $sw->getWorkout()) {
-                continue;
-            }
-            foreach ($this->metrics->distinctActivities($sw->getWorkout()) as $activity) {
-                $counts[$activity->value] = ($counts[$activity->value] ?? 0) + 1;
-            }
-        }
-
-        arsort($counts);
-
-        $out = [];
-        foreach ($counts as $value => $sessions) {
-            $out[] = ['activity' => ActivityType::from((string) $value), 'sessions' => $sessions];
-        }
-
-        return $out;
-    }
-
-    /**
-     * Volume réalisé cumulé sur l'historique des séances FAITES : tonnage et
-     * séries en salle, distance/durée par activité d'endurance. Formaté via
-     * UnitFormatter (source unique kg / km / mm:ss).
-     *
-     * @return array<string, mixed>
-     */
-    private function lifetimeVolume(User $user): array
-    {
-        $tonnage = 0.0;
-        $gymSets = 0;
-        $endurance = [
-            'running' => ['meters' => 0, 'seconds' => 0],
-            'cycling' => ['meters' => 0, 'seconds' => 0],
-            'swimming' => ['meters' => 0, 'seconds' => 0],
-        ];
-
-        foreach ($this->scheduled->findDoneWithContentForOwner($user) as $sw) {
-            // Séance libre ou source supprimée : rien de prescrit à agréger.
-            if (null === $sw->getWorkout()) {
-                continue;
-            }
-            $v = $this->metrics->volume($sw->getWorkout());
-            $tonnage += $v['gym']['tonnageKg'];
-            $gymSets += $v['gym']['totalSets'];
-            foreach ($endurance as $key => $_) {
-                $endurance[$key]['meters'] += $v[$key]['meters'];
-                $endurance[$key]['seconds'] += $v[$key]['seconds'];
-            }
-        }
-
-        $format = fn (array $e): array => [
-            'meters' => $e['meters'],
-            'seconds' => $e['seconds'],
-            'distanceLabel' => $this->units->distance($e['meters']),
-            'durationLabel' => $this->units->duration($e['seconds']),
-        ];
-
-        return [
-            'tonnageKg' => $tonnage,
-            'tonnageLabel' => $this->units->weight(round($tonnage)),
-            'gymSets' => $gymSets,
-            'running' => $format($endurance['running']),
-            'cycling' => $format($endurance['cycling']),
-            'swimming' => $format($endurance['swimming']),
         ];
     }
 
