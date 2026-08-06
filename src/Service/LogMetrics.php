@@ -75,7 +75,8 @@ final class LogMetrics
             ++$exerciseCount;
 
             // Séries de travail : l'échauffement est exclu ici comme partout
-            // ailleurs (SetType::countsAsWorking), y compris du record.
+            // ailleurs, et la série cochée sans valeur avec lui
+            // (LoggedSet::countsAsWorking) — y compris du record.
             $sets = $logged->getWorkingSetCount();
             $workingSets += $sets;
 
@@ -90,7 +91,7 @@ final class LogMetrics
                 // non chiffrée en charge : ne pas re-filtrer ici.
                 $tonnage += $set->getTonnageKg();
 
-                if (!$set->getSetType()->countsAsWorking()) {
+                if (!$set->countsAsWorking()) {
                     continue;
                 }
 

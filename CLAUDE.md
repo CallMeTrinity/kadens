@@ -137,6 +137,14 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   fait. Contrainte de coût qui va avec : hors de cette unique passe hydratante
   d'endurance (bornée), tout passe par des agrégats scalaires — sans quoi
   « depuis le début » remonterait l'historique entier à chaque affichage.
+  **Ce qui entre dans le volume de salle est défini une fois**, par
+  `LoggedSet::countsAsWorking()` et son pendant SQL `LoggedSetRepository::measured()`
+  (les deux bougent ensemble) : type de travail (échauffement exclu) **et** série
+  chiffrée — au moins une répétition ou au moins une seconde. Une série cochée
+  sans valeur (« ? ») a eu lieu mais ne mesure rien ; la charge seule ne la sauve
+  pas (140 kg × 0 rep n'est pas un record). Frontière assumée : `LogComparator`
+  la compte quand même, parce qu'il compare ce qui a été fait à ce qui était
+  prévu, et l'en retirer ferait passer une séance tenue pour « allégée ».
 - **Progression = fork à la pose (règle ajustée).** Poser une séance dans un plan en
   crée une **copie privée** (`Workout.planLocal = true`), portée par le `PlanItem`.
   Éditer une séance placée (progression) ne touche ni la séance de bibliothèque ni

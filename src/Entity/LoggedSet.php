@@ -183,13 +183,46 @@ class LoggedSet
     }
 
     /**
+     * La série entre-t-elle dans le VOLUME de travail ?
+     *
+     * Deux conditions, pas une :
+     *
+     * - le **type** compte (l'échauffement n'est pas du volume, cf.
+     *   `SetType::countsAsWorking()`) ;
+     * - la série est **chiffrée** : au moins une répétition, ou au moins une
+     *   seconde.
+     *
+     * La seconde condition est ce qui écarte la série cochée sans valeur (« ? »
+     * à l'écran) ou ramenée à zéro répétition. Elle a eu lieu — le tableau de la
+     * séance la montre, la comparaison prévu/réalisé la compte — mais elle ne
+     * décrit aucun travail : la faire entrer dans le décompte de séries, la
+     * ventilation par région ou la moyenne « séries par séance » ferait dire à
+     * ces chiffres quelque chose qui n'a pas été mesuré. La charge seule ne
+     * suffit pas : 100 kg × 0 rep, c'est une barre qu'on n'a pas soulevée.
+     *
+     * **Le pendant SQL de cette règle vit dans `LoggedSetRepository`**
+     * (`workingSetScope()`, `workingSetWindow()`, `correlatedFrom()`) : les deux
+     * définitions doivent bouger ensemble, sinon le bandeau d'une séance et
+     * `/profile/stats` ne compteraient pas les mêmes séries.
+     */
+    public function countsAsWorking(): bool
+    {
+        if (!$this->setType->countsAsWorking()) {
+            return false;
+        }
+
+        return ($this->reps ?? 0) > 0 || ($this->durationSeconds ?? 0) > 0;
+    }
+
+    /**
      * Tonnage de la série (reps × charge), 0 si elle n'est pas chiffrée en
      * charge — une série au poids du corps ou en durée n'a pas de tonnage.
-     * L'échauffement est exclu du volume de travail, comme partout.
+     * L'échauffement et la série non chiffrée sont exclus du volume de travail,
+     * comme partout (cf. `countsAsWorking()`).
      */
     public function getTonnageKg(): float
     {
-        if (!$this->setType->countsAsWorking() || null === $this->reps || null === $this->weightKg) {
+        if (!$this->countsAsWorking() || null === $this->reps || null === $this->weightKg) {
             return 0.0;
         }
 

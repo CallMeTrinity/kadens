@@ -158,8 +158,8 @@ class LoggedSetRepository extends ServiceEntityRepository
      * la fenêtre entière comme sur chaque semaine.
      *
      * Périmètre : celui de `workingSetScope()` — échauffement exclu, exercice
-     * sauté exclu, statut de la séance non filtré (le réalisé est un fait dès
-     * qu'il est écrit).
+     * sauté exclu, série non chiffrée exclue (cf. `measured()`), statut de la
+     * séance non filtré (le réalisé est un fait dès qu'il est écrit).
      *
      * @return list<array{date: \DateTimeImmutable, sessions: int, workingSets: int, tonnageKg: float, seconds: int, rpeSum: int, rpeCount: int}>
      */
@@ -262,8 +262,9 @@ class LoggedSetRepository extends ServiceEntityRepository
     /**
      * Le périmètre des agrégats : « les séries de travail de cet utilisateur »,
      * éventuellement bornées dans le temps. Mêmes filtres que
-     * `workingSetScope()` au mot près — échauffement et exercice sauté exclus —
-     * mais sans restriction d'exercice : ici on lit tout ce qui a été fait.
+     * `workingSetScope()` au mot près — échauffement, exercice sauté et série
+     * non chiffrée exclus — mais sans restriction d'exercice : ici on lit tout
+     * ce qui a été fait.
      *
      * Les bornes sont facultatives et indépendantes, comme partout dans les
      * statistiques : « depuis le début » n'a pas de borne basse.
@@ -276,6 +277,7 @@ class LoggedSetRepository extends ServiceEntityRepository
             ->andWhere('s.owner = :owner')
             ->andWhere('le.skipped = false')
             ->andWhere('ls.setType != :warmup')
+            ->andWhere(self::measured('ls'))
             ->setParameter('owner', $owner)
             ->setParameter('warmup', SetType::WARMUP->value);
 
@@ -300,7 +302,9 @@ class LoggedSetRepository extends ServiceEntityRepository
      * Le statut de la séance n'est PAS filtré : le réalisé est un fait dès
      * qu'il est écrit, une séance encore PLANNED en cours de synchro compte
      * déjà. Un exercice sauté, lui, est écarté même s'il porte des séries
-     * abandonnées — même règle que LogMetrics.
+     * abandonnées — même règle que LogMetrics. Une série cochée sans aucune
+     * valeur est écartée aussi (cf. `measured()`) : elle n'a rien à dire d'une
+     * performance.
      *
      * @param list<int> $exerciseIds
      */
@@ -341,6 +345,7 @@ class LoggedSetRepository extends ServiceEntityRepository
             ->andWhere('le.exercise IN (:exercises)')
             ->andWhere('le.skipped = false')
             ->andWhere('ls.setType != :warmup')
+            ->andWhere(self::measured('ls'))
             ->setParameter('owner', $owner)
             ->setParameter('exercises', $exerciseIds)
             ->setParameter('warmup', SetType::WARMUP->value);
@@ -360,7 +365,31 @@ class LoggedSetRepository extends ServiceEntityRepository
             .' WHERE le2.exercise = le.exercise'
             .' AND s2.owner = :owner'
             .' AND le2.skipped = false'
-            .' AND ls2.setType != :warmup';
+            .' AND ls2.setType != :warmup'
+            .' AND '.self::measured('ls2');
+    }
+
+    /**
+     * Le pendant SQL de `LoggedSet::countsAsWorking()` : une série n'entre dans
+     * le volume que si elle est CHIFFRÉE — au moins une répétition, ou au moins
+     * une seconde. Une série cochée sans valeur (« ? » à l'écran) a bien eu
+     * lieu, mais elle ne mesure rien : la compter gonflerait le décompte de
+     * séries, la ventilation par région et la moyenne par séance avec du vide,
+     * et ferait remonter une séance sans contenu comme « dernière performance ».
+     *
+     * `COALESCE` plutôt que `reps > 0` seul : en SQL `NULL > 0` ne vaut pas
+     * faux, il vaut NULL — et une série en durée, qui n'a pas de répétitions,
+     * doit rester dans le périmètre.
+     *
+     * Le prédicat est paramétré par l'alias parce qu'il sert aussi dans les
+     * sous-requêtes corrélées (`ls2`), dont le périmètre doit être identique à
+     * celui de la requête externe au mot près.
+     *
+     * Les deux définitions, PHP et SQL, doivent bouger ensemble.
+     */
+    private static function measured(string $alias): string
+    {
+        return sprintf('(COALESCE(%1$s.reps, 0) > 0 OR COALESCE(%1$s.durationSeconds, 0) > 0)', $alias);
     }
 
     /**

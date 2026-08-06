@@ -93,6 +93,49 @@ final class LogMetricsTest extends TestCase
         self::assertSame(6, $summary['workingSets']);
     }
 
+    public function testUnmeasuredSetCountsNowhere(): void
+    {
+        // Une série cochée sans rien saisir (« ? » à l'écran) ou ramenée à zéro
+        // répétition : elle a eu lieu, mais elle ne mesure aucun travail. La
+        // charge seule ne la sauve pas — 140 kg × 0 rep, c'est une barre qu'on
+        // n'a pas soulevée, et la laisser passer en ferait un record.
+        $logged = $this->logged('Squat', [TargetArea::QUADRICEPS], [
+            [SetType::NORMAL, 5, 100.0],
+            [SetType::NORMAL, 5, 100.0],
+            [SetType::NORMAL, null, 140.0, 9],
+            [SetType::NORMAL, 0, 140.0],
+        ]);
+
+        $summary = $this->metrics->summary($this->scheduled([$logged]));
+
+        self::assertNotNull($summary);
+        self::assertSame(2, $summary['workingSets']);
+        self::assertSame(1000.0, $summary['tonnageKg']);
+        self::assertSame(2, $summary['regions'][0]['sets']);
+        self::assertNotNull($summary['topLift']);
+        self::assertSame(100.0, $summary['topLift']['weightKg']);
+        // Le RPE d'une série qui ne compte pas ne pèse pas non plus dans la
+        // moyenne : elle n'est pas dans le volume qui la pondère.
+        self::assertNull($summary['averageRpe']);
+    }
+
+    public function testTimedSetCountsWithoutAnyRepetition(): void
+    {
+        // Le pendant, sans quoi la règle mangerait le gainage : une série en
+        // durée n'a pas de répétitions et reste du volume de travail.
+        $logged = $this->logged('Gainage', [TargetArea::ABS], [
+            [SetType::NORMAL, null, null, null, 60],
+            [SetType::NORMAL, null, null, null, 45],
+        ]);
+
+        $summary = $this->metrics->summary($this->scheduled([$logged]));
+
+        self::assertNotNull($summary);
+        self::assertSame(2, $summary['workingSets']);
+        self::assertSame(0.0, $summary['tonnageKg']);
+        self::assertSame(2, $summary['regions'][0]['sets']);
+    }
+
     public function testSkippedExerciseIsCountedApartAndBringsNoVolume(): void
     {
         $done = $this->logged('Squat', [TargetArea::QUADRICEPS], [
@@ -238,8 +281,8 @@ final class LogMetricsTest extends TestCase
     }
 
     /**
-     * @param list<TargetArea>                      $areas
-     * @param list<array{SetType, int, float, 3?: int}> $sets type, reps, charge, RPE
+     * @param list<TargetArea>                                              $areas
+     * @param list<array{SetType, int|null, float|null, 3?: int, 4?: int}> $sets type, reps, charge, RPE, durée
      */
     private function logged(string $name, array $areas, array $sets): LoggedExercise
     {
@@ -262,6 +305,10 @@ final class LogMetricsTest extends TestCase
 
             if (isset($sets[$i][3])) {
                 $set->setRpe($sets[$i][3]);
+            }
+
+            if (isset($sets[$i][4])) {
+                $set->setDurationSeconds($sets[$i][4]);
             }
 
             $logged->addLoggedSet($set);

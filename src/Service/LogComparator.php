@@ -39,6 +39,14 @@ use App\Enum\LogDeviation;
  *    6 × 82,5 kg là où 8 × 80 kg étaient prévus, c'est plus lourd mais moins de
  *    travail, et c'est « allégé ».
  *
+ * **Ce service est la frontière de la règle « série non chiffrée ».** Ailleurs,
+ * une série cochée sans aucune valeur (ni répétition ni durée) est écartée du
+ * volume — elle ne mesure rien (`LoggedSet::countsAsWorking`). Ici elle compte
+ * : le comparateur ne dit pas ce qui a été soulevé, il dit ce qui a été fait
+ * face à ce qui était prévu, et une série cochée A eu lieu. L'écarter du
+ * décompte ferait passer une séance tenue pour « allégée d'une série ». Le
+ * filtre est donc, à dessein, sur le seul `SetType`.
+ *
  * @phpstan-import-type FlatPrescribed from PlanFlattener
  * @phpstan-import-type FlatSetLine from PlanFlattener
  *

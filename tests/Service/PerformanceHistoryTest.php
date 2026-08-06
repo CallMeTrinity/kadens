@@ -92,6 +92,41 @@ final class PerformanceHistoryTest extends KernelTestCase
         self::assertSame(1190.0, $last['tonnageKg']);
     }
 
+    /**
+     * Une séance qui n'a que des séries cochées sans valeur ne dit rien d'une
+     * performance : la dernière performance reste celle d'avant, et le record
+     * ignore la barre chargée à 120 qu'aucune répétition n'a soulevée.
+     *
+     * C'est le test qui protège la SOUS-REQUÊTE corrélée : elle cherche la
+     * séance la plus récente, et si son périmètre n'excluait pas la série non
+     * chiffrée comme la requête externe, elle désignerait le 15 mars — dont la
+     * requête externe ne ramènerait aucune ligne. Résultat : plus aucune
+     * dernière performance, alors qu'il y en a une.
+     */
+    public function testASessionWithOnlyUnmeasuredSetsIsNotAPerformance(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise('Développé couché');
+
+        $this->log($user, $exercise, new \DateTimeImmutable('2026-03-08'), [
+            [SetType::NORMAL, 8, 85.0],
+        ]);
+        $this->log($user, $exercise, new \DateTimeImmutable('2026-03-15'), [
+            [SetType::NORMAL, null, 120.0],
+            [SetType::NORMAL, 0, 120.0],
+        ]);
+
+        $last = $this->history->lastPerformance($user, $exercise);
+
+        self::assertNotNull($last);
+        self::assertSame('2026-03-08', $last['date']->format('Y-m-d'));
+        self::assertSame(1, $last['workingSets']);
+
+        $best = $this->history->bestSet($user, $exercise);
+        self::assertNotNull($best);
+        self::assertSame(85.0, $best['weightKg']);
+    }
+
     /** Séries consécutives identiques fusionnées, rang réel conservé (comme le prescrit). */
     public function testLastPerformanceCondensesIdenticalConsecutiveSets(): void
     {
