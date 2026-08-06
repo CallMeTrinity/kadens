@@ -552,6 +552,7 @@ $ curl -sk "https://127.0.0.1:8000/api/bootstrap" -H "Authorization: Bearer $TOK
     {
       "id": 131,
       "name": "Abdominaux à la barre",
+      "nameEn": "Hanging leg raise",
       "description": "Avec une roue ou une barre lestée au sol, rouler vers l'avant en gainant puis revenir. Travail intense du gainage.",
       "activity": "gym",
       "targetAreas": ["abs", "obliques"],
@@ -586,6 +587,17 @@ remplacés ici par leur **nombre d'entrées**) :
 
 L'uuid listé dans `deleted` est celui d'une séance libre supprimée juste avant
 (§6.9).
+
+**`nameEn`** (ajouté) porte le nom anglais de l'exercice, `null` quand le nom
+français EST déjà l'anglais (« Dips », « Fartlek »). Le champ est **additif** :
+un client qui l'ignore continue d'afficher `name`, ce que fait l'app Android
+aujourd'hui — la préférence de langue est pour l'instant une affaire de
+navigateur. Un client qui l'adopte doit garder le repli sur `name`, `nameEn`
+étant facultatif par construction.
+
+Le champ n'a **pas** demandé de forçage du delta : la commande
+`app:import-exercises` réécrit les lignes qu'elle renseigne, `updatedAt` se pose
+donc tout seul et le prochain `?since` les remonte.
 
 **Erreurs** : `400` si `since` n'est pas une date ISO 8601 (`?since=hier` est
 refusé — le constructeur PHP l'accepterait comme « hier », ce qui produirait une

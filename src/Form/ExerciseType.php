@@ -21,6 +21,15 @@ class ExerciseType extends AbstractType
             ->add('name', TextType::class, [
                 'label' => 'Nom',
             ])
+            // Facultatif : les mouvements dont le nom français EST l'anglais
+            // (« Dips », « Fartlek ») n'ont rien à renseigner ici, et
+            // l'affichage en anglais retombe alors sur le nom français.
+            ->add('nameEn', TextType::class, [
+                'label' => 'Nom anglais',
+                'required' => false,
+                'help' => "Facultatif. Sert à la recherche dans les deux langues, et à l'affichage si tu as choisi l'anglais.",
+                'attr' => ['placeholder' => 'ex. Bench press'],
+            ])
             ->add('description', TextareaType::class, [
                 'label' => 'Description',
                 'required' => false,

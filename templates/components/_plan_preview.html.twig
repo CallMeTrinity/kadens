@@ -22,7 +22,7 @@
                     {% for ex in b.exercises %}
                         <li{% if ex.sets %} class="kd-planpreview__exo--detailed"{% endif %}>
                             {% if ex.groupLabel %}<span class="kd-planpreview__rank">{{ ex.groupLabel }}</span>{% endif %}
-                            <span class="kd-planpreview__exoname">{{ ex.exercise ? ex.exercise.name : '—' }}</span>
+                            <span class="kd-planpreview__exoname">{{ exercise_name(ex.exercise) }}</span>
                             {% if ex.sets %}
                                 <ul class="kd-setlist kd-setlist--preview">
                                     {% for g in ex.sets %}

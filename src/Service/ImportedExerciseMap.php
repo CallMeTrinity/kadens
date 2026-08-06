@@ -262,24 +262,18 @@ final class ImportedExerciseMap
         return (0.65 * $overlap) + (0.35 * max(0.0, $edit));
     }
 
-    /** @return list<string> */
+    /**
+     * Les mots-outils ne portent aucune information de mouvement et gonfleraient
+     * artificiellement le recouvrement entre deux exercices sans rapport
+     * (`extension de jambes` / `flexion de poignet`) : `TextNormalizer` les
+     * retire, et c'est lui qui porte la règle depuis qu'elle sert aussi à
+     * l'import de la bibliothèque et à la recherche des palettes.
+     *
+     * @return list<string>
+     */
     private static function words(string $value): array
     {
-        $normalized = self::normalize($value);
-        $words = preg_split('/\s+/', $normalized, -1, \PREG_SPLIT_NO_EMPTY) ?: [];
-
-        // Les mots-outils ne portent aucune information de mouvement et
-        // gonfleraient artificiellement le recouvrement entre deux exercices
-        // sans rapport (`extension de jambes` / `flexion de poignet`).
-        return array_values(array_diff($words, ['a', 'au', 'aux', 'de', 'des', 'du', 'la', 'le', 'les', 'en', 'sur', 'avec']));
-    }
-
-    private static function normalize(string $value): string
-    {
-        $value = mb_strtolower($value);
-        $value = transliterator_transliterate('Any-Latin; Latin-ASCII', $value) ?: $value;
-
-        return trim((string) preg_replace('/[^a-z0-9]+/', ' ', $value));
+        return TextNormalizer::words($value);
     }
 
     /**

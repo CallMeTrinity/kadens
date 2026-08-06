@@ -15,6 +15,7 @@ use App\Form\BlockType;
 use App\Form\PrescribedExerciseType;
 use App\Form\PrescribedSetType;
 use App\Repository\ExerciseRepository;
+use App\Repository\LoggedExerciseRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\WorkoutVoter;
 use App\Service\CoachedLibrary;
@@ -58,6 +59,7 @@ final class WorkoutController extends AbstractController
         private readonly FormFactoryInterface $formFactory,
         private readonly PlanFlattener $planFlattener,
         private readonly ExerciseRepository $exerciseRepository,
+        private readonly LoggedExerciseRepository $loggedExerciseRepository,
         private readonly WorkoutEstimator $estimator,
         private readonly SetSynchronizer $setSynchronizer,
         private readonly SupersetGrouper $supersets,
@@ -1181,6 +1183,31 @@ final class WorkoutController extends AbstractController
     {
         $exercises = $this->exerciseRepository->findLibraryForUsers($this->libraryOwners($workout));
 
+        // L'usage RÉEL décide de l'ordre : ce qu'on fait le plus souvent est ce
+        // qu'on repose le plus souvent, et une palette de 300 entrées classée
+        // A→Z fait défiler pour rien. La pertinence reprend la main dès qu'une
+        // recherche est tapée (`composer_controller`), l'usage n'y départage
+        // plus que les scores égaux.
+        //
+        // La portée est le PROPRIÉTAIRE de la séance, pas l'utilisateur courant :
+        // quand un coach compose pour son athlète, c'est l'historique de
+        // l'athlète qui rend l'ordre utile — le sien ne dit rien de ce que
+        // l'autre s'entraîne à faire. Même logique que
+        // `PlanTemplateController::ownerOf()`.
+        $owner = $workout->getOwner() ?? $this->getUser();
+        $usage = $owner instanceof User ? $this->loggedExerciseRepository->usageForOwner($owner) : [];
+
+        usort($exercises, static function (Exercise $a, Exercise $b) use ($usage): int {
+            $byUsage = ($usage[$b->getId()]['count'] ?? 0) <=> ($usage[$a->getId()]['count'] ?? 0);
+
+            // Le repli alphabétique n'est pas cosmétique : sans lui, l'ordre des
+            // exercices jamais faits — l'écrasante majorité — dépendrait de la
+            // stabilité de usort, donc de rien.
+            return 0 !== $byUsage
+                ? $byUsage
+                : strcoll((string) $a->getName(), (string) $b->getName());
+        });
+
         $countsByActivity = [];
         foreach ($exercises as $exercise) {
             $key = $exercise->getActivity()->value;
@@ -1203,6 +1230,7 @@ final class WorkoutController extends AbstractController
             'library' => $exercises,
             'libraryCount' => \count($exercises),
             'libraryActivities' => $activityFilters,
+            'libraryUsage' => $usage,
         ];
     }
 

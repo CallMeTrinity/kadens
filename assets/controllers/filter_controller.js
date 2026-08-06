@@ -1,19 +1,26 @@
 import { Controller } from '@hotwired/stimulus';
+import { normalize, scoreElement, tokens } from 'search';
 
 /*
  * Filtre + tri client d'une liste d'index (bibliothèque, séances, plans…).
  * Aucun réseau : compatible offline, cohérent avec les pages auto-suffisantes.
  *
  * Trois leviers, tous 100 % client :
- *   1. Recherche PONDÉRÉE — un match exact du nom passe avant un match en début
- *      de nom, avant un match dans le nom, avant un match ailleurs (activité,
- *      zones…). Les items non correspondants sont masqués.
+ *   1. Recherche PONDÉRÉE par MOTS-CLÉS — la requête est découpée en mots, tous
+ *      exigés, comparés sans accents (cf. `assets/search.js`). Au-delà de ce
+ *      filtre, un match exact du nom passe avant un match en début de nom, avant
+ *      un match dans le nom, avant un match ailleurs (activité, zones, nom dans
+ *      l'autre langue). Les items non correspondants sont masqués.
  *   2. Facettes — des puces (activité, portée…) restreignent la liste. Chaque
  *      groupe de facette est indépendant ; « Tous » réinitialise le groupe.
  *   3. Tri — un <select> réordonne les items (nom, récence, durée, volume…).
  *
- * Quand une recherche est active, la pertinence prime et le tri sert de
- * départage ; sans recherche, le tri choisi ordonne la liste.
+ * Quand une recherche est active, la pertinence prime, l'USAGE RÉEL départage
+ * (`data-sort-usage`, quand l'item en porte un), et le tri choisi tranche en
+ * dernier. C'est l'ordre utile en salle : à pertinence égale, l'exercice qu'on
+ * fait toutes les semaines passe avant celui qu'on n'a jamais touché. Sans
+ * recherche, le tri choisi ordonne seul la liste — l'usage n'y est qu'une des
+ * options du <select>, pas un ordre imposé.
  *
  * Cibles :
  *   - input : le champ de recherche
@@ -26,7 +33,9 @@ import { Controller } from '@hotwired/stimulus';
  *
  * Attributs portés par chaque item :
  *   - data-filter-name  : nom principal (base du classement exact/préfixe)
- *   - data-filter-text  : texte complet cherché (nom + activité + zones…)
+ *   - data-filter-text  : le reste du texte cherché (activité, zones, second
+ *                          libellé…). Le nom y est ajouté automatiquement, il
+ *                          n'a pas à y être répété.
  *   - data-facet-<grp>  : valeurs d'appartenance à un groupe (séparées par des
  *                          espaces), ex. data-facet-activity="gym running"
  *   - data-sort-<clef>  : valeur de tri, ex. data-sort-name, data-sort-created
@@ -45,6 +54,7 @@ export default class extends Controller {
 
     connect() {
         this.query = '';
+        this.terms = [];
         this.readFacets();
         this.readSort();
         this.apply();
@@ -52,7 +62,8 @@ export default class extends Controller {
 
     // --------------------------------------------------------------- Événements
     search(event) {
-        this.query = (event.target.value || '').trim().toLowerCase();
+        this.query = normalize(event.target.value);
+        this.terms = tokens(event.target.value);
         this.apply();
     }
 
@@ -101,10 +112,10 @@ export default class extends Controller {
     }
 
     apply() {
-        const q = this.query;
+        const searching = this.terms.length > 0;
         const entries = this.itemTargets.map((el) => {
-            const score = this.score(el, q);
-            return { el, score, visible: this.facetMatch(el) && (q === '' || score > 0) };
+            const score = searching ? scoreElement(el, this.terms, this.query) : 0;
+            return { el, score, visible: this.facetMatch(el) && (!searching || score > 0) };
         });
 
         let visible = 0;
@@ -115,7 +126,14 @@ export default class extends Controller {
 
         // Réordonnancement en place : visibles triés d'abord, masqués ensuite.
         const shown = entries.filter((e) => e.visible).sort((a, b) => {
-            if (q !== '' && a.score !== b.score) return b.score - a.score;
+            if (searching) {
+                if (a.score !== b.score) return b.score - a.score;
+                // À pertinence égale, ce qu'on fait le plus souvent d'abord.
+                // Un item sans `data-sort-usage` vaut 0 et part en fin de
+                // peloton, ce qui est juste : rien ne dit qu'il a été fait.
+                const usage = Number(b.el.dataset.sortUsage || 0) - Number(a.el.dataset.sortUsage || 0);
+                if (usage !== 0) return usage;
+            }
             return this.compareSort(a.el, b.el);
         });
         if (this.hasListTarget) {
@@ -125,18 +143,6 @@ export default class extends Controller {
 
         if (this.hasEmptyTarget) this.emptyTarget.hidden = visible !== 0;
         if (this.hasCountTarget) this.countTarget.textContent = visible;
-    }
-
-    /** Pertinence : 4 exact, 3 préfixe du nom, 2 dans le nom, 1 ailleurs, 0 rien. */
-    score(el, q) {
-        if (q === '') return 0;
-        const name = (el.dataset.filterName || '').toLowerCase();
-        const text = (el.dataset.filterText || '').toLowerCase();
-        if (name === q) return 4;
-        if (name.startsWith(q)) return 3;
-        if (name.includes(q)) return 2;
-        if (text.includes(q)) return 1;
-        return 0;
     }
 
     facetMatch(el) {

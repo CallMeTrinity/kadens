@@ -52,7 +52,7 @@ use App\Enum\LogDeviation;
  *
  * @phpstan-type LoggedLine array{set: LoggedSet, type: \App\Enum\SetType, typeLabel: string|null, effort: string, weightKg: float|null, reps: int|null, durationSeconds: int|null, rpe: int|null}
  * @phpstan-type ComparedLine array{index: int, planned: FlatSetLine|null, logged: LoggedLine|null, status: LogDeviation}
- * @phpstan-type ComparedExercise array{name: string, prescribedId: int|null, planned: FlatPrescribed|null, logged: LoggedExercise|null, status: LogDeviation, lines: list<ComparedLine>}
+ * @phpstan-type ComparedExercise array{name: string, exercise: Exercise|null, prescribedId: int|null, planned: FlatPrescribed|null, logged: LoggedExercise|null, status: LogDeviation, lines: list<ComparedLine>}
  * @phpstan-type Axes array{tonnageKg: float|null, weightKg: float|null, reps: int|null, durationSeconds: int|null, workingSets: int|null}
  */
 final class LogComparator
@@ -227,11 +227,17 @@ final class LogComparator
         $lines = $this->compareLines($flat['setLines'] ?? null, $logged);
 
         return [
-            // Le nom réellement exécuté prime : c'est le snapshot du réalisé qui
-            // survit à un renommage comme à une suppression en bibliothèque.
+            // Le snapshot du nom, qui survit à une suppression en bibliothèque.
+            // Ce n'est PLUS ce qui s'affiche par défaut : la vue le passe en
+            // repli à `exercise_name()`, qui préfère le nom vivant tant que la
+            // référence existe — sans quoi une séance faite avant la bascule de
+            // langue resterait écrite en français au milieu d'un écran anglais.
             'name' => $logged?->getExerciseName()
                 ?? (null !== $flat ? $flat['exercise']?->getName() : null)
                 ?? 'Exercice',
+            // La référence vivante, quand il en reste une (FK en SET NULL).
+            'exercise' => $logged?->getExercise()
+                ?? (null !== $flat ? $flat['exercise'] : null),
             'prescribedId' => null !== $flat ? $flat['prescribed']->getId() : null,
             'planned' => $flat,
             'logged' => $logged,

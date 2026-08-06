@@ -1,7 +1,7 @@
 {% extends 'base.html.twig' %}
 {% import 'components/_activity.html.twig' as activity %}
 
-{% block title %}{{ exercise.name }}{% endblock %}
+{% block title %}{{ exercise_name(exercise) }}{% endblock %}
 
 {% block body %}
     <a href="{{ path('app_exercise_index') }}" class="kd-backlink">
@@ -11,7 +11,11 @@
     <div class="kd-pagehead">
         <div>
             <p class="kd-eyebrow">Exercice</p>
-            <h1 class="kd-title">{{ exercise.name }}</h1>
+            <h1 class="kd-title">{{ exercise_name(exercise) }}</h1>
+            {# La fiche de l'exercice est le seul écran qui montre les deux noms :
+               ailleurs, un second libellé alourdirait des listes déjà denses. #}
+            {% set altName = exercise_alt_name(exercise) %}
+            {% if altName %}<p class="kd-altname">{{ altName }}</p>{% endif %}
             <div style="margin-top:var(--kd-space-4); display:flex; gap:var(--kd-space-3); align-items:center;">
                 {{ activity.badge(exercise.activity) }}
                 <span class="kd-scope">

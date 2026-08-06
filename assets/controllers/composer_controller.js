@@ -1,6 +1,7 @@
 import { Controller } from '@hotwired/stimulus';
 import { renderStreamMessage } from '@hotwired/turbo';
 import Sortable from 'sortablejs';
+import { normalize, scoreElement, tokens } from 'search';
 
 /*
  * Compositeur de séance (éditeur). La persistance reste 100 % côté serveur :
@@ -57,6 +58,7 @@ export default class extends Controller {
     // this.sortables / this.activeBlockId sont undefined au premier target.
     initialize() {
         this.libQuery = '';
+        this.libTerms = [];
         this.libActivity = 'all';
         this.activeBlockId = null;
         this.sortables = new WeakMap();
@@ -422,8 +424,15 @@ export default class extends Controller {
 
     // ---- Filtre de bibliothèque (client, offline-safe) --------------------
 
+    /*
+     * Même moteur que l'index (`assets/search.js`) : mots-clés tous exigés, sans
+     * accents, sur les deux libellés de l'exercice. La palette avait sa propre
+     * sous-chaîne, plus pauvre — deux comportements pour la même intention, et
+     * c'est la palette qu'on utilise debout entre deux séries.
+     */
     filterLib(event) {
-        this.libQuery = event.target.value.trim().toLowerCase();
+        this.libQuery = normalize(event.target.value);
+        this.libTerms = tokens(event.target.value);
         this.applyLibFilter();
     }
 
@@ -435,11 +444,35 @@ export default class extends Controller {
         this.applyLibFilter();
     }
 
+    /*
+     * Filtre ET réordonne. La palette se contentait de masquer : à l'écran, le
+     * meilleur résultat pouvait donc se retrouver sous quinze cartes moins
+     * pertinentes, dans un panneau qu'on fait défiler au pouce.
+     *
+     * L'ordre serveur (usage décroissant, puis nom) est déjà le bon hors
+     * recherche : on ne retrie que pendant une recherche, et l'usage y départage
+     * les scores égaux.
+     */
     applyLibFilter() {
-        this.libcardTargets.forEach((card) => {
-            const matchText = this.libQuery === '' || (card.dataset.filterText || '').toLowerCase().includes(this.libQuery);
+        const searching = this.libTerms.length > 0;
+
+        const entries = this.libcardTargets.map((card) => {
+            const score = searching ? scoreElement(card, this.libTerms, this.libQuery) : 0;
             const matchAct = this.libActivity === 'all' || card.dataset.activity === this.libActivity;
-            card.hidden = !(matchText && matchAct);
+
+            return { card, score, visible: matchAct && (!searching || score > 0) };
         });
+
+        entries.forEach((e) => { e.card.hidden = !e.visible; });
+
+        if (!searching || !this.hasLibraryTarget) {
+            return;
+        }
+
+        entries
+            .filter((e) => e.visible)
+            .sort((a, b) => (b.score - a.score)
+                || (Number(b.card.dataset.sortUsage || 0) - Number(a.card.dataset.sortUsage || 0)))
+            .forEach((e) => this.libraryTarget.appendChild(e.card));
     }
 }

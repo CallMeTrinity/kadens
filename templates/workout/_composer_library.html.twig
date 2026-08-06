@@ -1,6 +1,10 @@
 {# Bibliothèque du compositeur. Purement client pour la recherche/filtre
    (offline-safe) ; l'ajout passe par le contrôleur composer. Contexte : library,
-   libraryCount, libraryActivities.
+   libraryCount, libraryActivities, libraryUsage.
+
+   `library` arrive DÉJÀ TRIÉE par usage réel décroissant : ce qu'on fait le plus
+   souvent est ce qu'on repose le plus souvent, et l'ordre alphabétique faisait
+   défiler 300 entrées pour rien. Ne pas retrier ici.
 
    Deux formes pour un seul markup : colonne gauche sur écran large, feuille qui
    monte du bas sous 900px (classe `kd-libsheet--open`, cf. components.css).
@@ -47,10 +51,17 @@
                     data-exercise-id="{{ ex.id }}"
                     data-activity="{{ ex.activity.value }}"
                     data-action="composer#quickAdd"
-                    data-filter-text="{{ ex.name }} {{ ex.activity.label }}{% for a in ex.targetAreas %} {{ a.label }}{% endfor %}">
-                <span class="kd-libx__code">{{ ex.name|slice(0, 2)|upper }}</span>
+                    {# `data-filter-name` pilote le palier exact/préfixe, `data-filter-text`
+                       porte les DEUX libellés : « lat pulldown » et « tirage vertical »
+                       trouvent la même carte quelle que soit la langue choisie. #}
+                    data-filter-name="{{ exercise_name(ex) }}"
+                    data-filter-text="{{ exercise_search_text(ex) }} {{ ex.activity.label }}{% for a in ex.targetAreas %} {{ a.label }}{% endfor %}"
+                    {# Départage la pertinence pendant une recherche ; hors recherche c'est
+                       déjà l'ordre du serveur (cf. WorkoutController::libraryContext). #}
+                    data-sort-usage="{{ libraryUsage[ex.id].count|default(0) }}">
+                <span class="kd-libx__code">{{ exercise_name(ex)|slice(0, 2)|upper }}</span>
                 <span class="kd-libx__body">
-                    <span class="kd-libx__name">{{ ex.name }}</span>
+                    <span class="kd-libx__name">{{ exercise_name(ex) }}</span>
                     <span class="kd-libx__meta">{{ ux_icon(activity.icon(ex.activity)|trim) }} {{ ex.activity.label }}</span>
                     {% if ex.targetAreas %}
                         <span class="kd-tags">

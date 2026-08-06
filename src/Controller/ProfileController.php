@@ -6,6 +6,7 @@ use App\Entity\ApiToken;
 use App\Entity\PairingCode;
 use App\Entity\User;
 use App\Form\ChangePasswordType;
+use App\Form\DisplaySettingsType;
 use App\Enum\StatsRange;
 use App\Form\ProfileType;
 use App\Repository\ApiTokenRepository;
@@ -140,8 +141,31 @@ final class ProfileController extends AbstractController
         /** @var User $user */
         $user = $this->getUser();
 
+        // Deux formulaires sur une même route : chacun ne lit la requête que si
+        // c'est LUI qui a été posté. Un `handleRequest()` inconditionnel sur les
+        // deux ferait valider le second à vide au premier envoi du premier —
+        // pour `display_settings`, mappé sur `User`, ça écraserait la préférence
+        // avec la valeur par défaut de l'enum.
+        $display = $this->createForm(DisplaySettingsType::class, $user);
         $form = $this->createForm(ChangePasswordType::class);
-        $form->handleRequest($request);
+
+        $posted = $request->request->keys();
+
+        if (\in_array($display->getName(), $posted, true)) {
+            $display->handleRequest($request);
+
+            if ($display->isSubmitted() && $display->isValid()) {
+                $entityManager->flush();
+
+                $this->addFlash('success', 'Préférences d\'affichage mises à jour.');
+
+                return $this->redirectToRoute('app_profile_settings');
+            }
+        }
+
+        if (\in_array($form->getName(), $posted, true)) {
+            $form->handleRequest($request);
+        }
 
         if ($form->isSubmitted() && $form->isValid()) {
             $plainPassword = (string) $form->get('plainPassword')->getData();
@@ -169,6 +193,7 @@ final class ProfileController extends AbstractController
 
         return $this->render('profile/settings.html.twig', [
             'form' => $form,
+            'display' => $display,
             'devices' => $this->apiTokens->findForOwner($user),
         ]);
     }
@@ -234,6 +259,7 @@ final class ProfileController extends AbstractController
 
         return $this->render('profile/settings.html.twig', $context + [
             'form' => $this->createForm(ChangePasswordType::class)->createView(),
+            'display' => $this->createForm(DisplaySettingsType::class, $user)->createView(),
             'devices' => $this->apiTokens->findForOwner($user),
         ]);
     }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Entity\Exercise;
 use App\Entity\User;
 use App\Enum\ActivityType;
 use App\Enum\StatsRange;
@@ -69,6 +70,7 @@ final class TrainingStats
         private readonly WorkoutMetrics $metrics,
         private readonly RegionBreakdown $regions,
         private readonly UnitFormatter $units,
+        private readonly ExerciseNaming $naming,
     ) {
     }
 
@@ -92,6 +94,13 @@ final class TrainingStats
 
         $prescribed = $this->prescribedPass($user, $period);
 
+        // Les définitions des exercices réellement travaillés, chargées UNE fois
+        // et partagées : les zones s'y lisent (`regionShares`) et les libellés
+        // vivants aussi (`records`). Leur nombre est borné par la pratique, pas
+        // par l'historique — la fenêtre « depuis le début » ne coûte pas plus
+        // qu'un mois.
+        $lifted = $this->liftedExercises($gymByExercise);
+
         return [
             'period' => $period,
             'adherence' => $adherence,
@@ -102,8 +111,8 @@ final class TrainingStats
                 'cycling' => $this->endurance($prescribed['endurance']['cycling']),
                 'swimming' => $this->endurance($prescribed['endurance']['swimming']),
             ],
-            'regions' => $this->regionShares($gymByExercise),
-            'records' => $this->records($user, $period, $gymByExercise),
+            'regions' => $this->regionShares($gymByExercise, $lifted),
+            'records' => $this->records($user, $period, $gymByExercise, $lifted),
             'progression' => $this->progression($gymByDate, $period),
             'plans' => $this->planAdherence($user, $period),
             'activityCounts' => $prescribed['activities'],
@@ -429,10 +438,11 @@ final class TrainingStats
      * seule lecture, et d'aucune autre — c'est la même limite que LogMetrics.
      *
      * @param list<array{exerciseId: int|null, name: string, workingSets: int, tonnageKg: float, topWeightKg: float|null, sessions: int}> $byExercise
+     * @param array<int, Exercise>                                                                                                        $lifted
      *
      * @return list<RegionShare>
      */
-    private function regionShares(array $byExercise): array
+    private function regionShares(array $byExercise, array $lifted): array
     {
         $setsByExercise = [];
         foreach ($byExercise as $row) {
@@ -446,16 +456,45 @@ final class TrainingStats
         }
 
         $setsByArea = [];
-        // findBy sur les seuls exercices réellement travaillés : leur nombre est
-        // borné par la pratique, pas par l'historique.
-        foreach ($this->exercises->findBy(['id' => array_keys($setsByExercise)]) as $exercise) {
-            $sets = $setsByExercise[$exercise->getId()] ?? 0;
-            foreach ($exercise->getTargetAreas() ?? [] as $area) {
+        foreach ($setsByExercise as $id => $sets) {
+            foreach (($lifted[$id] ?? null)?->getTargetAreas() ?? [] as $area) {
                 $setsByArea[$area->value] = ($setsByArea[$area->value] ?? 0) + $sets;
             }
         }
 
         return $this->regions->shares($setsByArea);
+    }
+
+    /**
+     * Les définitions des exercices travaillés dans la fenêtre, indexées par id.
+     *
+     * `findBy` sur les seuls exercices réellement chargés : leur nombre est
+     * borné par la pratique, pas par l'historique. Un exercice supprimé depuis
+     * (`exerciseId` null, FK en SET NULL) n'en fait pas partie — il porte du
+     * tonnage bien réel mais n'a plus ni zone ni libellé vivant à donner.
+     *
+     * @param list<array{exerciseId: int|null, name: string, workingSets: int, tonnageKg: float, topWeightKg: float|null, sessions: int}> $byExercise
+     *
+     * @return array<int, Exercise>
+     */
+    private function liftedExercises(array $byExercise): array
+    {
+        $ids = array_values(array_unique(array_filter(
+            array_column($byExercise, 'exerciseId'),
+            static fn (?int $id): bool => null !== $id,
+        )));
+
+        if ([] === $ids) {
+            return [];
+        }
+
+        $indexed = [];
+
+        foreach ($this->exercises->findBy(['id' => $ids]) as $exercise) {
+            $indexed[(int) $exercise->getId()] = $exercise;
+        }
+
+        return $indexed;
     }
 
     /**
@@ -467,12 +506,24 @@ final class TrainingStats
      * par construction. On affiche alors le classement seul plutôt qu'une liste
      * de faux exploits.
      *
+     * Le libellé affiché est celui de la DÉFINITION vivante quand elle existe,
+     * pas le snapshot du réalisé sur lequel la requête groupe : sans ça, un
+     * classement de records resterait en français au milieu d'un écran anglais.
+     * Le snapshot reprend la main dès que l'exercice a été supprimé — c'est la
+     * seule chose qu'il reste alors à afficher.
+     *
      * @param list<array{exerciseId: int|null, name: string, workingSets: int, tonnageKg: float, topWeightKg: float|null, sessions: int}> $byExercise
+     * @param array<int, Exercise>                                                                                                        $lifted
      *
      * @return array{top: list<TopLift>, new: list<NewRecord>, comparable: bool}
      */
-    private function records(User $user, StatsPeriod $period, array $byExercise): array
+    private function records(User $user, StatsPeriod $period, array $byExercise, array $lifted): array
     {
+        $label = fn (array $row): string => $this->naming->label(
+            null !== $row['exerciseId'] ? ($lifted[$row['exerciseId']] ?? null) : null,
+            $row['name'],
+        );
+
         $lifted = array_values(array_filter(
             $byExercise,
             static fn(array $row): bool => null !== $row['topWeightKg'] && $row['topWeightKg'] > 0,
@@ -483,7 +534,7 @@ final class TrainingStats
         $top = [];
         foreach (\array_slice($lifted, 0, self::TOP_LIFTS) as $row) {
             $top[] = [
-                'name' => $row['name'],
+                'name' => $label($row),
                 'weightKg' => $row['topWeightKg'],
                 'weightLabel' => $this->units->weight($row['topWeightKg']),
                 'workingSets' => $row['workingSets'],
@@ -508,7 +559,7 @@ final class TrainingStats
             }
 
             $new[] = [
-                'name' => $row['name'],
+                'name' => $label($row),
                 'weightKg' => $row['topWeightKg'],
                 'weightLabel' => $this->units->weight($row['topWeightKg']),
                 'previousKg' => $previous[$id],

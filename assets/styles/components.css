@@ -401,6 +401,17 @@ turbo-frame {
     max-width: 60ch;
 }
 
+/* Le nom d'exercice dans l'AUTRE langue, sous le titre de sa fiche. Casse
+   normale et Barlow : c'est du contenu saisi, pas une étiquette de structure
+   (règle 4 du design system). Encre atténuée, jamais `textFaint` : c'est du
+   texte, il doit tenir le seuil AA. */
+.kd-altname {
+    font-family: var(--font-body);
+    font-size: 15px;
+    color: var(--color-text-soft);
+    margin: var(--kd-space-2) 0 0;
+}
+
 /* Bandeau de titre de page (eyebrow + titre + actions à droite) */
 .kd-pagehead {
     display: flex;
