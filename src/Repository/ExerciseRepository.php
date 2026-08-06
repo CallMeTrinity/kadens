@@ -113,6 +113,36 @@ class ExerciseRepository extends ServiceEntityRepository
     }
 
     /**
+     * Les noms de la bibliothèque globale (owner null), indexés par clé
+     * normalisée (minuscules, sans espaces de bord) → id.
+     *
+     * Sert la bascule perso → global (`app:exercise:globalize`) : avant de
+     * publier l'exercice d'un admin, il faut savoir si la globale porte déjà ce
+     * nom. La normalisation est plus large que le `findOneBy(['name' => ...])`
+     * de l'import, qui compare au caractère près : un « Rowing barre » et un
+     * « rowing barre » ne sont pas un doublon pour SQL mais en sont un dans une
+     * liste que tout le monde lit.
+     *
+     * @return array<string, int>
+     */
+    public function globalNameIndex(): array
+    {
+        $rows = $this->createQueryBuilder('e')
+            ->select('e.id', 'e.name')
+            ->andWhere('e.owner IS NULL')
+            ->getQuery()
+            ->getScalarResult()
+        ;
+
+        $index = [];
+        foreach ($rows as $row) {
+            $index[mb_strtolower(trim((string) $row['name']))] = (int) $row['id'];
+        }
+
+        return $index;
+    }
+
+    /**
      * QueryBuilder de la bibliothèque visible : la globale (owner null) plus les
      * exercices perso des membres donnés.
      *
