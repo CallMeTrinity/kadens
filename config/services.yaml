@@ -23,7 +23,7 @@ parameters:
 
     # En dessous, l'app se bloque d'elle-même. Ne monte **que** si le format de
     # synchronisation change : c'est un garde-fou, pas un levier de mise à jour.
-    app.mobile.minimum_version_code: 0
+    app.mobile.minimum_version_code: 10
 
     # Le dépôt qui héberge les releases. L'APK en téléchargement direct s'en
     # dérive, avec le nom de fichier composé par `.github/workflows/build.yml`.
