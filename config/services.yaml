@@ -18,7 +18,7 @@ parameters:
     # `0` / `0.0.0` = aucune version publiée : ni lien d'APK sur la page, ni
     # bandeau de mise à jour dans l'app. C'est l'état tant que le workflow de
     # build n'a pas tourné sur un tag.
-    app.mobile.version_code: 0
+    app.mobile.version_code: 7
     app.mobile.version_name: "0.0.3"
 
     # En dessous, l'app se bloque d'elle-même. Ne monte **que** si le format de
