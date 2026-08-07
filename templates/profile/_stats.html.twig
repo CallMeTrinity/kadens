@@ -21,9 +21,14 @@
            connecté, le lien n'aurait aucun sens sur la fiche d'un athlète suivi
            — il mènerait aux stats du coach. #}
         {% if own %}
-            <a href="{{ path('app_profile_stats') }}" class="kd-btn kd-btn--ghost">
-                {{ ux_icon('lucide:chart-column') }} Toutes les statistiques
-            </a>
+            <div class="kd-actionbar__end">
+                <a href="{{ path('app_profile_history') }}" class="kd-btn kd-btn--ghost">
+                    {{ ux_icon('lucide:history') }} Historique
+                </a>
+                <a href="{{ path('app_profile_stats') }}" class="kd-btn kd-btn--ghost">
+                    {{ ux_icon('lucide:chart-column') }} Toutes les statistiques
+                </a>
+            </div>
         {% endif %}
     </div>
 

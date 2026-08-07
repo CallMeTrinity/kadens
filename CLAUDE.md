@@ -299,7 +299,10 @@ Règles non négociables :
    l'échelle de gris `--color-cat-1..4`, jamais par une teinte inventée — c'est
    ce qui permet de couvrir les cinq activités là où l'ancienne palette n'en
    codait que deux. Les statuts gardent leurs tokens dédiés ; les types de série
-   détaillée se réduisent à deux axes (encre/rouge, plein/contour).
+   détaillée se réduisent à deux axes (encre/rouge, plein/contour). **Une seule
+   exception, bornée à `/profile/history`** : les cinq groupes musculaires
+   (`--color-muscle-*`), qui ne tiennent pas dans quatre gris sur une pastille de
+   6 px — cadrage et portée dans `docs/design-system.md` §2, à ne pas étendre.
 3. Nouvelle valeur → primitive `--kd-*` d'abord, puis token sémantique.
 4. **Le condensé capitales ne touche pas au contenu saisi.** Titre de page,
    bouton, onglet, rôle de bloc : Barlow Condensed uppercase. Nom d'exercice, de

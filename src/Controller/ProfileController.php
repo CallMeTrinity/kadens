@@ -7,6 +7,7 @@ use App\Entity\PairingCode;
 use App\Entity\User;
 use App\Form\ChangePasswordType;
 use App\Form\DisplaySettingsType;
+use App\Enum\MuscleGroup;
 use App\Enum\StatsRange;
 use App\Form\ProfileType;
 use App\Repository\ApiTokenRepository;
@@ -17,6 +18,7 @@ use App\Service\HeartRateZones;
 use App\Service\PairingQr;
 use App\Service\ProfileStats;
 use App\Service\StatsPeriod;
+use App\Service\TrainingHistory;
 use App\Service\TrainingStats;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -100,6 +102,31 @@ final class ProfileController extends AbstractController
             'period' => $period,
             'ranges' => StatsRange::pickable(),
             'months' => $training->availableMonths($user),
+        ]);
+    }
+
+    /**
+     * L'historique en calendrier : tous les mois, du plus récent au plus ancien.
+     *
+     * **Aucun paramètre d'URL, et c'est le point.** `/profile/stats` répond
+     * toujours d'une fenêtre choisie ; ici la réponse EST l'étendue complète.
+     * Accepter un `?range=` obligerait à choisir ce qu'on cherche justement à
+     * embrasser d'un seul regard — un `?range=` traînant dans un lien est donc
+     * simplement ignoré, pas rejeté.
+     *
+     * La page se rend entièrement côté serveur, sans fragment ni chargement
+     * différé : elle reste auto-suffisante (condition du cache offline) et
+     * lisible sans JS, comme le reste des vues de consultation.
+     */
+    #[Route('/profile/history', name: 'app_profile_history', methods: ['GET'])]
+    public function history(TrainingHistory $history): Response
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        return $this->render('profile/history.html.twig', [
+            'history' => $history->calendar($user),
+            'groups' => MuscleGroup::cases(),
         ]);
     }
 

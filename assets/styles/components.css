@@ -9735,3 +9735,280 @@ a.kd-coachitem__name:hover {
         min-width: 0;
     }
 }
+
+/* ============================================================================
+   Historique en calendrier (/profile/history)
+   ----------------------------------------------------------------------------
+   Une grille de mois qui défile, cases compactes, une pastille par groupe
+   musculaire travaillé.
+
+   Pourquoi un bloc à part et non une réutilisation de .kd-cal* : le calendrier
+   de planification a des cases de 116 px qui portent des pastilles de séance
+   cliquables, et sa grille impose min-width: 720px (elle défile
+   horizontalement). Ici on affiche jusqu'à douze mois d'affilée et la case ne
+   porte qu'un numéro et des points : il faut du compact, et surtout aucun
+   débordement horizontal — c'est la page entière qui défile, verticalement.
+
+   C'EST LE SEUL ENDROIT DU PROJET QUI EMPLOIE DE VRAIES COULEURS. Cinq groupes
+   ne rentrent pas dans les quatre gris de --color-cat-*, et cinq gris sur une
+   pastille de 6 px ne se distinguent pas. L'exception est bornée à cet écran et
+   documentée dans docs/design-system.md §2 ; .kd-muscle--* n'a rien à faire
+   ailleurs.
+   ============================================================================ */
+
+/* Le code couleur reste lisible quand on défile : sans ça, il faudrait remonter
+   le chercher, et un code qu'on remonte chercher n'en est pas un. */
+.kd-histlegend {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: var(--kd-space-4) 0;
+    margin-bottom: var(--kd-space-6);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-divider);
+}
+
+/* L'entrée « endurance » de la légende montre ses trois icônes plutôt qu'un
+   carré : c'est bien une icône qu'on retrouvera dans les cases. */
+.kd-legend__item--icon svg {
+    width: 12px;
+    height: 12px;
+    stroke-width: 2;
+    color: var(--color-text-secondary);
+}
+
+.kd-histyear__count {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-text-soft);
+}
+
+/* Trois mois de front : un trimestre se lit d'un bloc, et douze mois tiennent
+   en quatre rangées. */
+.kd-histmonths {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: var(--kd-space-6);
+}
+
+.kd-histmonth {
+    min-width: 0;
+}
+
+/* Un mois sans séance n'est pas masqué — un trou est une information — mais il
+   s'efface pour laisser les mois pleins accrocher l'œil. */
+.kd-histmonth--empty {
+    opacity: .55;
+}
+
+.kd-histmonth__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--kd-space-3);
+    margin-bottom: var(--kd-space-3);
+}
+
+.kd-histmonth__title {
+    margin: 0;
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-text);
+}
+
+.kd-histmonth__count {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: var(--kd-weight-semibold);
+    color: var(--color-text-secondary);
+}
+
+/* Pas de min-width, contrairement à .kd-cal__grid : cette grille se comprime
+   jusqu'au téléphone plutôt que de faire défiler la page en travers. */
+.kd-histgrid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--color-border-cell);
+    border: 1px solid var(--color-border-cell);
+}
+
+.kd-histgrid__dow {
+    padding: var(--kd-space-1) 0;
+    background: var(--color-surface-subtle);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    text-align: center;
+    color: var(--color-text-faint);
+}
+
+/* La case grandit avec ses séances plutôt que de les comprimer : deux séances
+   dans un jour, ce sont deux lignes. `min-height` fixe la case vide, rien ne
+   plafonne la case pleine. */
+.kd-histday {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    min-height: 42px;
+    padding: var(--kd-space-1) 1px var(--kd-space-2);
+    background: var(--color-surface-raised);
+}
+
+/* Débord du mois voisin : la colonne doit rester alignée sur son jour de la
+   semaine, mais la case n'appartient pas à ce mois-ci. */
+.kd-histday--out {
+    background: var(--color-surface-subtle);
+}
+
+.kd-histday--done {
+    background: var(--color-surface);
+}
+
+.kd-histday__num {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    line-height: 1.4;
+    color: var(--color-text-faint);
+}
+
+.kd-histday--out .kd-histday__num {
+    color: var(--color-text-placeholder);
+}
+
+.kd-histday--done .kd-histday__num {
+    color: var(--color-text-secondary);
+    font-weight: var(--kd-weight-medium);
+}
+
+/* Même repère qu'au calendrier de planification : aujourd'hui est en aplat
+   rouge sur le numéro. Le rouge garde ici son sens d'accent, pas de catégorie. */
+.kd-histday--today .kd-histday__num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    border-radius: var(--kd-radius-full);
+    font-weight: var(--kd-weight-bold);
+}
+
+/* Une séance = un lien. Deux séances le même jour font deux lignes empilées,
+   chacune ouvrable : on vient ici retrouver une séance, pas lire une densité.
+   Jusqu'à cinq pastilles, qui passent à la ligne plutôt que de déborder. */
+.kd-histsess {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    padding: 1px 3px;
+    color: inherit;
+    text-decoration: none;
+}
+
+.kd-histsess:hover,
+.kd-histsess:focus-visible {
+    background: var(--color-surface-ink);
+}
+
+/* Sur l'aplat encre du survol, une pastille encre disparaîtrait. */
+.kd-histsess:hover .kd-histdot--bare,
+.kd-histsess:focus-visible .kd-histdot--bare {
+    border-color: var(--color-on-ink);
+}
+
+/* L'ENDURANCE SE DIT PAR SON ICÔNE, pas par une couleur : son réalisé ne se
+   logue jamais, elle n'a donc aucun groupe musculaire à montrer. Sans elle, une
+   sortie course n'aurait qu'une case creuse — la règle du design system veut de
+   toute façon que l'activité soit portée par l'icône. */
+.kd-histsess--endurance svg {
+    width: 11px;
+    height: 11px;
+    stroke-width: 2;
+    color: var(--color-text-secondary);
+}
+
+.kd-histsess--endurance:hover svg,
+.kd-histsess--endurance:focus-visible svg {
+    color: var(--color-on-ink);
+}
+
+.kd-histdot {
+    width: 6px;
+    height: 6px;
+    flex: none;
+}
+
+/* La séance a eu lieu, mais rien n'a été logué : tout le cardio (qui ne se
+   logue jamais) et l'historique d'avant Kadens Live. Un contour, pas un aplat —
+   il s'est passé quelque chose, on ne sait juste pas quoi. */
+.kd-histdot--bare {
+    background: none;
+    border: 1px solid var(--color-text-soft);
+}
+
+/* L'échelle des groupes musculaires. Écrite comme .kd-cat--1..4 pour servir à
+   la fois les pastilles et les carrés de légende. */
+.kd-muscle--legs {
+    background: var(--color-muscle-legs);
+}
+
+.kd-muscle--chest {
+    background: var(--color-muscle-chest);
+}
+
+.kd-muscle--back {
+    background: var(--color-muscle-back);
+}
+
+.kd-muscle--arms {
+    background: var(--color-muscle-arms);
+}
+
+.kd-muscle--other {
+    background: var(--color-muscle-other);
+}
+
+/* Deux mois de front : à cette largeur, trois grilles de sept colonnes
+   donneraient des cases trop étroites pour cinq pastilles. */
+@media (max-width: 1200px) {
+    .kd-histmonths {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* Un mois par rangée. La grille de sept colonnes est conservée — contrairement
+   au calendrier de planification, qui bascule en agenda vertical : ici la case
+   ne porte pas de contenu à lire, seulement des points, et la forme du mois EST
+   l'information. */
+@media (max-width: 900px) {
+    .kd-histmonths {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--kd-space-7);
+    }
+
+    .kd-histday {
+        min-height: 44px;
+    }
+}
+
+@media (max-width: 560px) {
+    /* La légende collante mange trop de haut sur un petit écran : elle défile
+       avec la page. */
+    .kd-histlegend {
+        position: static;
+    }
+}
