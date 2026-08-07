@@ -6,6 +6,7 @@ use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
+use App\Enum\ActivityType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
@@ -241,6 +242,134 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
                 : new \DateTimeImmutable((string) $row['date']),
             $qb->getQuery()->getArrayResult(),
         );
+    }
+
+    /**
+     * Les séances FAITES d'un utilisateur, réduites à ce qu'il faut pour les
+     * poser sur un calendrier et les rendre cliquables : identifiant, date,
+     * titre affichable.
+     *
+     * Le pendant identifiable de `doneDatesForOwner()`, qui ne rend que des
+     * dates. Les deux existent parce qu'ils répondent à deux besoins :
+     * l'assiduité compte des séances sans avoir à les distinguer, l'historique
+     * doit pouvoir en ouvrir une — et deux séances le même jour y sont deux
+     * lignes, pas un compteur à 2.
+     *
+     * Le titre se lit sur le snapshot de la séance datée, avec repli sur celui
+     * de la séance de bibliothèque : c'est la règle de `getDisplayTitle()`,
+     * transcrite ici parce qu'on ne veut pas hydrater pour l'appliquer. Une
+     * séance dont la source a été supprimée (FK en SET NULL) garde donc son nom.
+     *
+     * @return list<array{id: int, date: \DateTimeImmutable, title: string}> triées du plus ancien au plus récent
+     */
+    public function doneSessionsForOwner(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
+    {
+        $qb = $this->createQueryBuilder('s')
+            ->select('s.id AS id', 's.scheduledDate AS date', 's.title AS title', 'w.title AS workoutTitle')
+            ->leftJoin('s.workout', 'w')
+            ->andWhere('s.owner = :owner')
+            ->andWhere('s.status = :done')
+            ->setParameter('owner', $owner)
+            ->setParameter('done', \App\Enum\ScheduledStatus::DONE)
+            ->orderBy('s.scheduledDate', 'ASC')
+            ->addOrderBy('s.id', 'ASC');
+
+        $this->applyDateWindow($qb, $start, $end);
+
+        return array_map(static fn (array $row): array => [
+            'id' => (int) $row['id'],
+            'date' => $row['date'] instanceof \DateTimeImmutable
+                ? $row['date']
+                : new \DateTimeImmutable((string) $row['date']),
+            'title' => (string) ($row['title'] ?? $row['workoutTitle'] ?? 'Séance'),
+        ], $qb->getQuery()->getArrayResult());
+    }
+
+    /**
+     * Les activités prescrites de chaque séance FAITE, avec le nombre
+     * d'exercices qui les portent : de quoi dire « cette séance-là, c'est de la
+     * course » sans hydrater une seule entité.
+     *
+     * **Pourquoi compter les exercices et pas seulement lister les activités.**
+     * Une séance mélange souvent deux natures (un footing suivi de gainage) ;
+     * l'appelant a besoin de savoir laquelle domine pour ranger la séance dans
+     * un décompte où chacune ne compte qu'une fois. Rendre l'ensemble sans les
+     * poids l'obligerait à choisir arbitrairement.
+     *
+     * Une séance libre ou dont la source a été supprimée n'a rien de prescrit :
+     * elle est simplement absente du résultat, elle n'y figure pas à zéro.
+     *
+     * @return list<array{scheduledId: int, activity: ActivityType, exercises: int}>
+     */
+    public function doneActivityCountsForOwner(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
+    {
+        $qb = $this->createQueryBuilder('s')
+            ->select('s.id AS scheduledId', 'e.activity AS activity', 'COUNT(pe.id) AS exercises')
+            ->join('s.workout', 'w')
+            ->join('w.blocks', 'b')
+            ->join('b.prescribedExercises', 'pe')
+            ->join('pe.exercise', 'e')
+            ->andWhere('s.owner = :owner')
+            ->andWhere('s.status = :done')
+            ->setParameter('owner', $owner)
+            ->setParameter('done', \App\Enum\ScheduledStatus::DONE)
+            ->groupBy('s.id')
+            ->addGroupBy('e.activity');
+
+        $this->applyDateWindow($qb, $start, $end);
+
+        return array_map(static fn (array $row): array => [
+            'scheduledId' => (int) $row['scheduledId'],
+            'activity' => $row['activity'] instanceof ActivityType
+                ? $row['activity']
+                : ActivityType::from((string) $row['activity']),
+            'exercises' => (int) $row['exercises'],
+        ], $qb->getQuery()->getArrayResult());
+    }
+
+    /**
+     * Le pendant de la méthode ci-dessus sur le RÉALISÉ : les activités des
+     * exercices réellement logués dans chaque séance faite.
+     *
+     * **Pourquoi les deux existent.** Une séance importée d'une autre
+     * application (`TrainingHistoryImporter`) est créée avec `workout = null` —
+     * délibérément, pour ne pas inventer une intention qui n'a jamais existé.
+     * Elle n'a donc AUCUN prescrit : lue sur le prescrit seul, elle n'a pas de
+     * nature, et trois cents séances de salle se rangeraient sous « activité
+     * inconnue ». Son réalisé, lui, sait parfaitement de quoi elle était faite.
+     *
+     * C'est la règle habituelle du projet, appliquée à la question « de quelle
+     * nature était cette séance » : on la lit sur la source qui fait autorité,
+     * et quand il n'y a pas de prescrit, le réalisé est la seule qui reste.
+     *
+     * Les exercices sautés sont **inclus** : ils disent la nature de la séance
+     * même s'ils n'ont rien produit. C'est le seul endroit où on les compte —
+     * partout ailleurs (volume, tonnage) ils restent exclus.
+     *
+     * @return list<array{scheduledId: int, activity: ActivityType, exercises: int}>
+     */
+    public function doneLoggedActivityCountsForOwner(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
+    {
+        $qb = $this->createQueryBuilder('s')
+            ->select('s.id AS scheduledId', 'e.activity AS activity', 'COUNT(le.id) AS exercises')
+            ->join('s.loggedExercises', 'le')
+            ->join('le.exercise', 'e')
+            ->andWhere('s.owner = :owner')
+            ->andWhere('s.status = :done')
+            ->setParameter('owner', $owner)
+            ->setParameter('done', \App\Enum\ScheduledStatus::DONE)
+            ->groupBy('s.id')
+            ->addGroupBy('e.activity');
+
+        $this->applyDateWindow($qb, $start, $end);
+
+        return array_map(static fn (array $row): array => [
+            'scheduledId' => (int) $row['scheduledId'],
+            'activity' => $row['activity'] instanceof ActivityType
+                ? $row['activity']
+                : ActivityType::from((string) $row['activity']),
+            'exercises' => (int) $row['exercises'],
+        ], $qb->getQuery()->getArrayResult());
     }
 
     /**

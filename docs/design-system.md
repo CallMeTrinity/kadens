@@ -125,6 +125,45 @@ Ventiler les 17 zones donnerait une barre empilée illisible.
 | Tronc | 3 |
 | Corps entier | 4 |
 
+### Groupes musculaires — l'exception colorée
+
+**C'est la seule entorse à la règle 2, et elle est bornée à un écran :
+`/profile/history`.** À lire comme telle : ailleurs, une catégorie passe par
+`--color-cat-1..4`, sans discussion.
+
+Pourquoi elle existe. Cette page code cinq groupes d'entraînement (`MuscleGroup` :
+jambes, pectoraux, dos, bras, autres) sur des **pastilles de 6 px**, jusqu'à cinq
+par case, dans une grille de douze mois. L'échelle catégorielle n'a que quatre
+nuances, et cinq gris de 6 px ne se distinguent pas à la volée — ce qui rendrait
+le code couleur inutile, donc la page avec.
+
+Pourquoi ces teintes-là. Des encres désaturées, qui cohabitent avec le papier
+froid et **restent à distance du rouge d'accent** : celui-ci garde son sens
+(action primaire, intensité, échec) et n'entre jamais dans cette échelle. Comme
+l'échelle catégorielle, elles ne portent **jamais de texte** — aplats de pastille
+et carrés de légende, rien d'autre.
+
+| Groupe | Token | Valeur | Classe utilitaire |
+|---|---|---|---|
+| Jambes | `--color-muscle-legs` | `#1d4e7a` | `.kd-muscle--legs` |
+| Pectoraux | `--color-muscle-chest` | `#a8632a` | `.kd-muscle--chest` |
+| Dos | `--color-muscle-back` | `#2f6b4f` | `.kd-muscle--back` |
+| Bras | `--color-muscle-arms` | `#6b3b6e` | `.kd-muscle--arms` |
+| Autres | `--color-muscle-other` | `#7a7a73` | `.kd-muscle--other` |
+
+À ne pas confondre avec les **régions anatomiques** ci-dessus : `MuscleGroup` et
+`TargetRegion` regroupent les mêmes 17 zones, mais répondent à deux questions
+différentes. `TargetRegion` dit « où part mon volume » (quatre parts qui se
+comparent sur une barre empilée, d'où le rang de gris) ; `MuscleGroup` dit
+« qu'est-ce que j'ai travaillé ce jour-là » (une étiquette qu'on reconnaît, où
+« haut du corps » ne dirait rien).
+
+Deux marques complètent l'échelle **sans consommer de couleur** :
+`.kd-histdot--bare`, un simple contour, pour une séance de salle qui a bien eu
+lieu mais n'a rien de logué (l'historique d'avant Kadens Live) ; et l'**icône
+d'activité** pour l'endurance, dont le réalisé ne s'écrit jamais — une sortie
+course se dit par ses empreintes, pas par une teinte de plus.
+
 ### Types de série détaillée
 Alignés sur l'enum `SetType`, rendus par `components/_set_type.html.twig` en
 pastille sigle carrée : `W` échauffement, `D` dégressive, `F` à l'échec, `DS`
@@ -414,6 +453,48 @@ affiche déjà la même donnée ailleurs.
   horizontalement (§5). Doublée d'un tableau `.kd-sr-only` : une barre
   proportionnelle n'a rien à dire à un lecteur d'écran.
 
+### Page d'historique (`/profile/history`)
+Tous les mois d'un coup, du plus récent au plus ancien, en cases compactes —
+là où `/profile/stats` répond toujours d'une **fenêtre** choisie, celle-ci
+répond de l'étendue complète et n'a donc aucun paramètre d'URL.
+
+- **Grille de mois** (`.kd-histmonths`) : trois de front, deux sous 1200, un
+  sous 900. La grille de sept colonnes est **conservée à toutes les largeurs**,
+  contrairement au calendrier de planification qui bascule en agenda vertical
+  sous 560 : ici la case ne porte rien à lire, seulement des points, et la forme
+  du mois **est** l'information.
+- **Case** (`.kd-histday`) : un numéro en mono, puis **une ligne par séance**.
+  `min-height` fixe la case vide, rien ne plafonne la case pleine : deux séances
+  le même jour font deux lignes, pas un compteur. Volontairement distincte de
+  `.kd-calday` (116 px, grille en `min-width: 720px` qui défile en travers) —
+  douze mois d'affilée imposent le compact et **zéro débordement horizontal**.
+- **Séance** (`.kd-histsess`) : un **lien** vers `app_scheduled_workout_show`.
+  C'est ce qui sépare cette vue d'une carte de chaleur — on vient y retrouver
+  une séance, pas lire une densité. Survol et focus en aplat encre.
+- **Deux codes, deux questions.** La **couleur** (`.kd-histdot` +
+  `.kd-muscle--*`) dit les groupes musculaires travaillés ; elle vient du
+  réalisé, donc seule la salle en porte. Jusqu'à cinq pastilles, qui passent à
+  la ligne, triées par volume décroissant — la première se lit comme le thème du
+  jour. L'**icône** (`.kd-histsess--endurance`) dit la nature de la séance, et
+  c'est elle qui rend une sortie course, vélo ou natation visible là où elle
+  n'aurait qu'une case creuse. Conforme à la règle générale : « l'activité est
+  portée par l'icône » — aucune couleur n'est inventée pour elle.
+- **Décompte par nature** (`.kd-metric`, en tête de page) : chaque séance
+  comptée **une fois**, sous son activité dominante, donc la somme vaut le total
+  affiché. À ne pas confondre avec la répartition de `/profile/stats`, qui compte
+  une séance dans **chacune** de ses activités : deux questions différentes, deux
+  chiffres qui peuvent diverger sans se contredire, d'où deux libellés distincts.
+- **Légende collante** (`.kd-histlegend`, `position: sticky`) : la page est
+  longue, et un code qu'il faut remonter chercher n'en est pas un. CSS pur, rien
+  à câbler ; elle redevient statique sous 560, où elle mangerait trop de haut.
+- **Mois vide** (`.kd-histmonth--empty`) : conservé, jamais masqué — un trou est
+  une information, comme les périodes creuses de la rampe de volume — mais
+  estompé pour laisser les mois pleins accrocher l'œil.
+- **Accessibilité** : seules les cases qui portent quelque chose s'annoncent, en
+  une phrase complète (`aria-label` : date, séances, groupes). Les autres sont
+  `aria-hidden` — trente et un jours égrenés un à un sont du bruit, pas de
+  l'information.
+
 ---
 
 ## 8. Règles
@@ -422,7 +503,9 @@ affiche déjà la même donnée ailleurs.
    via un token sémantique (`--color-*`, `--font-*`).
 2. **La couleur porte du sens, et il n'y a qu'une couleur.** Le rouge est
    réservé aux actions primaires, à l'intensité et à l'échec. Une catégorie se
-   code par son rang dans `--color-cat-*`, pas par une teinte inventée.
+   code par son rang dans `--color-cat-*`, pas par une teinte inventée. **Une
+   seule exception, bornée à `/profile/history`** : les cinq groupes musculaires
+   (`--color-muscle-*`), cf. §2 — elle ne s'étend à aucun autre écran.
 3. **Nouvelle valeur = nouvelle primitive `--kd-*` d'abord**, puis token
    sémantique. On n'expose jamais une primitive directement aux vues.
 4. **Le condensé capitales ne touche pas au contenu saisi** (cf. §3).

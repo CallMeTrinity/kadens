@@ -1,0 +1,187 @@
+{% extends 'base.html.twig' %}
+{% import 'components/_activity.html.twig' as activity %}
+
+{# Historique complet en calendrier : tous les mois, du plus récent au plus
+   ancien, chaque jour listant les séances qui s'y sont tenues.
+
+   Quatre choses à ne pas défaire :
+
+   1. **Le template ne calcule rien.** TrainingHistory livre des années qui
+      contiennent des mois qui contiennent des semaines de sept cases ; chaque
+      case porte la liste de ses séances, déjà décrites. Même règle que la page
+      de statistiques, dont les hauteurs de barres arrivent déjà en pourcentages.
+
+   2. **Une case liste ses séances, elle ne les résume pas.** Deux séances le
+      même jour font deux liens, pas un compteur : on vient ici pour retrouver
+      une séance, pas pour lire une densité.
+
+   3. **Deux codes, deux questions.** La COULEUR dit quels groupes musculaires
+      ont été travaillés — elle vient du réalisé, donc seule la salle en porte.
+      L'ICÔNE dit la nature de la séance, et c'est elle qui rend une sortie
+      course ou vélo visible là où elle n'aurait qu'une case creuse. C'est la
+      règle du design system : « l'activité est portée par l'icône ».
+
+   4. **Les cases vides sont aria-hidden.** Un mois de 31 jours annoncés un à un
+      est du bruit ; seules les cases qui portent quelque chose s'annoncent, et
+      chaque séance porte son propre libellé de lien. #}
+
+{% block title %}Historique — Kadens{% endblock %}
+
+{% block body %}
+    {% set years = history.years %}
+
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow kd-eyebrow--accent">Historique</p>
+            <h1 class="kd-title">Ton année, jour par jour</h1>
+            {% if years is not empty %}
+                {# Le libellé du premier mois d'historique est déjà calculé : les
+                   années sont triées du plus récent au plus ancien, donc c'est le
+                   dernier mois de la dernière année. Pas de second formatage de
+                   date à tenir d'accord avec celui du service. #}
+                <p class="kd-pagehead__lead">
+                    Depuis {{ years|last.months|last.label }} ·
+                    {{ history.totals.sessions }} séance{{ history.totals.sessions > 1 ? 's' }} faite{{ history.totals.sessions > 1 ? 's' }}
+                    sur {{ history.totals.activeDays }} jour{{ history.totals.activeDays > 1 ? 's' }}
+                </p>
+            {% endif %}
+        </div>
+        <div class="kd-actionbar__end">
+            <a href="{{ path('app_profile_stats') }}" class="kd-btn kd-btn--secondary">
+                {{ ux_icon('lucide:chart-column') }} Statistiques
+            </a>
+            <a href="{{ path('app_profile') }}" class="kd-btn kd-btn--ghost">
+                {{ ux_icon('lucide:arrow-left') }} Retour au profil
+            </a>
+        </div>
+    </div>
+
+    {% if years is empty %}
+        <div class="kd-empty">
+            {{ ux_icon('lucide:calendar-off') }}
+            <div>Aucun historique pour l'instant.</div>
+            <p class="kd-empty__hint">Dès qu'une séance est posée au calendrier, elle apparaît ici.</p>
+        </div>
+    {% else %}
+        {# Répartition par nature. Chaque séance compte pour UNE, sous son
+           activité dominante : la somme vaut le total affiché plus haut. À ne
+           pas confondre avec la répartition de /profile/stats, qui compte une
+           séance dans chacune de ses activités — deux questions, deux chiffres,
+           d'où deux libellés distincts. #}
+        {% if history.totals.byActivity is not empty %}
+            <div class="kd-grid kd-grid--4 kd-section__block">
+                {% for row in history.totals.byActivity %}
+                    <div class="kd-metric">
+                        <span class="kd-metric__icon">
+                            {{ ux_icon(row.activity ? activity.icon(row.activity)|trim : 'lucide:circle-dot') }}
+                        </span>
+                        <div>
+                            <div class="kd-metric__value">{{ row.sessions }}</div>
+                            {# `activity` null = ni prescrit ni réalisé ne dit la
+                               nature de la séance. Ce n'est pas « sans
+                               programme » (l'historique importé n'en a pas et se
+                               range très bien) : c'est une séance restée vide. #}
+                            <div class="kd-metric__label">
+                                {{ row.activity ? row.activity.label : 'Sans contenu' }}
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {# Légende collante : la page est longue, et un code couleur qu'il faut
+           remonter chercher n'est pas un code couleur. `position: sticky` est du
+           CSS pur — rien à câbler. #}
+        <div class="kd-histlegend">
+            <ul class="kd-legend">
+                {% for group in groups %}
+                    <li class="kd-legend__item">
+                        <span class="kd-legend__key kd-muscle--{{ group.value }}" aria-hidden="true"></span>
+                        {{ group.label }}
+                    </li>
+                {% endfor %}
+                <li class="kd-legend__item">
+                    <span class="kd-legend__key kd-histdot--bare" aria-hidden="true"></span>
+                    Sans réalisé
+                </li>
+                <li class="kd-legend__item kd-legend__item--icon">
+                    {{ ux_icon('lucide:footprints') }}{{ ux_icon('lucide:bike') }}{{ ux_icon('lucide:waves') }}
+                    Endurance
+                </li>
+            </ul>
+        </div>
+
+        {% for year in years %}
+            <section class="kd-section kd-histyear">
+                <div class="kd-pagehead kd-pagehead--sub">
+                    <div>
+                        <h2 class="kd-title kd-title--sm">{{ year.year }}</h2>
+                    </div>
+                    <p class="kd-histyear__count">
+                        {{ year.sessions }} séance{{ year.sessions > 1 ? 's' }}
+                    </p>
+                </div>
+
+                <div class="kd-histmonths">
+                    {% for month in year.months %}
+                        <div class="kd-histmonth{{ month.sessions == 0 ? ' kd-histmonth--empty' }}">
+                            <div class="kd-histmonth__head">
+                                <h3 class="kd-histmonth__title">{{ month.label }}</h3>
+                                {% if month.sessions > 0 %}
+                                    <span class="kd-histmonth__count">{{ month.sessions }}</span>
+                                {% endif %}
+                            </div>
+
+                            <div class="kd-histgrid">
+                                {% for label in ['L', 'M', 'M', 'J', 'V', 'S', 'D'] %}
+                                    <div class="kd-histgrid__dow" aria-hidden="true">{{ label }}</div>
+                                {% endfor %}
+
+                                {% for week in month.weeks %}
+                                    {% for day in week %}
+                                        {% set shown = day.inMonth ? day.sessions : [] %}
+
+                                        <div class="kd-histday
+                                                    {{- not day.inMonth ? ' kd-histday--out' }}
+                                                    {{- day.isToday ? ' kd-histday--today' }}
+                                                    {{- shown is not empty ? ' kd-histday--done' }}"
+                                             {{ shown is empty ? 'aria-hidden="true"' : '' }}>
+                                            <span class="kd-histday__num">{{ day.date|date('j') }}</span>
+
+                                            {% for session in shown %}
+                                                {# Chaque séance est un lien à part entière : son
+                                                   libellé porte la date, son titre et ce qu'on y a
+                                                   fait, pour se tenir seul dans une liste de liens. #}
+                                                {% set label = day.date|date('j') ~ ' ' ~ month.label ~ ' — ' ~ session.title
+                                                    ~ (session.groups is not empty
+                                                        ? ' — ' ~ session.groups|map(g => g.label)|join(', ')
+                                                        : (session.endurance
+                                                            ? ' — ' ~ session.activity.label
+                                                            : ' — sans réalisé')) %}
+
+                                                <a class="kd-histsess{{ session.endurance ? ' kd-histsess--endurance' }}"
+                                                   href="{{ path('app_scheduled_workout_show', {id: session.id}) }}"
+                                                   title="{{ label }}" aria-label="{{ label }}">
+                                                    {% if session.endurance %}
+                                                        {{ ux_icon(activity.icon(session.activity)|trim) }}
+                                                    {% elseif session.groups is empty %}
+                                                        <span class="kd-histdot kd-histdot--bare"></span>
+                                                    {% else %}
+                                                        {% for group in session.groups %}
+                                                            <span class="kd-histdot kd-muscle--{{ group.value }}"></span>
+                                                        {% endfor %}
+                                                    {% endif %}
+                                                </a>
+                                            {% endfor %}
+                                        </div>
+                                    {% endfor %}
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </section>
+        {% endfor %}
+    {% endif %}
+{% endblock %}

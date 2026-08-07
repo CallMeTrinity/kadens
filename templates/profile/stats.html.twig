@@ -27,9 +27,16 @@
             <h1 class="kd-title">Ce que tu as fait</h1>
             <p class="kd-pagehead__lead">{{ period.label }}</p>
         </div>
-        <a href="{{ path('app_profile') }}" class="kd-btn kd-btn--ghost">
-            {{ ux_icon('lucide:arrow-left') }} Retour au profil
-        </a>
+        <div class="kd-actionbar__end">
+            {# L'historique n'a pas de fenêtre : il n'hérite donc pas du `?range=`
+               courant, et c'est volontaire. #}
+            <a href="{{ path('app_profile_history') }}" class="kd-btn kd-btn--secondary">
+                {{ ux_icon('lucide:history') }} Historique
+            </a>
+            <a href="{{ path('app_profile') }}" class="kd-btn kd-btn--ghost">
+                {{ ux_icon('lucide:arrow-left') }} Retour au profil
+            </a>
+        </div>
     </div>
 
     {{ include('profile/_stats_range.html.twig', {period: period, ranges: ranges, months: months}) }}

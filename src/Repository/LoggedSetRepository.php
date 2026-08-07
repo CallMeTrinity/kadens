@@ -229,6 +229,55 @@ class LoggedSetRepository extends ServiceEntityRepository
     }
 
     /**
+     * Le même volume croisé sur les DEUX axes : une séance datée, un exercice,
+     * un nombre de séries. C'est ce qui permet de dire « cette séance-là,
+     * jambes et dos » — l'appelant croise `exerciseId` avec les `targetAreas` de
+     * la bibliothèque, exactement comme pour la ventilation par région, mais
+     * sans replier les séances entre elles.
+     *
+     * **Le groupement porte sur la séance, pas sur le jour**, et ce n'est pas un
+     * détail : deux séances le même jour (une salle le matin, une course le
+     * soir) doivent rester deux lignes distinctes à l'écran. Replier par date
+     * les fondrait en une seule, et il n'y aurait plus rien à cliquer.
+     *
+     * Volontairement pauvre : ni tonnage, ni charge, ni nom. La question posée
+     * est « qu'est-ce qui a été touché », pas « combien ça pesait » — et le
+     * nombre de lignes est déjà le produit des deux axes, il n'a pas besoin de
+     * porter des colonnes que personne ne lit. Ce que ça coûte reste borné par
+     * la pratique réelle (quelques exercices par séance), pas par la profondeur
+     * de l'historique.
+     *
+     * Un `exerciseId` à null (définition supprimée, FK SET NULL) est **conservé
+     * en ligne** : le volume a bien eu lieu. C'est l'appelant qui décide s'il
+     * peut lui attribuer un groupe musculaire — sans définition, il n'a plus de
+     * zones, donc il ne colore rien.
+     *
+     * Périmètre : celui de `workingSetWindow()`, comme les deux méthodes
+     * ci-dessus — échauffement exclu, exercice sauté exclu, série non chiffrée
+     * exclue (cf. `measured()`), statut de la séance non filtré.
+     *
+     * @return list<array{scheduledId: int, exerciseId: int|null, workingSets: int}>
+     */
+    public function gymTotalsByScheduledAndExerciseForOwner(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
+    {
+        $qb = $this->workingSetWindow($owner, $start, $end)
+            ->select(
+                's.id AS scheduledId',
+                'IDENTITY(le.exercise) AS exerciseId',
+                'COUNT(ls.id) AS workingSets',
+            )
+            ->groupBy('s.id')
+            ->addGroupBy('exerciseId')
+            ->orderBy('s.id', 'ASC');
+
+        return array_map(static fn (array $row): array => [
+            'scheduledId' => (int) $row['scheduledId'],
+            'exerciseId' => null !== $row['exerciseId'] ? (int) $row['exerciseId'] : null,
+            'workingSets' => (int) $row['workingSets'],
+        ], $qb->getQuery()->getArrayResult());
+    }
+
+    /**
      * La charge maximale soulevée sur chaque exercice **avant** une date : la
      * référence contre laquelle se juge un record de la fenêtre.
      *

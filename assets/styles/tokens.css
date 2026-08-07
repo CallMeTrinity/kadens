@@ -84,6 +84,26 @@
   --kd-cat-3: #8a8a82;
   --kd-cat-4: #c9c9c2;
 
+  /* Groupes musculaires — L'EXCEPTION COLORÉE du design system, et la seule.
+     Elle existe pour la page d'historique (/profile/history), qui doit coder
+     cinq groupes d'entraînement (jambes, pectoraux, dos, bras, autres) sur des
+     pastilles de 6 px : l'échelle catégorielle n'a que quatre nuances, et cinq
+     gris de 6 px ne se distinguent pas à la volée.
+
+     Teintes d'encre désaturées, pensées pour cohabiter avec le papier froid et
+     rester à distance du rouge d'accent, qui garde son sens (action, intensité,
+     échec). Comme l'échelle catégorielle, elles ne portent JAMAIS de texte :
+     aplats de pastille et carrés de légende, rien d'autre.
+
+     Portée : cet écran seul. Toute autre catégorie — activité, région
+     anatomique, rôle de bloc — reste sur --color-cat-1..4. Voir
+     docs/design-system.md §2. */
+  --kd-muscle-legs:  #1d4e7a; /* bleu d'encre */
+  --kd-muscle-chest: #a8632a; /* ocre brûlé */
+  --kd-muscle-back:  #2f6b4f; /* vert bouteille */
+  --kd-muscle-arms:  #6b3b6e; /* prune */
+  --kd-muscle-other: #7a7a73; /* gris (même valeur que --kd-ink-outside) */
+
   /* Statuts prévu / réalisé — sémantiques, donc distincts de l'échelle
      catégorielle : fait = vert, prévu = gris, manqué = rouge (le rouge
      signale l'écart au plan, cohérent avec son usage « intensité / échec »). */
@@ -216,6 +236,14 @@
   --color-cat-2:           var(--kd-cat-2);
   --color-cat-3:           var(--kd-cat-3);
   --color-cat-4:           var(--kd-cat-4);
+
+  /* Groupes musculaires — l'exception colorée, bornée à /profile/history.
+     Cf. le commentaire des primitives ci-dessus et docs/design-system.md §2. */
+  --color-muscle-legs:     var(--kd-muscle-legs);
+  --color-muscle-chest:    var(--kd-muscle-chest);
+  --color-muscle-back:     var(--kd-muscle-back);
+  --color-muscle-arms:     var(--kd-muscle-arms);
+  --color-muscle-other:    var(--kd-muscle-other);
 
   /* Accents d'activité — l'activité est portée par l'ICÔNE, la couleur ne fait
      que la ranger dans l'échelle catégorielle. Les cinq activités sont
