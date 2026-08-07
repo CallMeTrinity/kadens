@@ -23,7 +23,14 @@ parameters:
 
     # En dessous, l'app se bloque d'elle-même. Ne monte **que** si le format de
     # synchronisation change : c'est un garde-fou, pas un levier de mise à jour.
-    app.mobile.minimum_version_code: 10
+    #
+    # Ramené à 1 le 07/08/2026 : l'APK de la 1.0.0 embarque un manifeste qui
+    # annonce `versionCode: 1` (le workflow ne posait `KADENS_VERSION_CODE` qu'au
+    # prebuild, pas à l'étape Gradle qui regénère ce manifeste). Toutes les
+    # installations de la 1.0.0 se croient donc sous un plancher à 10 et affichent
+    # l'écran de blocage. Le plancher ne se remontera qu'après une version dont la
+    # version embarquée est vérifiée à la compilation.
+    app.mobile.minimum_version_code: 1
 
     # Le dépôt qui héberge les releases. L'APK en téléchargement direct s'en
     # dérive, avec le nom de fichier composé par `.github/workflows/build.yml`.
