@@ -62,7 +62,7 @@ use App\Repository\ScheduledWorkoutRepository;
  * @phpstan-import-type ApiHistoryEntry from PerformanceHistoryPayload
  *
  * @phpstan-type ApiExercise array{id: int|null, name: string|null, nameEn: string|null, description: string|null, activity: string|null, targetAreas: list<string>, mediaUrl: string|null, global: bool, updatedAt: string|null}
- * @phpstan-type ApiBootstrap array{serverTime: string, since: string|null, window: array{from: string, to: string}, exercises: list<ApiExercise>, schedule: list<ApiScheduledWorkout>, history: list<ApiHistoryEntry>, deleted: array{exercises: list<int>, schedule: list<string>}}
+ * @phpstan-type ApiBootstrap array{serverTime: string, since: string|null, exerciseLanguage: string, window: array{from: string, to: string}, exercises: list<ApiExercise>, schedule: list<ApiScheduledWorkout>, history: list<ApiHistoryEntry>, deleted: array{exercises: list<int>, schedule: list<string>}}
  */
 final class BootstrapPayload
 {
@@ -113,6 +113,16 @@ final class BootstrapPayload
             // ne contrôle pas.
             'serverTime' => $now->format(\DateTimeInterface::ATOM),
             'since' => $since?->format(\DateTimeInterface::ATOM),
+            // La langue d'affichage des noms d'exercices, telle que le compte la
+            // règle dans `/profile/settings`. Elle descend ici et pas dans
+            // `/api/me` parce que c'est **avec la bibliothèque** qu'elle sert :
+            // le téléphone la persiste au même moment que les `nameEn` qu'elle
+            // gouverne, et un client qui pull sans jamais appeler `/api/me`
+            // afficherait sinon la langue d'origine sans savoir qu'il le fait.
+            // Le libellé, lui, reste résolu **côté client** (§8 de
+            // `docs/feature-exercise-naming.md`) : le nom qui voyage est celui
+            // de la bibliothèque, pas celui d'une préférence figée au pull.
+            'exerciseLanguage' => $user->getExerciseLanguage()->value,
             'window' => ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')],
             'exercises' => $this->exercisePayloads($owners, $since),
             'schedule' => $schedule,

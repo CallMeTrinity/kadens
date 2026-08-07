@@ -514,6 +514,7 @@ qu'il a descendu.
 |---|---|
 | `serverTime` | L'horloge du **serveur**. C'est cette valeur que le client stocke et renvoie en `since` — se fier à la pendule du téléphone ferait dépendre la synchro d'une horloge qu'on ne contrôle pas. |
 | `since` | L'écho du paramètre reçu, ou `null`. |
+| `exerciseLanguage` | `fr` ou `en` — la langue sous laquelle le **compte** lit les noms d'exercices (`/profile/settings`). Voir plus bas. |
 | `window` | `{from, to}` — J-30 → J+14. **Fait autorité** (§4.5). |
 | `exercises` | La bibliothèque visible : la sienne, la globale, celle de ses coachs et de ses athlètes acceptés. |
 | `schedule` | Les séances datées de la fenêtre **qui se consignent**, structure du §6.7. Voir juste en dessous. |
@@ -547,6 +548,7 @@ $ curl -sk "https://127.0.0.1:8000/api/bootstrap" -H "Authorization: Bearer $TOK
 {
   "serverTime": "2026-08-02T21:58:55+00:00",
   "since": null,
+  "exerciseLanguage": "fr",
   "window": { "from": "2026-07-03", "to": "2026-08-16" },
   "exercises": [
     {
@@ -588,12 +590,29 @@ remplacés ici par leur **nombre d'entrées**) :
 L'uuid listé dans `deleted` est celui d'une séance libre supprimée juste avant
 (§6.9).
 
-**`nameEn`** (ajouté) porte le nom anglais de l'exercice, `null` quand le nom
-français EST déjà l'anglais (« Dips », « Fartlek »). Le champ est **additif** :
-un client qui l'ignore continue d'afficher `name`, ce que fait l'app Android
-aujourd'hui — la préférence de langue est pour l'instant une affaire de
-navigateur. Un client qui l'adopte doit garder le repli sur `name`, `nameEn`
-étant facultatif par construction.
+**`nameEn`** porte le nom anglais de l'exercice, `null` quand le nom français EST
+déjà l'anglais (« Dips », « Fartlek »). Le champ est **additif** : un client qui
+l'ignore continue d'afficher `name`. Un client qui l'adopte doit garder le repli
+sur `name`, `nameEn` étant facultatif par construction.
+
+**`exerciseLanguage`** dit sous quelle langue le compte lit ces noms. Trois
+choses à savoir avant de s'en servir :
+
+1. **Les deux libellés descendent toujours, le serveur n'en choisit aucun.** Il
+   ne peut pas : `?since` allège la bibliothèque, la préférence peut changer
+   entre deux pulls, et un `name` traduit à la descente resterait figé sur toutes
+   les lignes que le delta ne remonte pas. Le client résout le libellé à
+   l'affichage, avec le repli sur `name`.
+2. **Le prescrit et le réalisé n'y échappent pas** : `blocks[].exercises[].name`
+   et `log[].name` sont écrits en français, comme la bibliothèque. Le premier est
+   le nom de l'exercice **vivant**, le second un snapshot. Un client bilingue
+   les rerésout par `exerciseId` sur sa copie de la bibliothèque, et ne retombe
+   sur le nom transporté que lorsqu'il n'a pas d'exercice à quoi le rattacher —
+   la règle du web, mot pour mot (`docs/feature-exercise-naming.md` §4).
+3. **Elle descend ici et pas dans `/api/me`** parce que c'est avec la
+   bibliothèque qu'elle sert : le téléphone la persiste au même moment que les
+   `nameEn` qu'elle gouverne. Elle est en lecture seule — l'API n'a aucun moyen
+   de la changer, elle se règle dans `/profile/settings`.
 
 Le champ n'a **pas** demandé de forçage du delta : la commande
 `app:import-exercises` réécrit les lignes qu'elle renseigne, `updatedAt` se pose

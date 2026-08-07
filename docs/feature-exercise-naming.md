@@ -262,19 +262,44 @@ que l'autre s'entraîne à faire. Même logique que
 
 ---
 
-## 8. API mobile
+## 8. API mobile et téléphone
 
-`GET /api/bootstrap` expose `exercises[].nameEn`. **Additif** : un client qui
-l'ignore continue d'afficher `name`, ce que fait l'app Android aujourd'hui — la
-préférence de langue reste une affaire de navigateur. Un client qui l'adopte doit
-garder le repli sur `name`, `nameEn` étant facultatif par construction.
+`GET /api/bootstrap` expose `exercises[].nameEn` et, à la racine,
+`exerciseLanguage` (`fr` / `en`). **Additif** : un client qui les ignore continue
+d'afficher `name`. Un client qui les adopte garde le repli sur `name`, `nameEn`
+étant facultatif par construction.
 
-Le champ n'a pas demandé de forçage du delta : l'import réécrit les lignes qu'il
-renseigne, `updatedAt` se pose donc tout seul et le prochain `?since` les
-remonte.
+Le champ `nameEn` n'a pas demandé de forçage du delta : l'import réécrit les
+lignes qu'il renseigne, `updatedAt` se pose donc tout seul et le prochain
+`?since` les remonte.
 
-`kadens-mobile` n'est pas modifié : ni `src/db/schema.ts`, ni migration Drizzle,
-ni les points d'affichage. Chantier suivant.
+### Le serveur n'élit pas de libellé, même en connaissant la préférence
+
+`ScheduledWorkoutPayload` continue d'écrire le nom **français** dans
+`blocks[].exercises[].name` et `log[].name`, et la bibliothèque descend ses deux
+libellés. Traduire à la descente aurait été plus court à écrire et faux à
+l'usage : `?since` n'allège que la bibliothèque, la préférence peut changer entre
+deux pulls, et un `name` traduit resterait figé dans l'ancienne langue sur toutes
+les lignes qu'un delta ne remonte pas — c'est-à-dire, en régime établi, sur la
+quasi-totalité de la table. C'est pourquoi `exerciseLanguage` voyage avec la
+bibliothèque plutôt que dans `/api/me` : le téléphone persiste la préférence au
+même moment que les `nameEn` qu'elle gouverne.
+
+### Ce que le téléphone en fait
+
+`kadens-mobile` porte le pendant exact de `ExerciseNaming` :
+`src/session/naming.ts`, seul endroit qui décide d'un libellé. Les mêmes replis,
+la même règle « le nom vivant prime sur la copie figée » (le déroulé rerésout par
+`exerciseId` sur sa copie de la bibliothèque et ne retombe sur le nom transporté
+que si l'exercice en a disparu), et la recherche bilingue de la palette. La
+préférence est en **lecture seule** sur le téléphone — elle s'affiche dans la
+carte « Compte » des réglages, elle se change sur le site.
+
+Une règle d'écriture s'ajoute, propre au mobile : ce qui se **fige** — le
+`exerciseName` d'un réalisé, qui remonte ensuite au serveur — prend le nom
+canonique de la bibliothèque, jamais le libellé affiché. Un snapshot ne porte
+qu'une langue, et de l'anglais figé là ressortirait dans le réalisé d'un compte
+repassé en français.
 
 ---
 

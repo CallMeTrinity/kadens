@@ -15,6 +15,7 @@ use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\BlockRole;
 use App\Enum\CoachingStatus;
+use App\Enum\ExerciseLanguage;
 use App\Enum\PrescriptionType;
 use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
@@ -97,6 +98,10 @@ final class ApiBootstrapTest extends WebTestCase
         self::assertSame((new \DateTimeImmutable('+14 days'))->format('Y-m-d'), $payload['window']['to']);
         self::assertNull($payload['since']);
         self::assertNotEmpty($payload['serverTime']);
+        // La langue du compte descend avec la bibliothèque : c'est elle qui dit
+        // au téléphone sous quel libellé afficher les `nameEn` qu'il vient de
+        // recevoir. Défaut `fr`, comme la colonne.
+        self::assertSame('fr', $payload['exerciseLanguage']);
 
         self::assertCount(1, $payload['schedule']);
         $session = $payload['schedule'][0];
@@ -132,6 +137,34 @@ final class ApiBootstrapTest extends WebTestCase
         // Un jeu complet n'a rien à défalquer.
         self::assertSame([], $payload['deleted']['exercises']);
         self::assertSame([], $payload['deleted']['schedule']);
+    }
+
+    /**
+     * Les deux libellés descendent **toujours les deux**, et c'est la préférence
+     * du compte qui dit lequel afficher. Le serveur ne choisit pas à la place du
+     * client : il ne peut pas, la bibliothèque est allégée par `?since` alors que
+     * la préférence peut changer entre deux pulls — un `name` traduit au pull
+     * resterait figé sur toutes les lignes qu'un delta ne remonte pas.
+     */
+    public function testTheAccountLanguageTravelsWithBothLabels(): void
+    {
+        $user = $this->createUser('athlete@example.com');
+        $user->setExerciseLanguage(ExerciseLanguage::EN);
+        $this->createExercise('Tractions en supination', null)->setNameEn('Chin-up');
+        $this->createExercise('Dips', null); // le français EST l'anglais : pas de nameEn
+        $this->em->flush();
+
+        $payload = $this->bootstrap($this->issueToken($user));
+
+        self::assertSame('en', $payload['exerciseLanguage']);
+
+        $labels = [];
+        foreach ($payload['exercises'] as $exercise) {
+            $labels[$exercise['name']] = $exercise['nameEn'];
+        }
+
+        self::assertSame('Chin-up', $labels['Tractions en supination']);
+        self::assertNull($labels['Dips'], 'Un nameEn recopié à l\'identique serait du bruit.');
     }
 
     /**
