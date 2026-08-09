@@ -80,6 +80,68 @@ final class WorkoutMetricsTest extends TestCase
         self::assertSame(0.0, $vol['gym']['tonnageKg']);
     }
 
+    public function testDerivedDistanceComesFromDurationAndPaceOnly(): void
+    {
+        // 45 min à 5:00/km = 9 km. La distance n'est pas saisie : c'est le seul cas
+        // où on la déduit.
+        $run = $this->prescribed(ActivityType::RUNNING, PrescriptionType::DURATION, []);
+        $run->setDurationSeconds(2700)->setPaceSecondsPerKm(300);
+
+        $vol = $this->metrics->volume($this->workout([$this->block(BlockRole::MAIN, 1, [$run])]));
+
+        self::assertSame(9000, $vol['running']['derivedMeters']);
+        // La distance SAISIE reste vide : la déduite ne s'y verse jamais, sinon une
+        // estimation passerait pour une consigne.
+        self::assertSame(0, $vol['running']['meters']);
+        self::assertSame(2700, $vol['running']['seconds']);
+    }
+
+    public function testDerivedDistanceStaysEmptyWithoutPaceOrWhenDistanceIsGiven(): void
+    {
+        // Durée seule, sans allure : rien à déduire, la case reste vide.
+        $noPace = $this->prescribed(ActivityType::RUNNING, PrescriptionType::DURATION, []);
+        $noPace->setDurationSeconds(1800);
+
+        // Distance saisie ET allure : la consigne fait autorité, on ne double pas.
+        $given = $this->prescribed(ActivityType::CYCLING, PrescriptionType::DISTANCE_PACE, []);
+        $given->setDistanceMeters(30000)->setDurationSeconds(3600)->setPaceSecondsPerKm(120);
+
+        $vol = $this->metrics->volume($this->workout([$this->block(BlockRole::MAIN, 1, [$noPace, $given])]));
+
+        self::assertSame(0, $vol['running']['derivedMeters']);
+        self::assertSame(0, $vol['cycling']['derivedMeters']);
+        self::assertSame(30000, $vol['cycling']['meters']);
+    }
+
+    public function testDerivedDistanceMultipliesByBlockRounds(): void
+    {
+        // 4 min à 4:00/km = 1 km, dans un bloc à 5 tours (fractionné).
+        $interval = $this->prescribed(ActivityType::RUNNING, PrescriptionType::DURATION, []);
+        $interval->setDurationSeconds(240)->setPaceSecondsPerKm(240);
+
+        $vol = $this->metrics->volume($this->workout([$this->block(BlockRole::MAIN, 5, [$interval])]));
+
+        self::assertSame(5000, $vol['running']['derivedMeters']);
+        self::assertSame(1200, $vol['running']['seconds']);
+    }
+
+    public function testUnmappedSetsCountGymExercisesWithoutTargetArea(): void
+    {
+        // Un exercice de renforcement sans zone déclarée entre bien dans le total
+        // des séries, mais dans aucune part de setsByArea : sans ce compteur, la
+        // carte musculaire resterait vide sans rien pour l'expliquer.
+        $unmapped = $this->prescribed(ActivityType::GYM, PrescriptionType::SETS_REPS, []);
+        $unmapped->setSets(3)->setReps(10);
+        $mapped = $this->prescribed(ActivityType::GYM, PrescriptionType::SETS_REPS, [TargetArea::CHEST]);
+        $mapped->setSets(4)->setReps(8);
+
+        $vol = $this->metrics->volume($this->workout([$this->block(BlockRole::MAIN, 2, [$unmapped, $mapped])]));
+
+        self::assertSame(6, $vol['gym']['unmappedSets']);
+        self::assertSame(14, $vol['gym']['totalSets']);
+        self::assertSame(8, $vol['gym']['setsByArea']['chest']);
+    }
+
     public function testDetailedSetsCountWorkingSetsAndTonnagePerRow(): void
     {
         // Séries hétérogènes : 1 échauffement 10 @ 40, 2 travail 8 @ 100, 1 drop 6 @ 80.

@@ -10,6 +10,8 @@ use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\BlockRole;
+use App\Enum\BodySide;
+use App\Enum\BodySilhouette;
 use App\Enum\PrescriptionType;
 use App\Form\BlockType;
 use App\Form\PrescribedExerciseType;
@@ -18,11 +20,15 @@ use App\Repository\ExerciseRepository;
 use App\Repository\LoggedExerciseRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\WorkoutVoter;
+use App\Service\BodyLoad;
+use App\Service\BodyPlates;
 use App\Service\CoachedLibrary;
+use App\Service\PerformanceHistory;
 use App\Service\PlanFlattener;
 use App\Service\SetSynchronizer;
 use App\Service\SlugGenerator;
 use App\Service\SupersetGrouper;
+use App\Service\UnitFormatter;
 use App\Service\WorkoutCloner;
 use App\Service\WorkoutEstimator;
 use App\Service\WorkoutMetrics;
@@ -60,9 +66,13 @@ final class WorkoutController extends AbstractController
         private readonly PlanFlattener $planFlattener,
         private readonly ExerciseRepository $exerciseRepository,
         private readonly LoggedExerciseRepository $loggedExerciseRepository,
+        private readonly PerformanceHistory $performanceHistory,
         private readonly WorkoutEstimator $estimator,
         private readonly SetSynchronizer $setSynchronizer,
         private readonly SupersetGrouper $supersets,
+        private readonly BodyLoad $bodyLoad,
+        private readonly BodyPlates $bodyPlates,
+        private readonly UnitFormatter $units,
     ) {
     }
 
@@ -629,6 +639,120 @@ final class WorkoutController extends AbstractController
     }
 
     /**
+     * Le bandeau du compositeur : la carte des muscles chargés et le volume prévu.
+     *
+     * **Chargé après la page, et rafraîchi à chaque mutation** (contrôleur
+     * `composer`). Deux raisons qui vont dans le même sens : le contenu change à
+     * chaque exercice posé, et les deux planches pèsent ~70 Ko de tracés — les
+     * poser dans le HTML initial ralentirait l'ouverture du compositeur pour une
+     * information qu'on ne lit pas en premier.
+     *
+     * Cette route ne mute rien : c'est le pendant de `app_plan_template_grid`,
+     * qui re-rend la trame du plan sans la toucher.
+     *
+     * L'AJAX post-chargement est proscrit sur les pages de CONSULTATION, parce
+     * qu'il casserait leur cache offline. Le compositeur n'en est pas une : il est
+     * déjà entièrement piloté par `fetch` et marqué `data-turbo="false"`.
+     */
+    #[Route('/{id}/volume', name: 'app_workout_volume', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function volume(Request $request, Workout $workout, WorkoutMetrics $metrics): Response
+    {
+        $this->denyAccessUnlessGranted(WorkoutVoter::VIEW, $workout);
+
+        $context = $this->volumeContext($workout, $metrics);
+
+        if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
+            $request->setRequestFormat(TurboBundle::STREAM_FORMAT);
+
+            return $this->render('workout/stream/volume.stream.html.twig', $context);
+        }
+
+        // Repli sans JS : le fragment nu. Personne ne l'atteint depuis le
+        // compositeur, mais une route qui ne répond qu'en stream est une route
+        // qu'on ne peut pas ouvrir pour la déboguer.
+        return $this->render('workout/_volume.html.twig', $context);
+    }
+
+    /**
+     * Ce que le bandeau a besoin de savoir : le dessin, les paliers, les chiffres.
+     *
+     * La **silhouette** se lit sur l'utilisateur CONNECTÉ et non sur le
+     * propriétaire de la séance, contrairement au volume : c'est un réglage
+     * d'affichage, il appartient à celui qui regarde. Un coach voit donc la
+     * silhouette qu'il a choisie, avec les chiffres de son athlète.
+     *
+     * @return array<string, mixed>
+     */
+    private function volumeContext(Workout $workout, WorkoutMetrics $metrics): array
+    {
+        $volume = $metrics->volume($workout);
+        $load = $this->bodyLoad->for($volume['gym']['setsByArea'], $volume['gym']['unmappedSets']);
+
+        $user = $this->getUser();
+        $silhouette = $user instanceof User ? $user->getBodySilhouette() : BodySilhouette::MALE;
+
+        return [
+            'workout' => $workout,
+            'volume' => $volume,
+            'load' => $load,
+            'plates' => [
+                $this->bodyPlates->plate($silhouette, BodySide::FRONT),
+                $this->bodyPlates->plate($silhouette, BodySide::BACK),
+            ],
+            'endurance' => $this->enduranceLines($volume),
+        ];
+    }
+
+    /**
+     * Les lignes d'endurance à afficher, déjà formatées et déjà filtrées : une
+     * activité absente de la séance n'a pas de ligne, et une ligne sans distance
+     * ni durée n'existe pas.
+     *
+     * `derivedMeters` reste distinct de `meters` jusqu'ici : le total additionne
+     * les deux, mais la part déduite est dite à part — une estimation tirée d'une
+     * allure n'est pas une consigne, et l'écran doit pouvoir le signaler.
+     *
+     * @param array<string, mixed> $volume sortie de WorkoutMetrics::volume()
+     *
+     * @return list<array{activity: ActivityType, meters: int, derivedMeters: int, distanceLabel: string, durationLabel: string|null}>
+     */
+    private function enduranceLines(array $volume): array
+    {
+        $lines = [];
+
+        // Une liste de paires et non un tableau indexé par enum : une clé de
+        // tableau PHP ne peut pas être un enum.
+        $activities = [
+            [ActivityType::RUNNING, 'running'],
+            [ActivityType::CYCLING, 'cycling'],
+            [ActivityType::SWIMMING, 'swimming'],
+        ];
+
+        foreach ($activities as [$activity, $key]) {
+            /** @var array{meters: int, seconds: int, derivedMeters: int} $data */
+            $data = $volume[$key];
+            $total = $data['meters'] + $data['derivedMeters'];
+
+            if (0 === $total && 0 === $data['seconds']) {
+                continue;
+            }
+
+            $lines[] = [
+                'activity' => $activity,
+                'meters' => $data['meters'],
+                'derivedMeters' => $data['derivedMeters'],
+                // Sans distance ni allure, la case reste vide plutôt que d'afficher
+                // un « ? » : ce n'est pas une valeur manquante, c'est une séance
+                // décrite en durée seule.
+                'distanceLabel' => $total > 0 ? $this->units->distance($total) : '',
+                'durationLabel' => $data['seconds'] > 0 ? $this->units->duration($data['seconds']) : null,
+            ];
+        }
+
+        return $lines;
+    }
+
+    /**
      * Enregistre les paramètres d'un exercice depuis la mini-modale. Même
      * traitement que editPrescribed, mais renvoie le stream du panneau rapide
      * (#quick-panel) et non celui du compositeur (#workout-blocks). Sans JS, repli
@@ -1012,6 +1136,9 @@ final class WorkoutController extends AbstractController
             // suive le passage simple <-> détaillé.
             'prescribedForm' => $this->createPrescribedForm($prescribed)->createView(),
             'setForms' => $this->setFormsFor($prescribed),
+            // Le stream re-rend `_prescribed_params`, qui porte le rappel d'historique :
+            // sans cette clé, il disparaîtrait au premier ajout de série.
+            'history' => $this->historyFor($workout, [$prescribed->getExercise()?->getId()]),
         ];
     }
 
@@ -1083,6 +1210,8 @@ final class WorkoutController extends AbstractController
         $setForms = [];
         $segments = [];
 
+        $exerciseIds = [];
+
         foreach ($workout->getBlocks() as $block) {
             $blockForms[$block->getId()] = $this->createBlockForm($block)->createView();
             // Le compositeur rend les exercices segment par segment (isolé ou
@@ -1092,6 +1221,7 @@ final class WorkoutController extends AbstractController
 
             foreach ($block->getPrescribedExercises() as $prescribed) {
                 $prescribedForms[$prescribed->getId()] = $this->createPrescribedForm($prescribed)->createView();
+                $exerciseIds[] = $prescribed->getExercise()?->getId();
 
                 foreach ($prescribed->getDetailedSets() as $set) {
                     $setForms[$set->getId()] = $this->createSetForm($set)->createView();
@@ -1107,7 +1237,45 @@ final class WorkoutController extends AbstractController
             'setForms' => $setForms,
             'segments' => $segments,
             'summaries' => $this->prescribedSummaries($workout),
+            'history' => $this->historyFor($workout, $exerciseIds),
         ];
+    }
+
+    /**
+     * Ce qui a été RÉELLEMENT fait sur les exercices posés dans la séance, indexé
+     * par identifiant d'exercice : record et dernière performance. Alimente
+     * `workout/_exo_history.html.twig`, sous le panneau de paramètres.
+     *
+     * `bulkForIds` et non `ExerciseTrajectory::for()` : **deux requêtes quel que
+     * soit le nombre d'exercices**, là où la trajectoire complète en fait autant
+     * que d'exercices. Le compositeur rend le panneau de CHAQUE exercice dès le
+     * chargement (masqué), un N+1 y serait immédiat. La trajectoire détaillée
+     * reste sur `/exercise/{id}`, où le fragment renvoie par un lien.
+     *
+     * **La portée est le PROPRIÉTAIRE de la séance, pas l'utilisateur courant** —
+     * même règle que `libraryContext()`. C'est une divergence VOLONTAIRE avec
+     * `ExerciseController::show()`, qui scope sur `$this->getUser()` : là-bas la
+     * question est « est-ce que MOI je progresse » sur un exercice de la
+     * bibliothèque globale, que tout le monde pratique. Ici le contexte est une
+     * séance, qui a un propriétaire, et un coach qui règle une charge doit lire
+     * les chiffres de son athlète — les siens ne disent rien de ce qu'il prescrit.
+     *
+     * @param list<int|null> $exerciseIds identifiants bruts, nulls et doublons admis
+     *
+     * @return array<int, array{last: array<string, mixed>|null, best: array<string, mixed>|null}>
+     */
+    private function historyFor(Workout $workout, array $exerciseIds): array
+    {
+        $owner = $workout->getOwner() ?? $this->getUser();
+        if (!$owner instanceof User) {
+            return [];
+        }
+
+        // Un exercice supprimé de la bibliothèque laisse un `PrescribedExercise`
+        // sans exercice : sa ligne s'affiche encore, elle n'a pas d'historique.
+        $ids = array_values(array_unique(array_filter($exerciseIds, static fn (?int $id): bool => null !== $id)));
+
+        return [] === $ids ? [] : $this->performanceHistory->bulkForIds($owner, $ids);
     }
 
     /**

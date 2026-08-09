@@ -74,9 +74,18 @@
         token: csrf_token('workout_meta' ~ workout.id),
     }, with_context = false) }}
 
+    {# Le bandeau « ce que cette séance va charger » : vide au rendu, rempli par le
+       contrôleur `composer` puis rafraîchi à chaque mutation. Il est HORS de la
+       section compositeur (donc jamais emporté par un stream de blocs) et vide à
+       dessein : les deux planches pèsent ~70 Ko de tracés, les poser dans le HTML
+       initial ralentirait l'ouverture de l'éditeur pour ce qu'on ne lit pas en
+       premier. #}
+    <div id="workout-volume"></div>
+
     {# data-turbo="false" : Turbo n'intercepte aucun formulaire ici ; le contrôleur
        `composer` applique lui-même les Turbo Streams via fetch (voir le contrôleur). #}
-    <section class="kd-composer kd-composer--sheet kd-libsheet" data-controller="composer" data-turbo="false">
+    <section class="kd-composer kd-composer--sheet kd-libsheet" data-controller="composer" data-turbo="false"
+             data-composer-volume-url-value="{{ path('app_workout_volume', {id: workout.id}) }}">
 
         {# ---- Corps : bibliothèque (gauche) + blocs (droite) ---- #}
         <div class="kd-composer__body">

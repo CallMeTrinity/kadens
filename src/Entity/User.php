@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\BodySilhouette;
 use App\Enum\ExerciseLanguage;
 use App\Enum\Sex;
 use App\Enum\TrainingGoal;
@@ -58,6 +59,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     // la fiche athlète est nullable, ce champ-là ne peut pas l'être.
     #[ORM\Column(enumType: ExerciseLanguage::class, options: ['default' => 'fr'])]
     private ExerciseLanguage $exerciseLanguage = ExerciseLanguage::FR;
+
+    // La silhouette dessinée par la carte musculaire du compositeur. Réglage
+    // d'affichage, donc ici et non dans la fiche athlète : `sex` en dessous est
+    // nullable, accepte « autre » et sert au DOTS (cf. BodySilhouette). Il n'a
+    // donné que la valeur initiale de ce champ, à la migration.
+    #[ORM\Column(enumType: BodySilhouette::class, options: ['default' => 'male'])]
+    private BodySilhouette $bodySilhouette = BodySilhouette::MALE;
 
     // --- Fiche athlète : identité -------------------------------------------
 
@@ -310,6 +318,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setExerciseLanguage(ExerciseLanguage $exerciseLanguage): static
     {
         $this->exerciseLanguage = $exerciseLanguage;
+
+        return $this;
+    }
+
+    public function getBodySilhouette(): BodySilhouette
+    {
+        return $this->bodySilhouette;
+    }
+
+    public function setBodySilhouette(BodySilhouette $bodySilhouette): static
+    {
+        $this->bodySilhouette = $bodySilhouette;
 
         return $this;
     }

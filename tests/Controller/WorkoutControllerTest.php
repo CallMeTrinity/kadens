@@ -6,6 +6,7 @@ use App\Entity\Block;
 use App\Entity\Coaching;
 use App\Entity\Exercise;
 use App\Entity\LoggedExercise;
+use App\Entity\LoggedSet;
 use App\Entity\PlanTemplate;
 use App\Entity\PrescribedExercise;
 use App\Entity\PrescribedSet;
@@ -18,6 +19,7 @@ use App\Enum\CoachingStatus;
 use App\Enum\PrescriptionType;
 use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
+use App\Enum\TargetArea;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -481,6 +483,176 @@ final class WorkoutControllerTest extends WebTestCase
         $card = $crawler->filter('[data-composer-target="libcard"]')->first();
         self::assertSame('Tirage vertical poitrine', $card->attr('data-filter-name'));
         self::assertStringContainsString('Lat pulldown', (string) $card->attr('data-filter-text'));
+    }
+
+    /**
+     * Le compteur d'exécutions sur les cartes : ce qu'on fait souvent se voit, et
+     * ce qu'on n'a jamais fait n'affiche rien plutôt qu'un « ×0 » de bruit.
+     */
+    public function testThePaletteShowsHowManyTimesAnExerciseWasDone(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $done = $this->createExercise($user, 'Zottman curl');
+        $this->createExercise($user, 'Abduction des hanches');
+        $workout = $this->createWorkout($user, 'Séance');
+
+        $this->logTimes($user, $done, 3);
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId().'/edit');
+
+        $counts = $crawler->filter('.kd-libx__count')->each(static fn ($node): string => trim($node->text()));
+        self::assertSame(['×3'], $counts);
+    }
+
+    /**
+     * Le panneau déplié d'un exercice porte son record et sa dernière performance,
+     * et un exercice jamais fait n'affiche pas un cadre vide.
+     */
+    public function testTheExpandedPanelCarriesTheRecordOfAPractisedExercise(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $practised = $this->createExercise($user, 'Développé couché');
+        $never = $this->createExercise($user, 'Zottman curl');
+        $workout = $this->createWorkout($user, 'Séance');
+        $block = (new Block())->setRole(BlockRole::MAIN)->setPosition(0);
+        $block->addPrescribedExercise($this->makePrescribed($practised, 0));
+        $block->addPrescribedExercise($this->makePrescribed($never, 1));
+        $workout->addBlock($block);
+        $this->em->flush();
+
+        $this->logSets($user, $practised, [[8, 100.0], [5, 120.0]]);
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId().'/edit');
+
+        // Un seul bloc d'historique : celui de l'exercice pratiqué.
+        self::assertCount(1, $crawler->filter('.kd-exohist'));
+        self::assertStringContainsString('120 kg', $crawler->filter('.kd-exohist__fig--record')->text());
+    }
+
+    /**
+     * Le record montré est celui de l'ATHLÈTE propriétaire de la séance, pas celui
+     * du coach connecté. C'est la divergence volontaire avec `/exercise/{id}`, qui
+     * répond lui à « est-ce que MOI je progresse ».
+     */
+    public function testTheExpandedPanelShowsTheAthleteRecordNotTheCoachOne(): void
+    {
+        $athlete = $this->createUser('athlete@example.com');
+        $coach = $this->createUser('coach@example.com');
+        $this->acceptCoaching($coach, $athlete);
+
+        $exercise = $this->createExercise($athlete, 'Développé couché');
+        $workout = $this->createWorkout($athlete, 'Séance');
+        $block = (new Block())->setRole(BlockRole::MAIN)->setPosition(0);
+        $block->addPrescribedExercise($this->makePrescribed($exercise, 0));
+        $workout->addBlock($block);
+        $this->em->flush();
+
+        // L'athlète pousse 120, le coach 200 sur le même exercice.
+        $this->logSets($athlete, $exercise, [[5, 120.0]]);
+        $this->logSets($coach, $exercise, [[5, 200.0]]);
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId().'/edit');
+
+        $record = $crawler->filter('.kd-exohist__fig--record')->text();
+        self::assertStringContainsString('120 kg', $record);
+        self::assertStringNotContainsString('200 kg', $record);
+    }
+
+    /**
+     * Le bandeau de volume : chargé à part, il rend la carte des zones et les
+     * chiffres de la séance.
+     */
+    public function testTheVolumeFragmentPaintsTheAreasOfTheSession(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise($user, 'Développé couché');
+        $exercise->setTargetAreas([TargetArea::CHEST, TargetArea::TRICEPS]);
+        $workout = $this->createWorkout($user, 'Séance');
+        $block = (new Block())->setRole(BlockRole::MAIN)->setPosition(0);
+        $block->addPrescribedExercise($this->makePrescribed($exercise, 0)->setSets(4)->setReps(8)->setWeightKg(60.0));
+        $workout->addBlock($block);
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId().'/volume');
+
+        self::assertResponseIsSuccessful();
+        // Deux planches, face et dos, toujours ensemble.
+        self::assertCount(2, $crawler->filter('.kd-bodymap__plate'));
+        // Les deux zones ciblées reçoivent chacune les 4 séries : le total attribué
+        // dépasse le nombre de séries, et c'est voulu.
+        $legend = $crawler->filter('.kd-wkvol__legend')->text();
+        self::assertStringContainsString('Pectoraux', $legend);
+        self::assertStringContainsString('Triceps', $legend);
+        // 4 séries × 8 reps × 60 kg.
+        self::assertStringContainsString('1 920', $crawler->filter('.kd-wkvol__kpis')->text());
+    }
+
+    public function testTheVolumeFragmentIsReadableByTheCoachAndDeniedToAStranger(): void
+    {
+        $athlete = $this->createUser('athlete@example.com');
+        $coach = $this->createUser('coach@example.com');
+        $stranger = $this->createUser('stranger@example.com');
+        $this->acceptCoaching($coach, $athlete);
+        $workout = $this->createWorkout($athlete, 'Séance');
+
+        $this->client->loginUser($coach);
+        $this->client->request('GET', '/workout/'.$workout->getId().'/volume');
+        self::assertResponseIsSuccessful();
+
+        $this->client->loginUser($stranger);
+        $this->client->request('GET', '/workout/'.$workout->getId().'/volume');
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    private function acceptCoaching(User $coach, User $athlete): void
+    {
+        $this->em->persist(
+            (new Coaching())
+                ->setCoach($coach)
+                ->setAthlete($athlete)
+                ->setStatus(CoachingStatus::ACCEPTED)
+                ->setRequestedBy($coach)
+        );
+        $this->em->flush();
+    }
+
+    /**
+     * Une séance datée « faite » portant de vraies séries chiffrées — le matériau
+     * de `PerformanceHistory`, que `logTimes()` ne fournit pas (il ne crée que des
+     * exercices réalisés, sans série).
+     *
+     * @param list<array{0: int, 1: float}> $sets couples reps / charge
+     */
+    private function logSets(User $owner, Exercise $exercise, array $sets): void
+    {
+        $scheduled = (new ScheduledWorkout())
+            ->setOwner($owner)
+            ->setTitle('Séance loguée')
+            ->setScheduledDate(new \DateTimeImmutable('2026-05-04'))
+            ->setStatus(ScheduledStatus::DONE);
+
+        $logged = (new LoggedExercise())
+            ->setExercise($exercise)
+            ->setExerciseName((string) $exercise->getName())
+            ->setPosition(0);
+
+        foreach ($sets as $i => [$reps, $weight]) {
+            $logged->addLoggedSet(
+                (new LoggedSet())
+                    ->setPosition($i)
+                    ->setSetType(SetType::NORMAL)
+                    ->setReps($reps)
+                    ->setWeightKg($weight)
+            );
+        }
+
+        $scheduled->addLoggedExercise($logged);
+        $this->em->persist($scheduled);
+        $this->em->flush();
     }
 
     private function createUser(string $email): User

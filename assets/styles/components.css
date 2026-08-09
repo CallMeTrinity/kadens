@@ -4848,6 +4848,184 @@ a.kd-summplan__title:hover {
     overflow: hidden;
 }
 
+/* ---- Bandeau « ce que cette séance va charger » ----
+   Silhouette + légende chiffrée à gauche, tuiles de volume dessous. Il arrive
+   APRÈS le rendu de la page (fetch), d'où l'absence de hauteur réservée : rien
+   ne saute, parce que rien n'est posé en dessous avant qu'il n'existe — le
+   compositeur qui le suit descend simplement d'un cran. */
+.kd-wkvol {
+    margin-bottom: var(--kd-space-6);
+    padding: var(--kd-space-6);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--kd-radius-xl);
+}
+
+.kd-wkvol__body {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--kd-space-8);
+    flex-wrap: wrap;
+}
+
+.kd-bodymap {
+    display: flex;
+    justify-content: center;
+    gap: var(--kd-space-4);
+    flex: none;
+}
+
+/* Le SVG porte ses dimensions en attributs (la largeur est DÉDUITE de la hauteur,
+   cf. le composant) : `max-width` seul le laisserait déborder en écrasant le
+   rapport. `height: auto` rend la paire responsive sans la déformer. */
+.kd-bodymap__plate {
+    max-width: 100%;
+    height: auto;
+}
+
+.kd-wkvol__legend {
+    flex: 1 1 260px;
+    min-width: 0;
+}
+
+.kd-wkvol__title {
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: var(--kd-tracking-eyebrow-lg);
+    font-size: 13px;
+    color: var(--color-text-strong);
+    margin-bottom: var(--kd-space-4);
+}
+
+.kd-wkvol__areas {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.kd-wkvol__area {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-3);
+    font-size: 12.5px;
+}
+
+/* La pastille reprend EXACTEMENT la teinte du dessin : une légende dont les
+   pastilles ne seraient pas les couleurs de la carte n'est pas une légende.
+   Un contour, parce que le palier 1 sur fond papier est presque invisible. */
+.kd-wkvol__dot {
+    flex: none;
+    width: 10px;
+    height: 10px;
+    border: 1px solid var(--color-border-strong);
+}
+
+.kd-wkvol__dot--1 { background: var(--color-bodymap-1); }
+.kd-wkvol__dot--2 { background: var(--color-bodymap-2); }
+.kd-wkvol__dot--3 { background: var(--color-bodymap-3); }
+
+.kd-wkvol__areaname {
+    flex: 1 1 auto;
+    min-width: 0;
+    color: var(--color-text-strong);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.kd-wkvol__areasets,
+.kd-wkvol__areapct {
+    flex: none;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-secondary);
+}
+
+.kd-wkvol__areapct {
+    width: 44px;
+    text-align: right;
+}
+
+.kd-wkvol__aside,
+.kd-wkvol__hint {
+    margin-top: var(--kd-space-3);
+    font-size: 11.5px;
+    color: var(--color-text-secondary);
+}
+
+.kd-wkvol__kpis {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--kd-space-4) var(--kd-space-8);
+    margin: 0;
+    padding-top: var(--kd-space-5);
+    border-top: 1px solid var(--color-divider-soft);
+}
+
+/* Le bandeau peut n'avoir que des tuiles (séance de cardio pur) : le filet du
+   haut n'a alors rien à séparer. */
+.kd-wkvol__body + .kd-wkvol__kpis {
+    margin-top: var(--kd-space-5);
+}
+
+.kd-wkvol__kpis:first-child {
+    padding-top: 0;
+    border-top: none;
+}
+
+.kd-wkvol__kpi dt {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: var(--kd-tracking-eyebrow-lg);
+    font-size: 10.5px;
+    color: var(--color-text-secondary);
+}
+
+.kd-wkvol__kpi dt svg {
+    width: 13px;
+    height: 13px;
+}
+
+.kd-wkvol__kpi dd {
+    margin: 1px 0 0;
+    font-family: var(--font-mono);
+    font-size: 19px;
+    font-weight: var(--kd-weight-bold);
+    color: var(--color-text-strong);
+}
+
+.kd-wkvol__unit {
+    font-size: 12px;
+    font-weight: var(--kd-weight-regular);
+    color: var(--color-text-secondary);
+}
+
+.kd-wkvol__kpimeta {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--color-text-secondary);
+}
+
+/* Sous 560px, la paire de silhouettes prend toute la largeur et la légende passe
+   dessous : deux corps de 240px de haut côte à côte AVEC une liste à côté ne
+   tiennent pas, et c'est la liste qui doit céder — le dessin ne se lit plus une
+   fois réduit de moitié. */
+@media (max-width: 560px) {
+    .kd-wkvol {
+        padding: var(--kd-space-4);
+    }
+
+    .kd-wkvol__legend {
+        flex-basis: 100%;
+    }
+}
+
 /* Variante du compositeur de séance : les menus kebab de ses lignes sont des
    calques absolus qui dépassent la section par le bas, on ne peut donc pas la
    clipper. Le masquage ne servait qu'à empêcher le fond de la bibliothèque de
@@ -5150,6 +5328,18 @@ button.kd-libx:active {
 .kd-libx__meta svg {
     width: 12px;
     height: 12px;
+}
+
+/* Le compteur d'exécutions. Encre secondaire et non le gris pâle de la ligne
+   qui le porte : c'est le seul chiffre de la carte, il doit se lire sans
+   effort. Pas de rouge — un nombre de séances n'est ni une action, ni une
+   intensité, ni un échec. `margin-left: auto` le pousse en bout de ligne, où
+   l'œil le retrouve d'une carte à l'autre au lieu de le chercher après un
+   libellé d'activité de longueur variable. */
+.kd-libx__count {
+    margin-left: auto;
+    color: var(--color-text-secondary);
+    font-weight: var(--kd-weight-semibold);
 }
 
 .kd-libx .kd-tags {
@@ -5803,6 +5993,98 @@ button.kd-libx:active {
     padding: var(--kd-space-5);
     border-top: 1px solid var(--color-divider-soft);
     background: var(--color-surface);
+}
+
+/* ---- Rappel d'historique en tête du panneau de paramètres ----
+   Ce qui a été fait la dernière fois, juste au-dessus de ce qu'on va prescrire.
+   Fond teinté et non une carte encadrée : le panneau contient déjà des champs
+   « à peine là », un cadre de plus y ferait une boîte dans une boîte. La barre
+   de gauche suffit à séparer le constaté de la saisie. */
+.kd-exohist {
+    margin-bottom: var(--kd-space-5);
+    padding: var(--kd-space-3) var(--kd-space-4);
+    background: var(--color-fill);
+    border-left: 2px solid var(--color-border-strong);
+}
+
+.kd-exohist__figures {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--kd-space-3) var(--kd-space-6);
+}
+
+.kd-exohist__fig {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.kd-exohist__label {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: var(--kd-tracking-eyebrow-lg);
+    font-size: 10px;
+    color: var(--color-text-secondary);
+}
+
+.kd-exohist__label svg {
+    width: 12px;
+    height: 12px;
+}
+
+.kd-exohist__value {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: var(--kd-weight-bold);
+    color: var(--color-text-strong);
+}
+
+/* Le record est le seul chiffre à porter l'accent : c'est une intensité, l'un
+   des trois sens autorisés du rouge. `--color-primary-on-tint` et non
+   `--color-primary` — le texte rouge se lit sur un fond teinté. */
+.kd-exohist__fig--record .kd-exohist__value {
+    color: var(--color-primary-on-tint);
+}
+
+.kd-exohist__meta {
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--color-text-secondary);
+}
+
+.kd-exohist__sets {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--kd-space-2) var(--kd-space-4);
+    margin-top: var(--kd-space-3);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.kd-exohist__group {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+}
+
+.kd-exohist__more {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    margin-top: var(--kd-space-3);
+    font-family: var(--font-display);
+    text-transform: uppercase;
+    letter-spacing: var(--kd-tracking-eyebrow-lg);
+    font-size: 11px;
+}
+
+.kd-exohist__more svg {
+    width: 13px;
+    height: 13px;
 }
 
 .kd-cexo__params .kd-form {

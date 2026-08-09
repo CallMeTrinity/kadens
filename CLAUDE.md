@@ -238,6 +238,18 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   `app:user:promote-coach`). L'app n'expose que ce que le titulaire du compte peut
   changer lui-même : son mot de passe, dans `/profile/settings`. L'email reste un
   identifiant fixe côté console.
+- **Dans le compositeur, l'historique suit le PROPRIÉTAIRE de la séance ; sur la
+  fiche d'un exercice, il suit SOI.** Ce n'est pas une incohérence, ce sont deux
+  questions. `/exercise/{id}` répond à « est-ce que **je** progresse » sur un
+  exercice de la bibliothèque globale, que tout le monde pratique : il reste scopé
+  sur `$this->getUser()`. `/workout/{id}/edit` compose une séance, qui a un
+  propriétaire : le compteur d'exécutions de la palette, les records du panneau
+  déplié (`historyFor()`) et le volume du bandeau se lisent sur
+  `$workout->getOwner()`, comme `libraryContext()`. Un coach qui règle une charge
+  lit les chiffres de son athlète ; les siens ne disent rien de ce qu'il prescrit.
+  Le seul élément du compositeur qui reste au lecteur est la **silhouette**
+  (`User.bodySilhouette`) — c'est un réglage d'affichage, pas une donnée. Il ne se
+  dérive jamais de `User.sex`, qui est nullable, accepte « autre » et sert au DOTS.
 - **Aucune IA dans l'app.** Le remplissage de la biblio passe par une commande
   d'import JSON (Phase 3), pas d'API en prod.
 - **Un exercice a une identité (`refKey`) et des libellés (`name`, `nameEn`),

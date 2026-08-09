@@ -1,0 +1,8 @@
+{# Remplace le contenu du bandeau du compositeur. `update` et non `replace` :
+   c'est le conteneur #workout-volume qui porte l'identifiant, et le contrôleur
+   `composer` s'y adresse par URL à chaque mutation — il doit survivre. #}
+<turbo-stream action="update" target="workout-volume">
+    <template>
+        {{ include('workout/_volume.html.twig') }}
+    </template>
+</turbo-stream>
