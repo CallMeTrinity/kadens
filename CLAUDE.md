@@ -264,6 +264,25 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   Le seul élément du compositeur qui reste au lecteur est la **silhouette**
   (`User.bodySilhouette`) — c'est un réglage d'affichage, pas une donnée. Il ne se
   dérive jamais de `User.sex`, qui est nullable, accepte « autre » et sert au DOTS.
+- **Le retour dit d'où l'on vient, pas où aller (`?from=`).** Une séance s'ouvre
+  depuis six endroits et n'avait qu'un retour écrit en dur vers son index — faux
+  cinq fois sur six, et carrément en impasse depuis l'éditeur de plan (la copie
+  locale `planLocal` est exclue de la bibliothèque). L'ancre de contexte est un
+  jeton porté par la query, en trois temps : `back_to(kind, id)` le pose sur un
+  lien sortant, `back_carry()` le reconduit au saut suivant (sans quoi la chaîne
+  casse au premier), `components/_backlink.html.twig` l'affiche. Elle vise le
+  **conteneur d'origine** (le plan, la vue calendrier), pas l'écran précédent :
+  depuis le compositeur ouvert via un plan, on repart au plan, sans remonter
+  maillon par maillon. Invariants : le jeton ne porte **jamais d'URL**, seulement
+  un type et une clé résolus contre une table fermée de routes
+  (`App\Http\BackTarget`, garde-fou testé) — aucune redirection ouverte n'est
+  possible ; les droits se vérifient **avant** le libellé, un titre de plan étant
+  privé ; et un jeton illisible, périmé ou hors droits **n'est pas une erreur**,
+  il se lit comme une absence et la page retombe sur son retour d'origine.
+  Corollaire côté PWA : `from` est retiré de la clé de cache du service worker
+  (`cacheKey()` dans `public/sw.js`), sinon le hors-ligne se fragmenterait par
+  contexte d'entrée — les autres paramètres (`range`, `run`) restent dans la clé,
+  eux changent le contenu rendu.
 - **Aucune IA dans l'app.** Le remplissage de la biblio passe par une commande
   d'import JSON (Phase 3), pas d'API en prod.
 - **Un exercice a une identité (`refKey`) et des libellés (`name`, `nameEn`),

@@ -329,6 +329,11 @@ final class ScheduledWorkoutController extends AbstractController
             'statuses' => ScheduledStatus::cases(),
             'detailed' => (bool) $request->getPayload()->getInt('detailed'),
             'overdue' => $overdue,
+            // Ancre de contexte de la vue appelante, reconduite telle quelle : la
+            // pastille re-rendue doit garder des liens qui savent d'où l'on vient.
+            // Non validée ici — c'est `BackTarget::parse()` qui tranche, à la
+            // lecture, et un jeton illisible s'y lit comme une absence.
+            'backFrom' => $request->getPayload()->getString('from') ?: null,
         ]);
     }
 

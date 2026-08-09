@@ -54,10 +54,13 @@
                                    contrôleur `preview`). Auto-suffisant, aucun AJAX. #}
                                 <div class="kd-planentry" data-controller="preview"
                                      data-action="mouseenter->preview#show mouseleave->preview#hide">
+                                    {# `back_to` seulement hors page publique : la
+                                       page partagée n'a pas de retour applicatif
+                                       à porter, et le plan y est auth-gated. #}
                                     <a class="kd-planday__item"
                                        href="{{ public
                                            ? path('app_public_share', {slug: entry.workout.workout.slug})
-                                           : path('app_workout_show', {id: entry.item.workout.id}) }}">
+                                           : path('app_workout_show', {id: entry.item.workout.id}|merge(back_to('plan', template.id))) }}">
                                         {{ ux_icon('lucide:clipboard-list') }}
                                         <span>{{ entry.workout.workout.title }}</span>
                                     </a>

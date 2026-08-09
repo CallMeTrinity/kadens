@@ -1416,6 +1416,29 @@ a.kd-scope--link:hover {
     height: 14px;
 }
 
+/* Nom saisi dans un lien de retour contextuel (titre de plan). Il vit dans les
+   deux habillages du retour — `.kd-backlink` (page claire) et `.kd-wk__back`
+   (hero encré, en capitales condensées) — et doit échapper à la casse et à
+   l'interlettrage des deux : c'est du contenu, pas une étiquette de structure
+   (règle 4 du design system). D'où la remise à zéro explicite plutôt qu'une
+   simple couleur. */
+.kd-backlink__name {
+    font-family: var(--font-body);
+    text-transform: none;
+    letter-spacing: normal;
+    font-size: 12px;
+}
+
+/* Le kicker garde la couleur discrète du lien, le nom porte le repère : sans ce
+   contraste, « PLAN Prépa trail » se lit comme une seule étiquette grise. */
+.kd-backlink .kd-backlink__name {
+    color: var(--color-text-secondary);
+}
+
+.kd-wk__back .kd-backlink__name {
+    color: var(--color-on-ink);
+}
+
 /* ----------------------------------------------------------------------------
    Authentification (login) — écran centré plein hauteur, hors chrome applicatif.
    Le <main> prend la classe .kd-auth (bloc main_class dans base.html.twig).

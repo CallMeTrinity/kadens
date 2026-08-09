@@ -9,14 +9,16 @@
 {% set workout = workout|default(null) %}
 
 <div class="kd-wk__bar">
-    <a href="{{ path('app_calendar_index') }}" class="kd-wk__back">
-        {{ ux_icon('lucide:arrow-left') }} Calendrier
-    </a>
+    {{ include('components/_backlink.html.twig', {
+        fallback: 'app_calendar_index', kicker: 'Calendrier', class: 'kd-wk__back'
+    }) }}
 
     <div class="kd-wk__baractions">
         {{ include('components/_scheduled_badge.html.twig', {scheduled: scheduled}) }}
         {% if workout and is_granted('WORKOUT_EDIT', workout) %}
-            <a href="{{ path('app_workout_edit', {id: workout.id}) }}"
+            {# Le compositeur ouvert d'ici garde la vue calendrier d'origine :
+               c'est le maillon qui rendait le retour faux jusqu'au bout. #}
+            <a href="{{ path('app_workout_edit', {id: workout.id}|merge(back_carry())) }}"
                class="kd-btn kd-btn--sm kd-btn--onink">
                 {{ ux_icon('lucide:square-pen') }} Éditer
             </a>

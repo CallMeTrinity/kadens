@@ -33,9 +33,18 @@
      - statuses  : ScheduledStatus::cases()
      - detailed  : bool (optionnel) — carte haute de la vue semaine (méta + note)
      - overdue   : bool (optionnel) — séance passée encore « prévue »
+     - backFrom  : string|null (optionnel) — ancre de contexte de la vue appelante
+                   (`cal-week-…` / `cal-month-…`), posée sur les liens sortants
+                   pour que la séance ouverte d'ici sache y revenir. La vue est
+                   passée explicitement plutôt que déduite de `scheduled.date` :
+                   la grille du mois déborde sur ses voisins, et un événement du
+                   31 juillet affiché en août renverrait vers juillet. Elle
+                   traverse le flux Turbo par un champ caché, comme `detailed`.
    ============================================================================ #}
 {% import 'components/_activity.html.twig' as activity %}
 {% set fw = fw|default(null) %}
+{% set backFrom = backFrom|default(null) %}
+{% set back = backFrom ? {from: backFrom} : {} %}
 {% set workout = scheduled.workout %}
 {# Séance datée sans source : séance libre montée au fil de l'eau, ou séance de
    bibliothèque supprimée depuis. Rien à annoncer d'un programme — et c'est
@@ -51,7 +60,7 @@
      data-controller="dialog preview"
      data-action="mouseenter->preview#show mouseleave->preview#hide">
     {# La séance datée. Modale au pointeur fin, navigation au doigt. #}
-    <a href="{{ path('app_scheduled_workout_show', {id: scheduled.id}) }}"
+    <a href="{{ path('app_scheduled_workout_show', {id: scheduled.id}|merge(back)) }}"
        class="kd-calevent__open" data-action="dialog#openFine" title="{{ title }}">
         <span class="kd-calevent__title">{{ title }}</span>
         {% if freeform %}
@@ -82,8 +91,11 @@
        seul chemin vers le programme complet depuis le calendrier. #}
     <form method="post" action="{{ path('app_scheduled_workout_cycle_status', {id: scheduled.id}) }}" class="kd-calevent__statusform">
         <input type="hidden" name="_token" value="{{ csrf_token('cycle' ~ scheduled.id) }}">
-        {# Vue courante : permet au flux Turbo de re-rendre la pastille à l'identique. #}
+        {# Vue courante : permet au flux Turbo de re-rendre la pastille à l'identique.
+           `from` suit la même route que `detailed` — sans lui, changer un statut
+           re-rendrait une pastille dont les liens ont perdu leur contexte. #}
         <input type="hidden" name="detailed" value="{{ detailed ? 1 : 0 }}">
+        {% if backFrom %}<input type="hidden" name="from" value="{{ backFrom }}">{% endif %}
         <button type="submit" class="kd-calevent__toggle"
                 aria-label="Statut : {{ scheduled.status.label }}. Marquer « {{ nextStatus.label }} »"
                 title="{{ scheduled.status.label }} · cliquer pour marquer « {{ nextStatus.label }} »">
@@ -93,7 +105,7 @@
         </button>
     </form>
 
-    <a href="{{ path('app_scheduled_workout_show', {id: scheduled.id}) }}"
+    <a href="{{ path('app_scheduled_workout_show', {id: scheduled.id}|merge(back)) }}"
        class="kd-calevent__eye" aria-label="Voir « {{ title }} » en entier">
         {{ ux_icon('lucide:eye') }}
     </a>
@@ -113,7 +125,7 @@
             <div class="kd-modal__meta">
                 <span class="kd-badge kd-badge--{{ st }}"><span class="kd-badge__dot"></span>{{ scheduled.status.label }}</span>
                 {% if workout %}
-                    <a class="kd-btn kd-btn--ghost kd-btn--sm" href="{{ path('app_workout_show', {id: workout.id}) }}">
+                    <a class="kd-btn kd-btn--ghost kd-btn--sm" href="{{ path('app_workout_show', {id: workout.id}|merge(back)) }}">
                         {{ ux_icon('lucide:external-link') }} Voir la séance
                     </a>
                 {% else %}
@@ -129,6 +141,7 @@
                 <form method="post" action="{{ path('app_scheduled_workout_status', {id: scheduled.id}) }}" class="kd-modal__form">
                     <input type="hidden" name="_token" value="{{ csrf_token('status' ~ scheduled.id) }}">
                     <input type="hidden" name="detailed" value="{{ detailed ? 1 : 0 }}">
+                    {% if backFrom %}<input type="hidden" name="from" value="{{ backFrom }}">{% endif %}
                     <div class="kd-field">
                         <textarea name="completionNotes" rows="2" class="kd-input kd-input--area" placeholder="Écart / ressenti (optionnel)">{{ scheduled.completionNotes }}</textarea>
                     </div>

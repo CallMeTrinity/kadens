@@ -12,11 +12,13 @@
     {% endfor %}
 
     <div class="kd-actionbar">
-        <a href="{{ path('app_workout_index') }}" class="kd-backlink">
-            {{ ux_icon('lucide:arrow-left') }} Mes séances
-        </a>
+        {{ include('components/_backlink.html.twig', {
+            fallback: 'app_workout_index', kicker: 'Mes séances'
+        }) }}
         <div class="kd-actionbar__end">
-            <a href="{{ path('app_workout_show', {id: workout.id}) }}" class="kd-btn kd-btn--secondary kd-btn--sm">
+            {# `back_carry()` : ouvrir la consultation depuis le compositeur ne doit
+               pas perdre le contexte d'entrée, sinon le retour y redevient faux. #}
+            <a href="{{ path('app_workout_show', {id: workout.id}|merge(back_carry())) }}" class="kd-btn kd-btn--secondary kd-btn--sm">
                 {{ ux_icon('lucide:eye') }} Voir la séance
             </a>
             <a href="{{ path('app_export_workout', {id: workout.id}) }}" class="kd-btn kd-btn--secondary kd-btn--sm">

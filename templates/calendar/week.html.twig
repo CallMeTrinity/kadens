@@ -102,6 +102,7 @@
                                 statuses: statuses,
                                 detailed: true,
                                 overdue: day.isPast and scheduled.status.value == 'planned',
+                                backFrom: back_token('cal-week', monday|date('Y-m-d')),
                             }) }}
                         {% else %}
                             <p class="kd-weekday__rest">Repos</p>

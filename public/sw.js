@@ -73,19 +73,41 @@ async function cacheFirst(request) {
     return response;
 }
 
+/*
+ * Clé de cache d'une navigation : l'URL débarrassée de `from`.
+ *
+ * `from` est l'ancre de contexte de navigation (cf. App\Http\BackTarget) : elle
+ * ne décide que du libellé du lien de retour, jamais du contenu de la page. Sans
+ * cette normalisation, `/workout/12` et `/workout/12?from=plan-3` seraient deux
+ * entrées, et une séance ouverte hors ligne depuis un plan retomberait sur
+ * /offline.html alors qu'elle est en cache. Le compromis assumé : hors ligne, ce
+ * qu'on ressert peut porter le retour d'un autre contexte d'entrée — une page
+ * avec un retour générique vaut mieux qu'une page manquante.
+ *
+ * Les autres paramètres restent dans la clé : `?range=`, `?run=`, `?week=`
+ * changent réellement ce qui est rendu.
+ */
+function cacheKey(request) {
+    const url = new URL(request.url);
+    url.searchParams.delete('from');
+
+    return url.href;
+}
+
 /** Network-first : le réseau fait foi, le cache n'est qu'un filet hors ligne. */
 async function networkFirst(request) {
     const cache = await caches.open(CACHE);
+    const key = cacheKey(request);
 
     try {
         const response = await fetch(request);
         if (response && response.ok) {
-            cache.put(request, response.clone());
+            cache.put(key, response.clone());
         }
 
         return response;
     } catch {
-        const cached = await cache.match(request);
+        const cached = await cache.match(key);
 
         return cached || cache.match('/offline.html');
     }
