@@ -125,6 +125,43 @@ Ventiler les 17 zones donnerait une barre empilée illisible.
 | Tronc | 3 |
 | Corps entier | 4 |
 
+### Carte musculaire — trois paliers de charge
+
+La silhouette du compositeur (`components/_body_map.html.twig`) teinte les zones
+travaillées par une séance. **C'est du rouge, et ce n'en est pas une entorse** :
+le dessin code une **intensité**, l'un des trois sens autorisés de l'accent. Il
+ne code pas une catégorie — les zones ne se comparent pas entre elles par nature,
+elles se comparent par volume.
+
+| Palier | Token | Valeur | Sens |
+|---|---|---|---|
+| Au repos | `--color-fill` | `#f3f3f1` | non travaillée |
+| 1 | `--color-bodymap-1` | `#fbe9e8` | touchée |
+| 2 | `--color-bodymap-2` | `#cb7672` | chargée |
+| 3 | `--color-bodymap-3` | `#a81a14` | le plus chargé de la séance |
+
+Le palier est **relatif à la séance** (tiers du maximum, `BodyLoad::levelOf`), pas
+un barème absolu : la carte répond à « où ai-je chargé », pas à « est-ce
+beaucoup ». Un seuil fixe dirait la même chose d'une séance de dix séries et
+d'une de quarante.
+
+Trois nuances d'une même teinte ne se départagent pas d'un regard, et un
+daltonien n'y verra pas trois valeurs. La règle qui rend le dessin acceptable est
+donc absolue : **toute information de la carte est reprise chiffrée dans la
+légende** (zone, séries, part), y compris ce qui ne se peint pas — les séries
+« corps entier », qui allumeraient toute la silhouette, et celles d'un exercice
+sans zone déclarée, qui n'ont personne à colorier. C'est ce qui autorise le
+palier 1 à rester très pâle, et c'est pourquoi le `<svg>` est `aria-hidden` : le
+faire lire deux fois n'aiderait personne.
+
+Les formes inertes (cheveux, tête, cou, mains, pieds) sont **hors de l'échelle et
+le disent** : l'encre pour la chevelure, le papier pour le reste, jamais le gris
+du repos — un crâne de la couleur d'un pectoral inactif se lirait comme une zone
+qu'on aurait oublié de travailler.
+
+Les mêmes trois valeurs vivent côté mobile (`colors.bodymap*`), servies par
+`app:tokens:export` puis `npm run sync:tokens`.
+
 ### Groupes musculaires — l'exception colorée
 
 **C'est la seule entorse à la règle 2, et elle est bornée à un écran :

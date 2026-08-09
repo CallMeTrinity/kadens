@@ -87,12 +87,16 @@
 
                             {% if cell.scheduled|length %}
                                 <div class="kd-calday__events">
+                                    {# `backFrom` porte le mois **affiché**, pas celui de la
+                                       cellule : la grille déborde sur ses voisins, et une séance
+                                       du 31 juillet vue en août renverrait vers juillet. #}
                                     {% for scheduled in cell.scheduled %}
                                         {{ include('components/_cal_event.html.twig', {
                                             scheduled: scheduled,
                                             fw: scheduled.workout ? flattened[scheduled.workout.id] : null,
                                             statuses: statuses,
                                             overdue: cell.overdue and scheduled.status.value == 'planned',
+                                            backFrom: back_token('cal-month', '%04d-%02d'|format(year, month)),
                                         }) }}
                                     {% endfor %}
                                 </div>

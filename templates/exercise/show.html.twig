@@ -1,12 +1,25 @@
 {% extends 'base.html.twig' %}
 {% import 'components/_activity.html.twig' as activity %}
 
-{% block title %}{{ exercise_name(exercise) }}{% endblock %}
+{# `subject` = l'athlète dont on lit la trajectoire, ou null pour soi. Non nul,
+   la page est servie par `CoachController::athleteExercise` : même fiche, même
+   composant, seul l'historique change de propriétaire. Tout ce qui en dépend est
+   dans ce template, le reste de la page ne sait pas qui regarde. #}
+
+{% block title %}{{ exercise_name(exercise) }}{% if subject|default(null) %} — {{ subject.userIdentifier }}{% endif %}{% endblock %}
 
 {% block body %}
-    <a href="{{ path('app_exercise_index') }}" class="kd-backlink">
-        {{ ux_icon('lucide:arrow-left') }} Bibliothèque
-    </a>
+    {% set subject = subject|default(null) %}
+
+    {% if subject %}
+        <a href="{{ path('app_coach_athlete', {id: subject.id}) }}" class="kd-backlink">
+            {{ ux_icon('lucide:arrow-left') }} {{ subject.userIdentifier }}
+        </a>
+    {% else %}
+        <a href="{{ path('app_exercise_index') }}" class="kd-backlink">
+            {{ ux_icon('lucide:arrow-left') }} Bibliothèque
+        </a>
+    {% endif %}
 
     <div class="kd-pagehead">
         <div>
@@ -81,7 +94,8 @@
     </div>
 
     {# KL-50 : la seule page qui réponde à « est-ce que je progresse sur cet
-       exercice ? » sans passer par un plan. Rien du tout quand il n'a jamais été
-       fait — le composant en est garant. #}
-    {{ include('components/_exercise_trajectory.html.twig', {trajectory: trajectory}) }}
+       exercice ? » sans passer par un plan — « est-ce que MON ATHLÈTE progresse »
+       quand `subject` est posé. Rien du tout quand l'exercice n'a jamais été fait
+       — le composant en est garant. #}
+    {{ include('components/_exercise_trajectory.html.twig', {trajectory: trajectory, subject: subject}) }}
 {% endblock %}

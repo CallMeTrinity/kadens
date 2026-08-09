@@ -109,7 +109,7 @@
                                             <button type="button" class="kd-planitem__link"
                                                     data-action="plangrid#edit"
                                                     data-panel-url="{{ path('app_workout_quick_panel', {id: entry.item.workout.id}) }}"
-                                                    data-full-url="{{ path('app_workout_edit', {id: entry.item.workout.id}) }}">
+                                                    data-full-url="{{ path('app_workout_edit', {id: entry.item.workout.id}|merge(back_to('plan-edit', template.id))) }}">
                                                 <span class="kd-planitem__title">{{ entry.workout.workout.title }}</span>
                                                 <span class="kd-planitem__meta">
                                                     {% if entry.item.workout.estimatedDurationMinutes %}
@@ -132,7 +132,10 @@
                                                     {{ ux_icon('lucide:ellipsis') }}
                                                 </summary>
                                                 <div class="kd-kebab__panel">
-                                                    <a class="kd-kebab__item" href="{{ path('app_workout_edit', {id: entry.item.workout.id}) }}">
+                                                    {# Cette séance est la copie locale du plan (planLocal),
+                                                       exclue de la bibliothèque : sans contexte, son retour
+                                                       menait à un index où elle n'apparaît pas. #}
+                                                    <a class="kd-kebab__item" href="{{ path('app_workout_edit', {id: entry.item.workout.id}|merge(back_to('plan-edit', template.id))) }}">
                                                         {{ ux_icon('lucide:square-pen') }} Édition complète
                                                     </a>
 

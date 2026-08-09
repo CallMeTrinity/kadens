@@ -6,7 +6,20 @@
 
    Le réordonnancement de l'exercice n'est plus ici : il a rejoint le menu de la
    ligne, avec les autres actions. Un panneau de paramètres ne contient que des
-   paramètres. #}
+   paramètres.
+
+   Une exception, et elle est en tête : le rappel de ce qui a été fait la dernière
+   fois. Ce n'est pas un paramètre, mais c'est ce qui détermine celui qu'on va
+   saisir — le mettre après le formulaire reviendrait à le donner trop tard. #}
+{# `prescribed.exercise` peut être nul (exercice retiré de la bibliothèque) : on
+   passe par une variable plutôt que de déréférencer `.id` dans l'index. #}
+{% set histExercise = prescribed.exercise %}
+{{ include('workout/_exo_history.html.twig', {
+    entry: histExercise ? (history[histExercise.id]|default(null)) : null,
+    exercise: histExercise,
+    owner: workout.owner
+}) }}
+
 {{ include('workout/_prescribed_form.html.twig', {
     form: prescribedForm,
     auto_action: 'change->composer#submitForm'

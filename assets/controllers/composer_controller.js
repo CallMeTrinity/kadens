@@ -44,6 +44,11 @@ import { normalize, scoreElement, tokens } from 'search';
 export default class extends Controller {
     static targets = ['block', 'items', 'library', 'libcard', 'search', 'quickAddForm', 'reorderForm'];
 
+    // L'URL du bandeau de volume. Une value et non une target : le bandeau vit
+    // HORS de cette section (il ne doit pas être emporté par un stream de blocs),
+    // le contrôleur ne le connaît donc que par son id, côté serveur.
+    static values = { volumeUrl: String };
+
     static SORTABLE_GROUP = 'kd-exercises';
 
     // Appui long avant de soulever une carte, au doigt uniquement. Assez court pour
@@ -62,6 +67,7 @@ export default class extends Controller {
         this.libActivity = 'all';
         this.activeBlockId = null;
         this.sortables = new WeakMap();
+        this.volumePending = false;
     }
 
     connect() {
@@ -86,6 +92,7 @@ export default class extends Controller {
         document.addEventListener('keydown', this.onKey);
         document.addEventListener('click', this.onOutside);
         this.applyLibFilter();
+        this.refreshVolume();
     }
 
     disconnect() {
@@ -139,6 +146,10 @@ export default class extends Controller {
             // à jour au retour de l'appel (même raison que dans restoreFocus).
             requestAnimationFrame(() => this.syncExpanded());
             if (!isParamSave) this.restoreFocus(activeName, caret);
+            // Toute mutation change ce que la séance charge : une série ajoutée, un
+            // exercice déplacé dans un bloc à trois tours. Sans `await` — le bandeau
+            // n'est pas sur le chemin critique de l'enregistrement.
+            this.refreshVolume();
         } catch (error) {
             console.error('Composer submit failed:', error);
             // Sur un save de paramètre, ne PAS recharger : ça effacerait la saisie
@@ -171,6 +182,37 @@ export default class extends Controller {
                 }
             }
         });
+    }
+
+    // ---- Bandeau de volume (chargé après la page) --------------------------
+
+    /**
+     * Recharge « ce que cette séance va charger » : la carte des muscles et le
+     * volume prévu. Appelé au connect() puis après chaque mutation réussie.
+     *
+     * Deux règles :
+     * 1. **Ça n'échoue jamais bruyamment.** Un bandeau qui ne se rafraîchit pas
+     *    laisse ses chiffres précédents ; faire remonter l'erreur ferait échouer
+     *    une mutation qui, elle, a réussi.
+     * 2. **Une seule requête en vol.** Un ajout suivi d'un déplacement rapide en
+     *    déclencherait deux, et rien ne garantit l'ordre des réponses : la plus
+     *    lente écraserait la plus récente avec un état périmé.
+     */
+    async refreshVolume() {
+        if (!this.hasVolumeUrlValue || this.volumePending) return;
+
+        this.volumePending = true;
+        try {
+            const response = await fetch(this.volumeUrlValue, {
+                headers: { Accept: 'text/vnd.turbo-stream.html' },
+                credentials: 'same-origin',
+            });
+            if (response.ok) renderStreamMessage(await response.text());
+        } catch (error) {
+            console.error('Composer volume refresh failed:', error);
+        } finally {
+            this.volumePending = false;
+        }
     }
 
     // ---- Bloc actif --------------------------------------------------------
@@ -449,9 +491,15 @@ export default class extends Controller {
      * meilleur résultat pouvait donc se retrouver sous quinze cartes moins
      * pertinentes, dans un panneau qu'on fait défiler au pouce.
      *
-     * L'ordre serveur (usage décroissant, puis nom) est déjà le bon hors
-     * recherche : on ne retrie que pendant une recherche, et l'usage y départage
-     * les scores égaux.
+     * Deux rôles bien séparés, et c'est la règle de cette méthode :
+     * la PERTINENCE décide de ce qui reste visible (score > 0), l'USAGE décide de
+     * l'ordre. L'ordre serveur (usage décroissant, puis nom) est déjà celui-là hors
+     * recherche ; la recherche cesse simplement d'y déroger, au lieu de reclasser
+     * par score comme avant.
+     *
+     * Conséquence assumée : un exercice très pratiqué peut passer devant une
+     * correspondance plus exacte mais jamais faite. C'est voulu — on compose avec
+     * ce qu'on fait, et le filtre a déjà écarté ce qui ne correspond pas.
      */
     applyLibFilter() {
         const searching = this.libTerms.length > 0;
@@ -471,8 +519,8 @@ export default class extends Controller {
 
         entries
             .filter((e) => e.visible)
-            .sort((a, b) => (b.score - a.score)
-                || (Number(b.card.dataset.sortUsage || 0) - Number(a.card.dataset.sortUsage || 0)))
+            .sort((a, b) => (Number(b.card.dataset.sortUsage || 0) - Number(a.card.dataset.sortUsage || 0))
+                || (b.score - a.score))
             .forEach((e) => this.libraryTarget.appendChild(e.card));
     }
 }

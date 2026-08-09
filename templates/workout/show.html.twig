@@ -17,13 +17,15 @@
             <div class="kd-wk__bar"
                  data-controller="clipboard"
                  data-clipboard-url-value="{{ url('app_public_share', {slug: flat.workout.slug}) }}">
-                <a href="{{ path('app_workout_index') }}" class="kd-wk__back">
-                    {{ ux_icon('lucide:arrow-left') }} Mes séances
-                </a>
+                {{ include('components/_backlink.html.twig', {
+                    fallback: 'app_workout_index', kicker: 'Mes séances', class: 'kd-wk__back'
+                }) }}
 
                 <div class="kd-wk__baractions">
                     {% if is_granted('WORKOUT_EDIT', flat.workout) %}
-                        <a href="{{ path('app_workout_edit', {id: flat.workout.id}) }}"
+                        {# Le maillon de la chaîne « plan → séance → composer » :
+                           sans `back_carry()`, le contexte s'arrête ici. #}
+                        <a href="{{ path('app_workout_edit', {id: flat.workout.id}|merge(back_carry())) }}"
                            class="kd-btn kd-btn--sm kd-btn--onink">
                             {{ ux_icon('lucide:square-pen') }} Éditer
                         </a>

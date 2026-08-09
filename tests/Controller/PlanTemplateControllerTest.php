@@ -342,6 +342,99 @@ final class PlanTemplateControllerTest extends WebTestCase
         self::assertSelectorTextContains('.kd-prog__adherence', 'sur 1');
     }
 
+    /**
+     * L'impasse que l'ancre de contexte corrige : depuis l'éditeur de trame, la
+     * case ouvre la **copie locale** (`planLocal`), que la bibliothèque exclut.
+     * Un retour vers `/workout` menait donc à un index où la séance qu'on venait
+     * de quitter n'apparaît pas.
+     */
+    public function testTheComposerOpenedFromThePlanEditorReturnsToIt(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $workout = $this->createWorkout($user, 'Sortie longue');
+        $template = $this->createPlanTemplate($user, 'Plan 5k', 3);
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/plan-template/'.$template->getId().'/edit');
+        $this->client->request('POST', '/plan-template/'.$template->getId().'/place', [
+            '_token' => $crawler->filter('[data-place-token]')->attr('data-place-token'),
+            'workoutId' => $workout->getId(),
+            'week' => 1,
+            'day' => 1,
+        ]);
+
+        $this->em->clear();
+        $local = $this->em->getRepository(PlanItem::class)->findOneBy([])?->getWorkout();
+        self::assertNotNull($local);
+        self::assertTrue($local->isPlanLocal());
+
+        $editLink = '/workout/'.$local->getId().'/edit?from=plan-edit-'.$template->getId();
+        $crawler = $this->client->request('GET', '/plan-template/'.$template->getId().'/edit');
+        self::assertGreaterThan(0, $crawler->filter('a[href="'.$editLink.'"]')->count());
+
+        $crawler = $this->client->request('GET', $editLink);
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('a.kd-backlink[href="/plan-template/'.$template->getId().'/edit"]'));
+        self::assertSelectorTextContains('.kd-backlink', 'Plan 5k');
+    }
+
+    /**
+     * Le cas d'usage d'origine : « Plans → mon plan → séance → composer ». Le
+     * contexte doit tenir sur les deux sauts, sinon le retour redevient « Mes
+     * séances » dès la page de consultation quittée.
+     */
+    public function testThePlanContextSurvivesToTheComposer(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $workout = $this->createWorkout($user, 'Sortie longue');
+        $template = $this->createPlanTemplate($user, 'Plan 5k', 3);
+
+        $item = (new PlanItem())->setWeekNumber(1)->setDayOfWeek(1);
+        $item->setWorkout($workout);
+        $template->addPlanItem($item);
+        $this->em->persist($item);
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+
+        $planUrl = '/plan-template/'.$template->getId();
+        $crawler = $this->client->request('GET', $planUrl);
+        $showLink = '/workout/'.$workout->getId().'?from=plan-'.$template->getId();
+        self::assertCount(1, $crawler->filter('a.kd-planday__item[href="'.$showLink.'"]'));
+
+        $crawler = $this->client->request('GET', $showLink);
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('a.kd-wk__back[href="'.$planUrl.'"]'));
+
+        $editLink = '/workout/'.$workout->getId().'/edit?from=plan-'.$template->getId();
+        self::assertCount(1, $crawler->filter('a[href="'.$editLink.'"]'));
+
+        $crawler = $this->client->request('GET', $editLink);
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('a.kd-backlink[href="'.$planUrl.'"]'));
+    }
+
+    /**
+     * Le titre d'un plan est privé. Un identifiant deviné dans la query ne doit
+     * donc pas le révéler par le seul libellé du retour, sans jamais ouvrir la
+     * page : le voter tranche avant le libellé, et son refus se lit comme une
+     * absence de contexte.
+     */
+    public function testAForeignPlanContextIsIgnoredRatherThanLabelled(): void
+    {
+        $owner = $this->createUser('owner@example.com');
+        $intruder = $this->createUser('intruder@example.com');
+        $template = $this->createPlanTemplate($owner, 'Prépa marathon secrète', 3);
+        $workout = $this->createWorkout($intruder, 'Sortie longue');
+
+        $this->client->loginUser($intruder);
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId().'?from=plan-'.$template->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertStringNotContainsString('Prépa marathon secrète', (string) $this->client->getResponse()->getContent());
+        self::assertCount(1, $crawler->filter('a.kd-wk__back[href="/workout"]'));
+    }
+
     /** Une séance qui porte réellement de la charge : sans ça, il n'y a pas de rampe à tracer. */
     private function createLiftWorkout(User $owner, string $title): Workout
     {

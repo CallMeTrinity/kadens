@@ -9,12 +9,18 @@
    Paramètres :
    - period : StatsPeriod courant (porte `range`, `queryValue`, `label`)
    - ranges : list de StatsRange cliquables (StatsRange::pickable())
-   - months : list de {value, label}, le plus récent d'abord #}
+   - months : list de {value, label}, le plus récent d'abord
+   - subject : l'athlète regardé, ou null pour soi — il décide de la route visée,
+     sans quoi choisir une fenêtre depuis la page d'un athlète ramènerait le coach
+     sur ses propres statistiques #}
+{% set subject = subject|default(null) %}
+{% set statsRoute = subject ? 'app_coach_athlete_stats' : 'app_profile_stats' %}
+{% set statsParams = subject ? {id: subject.id} : {} %}
 
 <div class="kd-rangepick">
     <div class="kd-rangepick__tabs" role="group" aria-label="Fenêtre de temps">
         {% for range in ranges %}
-            <a href="{{ path('app_profile_stats', {range: range.value}) }}"
+            <a href="{{ path(statsRoute, statsParams|merge({range: range.value})) }}"
                class="kd-rangetab{{ period.queryValue == range.value ? ' is-active' }}"
                {{ period.queryValue == range.value ? 'aria-current="page"' : '' }}>
                 {{ range.shortLabel }}
@@ -23,7 +29,7 @@
     </div>
 
     {% if months|length > 1 %}
-        <form method="get" action="{{ path('app_profile_stats') }}" class="kd-rangepick__month">
+        <form method="get" action="{{ path(statsRoute, statsParams) }}" class="kd-rangepick__month">
             <label class="kd-rangepick__label" for="stats-month">Un mois</label>
             <select class="kd-rangepick__select" id="stats-month" name="range">
                 {% for month in months %}

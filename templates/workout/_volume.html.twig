@@ -1,0 +1,87 @@
+{# Le bandeau du compositeur : ce que la séance va charger, et combien.
+   Contenu de #workout-volume, chargé et rafraîchi par le contrôleur `composer`.
+   Contexte (volumeContext) : workout, volume, load, plates, endurance.
+
+   Le dessin ne porte JAMAIS une information tout seul : trois nuances de rouge ne
+   se départagent pas d'un regard, et un daltonien n'y verra pas trois valeurs.
+   Tout ce que la silhouette dit est donc repris chiffré dans la légende à droite —
+   c'est la condition qui autorise le palier bas à rester très pâle.
+
+   Une séance vide (ou de cardio pur) ne rend pas un cadre vide : le bandeau
+   disparaît, sauf s'il reste de l'endurance à annoncer. #}
+{% import 'components/_activity.html.twig' as activity %}
+
+{% set hasGym = load.areas is not empty or load.fullBody > 0 or load.unmapped > 0 %}
+
+{% if hasGym or endurance is not empty %}
+    <section class="kd-wkvol">
+        {% if hasGym %}
+            <div class="kd-wkvol__body">
+                {{ include('components/_body_map.html.twig', {plates: plates, levels: load.levels}) }}
+
+                <div class="kd-wkvol__legend">
+                    <h2 class="kd-wkvol__title">Zones travaillées</h2>
+
+                    {% if load.areas is not empty %}
+                        <ul class="kd-wkvol__areas">
+                            {% for item in load.areas %}
+                                <li class="kd-wkvol__area">
+                                    <span class="kd-wkvol__dot kd-wkvol__dot--{{ item.level }}" aria-hidden="true"></span>
+                                    <span class="kd-wkvol__areaname">{{ item.area.label }}</span>
+                                    <span class="kd-wkvol__areasets">{{ item.sets }} série{{ item.sets > 1 ? 's' }}</span>
+                                    <span class="kd-wkvol__areapct">{{ item.percent|number_format(0, ',', ' ') }} %</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+
+                    {# Ce qui ne se peint pas se dit quand même, sinon une carte pâle
+                       sur une séance pleine resterait inexpliquée. « Corps entier »
+                       allumerait toute la silhouette et ne dirait plus rien ; une
+                       série sans zone déclarée n'a personne à colorier. #}
+                    {% if load.fullBody > 0 or load.unmapped > 0 %}
+                        <p class="kd-wkvol__aside">
+                            {%- if load.fullBody > 0 %}{{ load.fullBody }} série{{ load.fullBody > 1 ? 's' }} « corps entier », hors du dessin{% endif -%}
+                            {%- if load.fullBody > 0 and load.unmapped > 0 %} · {% endif -%}
+                            {%- if load.unmapped > 0 %}{{ load.unmapped }} série{{ load.unmapped > 1 ? 's' }} sans zone déclarée{% endif -%}
+                        </p>
+                    {% endif %}
+
+                    <p class="kd-wkvol__hint">Une série compte pour chaque zone de l'exercice : le total attribué dépasse le nombre de séries.</p>
+                </div>
+            </div>
+        {% endif %}
+
+        <dl class="kd-wkvol__kpis">
+            {% if volume.gym.totalSets > 0 %}
+                <div class="kd-wkvol__kpi">
+                    <dt>Volume prévu</dt>
+                    <dd>{{ volume.gym.tonnageKg|round|number_format(0, ',', ' ') }}<span class="kd-wkvol__unit"> kg</span></dd>
+                    <p class="kd-wkvol__kpimeta">{{ volume.gym.totalSets }} série{{ volume.gym.totalSets > 1 ? 's' }} de travail</p>
+                </div>
+            {% endif %}
+
+            {% for line in endurance %}
+                <div class="kd-wkvol__kpi">
+                    <dt>{{ ux_icon(activity.icon(line.activity)|trim) }} {{ line.activity.label }}</dt>
+                    <dd>
+                        {%- if line.distanceLabel is not empty -%}
+                            {{ line.distanceLabel }}
+                        {%- else -%}
+                            {{ line.durationLabel }}
+                        {%- endif -%}
+                    </dd>
+                    <p class="kd-wkvol__kpimeta">
+                        {%- if line.distanceLabel is not empty and line.durationLabel %}{{ line.durationLabel }}{% endif -%}
+                        {# La part déduite d'une allure se signale : c'est un calcul,
+                           pas une consigne saisie. #}
+                        {%- if line.derivedMeters > 0 %}
+                            {%- if line.distanceLabel is not empty and line.durationLabel %} · {% endif -%}
+                            déduit de l'allure
+                        {%- endif -%}
+                    </p>
+                </div>
+            {% endfor %}
+        </dl>
+    </section>
+{% endif %}

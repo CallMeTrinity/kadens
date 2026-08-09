@@ -1,0 +1,73 @@
+{# La carte des muscles chargés par une séance : face et dos, côte à côte.
+
+   Paramètres :
+     plates  liste des deux planches à dessiner (sortie de BodyPlates::plate,
+             dans l'ordre de lecture : face puis dos)
+     levels  paliers par SLUG DE MUSCLE (sortie de BodyLoad::for()['levels'])
+     height  hauteur d'une planche en px (défaut 240)
+
+   **Un dessin, et rien d'autre.** Il reçoit des paliers déjà calculés et ne sait
+   ni compter des séries ni nommer une zone : la légende chiffrée qui l'accompagne
+   appartient à l'appelant, qui a le vocabulaire.
+
+   ## Face et dos ensemble, jamais un onglet
+   Un dos derrière un onglet est un dos qu'on ne regarde pas, et une séance de
+   tirage paraîtrait n'avoir rien travaillé. Les deux planches tiennent côte à
+   côte à hauteur constante, et il n'y a rien à toucher.
+
+   ## Le rouge est légitime ici, et il ne porte rien tout seul
+   L'intensité est l'un des trois sens autorisés du rouge : trois paliers pris
+   dans les tokens, du plus clair au plus sombre. Mais trois nuances de rouge ne
+   se départagent pas d'un regard, et un daltonien n'y verra pas trois valeurs —
+   **toute information de cette carte est reprise en toutes lettres dans la
+   légende**. C'est ce qui autorise le palier bas à rester pâle, et c'est aussi
+   pourquoi le SVG est `aria-hidden` : le faire lire deux fois n'aiderait personne.
+
+   ## Une personne, pas une planche d'anatomie
+   Cheveux, tête, cou, mains et pieds (`inert`) sont dessinés et ne porteront
+   jamais de teinte. Ils ne sont pas décoratifs pour autant : la chevelure est ce
+   qui distingue les deux silhouettes d'un coup d'œil. Ils sont hors de l'échelle
+   et le disent — l'encre pour les cheveux, le papier pour le reste, jamais le
+   gris des muscles au repos : un crâne de la couleur d'un pectoral inactif se
+   lirait comme une zone qu'on aurait oublié de travailler. #}
+{% set height = height|default(240) %}
+
+<div class="kd-bodymap">
+    {% for plate in plates %}
+        {# La hauteur est imposée et la largeur suit, jamais l'inverse : les quatre
+           planches n'ont pas le même viewBox (le corps féminin de face est plus
+           haut), et deux silhouettes côte à côte doivent s'aligner sur les épaules. #}
+        {% set box = plate.viewBox|split(' ') %}
+        <svg class="kd-bodymap__plate" viewBox="{{ plate.viewBox }}"
+             height="{{ height }}" width="{{ (height * box[2] / box[3])|round }}"
+             aria-hidden="true" focusable="false">
+            {# Avant les muscles, et c'est la seule chose à savoir de cet ordre : le
+               cou passe SOUS les trapèzes, comme il le doit. Les cheveux, eux, sont
+               derniers de leur propre liste et ne rencontrent aucun muscle. #}
+            {% for shape in plate.inert %}
+                {% for d in shape.paths %}
+                    <path d="{{ d }}"
+                          fill="{{ shape.slug == 'hair' ? 'var(--color-text-secondary)' : 'var(--color-surface-raised)' }}"
+                          stroke="{{ shape.slug == 'hair' ? 'none' : 'var(--color-border-strong)' }}"
+                          stroke-width="0.75" vector-effect="non-scaling-stroke"/>
+                {% endfor %}
+            {% endfor %}
+
+            {% for shape in plate.muscles %}
+                {% set level = levels[shape.slug]|default(null) %}
+                {% for d in shape.paths %}
+                    {# Sans `vector-effect`, l'épaisseur suivrait l'échelle : le viewBox
+                       fait 1448 points de haut pour ~240 à l'écran, un trait de 1 se
+                       rendrait à 0,17. #}
+                    <path d="{{ d }}"
+                          fill="{{ level ? 'var(--color-bodymap-' ~ level ~ ')' : 'var(--color-fill)' }}"
+                          stroke="var(--color-border-strong)"
+                          stroke-width="0.75" vector-effect="non-scaling-stroke"/>
+                {% endfor %}
+            {% endfor %}
+
+            <path d="{{ plate.outline }}" fill="none" stroke="var(--color-text-soft)"
+                  stroke-width="1" vector-effect="non-scaling-stroke"/>
+        </svg>
+    {% endfor %}
+</div>

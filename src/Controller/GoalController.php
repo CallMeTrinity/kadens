@@ -194,6 +194,13 @@ final class GoalController extends AbstractController
      * tombe sur la semaine ISO de l'objectif, puis PlanScheduler instancie
      * (idempotent : re-poser un plan déjà instancié resynchronise sans redater).
      * Le plan posé est rattaché à l'objectif au passage : le lien ne se perd plus.
+     *
+     * **L'instanciation vise le propriétaire de l'objectif, pas l'utilisateur
+     * courant.** `GoalVoter::EDIT` est accordé au coach accepté, et toute cette
+     * page est déjà scopée sur l'athlète (les plans proposés sont les siens) : sur
+     * `$this->getUser()`, un coach qui clique ici poserait les séances de son
+     * athlète sur SON calendrier — la seule action de l'espace coach qui écrivait
+     * chez le mauvais propriétaire.
      */
     #[Route('/{id}/prepare', name: 'app_goal_prepare', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function prepare(
@@ -215,8 +222,14 @@ final class GoalController extends AbstractController
         }
         $this->denyAccessUnlessGranted(PlanTemplateVoter::VIEW, $plan);
 
-        /** @var User $user */
-        $user = $this->getUser();
+        /** @var User $owner */
+        $owner = $goal->getOwner();
+
+        // Un plan d'un autre propriétaire n'a rien à faire sur ce calendrier : la
+        // liste proposée est déjà scopée, la garde couvre l'URL forgée.
+        if ($plan->getOwner() !== $owner) {
+            throw $this->createAccessDeniedException('Ce plan n\'appartient pas au propriétaire de cet objectif.');
+        }
 
         $weeks = max(1, $plan->getDurationWeeks() ?? 1);
         $target = $goal->getTargetDate();
@@ -225,20 +238,32 @@ final class GoalController extends AbstractController
         $goalMonday = $target->setTime(0, 0)->modify(sprintf('-%d days', (int) $target->format('N') - 1));
         $start = $goalMonday->modify(sprintf('-%d days', ($weeks - 1) * 7));
 
-        if ($planScheduler->isInstantiated($plan, $user)) {
-            $this->addFlash('error', sprintf('Le plan « %s » est déjà posé sur ton calendrier. Vide-le d\'abord pour le ré-ancrer sur cette échéance.', $plan->getTitle()));
+        $mine = $owner === $this->getUser();
+
+        if ($planScheduler->isInstantiated($plan, $owner)) {
+            $this->addFlash('error', sprintf(
+                'Le plan « %s » est déjà posé sur %s. Vide-le d\'abord pour le ré-ancrer sur cette échéance.',
+                $plan->getTitle(),
+                $mine ? 'ton calendrier' : 'le calendrier de '.$owner->getUserIdentifier(),
+            ));
 
             return $this->redirectToRoute('app_goal_show', ['id' => $goal->getId()]);
         }
 
-        $created = $planScheduler->instantiate($plan, $user, $start);
+        $created = $planScheduler->instantiate($plan, $owner, $start);
 
         // Le lien ne se perd plus : poser un plan pour une échéance, c'est dire que
         // ce plan la prépare. Idempotent (addGoal ignore un doublon).
         $plan->addGoal($goal);
         $entityManager->flush();
 
-        $this->addFlash('success', sprintf('Plan « %s » posé : %d séance%s, dernière semaine calée sur ton échéance.', $plan->getTitle(), \count($created), \count($created) > 1 ? 's' : ''));
+        $this->addFlash('success', sprintf(
+            'Plan « %s » posé : %d séance%s, dernière semaine calée sur %s.',
+            $plan->getTitle(),
+            \count($created),
+            \count($created) > 1 ? 's' : '',
+            $mine ? 'ton échéance' : 'l\'échéance de '.$owner->getUserIdentifier(),
+        ));
 
         return $this->redirectToRoute('app_goal_show', ['id' => $goal->getId()]);
     }

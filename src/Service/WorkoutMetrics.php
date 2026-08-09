@@ -22,8 +22,8 @@ use App\Enum\ActivityType;
  *
  * @phpstan-import-type RegionShare from RegionBreakdown
  *
- * @phpstan-type GymVolume array{setsByArea: array<string, int>, tonnageKg: float, totalSets: int}
- * @phpstan-type EnduranceVolume array{meters: int, seconds: int}
+ * @phpstan-type GymVolume array{setsByArea: array<string, int>, tonnageKg: float, totalSets: int, unmappedSets: int}
+ * @phpstan-type EnduranceVolume array{meters: int, seconds: int, derivedMeters: int}
  * @phpstan-type WorkoutVolume array{gym: GymVolume, running: EnduranceVolume, cycling: EnduranceVolume, swimming: EnduranceVolume}
  * @phpstan-type TopLift array{exercise: string, weightKg: float, sets: int}
  * @phpstan-type WorkoutSummary array{tonnageKg: float, workingSets: int, exerciseCount: int, blockCount: int, supersets: int, circuits: int, averageRpe: float|null, topLift: TopLift|null, regions: list<RegionShare>}
@@ -190,6 +190,19 @@ final class WorkoutMetrics
      * Les tours de bloc (rounds) multiplient le volume : un exercice dans un bloc
      * à 3 tours compte 3 fois.
      *
+     * Deux compteurs existent pour ce qu'on ne peut pas simplement additionner,
+     * et dans les deux cas c'est la règle « chaque chiffre vient de la source qui
+     * fait autorité sur lui » qui interdit de les fondre dans le total voisin :
+     *
+     * - `unmappedSets` — les séries d'un exercice de renforcement SANS zone
+     *   déclarée. Elles sont bien dans `totalSets` mais dans aucune part de
+     *   `setsByArea` : sans ce compteur, la carte musculaire d'une séance pleine
+     *   pourrait rester vide sans que rien ne l'explique.
+     * - `derivedMeters` — la distance DÉDUITE d'une durée et d'une allure, quand
+     *   la distance n'est pas saisie. C'est un calcul, pas une déclaration : la
+     *   verser dans `meters` ferait passer une estimation pour une consigne. Sans
+     *   allure, elle reste à zéro et l'appelant n'affiche rien.
+     *
      * @return WorkoutVolume
      */
     public function volume(Workout $workout): array
@@ -197,10 +210,11 @@ final class WorkoutMetrics
         $gymSetsByArea = [];
         $gymTonnage = 0.0;
         $gymTotalSets = 0;
+        $gymUnmappedSets = 0;
         $endurance = [
-            'running' => ['meters' => 0, 'seconds' => 0],
-            'cycling' => ['meters' => 0, 'seconds' => 0],
-            'swimming' => ['meters' => 0, 'seconds' => 0],
+            'running' => ['meters' => 0, 'seconds' => 0, 'derivedMeters' => 0],
+            'cycling' => ['meters' => 0, 'seconds' => 0, 'derivedMeters' => 0],
+            'swimming' => ['meters' => 0, 'seconds' => 0, 'derivedMeters' => 0],
         ];
 
         foreach ($workout->getBlocks() as $block) {
@@ -220,7 +234,13 @@ final class WorkoutMetrics
                     $sets = $pe->getWorkingSetCount() * $rounds;
                     if ($sets > 0) {
                         $gymTotalSets += $sets;
-                        foreach ($exercise->getTargetAreas() ?? [] as $area) {
+                        $areas = $exercise->getTargetAreas() ?? [];
+
+                        if ([] === $areas) {
+                            $gymUnmappedSets += $sets;
+                        }
+
+                        foreach ($areas as $area) {
                             $gymSetsByArea[$area->value] = ($gymSetsByArea[$area->value] ?? 0) + $sets;
                         }
                     }
@@ -240,8 +260,20 @@ final class WorkoutMetrics
                     continue;
                 }
 
-                $endurance[$key]['meters'] += ($pe->getDistanceMeters() ?? 0) * $rounds;
-                $endurance[$key]['seconds'] += ($pe->getDurationSeconds() ?? 0) * $rounds;
+                $distance = $pe->getDistanceMeters();
+                $seconds = $pe->getDurationSeconds();
+                $pace = $pe->getPaceSecondsPerKm();
+
+                $endurance[$key]['meters'] += ($distance ?? 0) * $rounds;
+                $endurance[$key]['seconds'] += ($seconds ?? 0) * $rounds;
+
+                // Distance déduite : « 45 min à 5:00/km » décrit bien 9 km, mais
+                // seulement quand la distance n'a PAS été posée — une consigne
+                // saisie fait toujours autorité sur un produit de deux autres
+                // champs, et les additionner compterait la sortie deux fois.
+                if (null === $distance && null !== $seconds && null !== $pace && $pace > 0) {
+                    $endurance[$key]['derivedMeters'] += (int) round($seconds / $pace * 1000) * $rounds;
+                }
             }
         }
 
@@ -250,6 +282,7 @@ final class WorkoutMetrics
                 'setsByArea' => $gymSetsByArea,
                 'tonnageKg' => $gymTonnage,
                 'totalSets' => $gymTotalSets,
+                'unmappedSets' => $gymUnmappedSets,
             ],
             'running' => $endurance['running'],
             'cycling' => $endurance['cycling'],

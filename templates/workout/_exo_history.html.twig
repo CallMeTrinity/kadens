@@ -1,0 +1,82 @@
+{# Rappel de ce qui a été RÉELLEMENT fait sur un exercice, en tête de son panneau
+   de paramètres : le record et la dernière performance. On lit ce qu'on a fait,
+   puis on saisit ce qu'on prévoit — d'où la position avant le formulaire.
+
+   Paramètres : entry (= history[exerciseId], forme {last, best}), exercise, owner
+   (propriétaire de la séance, nullable).
+
+   `entry` NUL = RIEN. Un exercice jamais fait n'affiche pas un cadre vide, il
+   n'affiche pas de bloc — même règle que `components/_exercise_trajectory.html.twig`,
+   et c'est aussi pourquoi `PerformanceHistory::bulkForIds` omet les exercices
+   sans historique au lieu de rendre des entrées creuses.
+
+   L'historique montré est celui du PROPRIÉTAIRE de la séance, pas du lecteur : un
+   coach qui règle une charge lit les chiffres de son athlète. Le contrôleur en est
+   garant (`WorkoutController::historyFor`), le lead ne le dit pas à l'écran — sur
+   la séance d'un athlète, il n'y a aucune ambiguïté sur à qui appartient le
+   chiffre.
+
+   **Le lien « Voir la trajectoire » suit la même portée**, et c'est tout l'objet
+   d'`owner` ici : `/exercise/{id}` répond de SOI (choix assumé, cf. CLAUDE.md §3),
+   donc y envoyer un coach ferait changer de propriétaire au clic, sans le dire.
+   Sur la séance d'un autre, on part vers la page coach de l'athlète. Comparaison
+   par `id` : `owner` est un proxy Doctrine, que Twig comparerait attribut par
+   attribut. #}
+{% set entry = entry|default(null) %}
+{% set owner = owner|default(null) %}
+{% set coached = owner is not null and app.user is not null and owner.id != app.user.id %}
+{% import 'components/_set_type.html.twig' as settype %}
+
+{% if entry %}
+    <div class="kd-exohist">
+        <div class="kd-exohist__figures">
+            {% if entry.best %}
+                {# Pas de record sans kilos : une série en durée ou au poids du corps
+                   n'en produit aucun, et la tuile disparaît plutôt que d'afficher un
+                   tiret qu'il faudrait interpréter. #}
+                <div class="kd-exohist__fig kd-exohist__fig--record">
+                    <span class="kd-exohist__label">{{ ux_icon('lucide:trophy') }} Record</span>
+                    <span class="kd-exohist__value">{{ entry.best.weightKg|round|number_format(0, ',', ' ') }} kg</span>
+                    <span class="kd-exohist__meta">
+                        {{ entry.best.detail }} ·
+                        <a href="{{ path('app_scheduled_workout_show', {id: entry.best.scheduledWorkoutId}) }}">{{ entry.best.date|date('d/m/Y') }}</a>
+                    </span>
+                </div>
+            {% endif %}
+
+            {% if entry.last %}
+                <div class="kd-exohist__fig">
+                    <span class="kd-exohist__label">{{ ux_icon('lucide:history') }} Dernière fois</span>
+                    <span class="kd-exohist__value">
+                        <a href="{{ path('app_scheduled_workout_show', {id: entry.last.scheduledWorkoutId}) }}">{{ entry.last.date|date('d/m/Y') }}</a>
+                    </span>
+                    <span class="kd-exohist__meta">
+                        {{ entry.last.workingSets }} série{{ entry.last.workingSets > 1 ? 's' }}
+                        {%- if entry.last.topWeightKg is not null %} · top {{ entry.last.topWeightKg|round|number_format(0, ',', ' ') }} kg{% endif -%}
+                    </span>
+                </div>
+            {% endif %}
+        </div>
+
+        {% if entry.last and entry.last.sets is not empty %}
+            {# Le condensé des séries de travail : les séries consécutives identiques
+               sont déjà fusionnées par PerformanceHistory, l'échauffement n'y est
+               jamais entré. #}
+            <p class="kd-exohist__sets">
+                {% for group in entry.last.sets %}
+                    <span class="kd-exohist__group">
+                        {{ settype.badge(group.type) }}{{ group.count }} × {{ group.detail }}
+                    </span>
+                {% endfor %}
+            </p>
+        {% endif %}
+
+        {% if exercise %}
+            <a class="kd-exohist__more" href="{{ coached
+                ? path('app_coach_athlete_exercise', {id: owner.id, exerciseId: exercise.id})
+                : path('app_exercise_show', {id: exercise.id}) }}">
+                {{ ux_icon('lucide:activity') }} Voir la trajectoire
+            </a>
+        {% endif %}
+    </div>
+{% endif %}

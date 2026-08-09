@@ -66,6 +66,18 @@
   --kd-accent-tint:   #fbe9e8; /* fond teinté rouge */
   --kd-accent-track:  #e8c9c7; /* piste de jauge d'intensité */
 
+  /* Carte musculaire — trois paliers de charge, du plus léger au plus chargé.
+     C'est du rouge et pas une échelle inventée : le dessin code une INTENSITÉ,
+     l'un des trois sens autorisés de l'accent. À ne pas confondre avec
+     --kd-muscle-* plus bas, qui code des CATÉGORIES sur /profile/history.
+     Les valeurs bornes reprennent l'accent (tint et dark) ; seul le palier
+     intermédiaire est propre à l'échelle — trois teintes doivent se départager
+     d'un regard. Le palier 1 peut rester très pâle parce que rien n'existe
+     seulement dans le dessin : tout y est repris en clair dans la légende. */
+  --kd-bodymap-1:     #fbe9e8; /* touchée         — = --kd-accent-tint */
+  --kd-bodymap-2:     #cb7672; /* chargée */
+  --kd-bodymap-3:     #a81a14; /* le plus chargé  — = --kd-accent-dark */
+
   /* Aplat encre — hero, en-tête de tableau, bloc mis en avant */
   --kd-ink-surface:      #0b0b0b;
   --kd-ink-surface-hover: #1a1a1a;
@@ -230,6 +242,13 @@
   --color-primary-track:   var(--kd-accent-track);
   --color-primary-on-tint: var(--kd-accent-dark);
   --color-on-primary:      #ffffff;
+
+  /* Carte musculaire — paliers de charge. Rangés sous le rouge et non avec les
+     échelles catégorielles ci-dessous : ils codent une intensité, pas une
+     catégorie. Cf. docs/design-system.md §2. */
+  --color-bodymap-1:       var(--kd-bodymap-1);
+  --color-bodymap-2:       var(--kd-bodymap-2);
+  --color-bodymap-3:       var(--kd-bodymap-3);
 
   /* Échelle catégorielle (séries de graphique, aplats de catégorie) */
   --color-cat-1:           var(--kd-cat-1);

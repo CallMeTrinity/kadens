@@ -5,21 +5,34 @@
    rien** : un exercice jamais fait n'affiche pas un cadre vide, il n'affiche pas
    de bloc. C'est la seule condition de rendu, et elle est ici.
 
-   L'historique montré est celui de l'utilisateur connecté, jamais celui d'un
-   autre : un exercice de la bibliothèque globale est pratiqué par tout le monde.
-   Le contrôleur en est garant, le lead le dit à l'écran.
+   L'historique montré est celui d'UNE personne, jamais un mélange : un exercice
+   de la bibliothèque globale est pratiqué par tout le monde. Par défaut c'est
+   l'utilisateur connecté ; `subject` (un athlète coaché) le remplace, et le
+   titre comme le lead le disent à l'écran — un chiffre de performance ne doit
+   jamais laisser douter de qui l'a produit. Le contrôleur est garant de la
+   correspondance entre `subject` et l'historique passé.
 
    Barres réutilisées telles quelles de `_progression` (`.kd-prog__bars`) : c'est
    le même dessin, servi par la même règle d'échelle. Une deuxième famille de
    classes pour le même trait finirait par diverger. #}
 {% import 'components/_set_type.html.twig' as settype %}
+{% set subject = subject|default(null) %}
 
 {% if trajectory %}
     <section class="kd-card kd-extraj">
         <div class="kd-card__head">
-            <h2 class="kd-card__title">{{ ux_icon('lucide:activity') }} Ma trajectoire</h2>
+            <h2 class="kd-card__title">
+                {{ ux_icon('lucide:activity') }}
+                {{ subject ? 'Sa trajectoire' : 'Ma trajectoire' }}
+            </h2>
         </div>
-        <p class="kd-extraj__lead">Ce que tu as réellement fait sur cet exercice, toutes séances et tous plans confondus. Ton historique seul.</p>
+        <p class="kd-extraj__lead">
+            {% if subject %}
+                Ce que {{ subject.userIdentifier }} a réellement fait sur cet exercice, toutes séances et tous plans confondus. Son historique seul.
+            {% else %}
+                Ce que tu as réellement fait sur cet exercice, toutes séances et tous plans confondus. Ton historique seul.
+            {% endif %}
+        </p>
 
         <dl class="kd-wk__kpis kd-wk__kpis--logged">
             {% if trajectory.best %}

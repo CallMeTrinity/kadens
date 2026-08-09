@@ -179,8 +179,11 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   commande (`app:user:promote-coach`), jamais depuis l'app. `GoalVoter` porte la
   même branche : la page athlète affiche ses échéances, elles doivent être
   ouvrables. Corollaire : toute vue accessible au coach doit se scoper sur
-  **`$entity->getOwner()`**, jamais sur `$this->getUser()` (`GoalController::show`
-  et les rattachements objectif↔plan suivent cette règle).
+  **`$entity->getOwner()`**, jamais sur `$this->getUser()` (`GoalController::show`,
+  les rattachements objectif↔plan et **`GoalController::prepare`** suivent cette
+  règle — ancrer un plan sur une échéance vise le calendrier du propriétaire de
+  l'objectif, avec en plus la garde « ce plan lui appartient » ; sur le lecteur, un
+  coach posait les séances de son athlète chez lui).
   **L'éditeur de trame ne fait pas exception** : sa palette, la garde de pose,
   l'owner des copies locales forkées, la duplication et l'owner passé à
   `PlanScheduler::rescheduleItem()` dérivent tous de `PlanTemplateController::ownerOf()`
@@ -238,6 +241,48 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   `app:user:promote-coach`). L'app n'expose que ce que le titulaire du compte peut
   changer lui-même : son mot de passe, dans `/profile/settings`. L'email reste un
   identifiant fixe côté console.
+- **Dans le compositeur, l'historique suit le PROPRIÉTAIRE de la séance ; sur la
+  fiche d'un exercice, il suit SOI.** Ce n'est pas une incohérence, ce sont deux
+  questions. `/exercise/{id}` répond à « est-ce que **je** progresse » sur un
+  exercice de la bibliothèque globale, que tout le monde pratique : il reste scopé
+  sur `$this->getUser()`. `/workout/{id}/edit` compose une séance, qui a un
+  propriétaire : le compteur d'exécutions de la palette, les records du panneau
+  déplié (`historyFor()`) et le volume du bandeau se lisent sur
+  `$workout->getOwner()`, comme `libraryContext()`. Un coach qui règle une charge
+  lit les chiffres de son athlète ; les siens ne disent rien de ce qu'il prescrit.
+  **Corollaire : un lien ne change jamais de sujet en silence.** Les deux portées
+  coexistent tant qu'aucun chemin ne fait passer de l'une à l'autre sans le dire —
+  ce que faisait « Voir la trajectoire », qui envoyait le coach de l'athlète à
+  lui-même. Le coach a donc son propre espace de lecture, gardé par
+  `CoachController::denyUnlessCoachOf()` : `/coach/athlete/{id}/exercise/{exId}`,
+  `/stats`, `/history`, qui rendent les **mêmes** templates au nom de quelqu'un
+  d'autre (paramètre `subject`, null = soi ; les services `ExerciseTrajectory`,
+  `TrainingStats` et `TrainingHistory` prennent déjà n'importe quel `User`). Règle
+  à tenir de ce côté : un template servi aux deux calcule ses destinations depuis
+  `subject` — un lien interne oublié (fenêtre `?range=`, retour) ramènerait le
+  coach sur ses propres données au clic suivant.
+  Le seul élément du compositeur qui reste au lecteur est la **silhouette**
+  (`User.bodySilhouette`) — c'est un réglage d'affichage, pas une donnée. Il ne se
+  dérive jamais de `User.sex`, qui est nullable, accepte « autre » et sert au DOTS.
+- **Le retour dit d'où l'on vient, pas où aller (`?from=`).** Une séance s'ouvre
+  depuis six endroits et n'avait qu'un retour écrit en dur vers son index — faux
+  cinq fois sur six, et carrément en impasse depuis l'éditeur de plan (la copie
+  locale `planLocal` est exclue de la bibliothèque). L'ancre de contexte est un
+  jeton porté par la query, en trois temps : `back_to(kind, id)` le pose sur un
+  lien sortant, `back_carry()` le reconduit au saut suivant (sans quoi la chaîne
+  casse au premier), `components/_backlink.html.twig` l'affiche. Elle vise le
+  **conteneur d'origine** (le plan, la vue calendrier), pas l'écran précédent :
+  depuis le compositeur ouvert via un plan, on repart au plan, sans remonter
+  maillon par maillon. Invariants : le jeton ne porte **jamais d'URL**, seulement
+  un type et une clé résolus contre une table fermée de routes
+  (`App\Http\BackTarget`, garde-fou testé) — aucune redirection ouverte n'est
+  possible ; les droits se vérifient **avant** le libellé, un titre de plan étant
+  privé ; et un jeton illisible, périmé ou hors droits **n'est pas une erreur**,
+  il se lit comme une absence et la page retombe sur son retour d'origine.
+  Corollaire côté PWA : `from` est retiré de la clé de cache du service worker
+  (`cacheKey()` dans `public/sw.js`), sinon le hors-ligne se fragmenterait par
+  contexte d'entrée — les autres paramètres (`range`, `run`) restent dans la clé,
+  eux changent le contenu rendu.
 - **Aucune IA dans l'app.** Le remplissage de la biblio passe par une commande
   d'import JSON (Phase 3), pas d'API en prod.
 - **Un exercice a une identité (`refKey`) et des libellés (`name`, `nameEn`),

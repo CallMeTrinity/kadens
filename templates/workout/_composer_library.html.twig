@@ -62,7 +62,16 @@
                 <span class="kd-libx__code">{{ exercise_name(ex)|slice(0, 2)|upper }}</span>
                 <span class="kd-libx__body">
                     <span class="kd-libx__name">{{ exercise_name(ex) }}</span>
-                    <span class="kd-libx__meta">{{ ux_icon(activity.icon(ex.activity)|trim) }} {{ ex.activity.label }}</span>
+                    <span class="kd-libx__meta">
+                        {{ ux_icon(activity.icon(ex.activity)|trim) }} {{ ex.activity.label }}
+                        {# Le nombre de fois où l'exercice a RÉELLEMENT été fait (le même
+                           compteur qui trie la palette). Rien à zéro : un « ×0 » sur trois
+                           cents cartes est du bruit, et l'absence dit déjà « jamais fait ». #}
+                        {% set done = libraryUsage[ex.id].count|default(0) %}
+                        {% if done > 0 %}
+                            <span class="kd-libx__count" title="Fait {{ done }} fois">×{{ done }}</span>
+                        {% endif %}
+                    </span>
                     {% if ex.targetAreas %}
                         <span class="kd-tags">
                             {% for a in ex.targetAreas %}<span class="kd-tag">{{ a.label }}</span>{% endfor %}

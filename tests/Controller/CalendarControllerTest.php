@@ -258,8 +258,57 @@ final class CalendarControllerTest extends WebTestCase
         $crawler = $this->client->request('GET', '/calendar/2026/3');
 
         // Au doigt, la pastille doit mener quelque part sans JS : c'est un lien,
-        // pas un bouton de modale.
-        self::assertCount(2, $crawler->filter('a.kd-calevent__open[href="/schedule/'.$scheduled->getId().'"], a.kd-calevent__eye[href="/schedule/'.$scheduled->getId().'"]'));
+        // pas un bouton de modale. Le href porte en plus son ancre de contexte
+        // (`?from=`), d'où le sélecteur par préfixe.
+        $target = '/schedule/'.$scheduled->getId();
+        self::assertCount(2, $crawler->filter('a.kd-calevent__open[href^="'.$target.'"], a.kd-calevent__eye[href^="'.$target.'"]'));
+
+        // Le mois **affiché**, pas celui de la séance : la grille déborde sur ses
+        // voisins, et une pastille datée du mois précédent renverrait ailleurs.
+        self::assertCount(2, $crawler->filter('a[href="'.$target.'?from=cal-month-2026-03"]'));
+    }
+
+    /**
+     * La chaîne « calendrier → séance datée → compositeur » : le retour doit
+     * ramener au calendrier d'où l'on vient, y compris après le second saut. Sans
+     * la reconduite du jeton, le compositeur retombait sur « Mes séances ».
+     */
+    public function testTheCalendarContextSurvivesToTheComposer(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $workout = $this->createWorkout($user, 'Sortie longue');
+        $scheduled = $this->createScheduled($user, $workout, new \DateTimeImmutable('2026-03-15'));
+
+        $this->client->loginUser($user);
+
+        $crawler = $this->client->request('GET', '/schedule/'.$scheduled->getId().'?from=cal-month-2026-03');
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('a.kd-wk__back[href="/calendar/2026/3"]'));
+
+        $editLink = '/workout/'.$workout->getId().'/edit?from=cal-month-2026-03';
+        self::assertCount(1, $crawler->filter('a[href="'.$editLink.'"]'));
+
+        $crawler = $this->client->request('GET', $editLink);
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('a.kd-backlink[href="/calendar/2026/3"]'));
+    }
+
+    /**
+     * Un jeton illisible n'est pas une erreur : la page se rend, avec le retour
+     * qu'elle avait avant cette fonctionnalité. C'est le pire cas assumé, et il
+     * arrive tout seul (URL tronquée, recopiée, vieillie).
+     */
+    public function testAnUnreadableContextFallsBackInsteadOfBreaking(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $workout = $this->createWorkout($user, 'Sortie longue');
+        $scheduled = $this->createScheduled($user, $workout, new \DateTimeImmutable('2026-03-15'));
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/schedule/'.$scheduled->getId().'?from=cal-month-2026-13');
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('a.kd-wk__back[href="/calendar"]'));
     }
 
     public function testMoveDeniedToNonOwner(): void

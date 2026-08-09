@@ -2,6 +2,7 @@
 
 namespace App\Tests\Controller;
 
+use App\Entity\Coaching;
 use App\Entity\Exercise;
 use App\Entity\Goal;
 use App\Entity\PlanItem;
@@ -9,6 +10,7 @@ use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
+use App\Enum\CoachingStatus;
 use App\Enum\GoalPriority;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -25,6 +27,10 @@ final class GoalControllerTest extends WebTestCase
         $this->client = static::createClient();
         $this->em = static::getContainer()->get('doctrine.orm.entity_manager');
 
+        // Relations de coaching : référencent user, à purger avant lui (FK).
+        foreach ($this->em->getRepository(Coaching::class)->findAll() as $coaching) {
+            $this->em->remove($coaching);
+        }
         foreach ($this->em->getRepository(Goal::class)->findAll() as $goal) {
             $this->em->remove($goal);
         }
@@ -139,6 +145,77 @@ final class GoalControllerTest extends WebTestCase
         self::assertCount(1, $scheduled);
         // Dernière semaine (semaine 2, lundi) calée sur la semaine de l'échéance.
         self::assertSame($goalMonday->format('Y-m-d'), $scheduled[0]->getScheduledDate()->format('Y-m-d'));
+    }
+
+    /**
+     * Le coach ancre le plan sur le calendrier de son ATHLÈTE. La page entière est
+     * scopée sur le propriétaire de l'objectif (les plans proposés sont les
+     * siens) : ancrer sur `$this->getUser()` posait les séances de l'athlète chez
+     * le coach — la seule action de l'espace coach qui écrivait chez le mauvais
+     * propriétaire.
+     */
+    public function testCoachPreparingAGoalSchedulesOnTheAthleteCalendar(): void
+    {
+        $athlete = $this->createUser('athlete@example.com');
+        $coach = $this->createUser('coach@example.com');
+        $this->acceptCoaching($coach, $athlete);
+
+        $workout = $this->createWorkout($athlete, 'Sortie longue');
+        $template = $this->createPlanTemplate($athlete, 'Plan 2 sem', 2);
+        $this->createPlanItem($template, $workout, 2, 1);
+
+        $goal = $this->createGoal($athlete, 'Course cible', new \DateTimeImmutable('+60 days'));
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/goal/'.$goal->getId());
+
+        $form = $crawler->selectButton('Ancrer sur l\'échéance')->form();
+        $form['planTemplate'] = (string) $template->getId();
+        $this->client->submit($form);
+
+        self::assertResponseRedirects('/goal/'.$goal->getId());
+
+        $scheduled = $this->em->getRepository(ScheduledWorkout::class)->findAll();
+        self::assertCount(1, $scheduled);
+        self::assertSame($athlete->getId(), $scheduled[0]->getOwner()->getId());
+    }
+
+    /** Un plan d'un autre propriétaire ne s'ancre pas, même par URL forgée. */
+    public function testPrepareRefusesAPlanFromAnotherOwner(): void
+    {
+        $athlete = $this->createUser('athlete@example.com');
+        $coach = $this->createUser('coach@example.com');
+        $this->acceptCoaching($coach, $athlete);
+
+        $goal = $this->createGoal($athlete, 'Course cible', new \DateTimeImmutable('+60 days'));
+        // L'athlète a un plan (sinon la section « préparer » ne s'affiche pas), le
+        // coach en a un autre : c'est celui-là qu'on tente de poser.
+        $this->createPlanTemplate($athlete, 'Son plan', 2);
+        $ownPlan = $this->createPlanTemplate($coach, 'Mon plan', 2);
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/goal/'.$goal->getId());
+        $token = $crawler->filter('form[action="/goal/'.$goal->getId().'/prepare"] input[name="_token"]')->attr('value');
+
+        $this->client->request('POST', '/goal/'.$goal->getId().'/prepare', [
+            '_token' => $token,
+            'planTemplate' => (string) $ownPlan->getId(),
+        ]);
+
+        self::assertResponseStatusCodeSame(403);
+        self::assertCount(0, $this->em->getRepository(ScheduledWorkout::class)->findAll());
+    }
+
+    private function acceptCoaching(User $coach, User $athlete): void
+    {
+        $this->em->persist(
+            (new Coaching())
+                ->setCoach($coach)
+                ->setAthlete($athlete)
+                ->setStatus(CoachingStatus::ACCEPTED)
+                ->setRequestedBy($coach)
+        );
+        $this->em->flush();
     }
 
     private function createUser(string $email): User

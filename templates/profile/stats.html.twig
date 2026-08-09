@@ -12,11 +12,20 @@
    vient. Le tonnage vient du RÉALISÉ (séries loguées), les distances du
    PRESCRIT des séances faites (le cardio ne se logue jamais), l'observance des
    statuts. Une séance d'avant Kadens Live compte donc en régularité sans porter
-   de tonnage — c'est exact, et la page le dit plutôt que de le combler. #}
+   de tonnage — c'est exact, et la page le dit plutôt que de le combler.
 
-{% block title %}Statistiques — Kadens{% endblock %}
+   `subject` = l'athlète regardé, ou null pour soi. `TrainingStats` prend
+   n'importe quel `User` : la page est la même, servie par
+   `CoachController::athleteStats`. Tout ce qui dépend du lecteur (titre,
+   destinations) est calculé en tête de `body` ; le corps ne sait pas qui
+   regarde. #}
+
+{% block title %}Statistiques{% if subject|default(null) %} — {{ subject.userIdentifier }}{% endif %} — Kadens{% endblock %}
 
 {% block body %}
+    {% set subject = subject|default(null) %}
+    {% set historyPath = subject ? path('app_coach_athlete_history', {id: subject.id}) : path('app_profile_history') %}
+    {% set backPath = subject ? path('app_coach_athlete', {id: subject.id}) : path('app_profile') %}
     {% set vol = stats.volume %}
     {% set reg = stats.regularity %}
     {% set prog = stats.progression %}
@@ -24,22 +33,27 @@
     <div class="kd-pagehead">
         <div>
             <p class="kd-eyebrow kd-eyebrow--accent">Statistiques</p>
-            <h1 class="kd-title">Ce que tu as fait</h1>
-            <p class="kd-pagehead__lead">{{ period.label }}</p>
+            {# Pas de pronom sujet pour l'athlète : le genre n'est pas une donnée
+               d'affichage (User.sex est nullable et sert au DOTS). #}
+            <h1 class="kd-title">{{ subject ? 'Ce qui a été fait' : 'Ce que tu as fait' }}</h1>
+            <p class="kd-pagehead__lead">
+                {%- if subject %}{{ subject.userIdentifier }} · {% endif -%}
+                {{ period.label }}
+            </p>
         </div>
         <div class="kd-actionbar__end">
             {# L'historique n'a pas de fenêtre : il n'hérite donc pas du `?range=`
                courant, et c'est volontaire. #}
-            <a href="{{ path('app_profile_history') }}" class="kd-btn kd-btn--secondary">
+            <a href="{{ historyPath }}" class="kd-btn kd-btn--secondary">
                 {{ ux_icon('lucide:history') }} Historique
             </a>
-            <a href="{{ path('app_profile') }}" class="kd-btn kd-btn--ghost">
-                {{ ux_icon('lucide:arrow-left') }} Retour au profil
+            <a href="{{ backPath }}" class="kd-btn kd-btn--ghost">
+                {{ ux_icon('lucide:arrow-left') }} {{ subject ? 'Retour à sa fiche' : 'Retour au profil' }}
             </a>
         </div>
     </div>
 
-    {{ include('profile/_stats_range.html.twig', {period: period, ranges: ranges, months: months}) }}
+    {{ include('profile/_stats_range.html.twig', {period: period, ranges: ranges, months: months, subject: subject}) }}
 
     {# ============================== BANDEAU DE TÊTE ========================= #}
     {# Les quatre repères qu'on lit avant tout le reste. Volontairement mêlés :

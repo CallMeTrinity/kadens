@@ -1,0 +1,21 @@
+{# Lien de retour contextuel. Seul endroit qui rend une ancre `?from=` — un
+   template qui écrirait son `<a class="kd-backlink">` à la main retomberait sur
+   le retour figé que ce composant remplace (cf. `App\Http\BackTarget`).
+
+   Attend :
+     - fallback : nom de route du retour d'origine, quand aucun contexte n'est
+                  porté ou qu'il est illisible/hors droits
+     - kicker   : son libellé (structurel, il passera en capitales)
+     - params   : paramètres de cette route (défaut {})
+     - class    : `kd-backlink` (page claire) ou `kd-wk__back` (hero encré)
+
+   Le libellé se rend en deux morceaux : le kicker est structurel et suit la
+   casse de la classe, `name` est du contenu saisi (titre de plan) et reste en
+   casse normale — règle 4 du design system. #}
+{% set back = back_link(fallback, kicker, params|default({})) %}
+
+<a href="{{ back.url }}" class="{{ class|default('kd-backlink') }}">
+    {{ ux_icon('lucide:arrow-left') }}
+    <span>{{ back.kicker }}</span>
+    {% if back.name %}<span class="kd-backlink__name">{{ back.name }}</span>{% endif %}
+</a>
