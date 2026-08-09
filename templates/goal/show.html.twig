@@ -11,8 +11,14 @@
         <p class="kd-flash kd-flash--error" role="alert">{{ ux_icon('lucide:x') }} {{ message }}</p>
     {% endfor %}
 
-    <a href="{{ path('app_goal_index') }}" class="kd-backlink">
-        {{ ux_icon('lucide:arrow-left') }} Objectifs
+    {# `mine` : la fiche est ouverte par son propriétaire, ou par son coach
+       (GoalVoter accorde VIEW/EDIT aux deux). Tout ce que la page fait — poser un
+       plan, rattacher — vise le propriétaire, jamais le lecteur ; ces libellés le
+       disent. Comparaison par `id` : `owner` peut être un proxy Doctrine. #}
+    {% set mine = app.user is not null and goal.owner is not null and goal.owner.id == app.user.id %}
+
+    <a href="{{ mine ? path('app_goal_index') : path('app_coach_athlete', {id: goal.owner.id}) }}" class="kd-backlink">
+        {{ ux_icon('lucide:arrow-left') }} {{ mine ? 'Objectifs' : goal.owner.userIdentifier }}
     </a>
 
     {% set days = goal.daysUntil %}
@@ -127,11 +133,15 @@
     {% if not goal.isPast %}
         <section class="kd-card kd-section__block">
             <h2 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:calendar-range') }} Préparer avec un plan</h2>
-            <p class="kd-lead" style="margin-top:0;">On raisonne à l'envers : Kadens cale la dernière semaine du plan sur ton échéance et calcule la date de départ.</p>
+            <p class="kd-lead" style="margin-top:0;">
+                On raisonne à l'envers : Kadens cale la dernière semaine du plan sur
+                {{ mine ? 'ton échéance' : 'cette échéance' }} et calcule la date de départ.
+                {% if not mine %}Le plan se pose sur le calendrier de {{ goal.owner.userIdentifier }}.{% endif %}
+            </p>
             {% if plans is empty %}
                 <div class="kd-empty">
                     {{ ux_icon('lucide:layers') }}
-                    <div>Tu n'as pas encore de plan. Crée une trame ci-dessus pour l'ancrer sur cette date.</div>
+                    <div>{{ mine ? 'Tu n\'as pas encore de plan.' : 'Aucun plan pour cet athlète.' }} Crée une trame ci-dessus pour l'ancrer sur cette date.</div>
                 </div>
             {% else %}
                 <form method="post" action="{{ path('app_goal_prepare', {id: goal.id}) }}" class="kd-goalprepare">

@@ -16,7 +16,8 @@
 {% set histExercise = prescribed.exercise %}
 {{ include('workout/_exo_history.html.twig', {
     entry: histExercise ? (history[histExercise.id]|default(null)) : null,
-    exercise: histExercise
+    exercise: histExercise,
+    owner: workout.owner
 }) }}
 
 {{ include('workout/_prescribed_form.html.twig', {

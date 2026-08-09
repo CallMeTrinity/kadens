@@ -562,6 +562,39 @@ final class WorkoutControllerTest extends WebTestCase
     }
 
     /**
+     * Et « Voir la trajectoire » ne doit pas défaire ce que le panneau vient de
+     * dire : le lien part vers la page coach de l'athlète, pas vers
+     * `/exercise/{id}`, qui répond de SOI. Sur sa propre séance, il ne bouge pas.
+     */
+    public function testTheTrajectoryLinkFollowsTheWorkoutOwner(): void
+    {
+        $athlete = $this->createUser('athlete@example.com');
+        $coach = $this->createUser('coach@example.com');
+        $this->acceptCoaching($coach, $athlete);
+
+        $exercise = $this->createExercise($athlete, 'Développé couché');
+        $workout = $this->createWorkout($athlete, 'Séance');
+        $block = (new Block())->setRole(BlockRole::MAIN)->setPosition(0);
+        $block->addPrescribedExercise($this->makePrescribed($exercise, 0));
+        $workout->addBlock($block);
+        $this->em->flush();
+
+        $this->logSets($athlete, $exercise, [[5, 120.0]]);
+
+        $coachLink = '/coach/athlete/'.$athlete->getId().'/exercise/'.$exercise->getId();
+        $ownLink = '/exercise/'.$exercise->getId();
+
+        $this->client->loginUser($coach);
+        $this->client->request('GET', '/workout/'.$workout->getId().'/edit');
+        self::assertSelectorExists('a.kd-exohist__more[href="'.$coachLink.'"]');
+        self::assertSelectorNotExists('a.kd-exohist__more[href="'.$ownLink.'"]');
+
+        $this->client->loginUser($athlete);
+        $this->client->request('GET', '/workout/'.$workout->getId().'/edit');
+        self::assertSelectorExists('a.kd-exohist__more[href="'.$ownLink.'"]');
+    }
+
+    /**
      * Le bandeau de volume : chargé à part, il rend la carte des zones et les
      * chiffres de la séance.
      */

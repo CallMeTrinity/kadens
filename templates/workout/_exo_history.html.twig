@@ -2,7 +2,8 @@
    de paramètres : le record et la dernière performance. On lit ce qu'on a fait,
    puis on saisit ce qu'on prévoit — d'où la position avant le formulaire.
 
-   Paramètres : entry (= history[exerciseId], forme {last, best}), exercise.
+   Paramètres : entry (= history[exerciseId], forme {last, best}), exercise, owner
+   (propriétaire de la séance, nullable).
 
    `entry` NUL = RIEN. Un exercice jamais fait n'affiche pas un cadre vide, il
    n'affiche pas de bloc — même règle que `components/_exercise_trajectory.html.twig`,
@@ -13,8 +14,17 @@
    coach qui règle une charge lit les chiffres de son athlète. Le contrôleur en est
    garant (`WorkoutController::historyFor`), le lead ne le dit pas à l'écran — sur
    la séance d'un athlète, il n'y a aucune ambiguïté sur à qui appartient le
-   chiffre. #}
+   chiffre.
+
+   **Le lien « Voir la trajectoire » suit la même portée**, et c'est tout l'objet
+   d'`owner` ici : `/exercise/{id}` répond de SOI (choix assumé, cf. CLAUDE.md §3),
+   donc y envoyer un coach ferait changer de propriétaire au clic, sans le dire.
+   Sur la séance d'un autre, on part vers la page coach de l'athlète. Comparaison
+   par `id` : `owner` est un proxy Doctrine, que Twig comparerait attribut par
+   attribut. #}
 {% set entry = entry|default(null) %}
+{% set owner = owner|default(null) %}
+{% set coached = owner is not null and app.user is not null and owner.id != app.user.id %}
 {% import 'components/_set_type.html.twig' as settype %}
 
 {% if entry %}
@@ -62,7 +72,9 @@
         {% endif %}
 
         {% if exercise %}
-            <a class="kd-exohist__more" href="{{ path('app_exercise_show', {id: exercise.id}) }}">
+            <a class="kd-exohist__more" href="{{ coached
+                ? path('app_coach_athlete_exercise', {id: owner.id, exerciseId: exercise.id})
+                : path('app_exercise_show', {id: exercise.id}) }}">
                 {{ ux_icon('lucide:activity') }} Voir la trajectoire
             </a>
         {% endif %}

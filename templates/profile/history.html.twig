@@ -23,17 +23,27 @@
 
    4. **Les cases vides sont aria-hidden.** Un mois de 31 jours annoncés un à un
       est du bruit ; seules les cases qui portent quelque chose s'annoncent, et
-      chaque séance porte son propre libellé de lien. #}
+      chaque séance porte son propre libellé de lien.
 
-{% block title %}Historique — Kadens{% endblock %}
+   `subject` = l'athlète regardé, ou null pour soi. `TrainingHistory` prend
+   n'importe quel `User` : même page, servie par
+   `CoachController::athleteHistory`. #}
+
+{% block title %}Historique{% if subject|default(null) %} — {{ subject.userIdentifier }}{% endif %} — Kadens{% endblock %}
 
 {% block body %}
+    {% set subject = subject|default(null) %}
+    {% set statsPath = subject ? path('app_coach_athlete_stats', {id: subject.id}) : path('app_profile_stats') %}
+    {% set backPath = subject ? path('app_coach_athlete', {id: subject.id}) : path('app_profile') %}
     {% set years = history.years %}
 
     <div class="kd-pagehead">
         <div>
             <p class="kd-eyebrow kd-eyebrow--accent">Historique</p>
-            <h1 class="kd-title">Ton année, jour par jour</h1>
+            <h1 class="kd-title">
+                {{- subject ? 'Son année, jour par jour' : 'Ton année, jour par jour' -}}
+            </h1>
+            {% if subject %}<p class="kd-pagehead__lead">{{ subject.userIdentifier }}</p>{% endif %}
             {% if years is not empty %}
                 {# Le libellé du premier mois d'historique est déjà calculé : les
                    années sont triées du plus récent au plus ancien, donc c'est le
@@ -47,11 +57,11 @@
             {% endif %}
         </div>
         <div class="kd-actionbar__end">
-            <a href="{{ path('app_profile_stats') }}" class="kd-btn kd-btn--secondary">
+            <a href="{{ statsPath }}" class="kd-btn kd-btn--secondary">
                 {{ ux_icon('lucide:chart-column') }} Statistiques
             </a>
-            <a href="{{ path('app_profile') }}" class="kd-btn kd-btn--ghost">
-                {{ ux_icon('lucide:arrow-left') }} Retour au profil
+            <a href="{{ backPath }}" class="kd-btn kd-btn--ghost">
+                {{ ux_icon('lucide:arrow-left') }} {{ subject ? 'Retour à sa fiche' : 'Retour au profil' }}
             </a>
         </div>
     </div>

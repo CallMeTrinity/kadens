@@ -724,6 +724,94 @@ final class CoachControllerTest extends WebTestCase
     }
 
     /**
+     * La trajectoire d'un exercice au nom de l'athlète : c'est SON historique qui
+     * s'affiche, sur un exercice de la bibliothèque globale que les deux
+     * pratiquent. Sans cette page, le lien du compositeur ramenait le coach sur
+     * ses propres chiffres.
+     */
+    public function testAthleteExercisePageShowsTheAthleteTrajectory(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+
+        $exercise = $this->createExercise(null, 'Squat');
+        $this->logSession($athlete, $exercise, '2026-03-08', [[SetType::NORMAL, 5, 120.0]]);
+        $this->logSession($coach, $exercise, '2026-03-09', [[SetType::NORMAL, 5, 200.0]]);
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/coach/athlete/'.$athlete->getId().'/exercise/'.$exercise->getId());
+
+        self::assertResponseIsSuccessful();
+        $trajectory = $crawler->filter('.kd-extraj')->text();
+        self::assertStringContainsString('120 kg', $trajectory);
+        self::assertStringNotContainsString('200 kg', $trajectory);
+        // La page dit de qui elle parle : un chiffre de performance ne doit pas
+        // laisser douter de qui l'a produit.
+        self::assertStringContainsString('athlete@example.com', $trajectory);
+
+        // La page « moi » n'a pas bougé pour autant : elle répond toujours de soi.
+        $crawler = $this->client->request('GET', '/exercise/'.$exercise->getId());
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString('200 kg', $crawler->filter('.kd-extraj')->text());
+    }
+
+    /** Sans relation acceptée, l'historique d'un autre reste fermé. */
+    public function testAthleteExercisePageIsDeniedWithoutAcceptedRelation(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::PENDING);
+
+        $exercise = $this->createExercise(null, 'Squat');
+
+        $this->client->loginUser($coach);
+        $this->client->request('GET', '/coach/athlete/'.$athlete->getId().'/exercise/'.$exercise->getId());
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    /**
+     * Statistiques et historique de l'athlète : mêmes pages que les siennes,
+     * servies au nom de quelqu'un d'autre. On vérifie que les chiffres sont ceux
+     * de l'athlète et que la navigation interne (fenêtre de temps) ne renvoie pas
+     * le coach sur ses propres statistiques.
+     */
+    public function testAthleteStatsAndHistoryReadTheAthleteData(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+
+        $exercise = $this->createExercise(null, 'Squat');
+        $this->logSession($athlete, $exercise, (new \DateTimeImmutable('-3 days'))->format('Y-m-d'), [
+            [SetType::NORMAL, 10, 100.0],
+        ]);
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/coach/athlete/'.$athlete->getId().'/stats');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'athlete@example.com');
+        // 10 × 100 kg de tonnage, chez l'athlète : le coach n'a rien logué.
+        $headline = implode(' ', $crawler->filter('.kd-metric')->each(static fn ($node): string => $node->text()));
+        self::assertStringContainsString('1 000', $headline);
+        // Le sélecteur de fenêtre reste sur l'athlète.
+        self::assertSelectorExists('a[href^="/coach/athlete/'.$athlete->getId().'/stats?range="]');
+        self::assertSelectorNotExists('a[href^="/profile/stats"]');
+
+        $this->client->request('GET', '/coach/athlete/'.$athlete->getId().'/history');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('body', 'athlete@example.com');
+        self::assertSelectorExists('a[href="/coach/athlete/'.$athlete->getId().'/stats"]');
+
+        // Et la fiche athlète mène aux deux.
+        $this->client->request('GET', '/coach/athlete/'.$athlete->getId());
+        self::assertSelectorExists('a[href="/coach/athlete/'.$athlete->getId().'/stats"]');
+        self::assertSelectorExists('a[href="/coach/athlete/'.$athlete->getId().'/history"]');
+    }
+
+    /**
      * Une séance datée qui porte le réalisé d'un seul exercice.
      *
      * @param list<array{0: SetType, 1: int|null, 2: float|null}> $sets

@@ -2,21 +2,29 @@
 
 namespace App\Controller;
 
+use App\Entity\Exercise;
 use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
+use App\Enum\MuscleGroup;
 use App\Enum\ScheduledStatus;
+use App\Enum\StatsRange;
 use App\Repository\GoalRepository;
 use App\Repository\PlanTemplateRepository;
 use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
+use App\Security\Voter\ExerciseVoter;
 use App\Service\CoachingResolver;
+use App\Service\ExerciseTrajectory;
 use App\Service\HeartRateZones;
 use App\Service\LogMetrics;
 use App\Service\PlanScheduler;
 use App\Service\ProfileStats;
 use App\Service\SlugGenerator;
+use App\Service\StatsPeriod;
+use App\Service\TrainingHistory;
+use App\Service\TrainingStats;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bridge\Doctrine\Attribute\MapEntity;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -100,6 +108,82 @@ final class CoachController extends AbstractController
             // Le coach a besoin des 1RM, records et zones cardio pour programmer.
             'stats' => $profileStats->for($athlete),
             'hrZones' => $heartRateZones->forUser($athlete),
+        ]);
+    }
+
+    /**
+     * La trajectoire d'un exercice **chez l'athlète** : même page que
+     * `/exercise/{id}`, lue au nom de quelqu'un d'autre.
+     *
+     * Elle existe parce que `ExerciseController::show()` scope volontairement sur
+     * `$this->getUser()` — « est-ce que MOI je progresse » sur un exercice de la
+     * bibliothèque globale, que tout le monde pratique. Cette question-là garde sa
+     * page ; celle du coach en a désormais une autre, au lieu de basculer en
+     * silence d'un athlète à soi au clic depuis le compositeur.
+     *
+     * Deux gardes, pas une : coach accepté de l'athlète (l'historique lu), **et**
+     * `ExerciseVoter::VIEW` sur l'exercice (un exercice perso d'un tiers reste
+     * fermé — la relation de coaching ne l'ouvre que dans son propre sens).
+     */
+    #[Route('/athlete/{id}/exercise/{exerciseId}', name: 'app_coach_athlete_exercise', methods: ['GET'], requirements: ['id' => '\d+', 'exerciseId' => '\d+'])]
+    public function athleteExercise(
+        #[MapEntity(id: 'id')] User $athlete,
+        #[MapEntity(id: 'exerciseId')] Exercise $exercise,
+        ExerciseTrajectory $trajectory,
+    ): Response {
+        $this->denyUnlessCoachOf($athlete);
+        $this->denyAccessUnlessGranted(ExerciseVoter::VIEW, $exercise);
+
+        return $this->render('exercise/show.html.twig', [
+            'exercise' => $exercise,
+            'trajectory' => $trajectory->for($athlete, $exercise),
+            'subject' => $athlete,
+        ]);
+    }
+
+    /**
+     * Les statistiques de l'athlète sur une fenêtre de temps — `/profile/stats`
+     * lu au nom de quelqu'un d'autre, même template et même moteur
+     * (`TrainingStats` prend n'importe quel `User`).
+     *
+     * La fenêtre reste un paramètre d'URL : « les stats de juillet de X » se
+     * partage et se met en favori, comme les siennes.
+     */
+    #[Route('/athlete/{id}/stats', name: 'app_coach_athlete_stats', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function athleteStats(
+        Request $request,
+        #[MapEntity(id: 'id')] User $athlete,
+        TrainingStats $training,
+    ): Response {
+        $this->denyUnlessCoachOf($athlete);
+
+        $period = StatsPeriod::resolve($request->query->getString('range'));
+
+        return $this->render('profile/stats.html.twig', [
+            'stats' => $training->over($athlete, $period),
+            'period' => $period,
+            'ranges' => StatsRange::pickable(),
+            'months' => $training->availableMonths($athlete),
+            'subject' => $athlete,
+        ]);
+    }
+
+    /**
+     * L'historique en calendrier de l'athlète — `/profile/history` lu au nom de
+     * quelqu'un d'autre. Sans paramètre de fenêtre, comme l'original : la réponse
+     * EST l'étendue complète.
+     */
+    #[Route('/athlete/{id}/history', name: 'app_coach_athlete_history', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function athleteHistory(
+        #[MapEntity(id: 'id')] User $athlete,
+        TrainingHistory $history,
+    ): Response {
+        $this->denyUnlessCoachOf($athlete);
+
+        return $this->render('profile/history.html.twig', [
+            'history' => $history->calendar($athlete),
+            'groups' => MuscleGroup::cases(),
+            'subject' => $athlete,
         ]);
     }
 

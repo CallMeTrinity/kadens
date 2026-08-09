@@ -29,9 +29,21 @@
                 </ul>
             {% endif %}
         </div>
-        <a href="{{ path('app_coaching_index') }}#athletes" class="kd-btn kd-btn--ghost kd-phero__edit">
-            {{ ux_icon('lucide:arrow-left') }} Mes athlètes
-        </a>
+        {# Les mêmes pages détaillées que sur son propre profil, lues à son nom :
+           le résumé ProfileStats plus bas ne répond ni « sur quelle fenêtre » ni
+           « quels jours ». Sans elles, un coach devait deviner — ou pire, lisait
+           les siennes sans s'en rendre compte. #}
+        <div class="kd-phero__actions">
+            <a href="{{ path('app_coach_athlete_stats', {id: athlete.id}) }}" class="kd-btn kd-btn--ghost">
+                {{ ux_icon('lucide:chart-column') }} Ses statistiques
+            </a>
+            <a href="{{ path('app_coach_athlete_history', {id: athlete.id}) }}" class="kd-btn kd-btn--ghost">
+                {{ ux_icon('lucide:history') }} Son historique
+            </a>
+            <a href="{{ path('app_coaching_index') }}#athletes" class="kd-btn kd-btn--ghost">
+                {{ ux_icon('lucide:arrow-left') }} Mes athlètes
+            </a>
+        </div>
     </header>
 
     {# ------------------------------ SES OBJECTIFS --------------------------- #}
