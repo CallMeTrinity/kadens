@@ -918,7 +918,7 @@ turbo-frame {
 
 .kd-sort__select {
     width: auto;
-    padding-left: 34px;
+    padding-left: 34px !important;
     font-size: 13px;
     cursor: pointer;
 }
