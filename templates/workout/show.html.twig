@@ -11,7 +11,8 @@
        `embed` et non `include` : la barre d'actions se pose dans le hero du
        composant partagé, que la page publique laisse vide. #}
     {% embed 'components/_workout_read.html.twig' with {
-        flat: flat, summary: summary, blockStats: blockStats
+        flat: flat, summary: summary, blockStats: blockStats,
+        volume: volume, load: load, plates: plates, endurance: endurance
     } only %}
         {% block actions %}
             <div class="kd-wk__bar"

@@ -130,8 +130,9 @@ final class WorkoutEstimator
         $pace = $pe->getPaceSecondsPerKm() ?? 0;
         $work = (int) round($meters / 1000 * $pace);
 
-        // Intervalles : chaque répétition refait la distance + sa récup.
-        $reps = max(1, $pe->getSets() ?? 1);
+        // Intervalles : chaque répétition refait la distance + sa récup. Même
+        // multiplicateur que le volume (WorkoutMetrics::volume), une seule écriture.
+        $reps = $pe->getEnduranceRepeats();
 
         return $reps * ($work + ($pe->getRestSeconds() ?? 0));
     }

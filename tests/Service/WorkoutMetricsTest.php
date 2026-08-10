@@ -80,6 +80,35 @@ final class WorkoutMetricsTest extends TestCase
         self::assertSame(0.0, $vol['gym']['tonnageKg']);
     }
 
+    public function testEnduranceVolumeMultipliesByPrescribedRepeats(): void
+    {
+        // Fractionné : 4 × 1 km à 5:00/km vaut 4 km, pas 1. Le champ `sets` fait
+        // partie de DISTANCE_PACE, et il compte — en course comme en vélo/nage.
+        $intervals = $this->prescribed(ActivityType::RUNNING, PrescriptionType::DISTANCE_PACE, []);
+        $intervals->setSets(4)->setDistanceMeters(1000)->setPaceSecondsPerKm(300);
+
+        // Sortie continue : pas de séries, l'effort compte une fois.
+        $ride = $this->prescribed(ActivityType::CYCLING, PrescriptionType::DISTANCE_PACE, []);
+        $ride->setDistanceMeters(30000);
+
+        $vol = $this->metrics->volume($this->workout([$this->block(BlockRole::MAIN, 1, [$intervals, $ride])]));
+
+        self::assertSame(4000, $vol['running']['meters']);
+        self::assertSame(30000, $vol['cycling']['meters']);
+    }
+
+    public function testEnduranceRepeatsAndBlockRoundsMultiplyTogether(): void
+    {
+        // 3 × 400 m dans un bloc joué 2 fois = 6 × 400 m = 2400 m. Les deux
+        // multiplicateurs sont distincts et se cumulent.
+        $intervals = $this->prescribed(ActivityType::SWIMMING, PrescriptionType::DISTANCE_PACE, []);
+        $intervals->setSets(3)->setDistanceMeters(400);
+
+        $vol = $this->metrics->volume($this->workout([$this->block(BlockRole::MAIN, 2, [$intervals])]));
+
+        self::assertSame(2400, $vol['swimming']['meters']);
+    }
+
     public function testDerivedDistanceComesFromDurationAndPaceOnly(): void
     {
         // 45 min à 5:00/km = 9 km. La distance n'est pas saisie : c'est le seul cas

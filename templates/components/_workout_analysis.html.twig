@@ -2,7 +2,19 @@
    se répartit entre les blocs. Rendu 100 % serveur, aucune lib de graphiques —
    des div proportionnelles suffisent et restent imprimables.
 
-   Attendus : summary (WorkoutMetrics::summary), blockStats (::blockBreakdown). #}
+   Attendus : summary (WorkoutMetrics::summary), blockStats (::blockBreakdown),
+   et en option volume/load/plates/endurance (VolumePanel::for) — le même bandeau
+   que le compositeur, pour que le volume prévu ne soit pas réservé à l'éditeur.
+   Sans eux (page publique), le panneau rend exactement ce qu'il rendait. #}
+{% set volume = volume|default(null) %}
+
+{% if volume %}
+    {# Hors du grid `.kd-analysis` : le bandeau est pleine largeur et porte sa
+       propre carte. Il vient en tête, c'est la réponse à « combien ». #}
+    {{ include('components/_workout_volume.html.twig', {
+        volume: volume, load: load, plates: plates, endurance: endurance
+    }, with_context = false) }}
+{% endif %}
 
 {% set maxTonnage = 0 %}
 {% for stat in blockStats %}
@@ -12,6 +24,10 @@
 {% set totalSeconds = 0 %}
 {% for stat in blockStats %}{% set totalSeconds = totalSeconds + stat.seconds %}{% endfor %}
 
+{# Le grid est bordé : sans cette garde, une séance qui n'a que du volume
+   d'endurance (aucune région, aucun tonnage, aucune durée estimable) laisserait
+   un cadre vide sous le bandeau. #}
+{% if summary.regions is not empty or maxTonnage > 0 or totalSeconds > 0 %}
 <div class="kd-analysis">
 
     {% if summary.regions is not empty %}
@@ -98,3 +114,4 @@
         </section>
     {% endif %}
 </div>
+{% endif %}

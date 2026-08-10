@@ -10,8 +10,6 @@ use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\BlockRole;
-use App\Enum\BodySide;
-use App\Enum\BodySilhouette;
 use App\Enum\PrescriptionType;
 use App\Form\BlockType;
 use App\Form\PrescribedExerciseType;
@@ -20,8 +18,6 @@ use App\Repository\ExerciseRepository;
 use App\Repository\LoggedExerciseRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\WorkoutVoter;
-use App\Service\BodyLoad;
-use App\Service\BodyPlates;
 use App\Service\CoachedLibrary;
 use App\Service\PerformanceHistory;
 use App\Service\PlanFlattener;
@@ -29,6 +25,7 @@ use App\Service\SetSynchronizer;
 use App\Service\SlugGenerator;
 use App\Service\SupersetGrouper;
 use App\Service\UnitFormatter;
+use App\Service\VolumePanel;
 use App\Service\WorkoutCloner;
 use App\Service\WorkoutEstimator;
 use App\Service\WorkoutMetrics;
@@ -70,8 +67,7 @@ final class WorkoutController extends AbstractController
         private readonly WorkoutEstimator $estimator,
         private readonly SetSynchronizer $setSynchronizer,
         private readonly SupersetGrouper $supersets,
-        private readonly BodyLoad $bodyLoad,
-        private readonly BodyPlates $bodyPlates,
+        private readonly VolumePanel $volumePanel,
         private readonly UnitFormatter $units,
     ) {
     }
@@ -166,17 +162,23 @@ final class WorkoutController extends AbstractController
      * Consultation d'une séance. En plus de la mise à plat, la page consomme la
      * synthèse et la ventilation par bloc de WorkoutMetrics : la vue ne calcule
      * rien, elle affiche. Voir components/_workout_read.html.twig.
+     *
+     * Le bandeau de volume est rendu ICI, dans le HTML initial, et non chargé
+     * comme dans le compositeur : une page de consultation ne fait aucun AJAX
+     * post-chargement, c'est la condition de son cache offline.
      */
     #[Route('/{id}', name: 'app_workout_show', methods: ['GET'], requirements: ['id' => '\d+'])]
     public function show(Workout $workout, PlanFlattener $planFlattener, WorkoutMetrics $metrics): Response
     {
         $this->denyAccessUnlessGranted(WorkoutVoter::VIEW, $workout);
 
+        $user = $this->getUser();
+
         return $this->render('workout/show.html.twig', [
             'flat' => $planFlattener->flattenWorkout($workout),
             'summary' => $metrics->summary($workout),
             'blockStats' => $metrics->blockBreakdown($workout),
-        ]);
+        ] + $this->volumePanel->for($workout, $user instanceof User ? $user : null));
     }
 
     /**
@@ -655,11 +657,11 @@ final class WorkoutController extends AbstractController
      * déjà entièrement piloté par `fetch` et marqué `data-turbo="false"`.
      */
     #[Route('/{id}/volume', name: 'app_workout_volume', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function volume(Request $request, Workout $workout, WorkoutMetrics $metrics): Response
+    public function volume(Request $request, Workout $workout): Response
     {
         $this->denyAccessUnlessGranted(WorkoutVoter::VIEW, $workout);
 
-        $context = $this->volumeContext($workout, $metrics);
+        $context = $this->volumeContext($workout);
 
         if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
             $request->setRequestFormat(TurboBundle::STREAM_FORMAT);
@@ -670,86 +672,21 @@ final class WorkoutController extends AbstractController
         // Repli sans JS : le fragment nu. Personne ne l'atteint depuis le
         // compositeur, mais une route qui ne répond qu'en stream est une route
         // qu'on ne peut pas ouvrir pour la déboguer.
-        return $this->render('workout/_volume.html.twig', $context);
+        return $this->render('components/_workout_volume.html.twig', $context);
     }
 
     /**
      * Ce que le bandeau a besoin de savoir : le dessin, les paliers, les chiffres.
-     *
-     * La **silhouette** se lit sur l'utilisateur CONNECTÉ et non sur le
-     * propriétaire de la séance, contrairement au volume : c'est un réglage
-     * d'affichage, il appartient à celui qui regarde. Un coach voit donc la
-     * silhouette qu'il a choisie, avec les chiffres de son athlète.
+     * Tout vient de VolumePanel, partagé avec la page de consultation ; seule la
+     * séance elle-même s'ajoute ici, pour le repli sans JS de la route.
      *
      * @return array<string, mixed>
      */
-    private function volumeContext(Workout $workout, WorkoutMetrics $metrics): array
+    private function volumeContext(Workout $workout): array
     {
-        $volume = $metrics->volume($workout);
-        $load = $this->bodyLoad->for($volume['gym']['setsByArea'], $volume['gym']['unmappedSets']);
-
         $user = $this->getUser();
-        $silhouette = $user instanceof User ? $user->getBodySilhouette() : BodySilhouette::MALE;
 
-        return [
-            'workout' => $workout,
-            'volume' => $volume,
-            'load' => $load,
-            'plates' => [
-                $this->bodyPlates->plate($silhouette, BodySide::FRONT),
-                $this->bodyPlates->plate($silhouette, BodySide::BACK),
-            ],
-            'endurance' => $this->enduranceLines($volume),
-        ];
-    }
-
-    /**
-     * Les lignes d'endurance à afficher, déjà formatées et déjà filtrées : une
-     * activité absente de la séance n'a pas de ligne, et une ligne sans distance
-     * ni durée n'existe pas.
-     *
-     * `derivedMeters` reste distinct de `meters` jusqu'ici : le total additionne
-     * les deux, mais la part déduite est dite à part — une estimation tirée d'une
-     * allure n'est pas une consigne, et l'écran doit pouvoir le signaler.
-     *
-     * @param array<string, mixed> $volume sortie de WorkoutMetrics::volume()
-     *
-     * @return list<array{activity: ActivityType, meters: int, derivedMeters: int, distanceLabel: string, durationLabel: string|null}>
-     */
-    private function enduranceLines(array $volume): array
-    {
-        $lines = [];
-
-        // Une liste de paires et non un tableau indexé par enum : une clé de
-        // tableau PHP ne peut pas être un enum.
-        $activities = [
-            [ActivityType::RUNNING, 'running'],
-            [ActivityType::CYCLING, 'cycling'],
-            [ActivityType::SWIMMING, 'swimming'],
-        ];
-
-        foreach ($activities as [$activity, $key]) {
-            /** @var array{meters: int, seconds: int, derivedMeters: int} $data */
-            $data = $volume[$key];
-            $total = $data['meters'] + $data['derivedMeters'];
-
-            if (0 === $total && 0 === $data['seconds']) {
-                continue;
-            }
-
-            $lines[] = [
-                'activity' => $activity,
-                'meters' => $data['meters'],
-                'derivedMeters' => $data['derivedMeters'],
-                // Sans distance ni allure, la case reste vide plutôt que d'afficher
-                // un « ? » : ce n'est pas une valeur manquante, c'est une séance
-                // décrite en durée seule.
-                'distanceLabel' => $total > 0 ? $this->units->distance($total) : '',
-                'durationLabel' => $data['seconds'] > 0 ? $this->units->duration($data['seconds']) : null,
-            ];
-        }
-
-        return $lines;
+        return ['workout' => $workout] + $this->volumePanel->for($workout, $user instanceof User ? $user : null);
     }
 
     /**

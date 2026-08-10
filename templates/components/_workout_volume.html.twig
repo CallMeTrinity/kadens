@@ -1,6 +1,11 @@
-{# Le bandeau du compositeur : ce que la séance va charger, et combien.
-   Contenu de #workout-volume, chargé et rafraîchi par le contrôleur `composer`.
-   Contexte (volumeContext) : workout, volume, load, plates, endurance.
+{# Le bandeau de volume prévu d'une séance : ce qu'elle va charger, et combien.
+   Attendus (VolumePanel::for) : volume, load, plates, endurance.
+
+   Deux écrans le rendent, et pas de la même façon :
+   - le compositeur, où il est le contenu de #workout-volume, chargé après la page
+     et rafraîchi en Turbo Stream à chaque mutation (contrôleur `composer`) ;
+   - les pages de consultation (onglet « Analyse »), qui le rendent dans le HTML
+     initial — aucun AJAX post-chargement, condition du cache offline.
 
    Le dessin ne porte JAMAIS une information tout seul : trois nuances de rouge ne
    se départagent pas d'un regard, et un daltonien n'y verra pas trois valeurs.

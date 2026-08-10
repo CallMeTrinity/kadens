@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
+use App\Entity\User;
 use App\Enum\ScheduledStatus;
 use App\Form\PlanInstantiationType;
 use App\Repository\PlanTemplateRepository;
@@ -16,6 +17,7 @@ use App\Service\LogComparator;
 use App\Service\LogMetrics;
 use App\Service\PlanFlattener;
 use App\Service\PlanScheduler;
+use App\Service\VolumePanel;
 use App\Service\WorkoutMetrics;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -143,10 +145,12 @@ final class ScheduledWorkoutController extends AbstractController
         WorkoutMetrics $metrics,
         LogComparator $comparator,
         LogMetrics $logMetrics,
+        VolumePanel $volumePanel,
     ): Response {
         $this->denyAccessUnlessGranted(ScheduledWorkoutVoter::VIEW, $scheduled);
 
         $workout = $scheduled->getWorkout();
+        $viewer = $this->getUser();
 
         // Vide quand la séance ne porte aucun réalisé : la colonne « Réalisé » et
         // son onglet n'apparaissent pas, plutôt que d'apparaître vides.
@@ -163,7 +167,10 @@ final class ScheduledWorkoutController extends AbstractController
             'comparison' => $comparison,
             'logSummary' => $logMetrics->summary($scheduled),
             'defaultTab' => $this->defaultTab($scheduled, $comparison),
-        ]);
+            // Le volume PRÉVU, dans le HTML initial comme le reste de la page :
+            // une vue de consultation ne charge rien après coup (cache offline).
+            // Sans prescrit, il n'y a pas de volume prévu à annoncer.
+        ] + (null === $workout ? [] : $volumePanel->for($workout, $viewer instanceof User ? $viewer : null)));
     }
 
     /**
