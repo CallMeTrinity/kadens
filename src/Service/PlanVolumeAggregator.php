@@ -150,12 +150,12 @@ final class PlanVolumeAggregator
     private function humanMinutes(int $minutes): string
     {
         if ($minutes < 60) {
-            return $minutes.' min';
+            return $minutes . ' min';
         }
 
         $hours = intdiv($minutes, 60);
         $rest = $minutes % 60;
 
-        return 0 === $rest ? $hours.' h' : sprintf('%dh%02d', $hours, $rest);
+        return 0 === $rest ? $hours . ' h' : sprintf('%dh%02d', $hours, $rest);
     }
 }

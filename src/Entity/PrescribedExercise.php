@@ -420,6 +420,22 @@ class PrescribedExercise
     }
 
     /**
+     * Répétitions d'un effort d'endurance : « 4 × 1 km » décrit 4 km, pas 1 km.
+     * Le fractionné se prescrit en séries — en course, en vélo comme en natation —,
+     * et `sets` fait partie des champs de DISTANCE_PACE comme de SETS_TIME. Là où
+     * le champ n'a pas de sens (DURATION), il est null et l'effort compte une fois.
+     *
+     * À ne pas confondre avec getWorkingSetCount(), qui compte des SÉRIES de
+     * travail (échauffement exclu, lignes détaillées si présentes, zéro possible).
+     * Celui-ci est un MULTIPLICATEUR de distance et de durée, donc jamais nul. Le
+     * mode détaillé est réservé à la muscu : il ne le concerne pas.
+     */
+    public function getEnduranceRepeats(): int
+    {
+        return max(1, $this->sets ?? 1);
+    }
+
+    /**
      * Charge la plus lourde prescrite (top set) : max des charges des lignes
      * détaillées, sinon la charge scalaire. Sert de métrique de progression.
      */

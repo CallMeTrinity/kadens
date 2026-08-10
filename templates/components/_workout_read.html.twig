@@ -7,6 +7,7 @@
      flat        sortie de PlanFlattener::flattenWorkout   (requis)
      summary     sortie de WorkoutMetrics::summary         (optionnel)
      blockStats  sortie de WorkoutMetrics::blockBreakdown  (optionnel)
+     volume/load/plates/endurance  sortie de VolumePanel::for (optionnel, en bloc)
      scheduled   ScheduledWorkout                         (optionnel)
      comparison  sortie de LogComparator::compare         (optionnel)
      logSummary  sortie de LogMetrics::summary            (optionnel)
@@ -32,6 +33,10 @@
 {% set comparison = comparison|default([]) %}
 {% set logSummary = logSummary|default(null) %}
 {% set defaultTab = defaultTab|default('') %}
+{% set volume = volume|default(null) %}
+{% set load = load|default(null) %}
+{% set plates = plates|default([]) %}
+{% set endurance = endurance|default([]) %}
 
 {# Statistiques indexées par position de bloc, pour retrouver celles d'un bloc
    pendant la boucle de rendu (les deux listes suivent le même ordre). #}
@@ -84,7 +89,11 @@
         </div>
     </header>
 
-    {% set has_analysis = summary and summary.workingSets > 0 %}
+    {# Le volume prévu ouvre l'analyse à lui seul : une séance de cardio pur n'a
+       aucune série de travail et avait donc perdu son onglet, alors qu'elle a bien
+       un volume à annoncer (4 × 1 km = 4 km). #}
+    {% set has_volume = volume is not null and (volume.gym.totalSets > 0 or endurance is not empty) %}
+    {% set has_analysis = summary and (summary.workingSets > 0 or has_volume) %}
     {% set has_log = comparison is not empty %}
 
     {# `has_log` entre dans la garde : une séance sans bloc mais avec du réalisé
@@ -157,7 +166,9 @@
                          aria-labelledby="wk-panel-analyse">
                     <h2 class="kd-wk__paneltitle" id="wk-panel-analyse" data-tabs-target="panelTitle">Analyse</h2>
                     {% include 'components/_workout_analysis.html.twig' with {
-                        summary: summary, blockStats: blockStats
+                        summary: summary, blockStats: blockStats,
+                        volume: has_volume ? volume : null,
+                        load: load, plates: plates, endurance: endurance
                     } only %}
                 </section>
             {% endif %}

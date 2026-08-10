@@ -185,7 +185,8 @@ final class WorkoutMetrics
      * - salle : séries attribuées à CHAQUE groupe musculaire ciblé (métrique
      *   standard « séries par groupe musculaire »), + tonnage (séries × reps ×
      *   charge) quand une charge est présente ;
-     * - course / vélo / natation : distance (m) et durée (s) cumulées.
+     * - course / vélo / natation : distance (m) et durée (s) cumulées, répétitions
+     *   de l'effort comprises (getEnduranceRepeats : « 4 × 1 km » = 4 km).
      *
      * Les tours de bloc (rounds) multiplient le volume : un exercice dans un bloc
      * à 3 tours compte 3 fois.
@@ -264,15 +265,21 @@ final class WorkoutMetrics
                 $seconds = $pe->getDurationSeconds();
                 $pace = $pe->getPaceSecondsPerKm();
 
-                $endurance[$key]['meters'] += ($distance ?? 0) * $rounds;
-                $endurance[$key]['seconds'] += ($seconds ?? 0) * $rounds;
+                // Le multiplicateur d'endurance est DOUBLE : les répétitions de
+                // l'effort lui-même (« 4 × 1 km » vaut 4 km — le fractionné se
+                // prescrit en séries, en course comme en vélo ou en nage) et les
+                // tours du bloc, qui rejouent la section entière.
+                $repeats = $pe->getEnduranceRepeats() * $rounds;
+
+                $endurance[$key]['meters'] += ($distance ?? 0) * $repeats;
+                $endurance[$key]['seconds'] += ($seconds ?? 0) * $repeats;
 
                 // Distance déduite : « 45 min à 5:00/km » décrit bien 9 km, mais
                 // seulement quand la distance n'a PAS été posée — une consigne
                 // saisie fait toujours autorité sur un produit de deux autres
                 // champs, et les additionner compterait la sortie deux fois.
                 if (null === $distance && null !== $seconds && null !== $pace && $pace > 0) {
-                    $endurance[$key]['derivedMeters'] += (int) round($seconds / $pace * 1000) * $rounds;
+                    $endurance[$key]['derivedMeters'] += (int) round($seconds / $pace * 1000) * $repeats;
                 }
             }
         }

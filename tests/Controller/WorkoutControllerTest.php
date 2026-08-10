@@ -624,6 +624,60 @@ final class WorkoutControllerTest extends WebTestCase
         self::assertStringContainsString('1 920', $crawler->filter('.kd-wkvol__kpis')->text());
     }
 
+    /**
+     * Le même bandeau vit AUSSI dans la page de consultation, et il y est rendu
+     * d'emblée : une vue de consultation ne charge rien après coup.
+     */
+    public function testTheSessionPageCarriesTheVolumePanelWithoutAnyFetch(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise($user, 'Développé couché');
+        $exercise->setTargetAreas([TargetArea::CHEST]);
+        $workout = $this->createWorkout($user, 'Séance');
+        $block = (new Block())->setRole(BlockRole::MAIN)->setPosition(0);
+        $block->addPrescribedExercise($this->makePrescribed($exercise, 0)->setSets(4)->setReps(8)->setWeightKg(60.0));
+        $workout->addBlock($block);
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(2, $crawler->filter('.kd-bodymap__plate'));
+        self::assertStringContainsString('Pectoraux', $crawler->filter('.kd-wkvol__legend')->text());
+        self::assertStringContainsString('1 920', $crawler->filter('.kd-wkvol__kpis')->text());
+    }
+
+    /**
+     * Une séance de cardio pur n'a aucune série de travail : elle n'avait donc
+     * pas d'onglet « Analyse », alors qu'elle a bien un volume à annoncer — et ce
+     * volume compte les répétitions de l'effort (4 × 1 km = 4 km, pas 1 km).
+     */
+    public function testACardioSessionAnnouncesItsIntervalVolume(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise($user, 'Fractionné piste');
+        $exercise->setActivity(ActivityType::RUNNING);
+        $workout = $this->createWorkout($user, 'Fractionné');
+        $block = (new Block())->setRole(BlockRole::MAIN)->setPosition(0);
+        $block->addPrescribedExercise(
+            $this->makePrescribed($exercise, 0)
+                ->setPrescriptionType(PrescriptionType::DISTANCE_PACE)
+                ->setSets(4)->setDistanceMeters(1000)->setPaceSecondsPerKm(300)
+        );
+        $workout->addBlock($block);
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/workout/'.$workout->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('[data-tabs-name="analyse"]');
+        self::assertStringContainsString('4 km', $crawler->filter('.kd-wkvol__kpis')->text());
+        // Aucune série de salle : pas de silhouette à peindre.
+        self::assertCount(0, $crawler->filter('.kd-bodymap__plate'));
+    }
+
     public function testTheVolumeFragmentIsReadableByTheCoachAndDeniedToAStranger(): void
     {
         $athlete = $this->createUser('athlete@example.com');

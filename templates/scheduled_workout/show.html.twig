@@ -25,7 +25,9 @@
         {% embed 'components/_workout_read.html.twig' with {
             flat: flat, summary: summary, blockStats: blockStats,
             scheduled: scheduled,
-            comparison: comparison, logSummary: logSummary, defaultTab: defaultTab
+            comparison: comparison, logSummary: logSummary, defaultTab: defaultTab,
+            volume: volume|default(null), load: load|default(null),
+            plates: plates|default([]), endurance: endurance|default([])
         } only %}
             {% block actions %}
                 {{ include('scheduled_workout/_hero_actions.html.twig', {
