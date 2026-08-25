@@ -41,8 +41,8 @@
             <header class="kd-formsection__head">
                 <span class="kd-formsection__icon kd-formsection__icon--gym">{{ ux_icon('lucide:dumbbell') }}</span>
                 <div>
-                    <h2 class="kd-formsection__title">Records de force (1RM)</h2>
-                    <p class="kd-formsection__hint">Charge maximale sur une répétition. Le total SBD et le score DOTS en découlent.</p>
+                    <h2 class="kd-formsection__title">Records de force</h2>
+                    <p class="kd-formsection__hint">Charge maximale sur une répétition, maximum de répétitions au poids du corps, temps tenu en suspension. Ces valeurs sont un plancher : une série loguée qui les atteint met le record à jour toute seule. Le total SBD et le score DOTS en découlent.</p>
                 </div>
             </header>
             <div class="kd-formgrid">
@@ -51,6 +51,10 @@
                 {{ form_row(form.deadlift1rmKg) }}
                 {{ form_row(form.ohp1rmKg) }}
                 {{ form_row(form.weightedPullupKg) }}
+                {{ form_row(form.maxPullups) }}
+                {{ form_row(form.maxPushups) }}
+                {{ form_row(form.maxDips) }}
+                {{ form_row(form.deadhangSeconds) }}
             </div>
         </section>
 

@@ -9,8 +9,12 @@
    Paramètres :
    - stats : sortie de ProfileStats::for($user) (on n'en lit que `athlete`)
    - hrZones : sortie de HeartRateZones::forUser($user)
-   - own : true = c'est mon profil (liens d'édition, tutoiement) #}
+   - own : true = c'est mon profil (liens d'édition, tutoiement)
+   - subject : l'athlète dont c'est la fiche, null = moi. Sert aux liens vers
+     un exercice : un record mesuré renvoie à SA trajectoire, jamais à la
+     mienne (règle « un lien ne change jamais de sujet en silence »). #}
 {% set own = own|default(false) %}
+{% set subject = subject|default(null) %}
 {% set card = stats.athlete %}
 
 <section class="kd-section">
@@ -50,7 +54,20 @@
                     <dl class="kd-deflist kd-deflist--profile">
                         {% for r in g.rows %}
                             <dt>{{ r.label }}</dt>
-                            <dd class="{{ r.derived ?? false ? 'kd-deflist__derived' }}{{ r.value is null ? ' kd-deflist__empty' }}">{{ r.value ?? '—' }}</dd>
+                            {# La valeur d'un record mesuré ouvre l'exercice qui l'a
+                               produit : c'est là qu'on va voir ce qui s'est passé.
+                               La note dit quand et sur quel effort — son absence
+                               est ce qui signale une valeur déclarée à la main. #}
+                            <dd class="{{ r.derived ? 'kd-deflist__derived' }}{{ r.value is null ? ' kd-deflist__empty' }}">
+                                {% if r.value is not null and r.exerciseId is not null %}
+                                    <a href="{{ subject
+                                        ? path('app_coach_athlete_exercise', {id: subject.id, exerciseId: r.exerciseId})
+                                        : path('app_exercise_show', {id: r.exerciseId}) }}">{{ r.value }}</a>
+                                {% else %}
+                                    {{ r.value ?? '—' }}
+                                {% endif %}
+                                {% if r.note %}<span class="kd-deflist__note">{{ r.note }}</span>{% endif %}
+                            </dd>
                         {% endfor %}
                     </dl>
                 </section>

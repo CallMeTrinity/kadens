@@ -29,6 +29,8 @@ use App\Repository\LoggedSetRepository;
  * @phpstan-type PerfSetGroup array{type: SetType, typeLabel: string|null, count: int, detail: string, effort: string, weightKg: float|null, reps: int|null, durationSeconds: int|null, firstIndex: int, lastIndex: int}
  * @phpstan-type LastPerformance array{scheduledWorkoutId: int, date: \DateTimeImmutable, sets: list<PerfSetGroup>, workingSets: int, tonnageKg: float, topWeightKg: float|null}
  * @phpstan-type BestSet array{scheduledWorkoutId: int, date: \DateTimeImmutable, weightKg: float, reps: int|null, durationSeconds: int|null, type: SetType, detail: string}
+ * @phpstan-type BestHold array{scheduledWorkoutId: int, date: \DateTimeImmutable, durationSeconds: int, reps: int|null, type: SetType, detail: string}
+ * @phpstan-type BestRepMax array{scheduledWorkoutId: int, date: \DateTimeImmutable, reps: int, type: SetType, detail: string}
  * @phpstan-type ExerciseHistory array{last: LastPerformance|null, best: BestSet|null}
  */
 final class PerformanceHistory
@@ -105,6 +107,99 @@ final class PerformanceHistory
         }
 
         return $this->bestByExercise($user, [$id])[$id] ?? null;
+    }
+
+    /**
+     * Les records de charge d'un jeu d'exercices, indexés par identifiant —
+     * `bestSet()` en une requête pour plusieurs exercices, sans la dernière
+     * performance que `bulkForIds()` ramène avec.
+     *
+     * C'est ce dont la fiche athlète a besoin (`AthleteRecords`) : elle ne lit
+     * qu'un record par case, la trajectoire ne la regarde pas. Les exercices
+     * jamais chargés sont **absents**, comme partout ici.
+     *
+     * @param list<int> $ids
+     *
+     * @return array<int, BestSet>
+     */
+    public function bestSetsForIds(User $user, array $ids): array
+    {
+        return $this->bestByExercise($user, $ids);
+    }
+
+    /**
+     * Le pendant en temps : la série de travail la plus **longue** jamais tenue
+     * sur chaque exercice demandé. Un gainage ou une suspension n'a pas de
+     * charge — `bestSetsForIds()` les laisse vides à jamais, et c'est correct :
+     * il n'y a pas de record sans kilos, mais il y a un record sans charge.
+     *
+     * Départage : à durée égale, la plus récente. Les lignes arrivent déjà
+     * triées séance la plus récente d'abord, la première rencontrée est donc la
+     * bonne — même appui que `lastByExercise()`.
+     *
+     * @param list<int> $ids
+     *
+     * @return array<int, BestHold>
+     */
+    public function bestHoldsForIds(User $user, array $ids): array
+    {
+        $best = [];
+
+        foreach ($this->sets->findLongestWorkingSetsForExercises($user, $ids) as $row) {
+            $exerciseId = $row['exerciseId'];
+            if (isset($best[$exerciseId])) {
+                continue;
+            }
+
+            $best[$exerciseId] = [
+                'scheduledWorkoutId' => $row['scheduledWorkoutId'],
+                'date' => $row['date'],
+                // Garanti non nul par la requête (durationSeconds IS NOT NULL).
+                'durationSeconds' => (int) $row['durationSeconds'],
+                'reps' => $row['reps'],
+                'type' => $row['setType'],
+                'detail' => $this->detail($row),
+            ];
+        }
+
+        return $best;
+    }
+
+    /**
+     * Le pendant en répétitions : la plus longue série jamais enchaînée **au
+     * poids du corps** sur chaque exercice demandé. C'est le record d'une
+     * traction, d'une pompe ou d'un dips — mouvements dont la charge, quand
+     * elle existe, répond à une autre question (`bestSetsForIds()`).
+     *
+     * Départage : à nombre de répétitions égal, la plus récente. Les lignes
+     * arrivent déjà triées séance la plus récente d'abord, la première
+     * rencontrée est donc la bonne — même appui que `bestHoldsForIds()`.
+     *
+     * @param list<int> $ids
+     *
+     * @return array<int, BestRepMax>
+     */
+    public function bestRepMaxesForIds(User $user, array $ids): array
+    {
+        $best = [];
+
+        foreach ($this->sets->findMostRepsUnloadedWorkingSetsForExercises($user, $ids) as $row) {
+            $exerciseId = $row['exerciseId'];
+            if (isset($best[$exerciseId])) {
+                continue;
+            }
+
+            $best[$exerciseId] = [
+                'scheduledWorkoutId' => $row['scheduledWorkoutId'],
+                'date' => $row['date'],
+                // Garanti non nul par la requête (reps IS NOT NULL).
+                'reps' => (int) $row['reps'],
+                'type' => $row['setType'],
+                'detail' => $this->detail($row),
+            ];
+        }
+
+        return $best;
     }
 
     /**

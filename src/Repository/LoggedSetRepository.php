@@ -98,6 +98,77 @@ class LoggedSetRepository extends ServiceEntityRepository
     }
 
     /**
+     * Séries de TRAVAIL portant la durée maximale jamais tenue sur chaque
+     * exercice demandé — le record d'un mouvement qui se compte en secondes
+     * (suspension, gainage) et jamais en kilos.
+     *
+     * Exact pendant de `findBestWorkingSetsForExercises`, au filtre près :
+     * `durationSeconds` remplace `weightKg`. Les deux lectures sont séparées
+     * parce que la question l'est — « le plus lourd » et « le plus longtemps »
+     * ne se départagent pas de la même façon, et une série lestée ET tenue en
+     * temps doit pouvoir répondre aux deux.
+     *
+     * Plusieurs séries peuvent porter la même durée maximale ; toutes sont
+     * renvoyées, c'est à l'appelant de les départager.
+     *
+     * @param list<int> $exerciseIds
+     *
+     * @return list<PerfRow>
+     */
+    public function findLongestWorkingSetsForExercises(User $owner, array $exerciseIds): array
+    {
+        if ([] === $exerciseIds) {
+            return [];
+        }
+
+        $qb = $this->workingSetRows($owner, $exerciseIds);
+
+        $qb->andWhere('ls.durationSeconds IS NOT NULL')
+            ->andWhere(sprintf(
+                'ls.durationSeconds = (SELECT MAX(ls2.durationSeconds) %s)',
+                $this->correlatedFrom(),
+            ));
+
+        return $this->hydrateRows($qb->getQuery()->getArrayResult());
+    }
+
+    /**
+     * Séries de TRAVAIL portant le plus grand nombre de répétitions jamais
+     * enchaînées **au poids du corps** sur chaque exercice demandé — le record
+     * d'un mouvement qu'on compte au lieu de le charger (traction, pompe,
+     * dips).
+     *
+     * La charge ajoutée est exclue des deux côtés, requête et sous-requête : 8
+     * dips à 15 kg ne disent rien d'un maximum de répétitions, et laisser le
+     * MAX les voir viderait le record au lieu de l'écarter (le filtre externe
+     * ne trouverait alors aucune série à vide à cette valeur).
+     *
+     * Plusieurs séries peuvent porter le même maximum ; toutes sont renvoyées,
+     * c'est à l'appelant de les départager.
+     *
+     * @param list<int> $exerciseIds
+     *
+     * @return list<PerfRow>
+     */
+    public function findMostRepsUnloadedWorkingSetsForExercises(User $owner, array $exerciseIds): array
+    {
+        if ([] === $exerciseIds) {
+            return [];
+        }
+
+        $qb = $this->workingSetRows($owner, $exerciseIds);
+
+        $qb->andWhere('ls.reps IS NOT NULL')
+            ->andWhere(self::unloaded('ls'))
+            ->andWhere(sprintf(
+                'ls.reps = (SELECT MAX(ls2.reps) %s)',
+                $this->correlatedFrom(self::unloaded('ls2')),
+            ));
+
+        return $this->hydrateRows($qb->getQuery()->getArrayResult());
+    }
+
+    /**
      * Séries de TRAVAIL des `limit` dernières séances où un exercice apparaît —
      * la trajectoire que le téléphone affiche sur la fiche d'un exercice
      * (KL-17). Même périmètre que les deux lectures ci-dessus, à dessein : trois
@@ -401,12 +472,20 @@ class LoggedSetRepository extends ServiceEntityRepository
     }
 
     /**
-     * Le FROM/WHERE des sous-requêtes corrélées, identique aux deux : mêmes
+     * Le FROM/WHERE des sous-requêtes corrélées, identique à toutes : mêmes
      * filtres que la requête externe, mais restreints à l'exercice de la ligne
-     * courante. Écrit une seule fois pour que les deux bornes (dernière séance,
-     * record) ne puissent pas diverger de leur périmètre.
+     * courante. Écrit une seule fois pour que les bornes (dernière séance,
+     * record de charge, de répétitions ou de temps) ne puissent pas diverger de
+     * leur périmètre.
+     *
+     * `$extra` ajoute la restriction propre à une lecture, et elle n'est pas
+     * facultative quand la requête externe en porte une : sans elle, le MAX
+     * serait cherché sur des lignes que le filtre externe écarte, et la
+     * comparaison ne trouverait rien. Le cas concret est le maximum de
+     * répétitions au poids du corps — un `MAX(reps)` pris sur les séries
+     * lestées ne correspond à aucune série à vide, et le record disparaîtrait.
      */
-    private function correlatedFrom(): string
+    private function correlatedFrom(?string $extra = null): string
     {
         return 'FROM '.LoggedSet::class.' ls2'
             .' JOIN ls2.loggedExercise le2'
@@ -415,7 +494,19 @@ class LoggedSetRepository extends ServiceEntityRepository
             .' AND s2.owner = :owner'
             .' AND le2.skipped = false'
             .' AND ls2.setType != :warmup'
-            .' AND '.self::measured('ls2');
+            .' AND '.self::measured('ls2')
+            .(null === $extra ? '' : ' AND '.$extra);
+    }
+
+    /**
+     * « La série ne porte aucune charge ajoutée » : c'est ce qui définit le
+     * poids du corps ici. `NULL` est la forme normale (rien de saisi), `0` la
+     * forme importée — les deux disent la même chose et doivent se lire
+     * pareil, sinon un historique repris ferait sauter le record.
+     */
+    private static function unloaded(string $alias): string
+    {
+        return sprintf('(%1$s.weightKg IS NULL OR %1$s.weightKg = 0)', $alias);
     }
 
     /**
