@@ -5,12 +5,16 @@ namespace App\Tests\Controller;
 use App\Entity\Coaching;
 use App\Entity\Exercise;
 use App\Entity\Goal;
+use App\Entity\LoggedExercise;
+use App\Entity\LoggedSet;
 use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\ExerciseLanguage;
+use App\Enum\ScheduledStatus;
+use App\Enum\SetType;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -199,6 +203,67 @@ final class ProfileControllerTest extends WebTestCase
         self::assertSame(
             ExerciseLanguage::EN,
             $this->em->getRepository(User::class)->findOneBy(['email' => 'owner@example.com'])?->getExerciseLanguage(),
+        );
+    }
+
+    // --- Fiche athlète : les records suivent le réalisé ----------------------
+
+    /**
+     * Le câblage de bout en bout : une série plus lourde que le record déclaré
+     * se voit sur la page d'accueil, datée, et renvoie à l'exercice qui l'a
+     * produite. Le service est couvert à part (AthleteRecordsTest) ; ce qui se
+     * joue ici est le fragment Twig, que rien d'autre ne rend avec un record
+     * mesuré.
+     */
+    public function testAProfileRecordFollowsTheLoggedSets(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $user->setSquat1rmKg(140.0);
+
+        $squat = (new Exercise())
+            ->setName('Squat à la barre')
+            ->setRefKey('barbell-squat')
+            ->setActivity(ActivityType::GYM);
+        $this->em->persist($squat);
+
+        $logged = (new LoggedExercise())
+            ->setExercise($squat)
+            ->setExerciseName('Squat à la barre')
+            ->setPosition(1)
+            ->setSkipped(false)
+            ->addLoggedSet(
+                (new LoggedSet())
+                    ->setPosition(1)
+                    ->setSetType(SetType::NORMAL)
+                    ->setReps(1)
+                    ->setWeightKg(150.0)
+            );
+
+        $scheduled = (new ScheduledWorkout())
+            ->setOwner($user)
+            ->setTitle('Jambes')
+            ->setScheduledDate(new \DateTimeImmutable('2026-08-12'))
+            ->setStatus(ScheduledStatus::DONE)
+            ->addLoggedExercise($logged);
+        $this->em->persist($scheduled);
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/');
+
+        self::assertResponseIsSuccessful();
+        // Trois listes dans la fiche (identité, force, endurance) : on les lit
+        // toutes, `html()` ne rendant que la première.
+        $sheet = implode('', $crawler->filter('.kd-deflist--profile')->each(
+            static fn (Crawler $list): string => $list->html(),
+        ));
+        self::assertStringContainsString('150 kg', $sheet);
+        self::assertStringContainsString('1 rep · 12/08/26', $sheet);
+        self::assertStringNotContainsString('140 kg', $sheet, 'Le record déclaré est un plancher : battu, il ne s\'affiche plus.');
+        self::assertSame(
+            1,
+            $crawler->filter('.kd-deflist--profile a[href="/exercise/'.$squat->getId().'"]')->count(),
+            'La valeur mesurée ouvre l\'exercice qui l\'a produite.',
         );
     }
 

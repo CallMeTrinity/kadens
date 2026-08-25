@@ -8012,6 +8012,32 @@ textarea.kd-inlineedit__input {
     font-weight: var(--kd-weight-bold);
 }
 
+/* Un record mesuré ouvre l'exercice qui l'a produit. Le lien reste en encre :
+   le rouge dit action primaire, intensité ou échec, jamais « c'est cliquable »,
+   et le prendre ici rendrait la moitié de la fiche rouge. Le filet sous la
+   valeur suffit à l'annoncer. */
+.kd-deflist--profile a {
+    color: inherit;
+    text-decoration: underline;
+    text-decoration-color: var(--color-divider);
+    text-underline-offset: 3px;
+}
+
+.kd-deflist--profile a:hover {
+    color: var(--color-primary-hover);
+    text-decoration-color: currentColor;
+}
+
+/* La provenance d'un record mesuré (effort et date), sous sa valeur. Sur la
+   même ligne, elle doublerait la largeur de la colonne dans une carte étroite —
+   et c'est la valeur qu'on lit en diagonale, pas sa date. */
+.kd-deflist--profile .kd-deflist__note {
+    display: block;
+    font-family: var(--font-body);
+    font-size: 11px;
+    line-height: 1.4;
+}
+
 .kd-profile__bio {
     white-space: pre-line;
     color: var(--color-text);

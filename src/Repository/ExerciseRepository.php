@@ -143,6 +143,42 @@ class ExerciseRepository extends ServiceEntityRepository
     }
 
     /**
+     * Identifiants de la bibliothèque globale pour un jeu de `refKey`, indexés
+     * par clé. Les clés inconnues sont **absentes** : une base qui n'a pas
+     * encore importé `data/exercises.json` n'est pas une erreur, elle n'a
+     * simplement rien à relier.
+     *
+     * Sert le lien records ↔ exercices de la fiche athlète (`AthleteRecords`) :
+     * la clé est la seule chose stable à laquelle accrocher un record, le nom
+     * bougeant avec la langue du compte et les renommages.
+     *
+     * @param list<string> $refKeys
+     *
+     * @return array<string, int>
+     */
+    public function idsByRefKey(array $refKeys): array
+    {
+        if ([] === $refKeys) {
+            return [];
+        }
+
+        $rows = $this->createQueryBuilder('e')
+            ->select('e.id', 'e.refKey')
+            ->andWhere('e.refKey IN (:keys)')
+            ->setParameter('keys', $refKeys)
+            ->getQuery()
+            ->getScalarResult()
+        ;
+
+        $index = [];
+        foreach ($rows as $row) {
+            $index[(string) $row['refKey']] = (int) $row['id'];
+        }
+
+        return $index;
+    }
+
+    /**
      * QueryBuilder de la bibliothèque visible : la globale (owner null) plus les
      * exercices perso des membres donnés.
      *

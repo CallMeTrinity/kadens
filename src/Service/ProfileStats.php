@@ -22,8 +22,10 @@ use App\Repository\WorkoutRepository;
  * afficher deux tonnages différents.
  *
  * Ce qui lui reste en propre est ce que TrainingStats n'a pas à connaître :
- * les compteurs de bibliothèque, la fiche athlète (mesures saisies, records
- * déclarés) et le score DOTS qui s'en déduit.
+ * les compteurs de bibliothèque, la fiche athlète (mesures saisies) et le score
+ * DOTS. Les records de force ne sont pas non plus de son ressort — ils croisent
+ * le déclaré et le réalisé, et c'est `AthleteRecords` qui les réconcilie ; ce
+ * service ne fait que poser le bloc rendu à sa place dans la fiche.
  *
  * Rappel de périmètre, hérité de TrainingStats : le tonnage vient du RÉALISÉ
  * (LoggedSet), les distances du PRESCRIT des séances faites — le cardio ne se
@@ -37,6 +39,7 @@ final class ProfileStats
         private readonly PlanTemplateRepository $plans,
         private readonly ExerciseRepository $exercises,
         private readonly TrainingStats $training,
+        private readonly AthleteRecords $records,
         private readonly UnitFormatter $units,
     ) {
     }
@@ -50,7 +53,11 @@ final class ProfileStats
         $monthStart = $now->modify('first day of this month')->setTime(0, 0);
         $monthEnd = $now->modify('last day of this month')->setTime(23, 59, 59);
 
-        $dots = $this->dots($user);
+        // Les records d'abord : le total SBD effectif en sort, et le score DOTS
+        // s'en déduit. L'ordre n'est pas cosmétique — le calculer sur les
+        // seules valeurs saisies contredirait les lignes juste au-dessus.
+        $strength = $this->records->strengthFor($user);
+        $dots = $this->dots($user, $strength['sbdTotalKg']);
         $allTime = $this->training->over($user, StatsPeriod::allTime($now));
 
         return [
@@ -64,7 +71,7 @@ final class ProfileStats
             'activityCounts' => $allTime['activityCounts'],
             'volume' => $this->summaryVolume($allTime['volume']),
             'dots' => $dots,
-            'athlete' => $this->athleteCard($user, $dots),
+            'athlete' => $this->athleteCard($user, $strength, $dots),
         ];
     }
 
@@ -96,49 +103,54 @@ final class ProfileStats
     }
 
     /**
-     * Fiche athlète prête à l'affichage : lignes {label, value} groupées, valeurs
-     * déjà formatées via UnitFormatter (kg, mm:ss). value = null -> « — » côté vue.
+     * Fiche athlète prête à l'affichage : lignes groupées, valeurs déjà
+     * formatées via UnitFormatter (kg, mm:ss). value = null -> « — » côté vue.
      *
-     * @return array{identity: list<array{label: string, value: ?string, derived?: bool}>, strength: list<array{label: string, value: ?string, derived?: bool}>, endurance: list<array{label: string, value: ?string, derived?: bool}>, bio: ?string, hasAny: bool}
+     * **Toutes les lignes ont les mêmes clés**, y compris celles qui n'ont rien
+     * à y mettre : le fragment Twig les lit sans garde, et une ligne à la forme
+     * variable finirait par en demander une à chaque ajout.
+     *
+     * Le bloc « Force » n'est pas construit ici : ses lignes croisent le déclaré
+     * et le réalisé, et cette réconciliation appartient à `AthleteRecords`.
+     *
+     * @param array{rows: list<array{label: string, value: string|null, note: string|null, exerciseId: int|null, derived: bool}>, sbdTotalKg: float|null} $strength
+     *
+     * @return array{identity: list<array{label: string, value: string|null, note: string|null, exerciseId: int|null, derived: bool}>, strength: list<array{label: string, value: string|null, note: string|null, exerciseId: int|null, derived: bool}>, endurance: list<array{label: string, value: string|null, note: string|null, exerciseId: int|null, derived: bool}>, bio: ?string, hasAny: bool}
      */
-    private function athleteCard(User $user, ?float $dots): array
+    private function athleteCard(User $user, array $strength, ?float $dots): array
     {
         $kg = fn (?float $v): ?string => null === $v ? null : $this->units->weight($v);
         $time = fn (?int $v): ?string => null === $v ? null : $this->units->duration($v);
         $bmi = $user->getBmi();
-        $total = $user->getSbdTotalKg();
 
         $identity = [
-            ['label' => 'Âge', 'value' => null !== $user->getAge() ? $user->getAge().' ans' : null],
-            ['label' => 'Sexe', 'value' => $user->getSex()?->getLabel()],
-            ['label' => 'Taille', 'value' => null !== $user->getHeightCm() ? $user->getHeightCm().' cm' : null],
-            ['label' => 'Poids', 'value' => $kg($user->getWeightKg())],
-            ['label' => 'IMC', 'value' => null !== $bmi ? str_replace('.', ',', (string) $bmi) : null, 'derived' => true],
-            ['label' => "Années d'entraînement", 'value' => null !== $user->getTrainingYears() ? $user->getTrainingYears().' ans' : null],
-            ['label' => 'Objectif', 'value' => $user->getMainGoal()?->getLabel()],
+            $this->line('Âge', null !== $user->getAge() ? $user->getAge().' ans' : null),
+            $this->line('Sexe', $user->getSex()?->getLabel()),
+            $this->line('Taille', null !== $user->getHeightCm() ? $user->getHeightCm().' cm' : null),
+            $this->line('Poids', $kg($user->getWeightKg())),
+            $this->line('IMC', null !== $bmi ? str_replace('.', ',', (string) $bmi) : null, derived: true),
+            $this->line("Années d'entraînement", null !== $user->getTrainingYears() ? $user->getTrainingYears().' ans' : null),
+            $this->line('Objectif', $user->getMainGoal()?->getLabel()),
         ];
 
-        $strength = [
-            ['label' => 'Squat', 'value' => $kg($user->getSquat1rmKg())],
-            ['label' => 'Développé couché', 'value' => $kg($user->getBench1rmKg())],
-            ['label' => 'Soulevé de terre', 'value' => $kg($user->getDeadlift1rmKg())],
-            ['label' => 'Total SBD', 'value' => $kg($total), 'derived' => true],
-            ['label' => 'Développé militaire', 'value' => $kg($user->getOhp1rmKg())],
-            ['label' => 'Traction lestée', 'value' => $kg($user->getWeightedPullupKg())],
-            ['label' => 'Score DOTS', 'value' => null !== $dots ? str_replace('.', ',', (string) $dots) : null, 'derived' => true],
+        // Le score ferme le bloc force : il résume les lignes du dessus, et il
+        // se lit sur le total effectif, pas sur les seules valeurs saisies.
+        $strengthRows = [
+            ...$strength['rows'],
+            $this->line('Score DOTS', null !== $dots ? str_replace('.', ',', (string) $dots) : null, derived: true),
         ];
 
         $endurance = [
-            ['label' => '5 km', 'value' => $time($user->getRun5kSeconds())],
-            ['label' => '10 km', 'value' => $time($user->getRun10kSeconds())],
-            ['label' => 'Semi-marathon', 'value' => $time($user->getHalfMarathonSeconds())],
-            ['label' => 'Marathon', 'value' => $time($user->getMarathonSeconds())],
-            ['label' => 'FTP vélo', 'value' => null !== $user->getCyclingFtpWatts() ? $user->getCyclingFtpWatts().' W' : null],
-            ['label' => '100 m natation', 'value' => $time($user->getSwim100mSeconds())],
+            $this->line('5 km', $time($user->getRun5kSeconds())),
+            $this->line('10 km', $time($user->getRun10kSeconds())),
+            $this->line('Semi-marathon', $time($user->getHalfMarathonSeconds())),
+            $this->line('Marathon', $time($user->getMarathonSeconds())),
+            $this->line('FTP vélo', null !== $user->getCyclingFtpWatts() ? $user->getCyclingFtpWatts().' W' : null),
+            $this->line('100 m natation', $time($user->getSwim100mSeconds())),
         ];
 
         $hasAny = false;
-        foreach ([...$identity, ...$strength, ...$endurance] as $row) {
+        foreach ([...$identity, ...$strengthRows, ...$endurance] as $row) {
             if (null !== $row['value']) {
                 $hasAny = true;
                 break;
@@ -147,7 +159,7 @@ final class ProfileStats
 
         return [
             'identity' => $identity,
-            'strength' => $strength,
+            'strength' => $strengthRows,
             'endurance' => $endurance,
             'bio' => $user->getBio(),
             'hasAny' => $hasAny || null !== $user->getBio(),
@@ -155,13 +167,35 @@ final class ProfileStats
     }
 
     /**
+     * Une ligne de fiche, à la même forme que celles d'`AthleteRecords` : ni
+     * note ni exercice, parce qu'une mesure saisie ne vient de nulle part
+     * d'autre que du formulaire.
+     *
+     * @return array{label: string, value: string|null, note: string|null, exerciseId: int|null, derived: bool}
+     */
+    private function line(string $label, ?string $value, bool $derived = false): array
+    {
+        return [
+            'label' => $label,
+            'value' => $value,
+            'note' => null,
+            'exerciseId' => null,
+            'derived' => $derived,
+        ];
+    }
+
+    /**
      * Score de force normalisé DOTS (comparable entre poids de corps), à partir du
      * total SBD, du poids de corps et du sexe. Retourne null si une donnée manque
      * ou si le sexe n'a pas de coefficients (OTHER).
+     *
+     * Le total est **passé**, pas relu : c'est le total effectif calculé par
+     * `AthleteRecords` (déclaré ou battu en séance). Le recalculer ici ferait
+     * du score le seul chiffre de la fiche à ignorer un record fraîchement
+     * battu.
      */
-    private function dots(User $user): ?float
+    private function dots(User $user, ?float $total): ?float
     {
-        $total = $user->getSbdTotalKg();
         $bw = $user->getWeightKg();
         $sex = $user->getSex();
         if (null === $total || null === $bw || $bw <= 0 || null === $sex) {

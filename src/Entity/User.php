@@ -107,6 +107,29 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(nullable: true)]
     private ?float $weightedPullupKg = null;
 
+    /**
+     * Les maximums au poids du corps, en répétitions. Ils ne se comparent à
+     * aucune charge : une traction lestée et un maximum de tractions sont deux
+     * records du même mouvement, pas deux versions du même chiffre — d'où deux
+     * colonnes plutôt qu'une.
+     */
+    #[ORM\Column(nullable: true)]
+    private ?int $maxPullups = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $maxPushups = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $maxDips = null;
+
+    /**
+     * La suspension à la barre la plus longue, en secondes. Le seul record de
+     * force qui soit un temps tenu : il se saisit donc comme un chrono
+     * (DurationType), pas comme des kilos ni comme un compte.
+     */
+    #[ORM\Column(nullable: true)]
+    private ?int $deadhangSeconds = null;
+
     // --- Fiche athlète : records d'endurance (temps en secondes) ------------
 
     #[ORM\Column(nullable: true)]
@@ -498,18 +521,62 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    /**
-     * Total SBD (squat + bench + deadlift) dérivé, si les trois lifts sont
-     * renseignés. Base du score de force normalisé.
-     */
-    public function getSbdTotalKg(): ?float
+    public function getMaxPullups(): ?int
     {
-        if (null === $this->squat1rmKg || null === $this->bench1rmKg || null === $this->deadlift1rmKg) {
-            return null;
-        }
-
-        return $this->squat1rmKg + $this->bench1rmKg + $this->deadlift1rmKg;
+        return $this->maxPullups;
     }
+
+    public function setMaxPullups(?int $maxPullups): static
+    {
+        $this->maxPullups = $maxPullups;
+
+        return $this;
+    }
+
+    public function getMaxPushups(): ?int
+    {
+        return $this->maxPushups;
+    }
+
+    public function setMaxPushups(?int $maxPushups): static
+    {
+        $this->maxPushups = $maxPushups;
+
+        return $this;
+    }
+
+    public function getMaxDips(): ?int
+    {
+        return $this->maxDips;
+    }
+
+    public function setMaxDips(?int $maxDips): static
+    {
+        $this->maxDips = $maxDips;
+
+        return $this;
+    }
+
+    public function getDeadhangSeconds(): ?int
+    {
+        return $this->deadhangSeconds;
+    }
+
+    public function setDeadhangSeconds(?int $deadhangSeconds): static
+    {
+        $this->deadhangSeconds = $deadhangSeconds;
+
+        return $this;
+    }
+
+    /*
+     * Pas de `getSbdTotalKg()` ici, et c'est délibéré : le total SBD ne se
+     * dérive plus des seules valeurs saisies. Une série de squat plus lourde
+     * que le 1RM déclaré fait le record, donc le total — la somme se calcule
+     * sur les records EFFECTIFS, dans `AthleteRecords`, qui est le seul endroit
+     * à connaître les deux sources. Une seconde somme lue sur l'entité finirait
+     * par contredire la fiche.
+     */
 
     public function getRun5kSeconds(): ?int
     {

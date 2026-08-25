@@ -18,6 +18,11 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  * Fiche athlète éditable. Tous les champs sont facultatifs (la fiche se remplit
  * progressivement). Unités normalisées : force en kg (NumberType), temps en
  * secondes via DurationType (saisie mm:ss / h:mm:ss).
+ *
+ * Les records de force saisis ici sont un **plancher**, pas la valeur affichée :
+ * ils portent ce qui a été fait avant l'app ou hors séance loguée, et le réalisé
+ * les dépasse dès qu'il les bat (`AthleteRecords`). C'est pourquoi ils restent
+ * éditables alors que la fiche se met à jour toute seule.
  */
 class ProfileType extends AbstractType
 {
@@ -35,6 +40,12 @@ class ProfileType extends AbstractType
             'label' => $label,
             'required' => false,
             'attr' => ['placeholder' => $placeholder],
+        ];
+
+        $reps = static fn (string $label, string $placeholder): array => [
+            'label' => $label,
+            'required' => false,
+            'attr' => ['inputmode' => 'numeric', 'min' => 0, 'placeholder' => $placeholder],
         ];
 
         $zoneMax = static fn (string $label): array => [
@@ -87,6 +98,14 @@ class ProfileType extends AbstractType
             ->add('deadlift1rmKg', NumberType::class, $kg('Soulevé de terre (1RM)', 'ex. 180'))
             ->add('ohp1rmKg', NumberType::class, $kg('Développé militaire (1RM)', 'ex. 60'))
             ->add('weightedPullupKg', NumberType::class, $kg('Traction lestée (poids ajouté)', 'ex. 30'))
+            // Des répétitions au milieu des kilos : au poids du corps, le record
+            // est un compte, pas une charge. Une série lestée ne l'alimente pas.
+            ->add('maxPullups', IntegerType::class, $reps('Tractions (max)', 'ex. 14'))
+            ->add('maxPushups', IntegerType::class, $reps('Pompes (max)', 'ex. 40'))
+            ->add('maxDips', IntegerType::class, $reps('Dips (max)', 'ex. 17'))
+            // Un temps, enfin : la suspension est un record de force (grip),
+            // pas d'endurance, et se saisit donc ici en mm:ss.
+            ->add('deadhangSeconds', DurationType::class, $time('Suspension à la barre', 'ex. 1:30'))
             // --- Records d'endurance ---
             ->add('run5kSeconds', DurationType::class, $time('5 km', 'ex. 21:30'))
             ->add('run10kSeconds', DurationType::class, $time('10 km', 'ex. 45:00'))
