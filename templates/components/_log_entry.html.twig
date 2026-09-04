@@ -1,0 +1,57 @@
+{# Une ligne de journal du RÉALISÉ : date, titre, ce que la séance a pesé, et
+   son statut UNIQUEMENT s'il sort de l'ordinaire. Rendue à l'identique sur la
+   fiche athlète du coach (les dix dernières) et sur le journal complet — un seul
+   dessin pour une seule chose.
+
+   **La ligne entière est le lien**, comme `.kd-goalcard` : sur un téléphone, la
+   cible est la ligne, pas le titre. C'est ce qui répare les liens qu'on ne
+   pouvait pas atteindre quand la métrique poussait le titre hors de l'écran.
+
+   Deux silences volontaires, et ils font le calme de la liste :
+
+   - **« Faite » ne s'écrit pas.** Une séance qui porte du réalisé a eu lieu :
+     répéter le badge à chaque ligne empile dix fois la même information et
+     n'apprend rien. Le badge reste pour l'exception (une séance encore
+     « prévue » dont la synchro a déjà déposé des séries, une « manquée » qui en
+     porte quand même) — là, il dit quelque chose.
+   - **Une durée sous la minute ne s'écrit pas** : « 0 min » n'est pas une durée,
+     c'est une borne de fin posée trop tôt par le téléphone.
+
+   Le contenu vient de `TrainingLog`, déjà résumé : le template ne compte rien,
+   il met en forme. Une séance sans volume mesuré (mobilité consignée en séries
+   non chiffrées) garde sa ligne et n'affiche simplement pas de tonnage.
+
+   Paramètres :
+   - entry : une entrée de TrainingLog (id, date, title, status, workingSets,
+     tonnageKg, durationSeconds, averageRpe, exercises, skipped)
+   - back  : jeton de contexte à poser sur le lien (`back_to(...)`), ou {} #}
+{% set back = back|default({}) %}
+
+<li class="kd-loglist__item">
+    <a class="kd-logline" href="{{ path('app_scheduled_workout_show', {id: entry.id}|merge(back)) }}">
+        <span class="kd-logline__date">{{ entry.date|date('d/m') }}</span>
+        <span class="kd-logline__title">{{ entry.title }}</span>
+        {# Les séparateurs « · » sont posés en CSS : sans ça, chaque valeur
+           masquée laisserait le sien derrière elle. #}
+        <span class="kd-logline__meta">
+            {% if entry.workingSets > 0 %}
+                <span>{{ entry.workingSets }} série{{ entry.workingSets > 1 ? 's' }}</span>
+            {% endif %}
+            {% if entry.tonnageKg > 0 %}
+                <span class="kd-logline__tonnage">{{ entry.tonnageKg|round|number_format(0, ',', ' ') }} kg</span>
+            {% endif %}
+            {% if entry.durationSeconds >= 60 %}
+                <span>{{ (entry.durationSeconds / 60)|round }} min</span>
+            {% endif %}
+            {% if entry.averageRpe is not null %}
+                <span>RPE {{ entry.averageRpe|number_format(1, ',', ' ') }}</span>
+            {% endif %}
+            {% if entry.skipped > 0 %}
+                <span>{{ entry.skipped }} sauté{{ entry.skipped > 1 ? 's' }}</span>
+            {% endif %}
+        </span>
+        {% if entry.status.value != 'done' %}
+            <span class="kd-badge kd-badge--{{ entry.status.value }} kd-logline__status">{{ entry.status.label }}</span>
+        {% endif %}
+    </a>
+</li>

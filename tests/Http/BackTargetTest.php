@@ -27,6 +27,12 @@ final class BackTargetTest extends TestCase
         // plan dont l'identifiant serait « edit-12 ».
         yield 'éditeur de plan' => ['plan-edit-12', BackTarget::PLAN_EDIT, '12'];
         yield 'semaine' => ['cal-week-2026-08-10', BackTarget::CAL_WEEK, '2026-08-10'];
+        yield 'fiche athlète' => ['athlete-7', BackTarget::ATHLETE, '7'];
+        // Même piège d'alternance que `plan-edit` : `athlete-log-7` n'est pas un
+        // athlète dont l'identifiant serait « log-7 ».
+        yield 'journal d\'un athlète' => ['athlete-log-7', BackTarget::ATHLETE_LOG, '7'];
+        // Le seul contexte sans identifiant : mon journal, il n'y en a qu'un.
+        yield 'mon journal' => ['log', BackTarget::LOG, ''];
         yield 'mois' => ['cal-month-2026-08', BackTarget::CAL_MONTH, '2026-08'];
     }
 
@@ -61,6 +67,10 @@ final class BackTargetTest extends TestCase
         yield 'url absolue' => ['https://exemple.test/'];
         yield 'chemin' => ['/workout/12'];
         yield 'jeton avec suffixe' => ['plan-12-bis'];
+        yield 'athlète sans identifiant' => ['athlete-'];
+        yield 'athlète non numérique' => ['athlete-moi'];
+        // « log » est le type nu ; « log-3 » n'est pas un journal numéroté.
+        yield 'journal numéroté' => ['log-3'];
     }
 
     #[DataProvider('rejectedTokens')]
@@ -74,7 +84,18 @@ final class BackTargetTest extends TestCase
         // Émission et lecture sont deux moitiés d'un même format : le jour où
         // l'une bouge sans l'autre, tous les retours retombent silencieusement
         // sur leur repli et personne ne voit d'erreur.
-        foreach ([[BackTarget::PLAN, 12], [BackTarget::PLAN_EDIT, 12], [BackTarget::CAL_MONTH, '2026-08']] as [$kind, $value]) {
+        $cases = [
+            [BackTarget::PLAN, 12],
+            [BackTarget::PLAN_EDIT, 12],
+            [BackTarget::CAL_MONTH, '2026-08'],
+            [BackTarget::ATHLETE, 7],
+            [BackTarget::ATHLETE_LOG, 7],
+            // Sans valeur : `token()` doit rendre le type nu, pas « log- », que
+            // `parse()` rejetterait.
+            [BackTarget::LOG, ''],
+        ];
+
+        foreach ($cases as [$kind, $value]) {
             $target = BackTarget::parse(BackTarget::token($kind, $value));
 
             self::assertNotNull($target, \sprintf('Le jeton « %s » n\'est pas relu.', $kind));

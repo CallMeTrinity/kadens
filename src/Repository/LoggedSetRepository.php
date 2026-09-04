@@ -300,6 +300,55 @@ class LoggedSetRepository extends ServiceEntityRepository
     }
 
     /**
+     * Le volume de SALLE réalisé, agrégé par **séance datée** : une ligne de
+     * journal, un tonnage, des séries, un RPE. C'est la matière de la fiche
+     * athlète du coach et du journal complet (`TrainingLog`).
+     *
+     * À distinguer de `gymTotalsByDateForOwner()`, qui replie par JOUR pour les
+     * statistiques : ici deux séances du même jour restent deux lignes, parce
+     * qu'on vient lire des séances, pas une densité — et que chacune est un lien.
+     *
+     * **Aucune entité hydratée, une requête, quelle que soit la fenêtre.**
+     *
+     * Le RPE revient en somme + effectif, jamais en moyenne : c'est l'appelant
+     * qui divise, et une moyenne de moyennes ne se recompose pas.
+     *
+     * Périmètre : celui de `workingSetWindow()` — échauffement exclu, exercice
+     * sauté exclu, série non chiffrée exclue (cf. `measured()`), statut de la
+     * séance non filtré. Même règle que `LogMetrics::summary()`, dont ces
+     * chiffres sont le pendant SQL : les deux doivent dire la même chose d'une
+     * même séance.
+     *
+     * @return array<int, array{workingSets: int, tonnageKg: float, rpeSum: int, rpeCount: int}> indexé par identifiant de séance datée
+     */
+    public function gymTotalsByScheduledForOwner(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
+    {
+        $rows = $this->workingSetWindow($owner, $start, $end)
+            ->select(
+                's.id AS scheduledId',
+                'COUNT(ls.id) AS workingSets',
+                'SUM(CASE WHEN ls.reps IS NOT NULL AND ls.weightKg IS NOT NULL THEN ls.reps * ls.weightKg ELSE 0 END) AS tonnage',
+                'SUM(COALESCE(ls.rpe, 0)) AS rpeSum',
+                'SUM(CASE WHEN ls.rpe IS NOT NULL THEN 1 ELSE 0 END) AS rpeCount',
+            )
+            ->groupBy('s.id')
+            ->getQuery()
+            ->getArrayResult();
+
+        $totals = [];
+        foreach ($rows as $row) {
+            $totals[(int) $row['scheduledId']] = [
+                'workingSets' => (int) $row['workingSets'],
+                'tonnageKg' => (float) $row['tonnage'],
+                'rpeSum' => (int) $row['rpeSum'],
+                'rpeCount' => (int) $row['rpeCount'],
+            ];
+        }
+
+        return $totals;
+    }
+
+    /**
      * Le même volume croisé sur les DEUX axes : une séance datée, un exercice,
      * un nombre de séries. C'est ce qui permet de dire « cette séance-là,
      * jambes et dos » — l'appelant croise `exerciseId` avec les `targetAreas` de

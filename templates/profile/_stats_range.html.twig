@@ -12,9 +12,14 @@
    - months : list de {value, label}, le plus récent d'abord
    - subject : l'athlète regardé, ou null pour soi — il décide de la route visée,
      sans quoi choisir une fenêtre depuis la page d'un athlète ramènerait le coach
-     sur ses propres statistiques #}
+     sur ses propres statistiques
+   - route   : nom de route de la PAGE qui affiche le sélecteur (défaut : les
+     statistiques). Le journal partage la même fenêtre et le même sélecteur ;
+     sans ce paramètre, choisir « 6 mois » depuis le journal renverrait aux
+     statistiques — un sélecteur ne change pas de page en même temps que de
+     fenêtre. Il reçoit `{id}` quand `subject` est posé, comme les stats. #}
 {% set subject = subject|default(null) %}
-{% set statsRoute = subject ? 'app_coach_athlete_stats' : 'app_profile_stats' %}
+{% set statsRoute = route|default(subject ? 'app_coach_athlete_stats' : 'app_profile_stats') %}
 {% set statsParams = subject ? {id: subject.id} : {} %}
 
 <div class="kd-rangepick">

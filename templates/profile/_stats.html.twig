@@ -22,6 +22,9 @@
            — il mènerait aux stats du coach. #}
         {% if own %}
             <div class="kd-actionbar__end">
+                <a href="{{ path('app_profile_log') }}" class="kd-btn kd-btn--ghost">
+                    {{ ux_icon('lucide:clipboard-list') }} Journal
+                </a>
                 <a href="{{ path('app_profile_history') }}" class="kd-btn kd-btn--ghost">
                     {{ ux_icon('lucide:history') }} Historique
                 </a>

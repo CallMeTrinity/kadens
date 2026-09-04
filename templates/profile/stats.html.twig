@@ -25,6 +25,7 @@
 {% block body %}
     {% set subject = subject|default(null) %}
     {% set historyPath = subject ? path('app_coach_athlete_history', {id: subject.id}) : path('app_profile_history') %}
+    {% set logPath = subject ? path('app_coach_athlete_log', {id: subject.id}) : path('app_profile_log') %}
     {% set backPath = subject ? path('app_coach_athlete', {id: subject.id}) : path('app_profile') %}
     {% set vol = stats.volume %}
     {% set reg = stats.regularity %}
@@ -44,7 +45,10 @@
         <div class="kd-actionbar__end">
             {# L'historique n'a pas de fenêtre : il n'hérite donc pas du `?range=`
                courant, et c'est volontaire. #}
-            <a href="{{ historyPath }}" class="kd-btn kd-btn--secondary">
+            <a href="{{ logPath }}" class="kd-btn kd-btn--secondary">
+                {{ ux_icon('lucide:clipboard-list') }} Journal
+            </a>
+            <a href="{{ historyPath }}" class="kd-btn kd-btn--ghost">
                 {{ ux_icon('lucide:history') }} Historique
             </a>
             <a href="{{ backPath }}" class="kd-btn kd-btn--ghost">

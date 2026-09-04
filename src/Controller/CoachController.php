@@ -18,12 +18,12 @@ use App\Security\Voter\ExerciseVoter;
 use App\Service\CoachingResolver;
 use App\Service\ExerciseTrajectory;
 use App\Service\HeartRateZones;
-use App\Service\LogMetrics;
 use App\Service\PlanScheduler;
 use App\Service\ProfileStats;
 use App\Service\SlugGenerator;
 use App\Service\StatsPeriod;
 use App\Service\TrainingHistory;
+use App\Service\TrainingLog;
 use App\Service\TrainingStats;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bridge\Doctrine\Attribute\MapEntity;
@@ -84,18 +84,17 @@ final class CoachController extends AbstractController
         GoalRepository $goalRepository,
         ProfileStats $profileStats,
         HeartRateZones $heartRateZones,
-        LogMetrics $logMetrics,
+        TrainingLog $trainingLog,
     ): Response {
         $this->denyUnlessCoachOf($athlete);
 
         $today = new \DateTimeImmutable('today');
 
-        // Chaque séance réalisée avec sa synthèse : LogMetrics est déjà le service
-        // du réalisé côté web (KL-07), on ne recompte rien dans le template.
-        $logged = [];
-        foreach ($scheduledWorkoutRepository->findRecentLoggedForOwner($athlete, self::LOGGED_SESSIONS) as $session) {
-            $logged[] = ['scheduled' => $session, 'summary' => $logMetrics->summary($session)];
-        }
+        // Les dernières séances consignées, en agrégats scalaires : TrainingLog
+        // rend la même ligne ici et sur le journal complet, et ne remonte aucune
+        // série. Le total dit combien il y en a derrière ces dix-là — sans lui,
+        // la fiche laissait croire que l'athlète n'avait fait que ça.
+        $logged = $trainingLog->recent($athlete, self::LOGGED_SESSIONS);
 
         return $this->render('coach/athlete.html.twig', [
             'athlete' => $athlete,
@@ -103,6 +102,7 @@ final class CoachController extends AbstractController
             'plans' => $planTemplateRepository->findBy(['owner' => $athlete], ['title' => 'ASC']),
             'upcoming' => $scheduledWorkoutRepository->findByOwnerBetween($athlete, $today, $today->modify('+8 weeks')),
             'logged' => $logged,
+            'loggedTotal' => $trainingLog->total($athlete),
             'goals' => $goalRepository->findUpcomingForOwner($athlete, 3),
             // Mêmes services que la page profil : ils prennent n'importe quel User.
             // Le coach a besoin des 1RM, records et zones cardio pour programmer.
@@ -183,6 +183,39 @@ final class CoachController extends AbstractController
         return $this->render('profile/history.html.twig', [
             'history' => $history->calendar($athlete),
             'groups' => MuscleGroup::cases(),
+            'subject' => $athlete,
+        ]);
+    }
+
+    /**
+     * Le journal du réalisé de l'athlète — `/profile/log` lu au nom de quelqu'un
+     * d'autre, même template et même service (`TrainingLog` prend n'importe quel
+     * `User`).
+     *
+     * C'est la sortie de la fiche, qui ne montre que les dix dernières : au-delà,
+     * ce n'était plus une fiche, mais il fallait bien un endroit où lire la
+     * suite. La fenêtre est un paramètre d'URL, comme pour les statistiques.
+     */
+    #[Route('/athlete/{id}/log', name: 'app_coach_athlete_log', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function athleteLog(
+        Request $request,
+        #[MapEntity(id: 'id')] User $athlete,
+        TrainingLog $log,
+        TrainingStats $training,
+    ): Response {
+        $this->denyUnlessCoachOf($athlete);
+
+        $period = StatsPeriod::resolve($request->query->getString('range'));
+
+        $groups = $log->monthly($athlete, $period);
+
+        return $this->render('profile/log.html.twig', [
+            'groups' => $groups,
+            'sessions' => array_sum(array_column($groups, 'sessions')),
+            'total' => $log->total($athlete),
+            'period' => $period,
+            'ranges' => StatsRange::pickable(),
+            'months' => $training->availableMonths($athlete),
             'subject' => $athlete,
         ]);
     }

@@ -9233,10 +9233,15 @@ textarea.kd-inlineedit__input {
     padding: 0;
 }
 
+/* La ligne PEUT passer à plusieurs lignes, et c'est ce qui la répare : sans
+   `wrap`, la métrique (elle-même insécable) écrasait le nom jusqu'à zéro et
+   poussait le badge ou le bouton hors du cadre — invisibles, donc intouchables.
+   Le nom garde une base large et se replie plutôt que de se faire tronquer. */
 .kd-coachitem {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
-    gap: var(--kd-space-4);
+    gap: var(--kd-space-2) var(--kd-space-4);
     padding: var(--kd-space-4) 0;
     border-bottom: 1px solid var(--color-divider);
 }
@@ -9246,14 +9251,16 @@ textarea.kd-inlineedit__input {
 }
 
 .kd-coachitem__name {
-    flex: 1 1 auto;
+    flex: 1 1 12rem;
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
     color: var(--color-text-strong);
     text-decoration: none;
     font-weight: var(--kd-weight-medium);
+}
+
+a.kd-coachitem__name {
+    transition: color .12s ease;
 }
 
 a.kd-coachitem__name:hover {
@@ -9261,10 +9268,10 @@ a.kd-coachitem__name:hover {
 }
 
 .kd-coachitem__meta {
-    flex: none;
+    flex: 0 1 auto;
     font-family: var(--font-mono);
     font-size: 11px;
-    color: var(--color-text-faint);
+    color: var(--color-text-secondary);
 }
 
 .kd-coachitem__date {
@@ -10341,5 +10348,151 @@ a.kd-coachitem__name:hover {
        avec la page. */
     .kd-histlegend {
         position: static;
+    }
+}
+
+/* ----------------------------------------------------------------------------
+   JOURNAL DU RÉALISÉ (`/profile/log`, `/coach/athlete/{id}/log`, fiche athlète)
+   Une ligne = une séance consignée. La LIGNE ENTIÈRE est le lien, comme
+   `.kd-goalcard` : sur un téléphone, la cible est la ligne, jamais le titre
+   seul, qui se faisait pousser hors de l'écran par la métrique.
+   La grille est explicite (aires nommées) parce que le passage à deux lignes
+   sous 900 px n'est pas un `wrap` heureux : il place le statut à côté du titre
+   et renvoie la métrique dessous, à l'aplomb du titre.
+   ---------------------------------------------------------------------------- */
+/* Reset de liste seulement. À NE PAS combiner avec `kd-card` sur le même
+   élément : ce `padding: 0` est déclaré après celui de `.kd-card`, il gagnerait
+   la cascade et la carte perdrait sa marge intérieure. La carte enveloppe la
+   liste, elle ne se confond pas avec elle. */
+.kd-loglist {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.kd-loglist__item + .kd-loglist__item {
+    /* Trait léger : dix lignes séparées par le divider plein donnaient un
+       tableau, là où la liste doit se lire d'un trait. */
+    border-top: 1px solid var(--color-divider-soft);
+}
+
+.kd-logline {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas: "date title meta status";
+    align-items: center;
+    gap: var(--kd-space-2) var(--kd-space-6);
+    /* Même respiration que `.kd-exrow`, l'autre liste dense du projet : le
+       rythme d'une ligne ne s'invente pas par liste. Le débord horizontal reste
+       plus petit que le padding de la carte — celle-ci garde sa marge — et
+       élargit le survol comme la cible tactile au-delà du seul texte. */
+    padding: var(--kd-space-5) var(--kd-space-4);
+    margin-inline: calc(var(--kd-space-4) * -1);
+    color: inherit;
+    text-decoration: none;
+    /* .12s ease : la durée de toutes les transitions du projet. */
+    transition: background-color .12s ease;
+}
+
+.kd-logline:hover {
+    background: var(--color-surface-hover);
+}
+
+.kd-logline:hover .kd-logline__title {
+    color: var(--color-primary);
+}
+
+.kd-logline__date {
+    grid-area: date;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.kd-logline__title {
+    grid-area: title;
+    min-width: 0;
+    transition: color .12s ease;
+    /* Pas d'ellipsis : un nom de séance qui ne tient pas passe à la ligne. Le
+       tronquer était le défaut d'origine — « Mobilité… » ne dit plus rien. */
+    overflow-wrap: anywhere;
+    color: var(--color-text-strong);
+    font-weight: var(--kd-weight-medium);
+}
+
+.kd-logline__meta {
+    grid-area: meta;
+    /* Colonne dimensionnée sur la métrique la plus longue : sans ça, les lignes
+       courtes s'étireraient et le nombre ne s'alignerait plus d'une ligne à
+       l'autre. */
+    justify-self: end;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0 var(--kd-space-3);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+/* Le séparateur appartient au CSS, pas au template : une valeur absente ne
+   laisse alors pas son point derrière elle. */
+.kd-logline__meta > span + span::before {
+    content: '·';
+    margin-right: var(--kd-space-3);
+    color: var(--color-text-faint);
+}
+
+/* Le seul chiffre qui porte l'effort de la séance : il se lit avant les autres. */
+.kd-logline__tonnage {
+    color: var(--color-text-strong);
+}
+
+.kd-logline__status {
+    grid-area: status;
+    justify-self: end;
+}
+
+/* Renvoi vers le journal complet sous un aperçu borné (fiche athlète). */
+.kd-loglist__more {
+    display: flex;
+    justify-content: flex-end;
+    margin: var(--kd-space-5) 0 0;
+}
+
+/* En-tête d'un mois du journal : son nom, et ce que le mois a pesé. */
+.kd-loggroup__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--kd-space-2) var(--kd-space-6);
+}
+
+.kd-loggroup__totals {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-secondary);
+}
+
+@media (max-width: 900px) {
+    .kd-logline {
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        grid-template-areas:
+            "date title status"
+            ".    meta  meta";
+        /* La cible tactile couvre les deux lignes : c'est le lien entier. */
+        padding: var(--kd-space-6) var(--kd-space-4);
+    }
+
+    .kd-logline__status {
+        align-self: start;
+    }
+
+    /* Sur sa propre ligne, la métrique se lit à gauche, à l'aplomb du titre. */
+    .kd-logline__meta {
+        justify-self: start;
+        text-align: left;
     }
 }
