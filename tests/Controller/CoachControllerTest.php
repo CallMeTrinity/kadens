@@ -688,11 +688,94 @@ final class CoachControllerTest extends WebTestCase
         $this->client->request('GET', '/coach/athlete/'.$athlete->getId());
 
         self::assertResponseIsSuccessful();
-        self::assertSelectorExists('a[href="/schedule/'.$logged->getId().'"]');
-        self::assertSelectorNotExists('a[href="/schedule/'.$bare->getId().'"]');
+        // Le lien porte le contexte de retour : d'ici, la séance datée revient à
+        // la fiche de l'athlète, pas au calendrier du coach.
+        self::assertSelectorExists('a[href="/schedule/'.$logged->getId().'?from=athlete-'.$athlete->getId().'"]');
+        self::assertSelectorNotExists('a[href^="/schedule/'.$bare->getId().'"]');
         // Deux séries de travail, 1000 kg : l'échauffement ne compte pas.
         self::assertSelectorTextContains('body', '2 séries');
         self::assertSelectorTextContains('body', '1 000 kg');
+    }
+
+    /**
+     * Le journal complet : la fiche ne montre que dix séances, il fallait un
+     * endroit où lire la suite. La fenêtre s'y choisit comme sur les statistiques.
+     */
+    public function testAthleteLogPageListsTheWholeWindow(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+
+        $exercise = $this->createExercise($athlete, 'Squat');
+        $recent = $this->logSession($athlete, $exercise, '2026-03-08', [[SetType::NORMAL, 5, 100.0]]);
+        // Hors des quatre dernières semaines : visible seulement en « tout ».
+        $old = $this->logSession($athlete, $exercise, '2024-01-15', [[SetType::NORMAL, 5, 80.0]]);
+
+        $this->client->loginUser($coach);
+        $this->client->request('GET', '/coach/athlete/'.$athlete->getId().'/log?range=all');
+
+        self::assertResponseIsSuccessful();
+        // Chaque ligne revient au journal, pas au calendrier du coach.
+        self::assertSelectorExists('a[href="/schedule/'.$recent->getId().'?from=athlete-log-'.$athlete->getId().'"]');
+        self::assertSelectorExists('a[href="/schedule/'.$old->getId().'?from=athlete-log-'.$athlete->getId().'"]');
+        // Le sélecteur de fenêtre reste sur le journal : il change de fenêtre,
+        // pas de page.
+        self::assertSelectorExists('a[href="/coach/athlete/'.$athlete->getId().'/log?range=6m"]');
+
+        // Une fenêtre courte ne montre que ce qui s'y trouve, sans rien perdre :
+        // le total dit ce qu'il y a derrière.
+        $this->client->request('GET', '/coach/athlete/'.$athlete->getId().'/log?range=4w');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorNotExists('a[href^="/schedule/'.$old->getId().'"]');
+    }
+
+    /**
+     * Le retour posé sur les lignes du réalisé se résout — et seulement pour un
+     * coach accepté. L'identifiant de l'athlète est une donnée privée : un jeton
+     * `athlete-<id>` deviné dans la query ne doit rien nommer, et se lire comme
+     * une absence (la page retombe sur son retour d'origine, le calendrier).
+     */
+    public function testTheAthleteBacklinkIsResolvedOnlyForAnAcceptedCoach(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+
+        $exercise = $this->createExercise($athlete, 'Squat');
+        $logged = $this->logSession($athlete, $exercise, '2026-03-08', [[SetType::NORMAL, 5, 100.0]]);
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/schedule/'.$logged->getId().'?from=athlete-'.$athlete->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertGreaterThan(0, $crawler->filter('a[href="/coach/athlete/'.$athlete->getId().'"]')->count());
+
+        // Un tiers curieux, sur SA propre séance, avec le jeton d'un autre : il
+        // n'apprend rien et son retour retombe sur le calendrier.
+        $stranger = $this->createUser('curieux@example.com');
+        $own = $this->logSession($stranger, $exercise, '2026-03-08', [[SetType::NORMAL, 5, 60.0]]);
+
+        $this->client->loginUser($stranger);
+        $crawler = $this->client->request('GET', '/schedule/'.$own->getId().'?from=athlete-'.$athlete->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertStringNotContainsString('athlete@example.com', $crawler->filter('body')->text());
+        self::assertSame(0, $crawler->filter('a[href="/coach/athlete/'.$athlete->getId().'"]')->count());
+    }
+
+    /** Sans relation acceptée, le journal d'un autre reste fermé. */
+    public function testAthleteLogPageIsDeniedWithoutAcceptedRelation(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::PENDING);
+
+        $this->client->loginUser($coach);
+        $this->client->request('GET', '/coach/athlete/'.$athlete->getId().'/log');
+
+        self::assertResponseStatusCodeSame(403);
     }
 
     /**

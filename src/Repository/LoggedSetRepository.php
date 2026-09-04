@@ -267,10 +267,20 @@ class LoggedSetRepository extends ServiceEntityRepository
      * groupe musculaire (l'appelant croise `exerciseId` avec les `targetAreas`
      * de la bibliothèque) et le classement des charges de la fenêtre.
      *
-     * Le regroupement porte sur l'identifiant **et** le nom figé : un
-     * `LoggedExercise` dont la définition a été supprimée (SET NULL) n'a plus
-     * que son nom, et l'écarter ferait disparaître du volume réellement
-     * soulevé. L'appelant replie les lignes de même exercice.
+     * **Le regroupement porte sur l'identité, pas sur le libellé.**
+     * `LoggedExercise.exerciseName` est un instantané pris pendant la séance :
+     * renommer un exercice fait donc coexister plusieurs noms figés pour un
+     * même `exercise_id`. Grouper sur le nom scindait l'exercice en autant de
+     * lignes qu'il a porté de noms — et comme l'affichage résout le libellé
+     * VIVANT, le classement des charges montrait deux fois « Squat à la barre »
+     * avec deux maximums différents.
+     *
+     * Le nom figé reste sélectionné (`MAX()`, un représentant qui ne départage
+     * rien) parce qu'il est l'ultime repli : un `LoggedExercise` dont la
+     * définition a été supprimée (SET NULL) n'a plus que lui. Ces orphelins
+     * sont les seuls à se regrouper par nom — c'est leur seule identité
+     * restante — d'où le `CASE` en clé de groupe secondaire, vide (donc neutre)
+     * dès que l'exercice existe encore.
      *
      * @return list<array{exerciseId: int|null, name: string, workingSets: int, tonnageKg: float, topWeightKg: float|null, sessions: int}>
      */
@@ -279,14 +289,15 @@ class LoggedSetRepository extends ServiceEntityRepository
         $qb = $this->workingSetWindow($owner, $start, $end)
             ->select(
                 'IDENTITY(le.exercise) AS exerciseId',
-                'le.exerciseName AS name',
+                'MAX(le.exerciseName) AS name',
                 'COUNT(ls.id) AS workingSets',
                 'SUM(CASE WHEN ls.reps IS NOT NULL AND ls.weightKg IS NOT NULL THEN ls.reps * ls.weightKg ELSE 0 END) AS tonnage',
                 'MAX(ls.weightKg) AS topWeight',
                 'COUNT(DISTINCT s.id) AS sessions',
+                "CASE WHEN le.exercise IS NULL THEN le.exerciseName ELSE '' END AS HIDDEN orphanName",
             )
             ->groupBy('exerciseId')
-            ->addGroupBy('le.exerciseName')
+            ->addGroupBy('orphanName')
             ->orderBy('workingSets', 'DESC');
 
         return array_map(static fn (array $row): array => [
@@ -297,6 +308,55 @@ class LoggedSetRepository extends ServiceEntityRepository
             'topWeightKg' => null !== $row['topWeight'] ? (float) $row['topWeight'] : null,
             'sessions' => (int) $row['sessions'],
         ], $qb->getQuery()->getArrayResult());
+    }
+
+    /**
+     * Le volume de SALLE réalisé, agrégé par **séance datée** : une ligne de
+     * journal, un tonnage, des séries, un RPE. C'est la matière de la fiche
+     * athlète du coach et du journal complet (`TrainingLog`).
+     *
+     * À distinguer de `gymTotalsByDateForOwner()`, qui replie par JOUR pour les
+     * statistiques : ici deux séances du même jour restent deux lignes, parce
+     * qu'on vient lire des séances, pas une densité — et que chacune est un lien.
+     *
+     * **Aucune entité hydratée, une requête, quelle que soit la fenêtre.**
+     *
+     * Le RPE revient en somme + effectif, jamais en moyenne : c'est l'appelant
+     * qui divise, et une moyenne de moyennes ne se recompose pas.
+     *
+     * Périmètre : celui de `workingSetWindow()` — échauffement exclu, exercice
+     * sauté exclu, série non chiffrée exclue (cf. `measured()`), statut de la
+     * séance non filtré. Même règle que `LogMetrics::summary()`, dont ces
+     * chiffres sont le pendant SQL : les deux doivent dire la même chose d'une
+     * même séance.
+     *
+     * @return array<int, array{workingSets: int, tonnageKg: float, rpeSum: int, rpeCount: int}> indexé par identifiant de séance datée
+     */
+    public function gymTotalsByScheduledForOwner(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
+    {
+        $rows = $this->workingSetWindow($owner, $start, $end)
+            ->select(
+                's.id AS scheduledId',
+                'COUNT(ls.id) AS workingSets',
+                'SUM(CASE WHEN ls.reps IS NOT NULL AND ls.weightKg IS NOT NULL THEN ls.reps * ls.weightKg ELSE 0 END) AS tonnage',
+                'SUM(COALESCE(ls.rpe, 0)) AS rpeSum',
+                'SUM(CASE WHEN ls.rpe IS NOT NULL THEN 1 ELSE 0 END) AS rpeCount',
+            )
+            ->groupBy('s.id')
+            ->getQuery()
+            ->getArrayResult();
+
+        $totals = [];
+        foreach ($rows as $row) {
+            $totals[(int) $row['scheduledId']] = [
+                'workingSets' => (int) $row['workingSets'],
+                'tonnageKg' => (float) $row['tonnage'],
+                'rpeSum' => (int) $row['rpeSum'],
+                'rpeCount' => (int) $row['rpeCount'],
+            ];
+        }
+
+        return $totals;
     }
 
     /**

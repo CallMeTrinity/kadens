@@ -19,6 +19,7 @@ use App\Service\PairingQr;
 use App\Service\ProfileStats;
 use App\Service\StatsPeriod;
 use App\Service\TrainingHistory;
+use App\Service\TrainingLog;
 use App\Service\TrainingStats;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -99,6 +100,39 @@ final class ProfileController extends AbstractController
 
         return $this->render('profile/stats.html.twig', [
             'stats' => $training->over($user, $period),
+            'period' => $period,
+            'ranges' => StatsRange::pickable(),
+            'months' => $training->availableMonths($user),
+        ]);
+    }
+
+    /**
+     * Le journal du réalisé : les séances consignées d'une fenêtre, la plus
+     * récente d'abord, chacune résumée en une ligne cliquable.
+     *
+     * Il répond à une question que ni les statistiques ni l'historique ne
+     * posaient. `/profile/stats` agrège (« combien de tonnage sur six mois »),
+     * `/profile/history` situe dans le temps (un calendrier, sans chiffres) ;
+     * ici on PARCOURT les séances une à une, avec ce que chacune a pesé.
+     *
+     * Même fenêtre et même sélecteur que les statistiques (`StatsPeriod`) : il
+     * n'y a qu'une façon de dire « quatre semaines » dans l'app, et passer d'une
+     * page à l'autre garde la fenêtre courante.
+     */
+    #[Route('/profile/log', name: 'app_profile_log', methods: ['GET'])]
+    public function log(Request $request, TrainingLog $log, TrainingStats $training): Response
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $period = StatsPeriod::resolve($request->query->getString('range'));
+
+        $groups = $log->monthly($user, $period);
+
+        return $this->render('profile/log.html.twig', [
+            'groups' => $groups,
+            'sessions' => array_sum(array_column($groups, 'sessions')),
+            'total' => $log->total($user),
             'period' => $period,
             'ranges' => StatsRange::pickable(),
             'months' => $training->availableMonths($user),

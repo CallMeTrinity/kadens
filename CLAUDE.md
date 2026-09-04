@@ -137,6 +137,11 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   fait. Contrainte de coût qui va avec : hors de cette unique passe hydratante
   d'endurance (bornée), tout passe par des agrégats scalaires — sans quoi
   « depuis le début » remonterait l'historique entier à chaque affichage.
+  **Parcourir n'est pas agréger** : `TrainingLog` (journal, `/profile/log` et son
+  jumeau coach) liste les séances consignées une à une, en trois requêtes
+  d'agrégat — c'est le pendant SQL de `LogMetrics`, dont il doit dire d'une même
+  séance exactement la même chose (test croisé). Une liste qui hydraterait le
+  réalisé pour le sommer en PHP ne tient que bornée à dix lignes.
   **Ce qui entre dans le volume de salle est défini une fois**, par
   `LoggedSet::countsAsWorking()`, son pendant SQL `LoggedSetRepository::measured()`
   et son pendant mobile `isMeasured()` (`kadens-mobile/src/session/summary.ts`) —
@@ -277,8 +282,10 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   un type et une clé résolus contre une table fermée de routes
   (`App\Http\BackTarget`, garde-fou testé) — aucune redirection ouverte n'est
   possible ; les droits se vérifient **avant** le libellé, un titre de plan étant
-  privé ; et un jeton illisible, périmé ou hors droits **n'est pas une erreur**,
-  il se lit comme une absence et la page retombe sur son retour d'origine.
+  privé — de même pour `athlete-<id>` / `athlete-log-<id>`, gardés par la relation
+  acceptée : l'adresse d'un athlète ne se laisse pas deviner dans la query ; et
+  un jeton illisible, périmé ou hors droits **n'est pas une erreur**, il se lit
+  comme une absence et la page retombe sur son retour d'origine.
   Corollaire côté PWA : `from` est retiré de la clé de cache du service worker
   (`cacheKey()` dans `public/sw.js`), sinon le hors-ligne se fragmenterait par
   contexte d'entrée — les autres paramètres (`range`, `run`) restent dans la clé,

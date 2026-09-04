@@ -2,9 +2,12 @@
 
 namespace App\Service;
 
+use App\Entity\User;
 use App\Http\BackTarget;
 use App\Repository\PlanTemplateRepository;
+use App\Repository\UserRepository;
 use App\Security\Voter\PlanTemplateVoter;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Security\Core\Authorization\AuthorizationCheckerInterface;
@@ -45,6 +48,9 @@ final class BackLink
         private readonly UrlGeneratorInterface $urlGenerator,
         private readonly PlanTemplateRepository $planTemplateRepository,
         private readonly AuthorizationCheckerInterface $authorizationChecker,
+        private readonly UserRepository $userRepository,
+        private readonly CoachingResolver $coachingResolver,
+        private readonly Security $security,
     ) {
     }
 
@@ -70,7 +76,7 @@ final class BackLink
      *
      * @return array{from: string}
      */
-    public function to(string $kind, string|int $value): array
+    public function to(string $kind, string|int $value = ''): array
     {
         return ['from' => BackTarget::token($kind, $value)];
     }
@@ -119,6 +125,13 @@ final class BackLink
         return match ($target->kind) {
             BackTarget::PLAN => $this->plan($target->value, PlanTemplateVoter::VIEW, 'app_plan_template_show', 'Plan'),
             BackTarget::PLAN_EDIT => $this->plan($target->value, PlanTemplateVoter::EDIT, 'app_plan_template_edit', 'Trame'),
+            BackTarget::LOG => [
+                'url' => $this->urlGenerator->generate('app_profile_log'),
+                'kicker' => 'Journal',
+                'name' => null,
+            ],
+            BackTarget::ATHLETE => $this->athlete($target->value, 'app_coach_athlete', 'Athlète'),
+            BackTarget::ATHLETE_LOG => $this->athlete($target->value, 'app_coach_athlete_log', 'Son journal'),
             BackTarget::CAL_WEEK => $this->calendarWeek($target->value),
             BackTarget::CAL_MONTH => $this->calendarMonth($target->value),
             default => null,
@@ -140,6 +153,34 @@ final class BackLink
             'url' => $this->urlGenerator->generate($route, ['id' => $template->getId()]),
             'kicker' => $kicker,
             'name' => $template->getTitle(),
+        ];
+    }
+
+    /**
+     * Retour vers une page d'athlète suivi. Même règle que pour un plan : le
+     * droit se vérifie AVANT le libellé, parce que l'identifiant de l'athlète
+     * est une donnée privée — sans cette garde, un id deviné dans la query
+     * afficherait « ← Athlète marie@… » à n'importe qui.
+     *
+     * La garde est celle des pages visées elles-mêmes : coach accepté de cet
+     * athlète. Un refus se lit comme une absence de jeton, jamais comme une
+     * erreur.
+     *
+     * @return array{url: string, kicker: string, name: string|null}|null
+     */
+    private function athlete(string $id, string $route, string $kicker): ?array
+    {
+        $athlete = $this->userRepository->find((int) $id);
+        $coach = $this->security->getUser();
+
+        if (null === $athlete || !$coach instanceof User || !$this->coachingResolver->isAcceptedCoachOf($coach, $athlete)) {
+            return null;
+        }
+
+        return [
+            'url' => $this->urlGenerator->generate($route, ['id' => $athlete->getId()]),
+            'kicker' => $kicker,
+            'name' => $athlete->getUserIdentifier(),
         ];
     }
 

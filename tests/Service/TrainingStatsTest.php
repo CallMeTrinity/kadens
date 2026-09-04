@@ -174,6 +174,44 @@ final class TrainingStatsTest extends KernelTestCase
     }
 
     /**
+     * Régression : `LoggedExercise.exerciseName` est un instantané, pas une
+     * identité. Renommer un exercice fait coexister deux noms figés pour un
+     * même `exercise_id` ; l'agrégat groupait dessus et rendait deux lignes,
+     * que l'affichage résolvait ensuite au même libellé vivant — d'où « Squat à
+     * la barre » deux fois, avec deux maximums, au classement des charges comme
+     * aux nouveaux records.
+     *
+     * Ici : 2 séries à 100 kg sous l'ancien nom, 2 à 110 sous le nouveau. Une
+     * seule ligne, 4 séries, 2 séances, et le max des deux.
+     */
+    public function testRenamingAnExerciseDoesNotSplitItsRecordLine(): void
+    {
+        $bench = $this->em->getRepository(Exercise::class)->findOneBy(['name' => 'Développé couché']);
+
+        $this->schedule(
+            $this->gymWorkout($bench, 'Haut du corps (après renommage)'),
+            '2026-07-28',
+            ScheduledStatus::DONE,
+            [
+                [SetType::NORMAL, 6, 110.0],
+                [SetType::NORMAL, 6, 110.0],
+            ],
+            null,
+            'Développé couché à la barre',
+        );
+        $this->em->flush();
+
+        $records = $this->stats->over($this->user, StatsPeriod::month(2026, 7))['records'];
+
+        self::assertCount(1, $records['top'], "Un exercice renommé reste un exercice.");
+        self::assertSame('Développé couché', $records['top'][0]['name']);
+        self::assertSame(110.0, $records['top'][0]['weightKg']);
+        self::assertSame(4, $records['top'][0]['workingSets']);
+        self::assertSame(2, $records['top'][0]['sessions']);
+        self::assertCount(1, $records['new'], 'Un record par exercice, pas un par nom porté.');
+    }
+
+    /**
      * La ventilation par région se lit sur les zones de la DÉFINITION en
      * bibliothèque, croisées avec les séries réellement loguées. L'échauffement
      * en est exclu comme partout, la série non chiffrée aussi.
@@ -365,7 +403,7 @@ final class TrainingStatsTest extends KernelTestCase
     /**
      * @param list<array{SetType, int|null, float|null}> $sets
      */
-    private function schedule(Workout $workout, string $date, ScheduledStatus $status, array $sets = [], ?PlanTemplate $plan = null): ScheduledWorkout
+    private function schedule(Workout $workout, string $date, ScheduledStatus $status, array $sets = [], ?PlanTemplate $plan = null, ?string $loggedName = null): ScheduledWorkout
     {
         $scheduled = (new ScheduledWorkout())
             ->setOwner($this->user)
@@ -378,9 +416,14 @@ final class TrainingStatsTest extends KernelTestCase
         }
 
         if ([] !== $sets) {
+            $exercise = $workout->getBlocks()->first()->getPrescribedExercises()->first()->getExercise();
+
+            // Le nom figé se surcharge : c'est ce qui permet de rejouer un
+            // renommage, où deux séances du même exercice ne portent pas le
+            // même instantané.
             $logged = (new LoggedExercise())
-                ->setExerciseName('Développé couché')
-                ->setExercise($workout->getBlocks()->first()->getPrescribedExercises()->first()->getExercise())
+                ->setExerciseName($loggedName ?? $exercise->getName())
+                ->setExercise($exercise)
                 ->setPosition(0);
 
             foreach ($sets as $position => [$type, $reps, $weightKg]) {

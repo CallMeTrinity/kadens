@@ -264,6 +264,14 @@
        gardé par l'attribut LOG — réservé au propriétaire. Personne ne déclare à la
        place de quelqu'un d'autre ce qu'il a soulevé.
 
+       La fiche montre les dix dernières et **dit combien il y en a derrière** :
+       sans ce compte, elle laissait croire que l'athlète n'avait fait que ça. La
+       suite se lit sur le journal, qui est la même liste sur une fenêtre choisie.
+
+       Chaque ligne pose son contexte de retour (`athlete-<id>`) : sans lui, le
+       retour de la séance datée renvoyait le coach à SON calendrier — un lien ne
+       change pas de sujet en silence.
+
        Le bloc-notes privé de l'athlète (`Workout.notes`) n'apparaît ni ici ni
        là-bas : il ne se rend que dans les éditeurs, et pour son seul propriétaire. #}
     <section class="kd-section">
@@ -273,6 +281,11 @@
                 <h2 class="kd-title kd-title--sm">Ce qu'il a fait</h2>
                 <p class="kd-lead">Ses dernières séances consignées série par série. Lecture seule : consigner appartient à l'athlète.</p>
             </div>
+            {% if loggedTotal > 0 %}
+                <a href="{{ path('app_coach_athlete_log', {id: athlete.id}) }}" class="kd-btn kd-btn--ghost">
+                    {{ ux_icon('lucide:history') }} Son journal ({{ loggedTotal }})
+                </a>
+            {% endif %}
         </div>
 
         {% if logged is empty %}
@@ -283,27 +296,28 @@
                 </div>
             </div>
         {% else %}
+            {# La carte est le conteneur, la liste est dedans — comme partout
+               ailleurs (`kd-card` > `kd-coachitems`). Les cumuler sur le même
+               `<ul>` fait perdre à la carte son padding : le reset de liste est
+               déclaré plus loin dans la feuille et l'emporte. #}
             <div class="kd-card kd-section__block">
-                <ul class="kd-coachitems">
-                    {% for row in logged %}
-                        <li class="kd-coachitem">
-                            <span class="kd-coachitem__date">{{ row.scheduled.scheduledDate|date('d/m') }}</span>
-                            <a href="{{ path('app_scheduled_workout_show', {id: row.scheduled.id}) }}"
-                               class="kd-coachitem__name">{{ row.scheduled.displayTitle }}</a>
-                            {% if row.summary %}
-                                <span class="kd-coachitem__meta">
-                                    {{ row.summary.workingSets }} série{{ row.summary.workingSets > 1 ? 's' }}
-                                    {%- if row.summary.tonnageKg > 0 %} · {{ row.summary.tonnageKg|round|number_format(0, ',', ' ') }} kg{% endif -%}
-                                    {%- if row.summary.durationSeconds is not null %} · {{ (row.summary.durationSeconds / 60)|round }} min{% endif -%}
-                                    {%- if row.summary.averageRpe is not null %} · RPE {{ row.summary.averageRpe|number_format(1, ',', ' ') }}{% endif -%}
-                                    {%- if row.summary.skipped %} · {{ row.summary.skipped }} sauté{{ row.summary.skipped > 1 ? 's' }}{% endif -%}
-                                </span>
-                            {% endif %}
-                            <span class="kd-badge kd-badge--{{ row.scheduled.status.value }}">{{ row.scheduled.status.label }}</span>
-                        </li>
+                <ul class="kd-loglist">
+                    {% for entry in logged %}
+                        {{ include('components/_log_entry.html.twig', {
+                            entry: entry, back: back_to('athlete', athlete.id)
+                        }) }}
                     {% endfor %}
                 </ul>
             </div>
+            {% if loggedTotal > logged|length %}
+                <p class="kd-loglist__more">
+                    <a href="{{ path('app_coach_athlete_log', {id: athlete.id}) }}"
+                       class="kd-btn kd-btn--ghost kd-btn--sm">
+                        Voir les {{ loggedTotal }} séances consignées
+                        {{ ux_icon('lucide:arrow-right') }}
+                    </a>
+                </p>
+            {% endif %}
         {% endif %}
     </section>
 

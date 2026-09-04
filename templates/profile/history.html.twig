@@ -34,6 +34,7 @@
 {% block body %}
     {% set subject = subject|default(null) %}
     {% set statsPath = subject ? path('app_coach_athlete_stats', {id: subject.id}) : path('app_profile_stats') %}
+    {% set logPath = subject ? path('app_coach_athlete_log', {id: subject.id}) : path('app_profile_log') %}
     {% set backPath = subject ? path('app_coach_athlete', {id: subject.id}) : path('app_profile') %}
     {% set years = history.years %}
 
@@ -57,7 +58,10 @@
             {% endif %}
         </div>
         <div class="kd-actionbar__end">
-            <a href="{{ statsPath }}" class="kd-btn kd-btn--secondary">
+            <a href="{{ logPath }}" class="kd-btn kd-btn--secondary">
+                {{ ux_icon('lucide:clipboard-list') }} Journal
+            </a>
+            <a href="{{ statsPath }}" class="kd-btn kd-btn--ghost">
                 {{ ux_icon('lucide:chart-column') }} Statistiques
             </a>
             <a href="{{ backPath }}" class="kd-btn kd-btn--ghost">

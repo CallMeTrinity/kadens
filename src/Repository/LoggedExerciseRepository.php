@@ -72,4 +72,50 @@ class LoggedExerciseRepository extends ServiceEntityRepository
 
         return $usage;
     }
+
+    /**
+     * Ce que chaque séance datée a porté d'exercices : combien réellement faits,
+     * combien sautés. Complète l'agrégat de séries de `LoggedSetRepository` pour
+     * écrire une ligne de journal (`TrainingLog`).
+     *
+     * Le saut est une **information**, pas du volume : il ne gonfle pas le compte
+     * d'exercices et se dit à part, exactement comme dans `LogMetrics::summary()`.
+     *
+     * Une requête d'agrégat, aucune entité hydratée, quelle que soit la fenêtre.
+     *
+     * @return array<int, array{exercises: int, skipped: int}> indexé par identifiant de séance datée
+     */
+    public function countsByScheduledForOwner(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
+    {
+        $qb = $this->createQueryBuilder('le')
+            ->select(
+                's.id AS scheduledId',
+                'SUM(CASE WHEN le.skipped = false THEN 1 ELSE 0 END) AS done',
+                'SUM(CASE WHEN le.skipped = true THEN 1 ELSE 0 END) AS skipped',
+            )
+            ->join('le.scheduledWorkout', 's')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('owner', $owner)
+            ->groupBy('s.id');
+
+        if (null !== $start) {
+            $qb->andWhere('s.scheduledDate >= :windowStart')
+                ->setParameter('windowStart', $start, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE);
+        }
+
+        if (null !== $end) {
+            $qb->andWhere('s.scheduledDate <= :windowEnd')
+                ->setParameter('windowEnd', $end, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE);
+        }
+
+        $counts = [];
+        foreach ($qb->getQuery()->getArrayResult() as $row) {
+            $counts[(int) $row['scheduledId']] = [
+                'exercises' => (int) $row['done'],
+                'skipped' => (int) $row['skipped'],
+            ];
+        }
+
+        return $counts;
+    }
 }

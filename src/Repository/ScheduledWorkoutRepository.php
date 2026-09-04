@@ -7,6 +7,7 @@ use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Enum\ActivityType;
+use App\Enum\ScheduledStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
@@ -594,56 +595,111 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     }
 
     /**
-     * Les `limit` dernières séances datées d'un utilisateur qui portent
-     * réellement du réalisé, avec tout ce réalisé joint. Alimente la fiche
-     * athlète du coach (KL-45), qui lit ce que son athlète a fait.
+     * Les séances datées d'un utilisateur qui portent réellement du réalisé, en
+     * **projection scalaire** : de quoi écrire une ligne de journal (date, titre,
+     * statut, bornes d'exécution), rien de plus. Alimente `TrainingLog`, donc la
+     * fiche athlète du coach (KL-45) comme le journal complet.
      *
-     * **Deux requêtes, et la première borne.** Une jointure de collection et un
-     * `setMaxResults` ne se combinent pas : la limite porterait sur les lignes
-     * hydratées, donc sur des séries, et rendrait un nombre imprévisible de
-     * séances. On borne donc d'abord les séances (lignes distinctes), puis on lit
-     * le réalisé de celles-là seulement.
+     * **Aucune entité hydratée, une requête, quelle que soit la fenêtre.** C'est
+     * ce qui permet à « depuis le début » de tenir : le résultat grossit en
+     * nombre de séances, jamais en nombre de séries. L'ancienne lecture
+     * fetch-joignait tout le réalisé pour que `LogMetrics` le somme en PHP — elle
+     * ne tenait que parce qu'elle était bornée à dix lignes.
      *
      * Le filtre est l'existence d'un `LoggedExercise`, pas le statut : une séance
      * simplement cochée « faite » n'a rien à montrer ici, et une séance encore
      * `PLANNED` dont la synchro a déjà déposé des séries en a.
      *
-     * @return list<ScheduledWorkout>
+     * Le titre revient en deux colonnes plutôt qu'en une : `getDisplayTitle()`
+     * est une règle de l'entité (séance de bibliothèque, sinon titre propre,
+     * sinon « Séance libre ») et c'est l'appelant qui la rejoue, pas le SQL.
+     *
+     * Les bornes sont facultatives et indépendantes, comme partout dans les
+     * statistiques ; `limit` borne le nombre de séances (lignes distinctes, donc
+     * la limite veut bien dire ce qu'elle dit).
+     *
+     * @return list<array{id: int, date: \DateTimeImmutable, workoutTitle: string|null, ownTitle: string|null, status: ScheduledStatus, startedAt: \DateTimeImmutable|null, endedAt: \DateTimeImmutable|null}>
      */
-    public function findRecentLoggedForOwner(User $owner, int $limit): array
+    public function findLoggedRowsForOwner(User $owner, ?\DateTimeImmutable $start = null, ?\DateTimeImmutable $end = null, ?int $limit = null): array
     {
-        if ($limit < 1) {
+        if (null !== $limit && $limit < 1) {
             return [];
         }
 
-        $sessions = $this->createQueryBuilder('s')
-            ->select('DISTINCT s.id AS id', 's.scheduledDate AS date')
+        $qb = $this->createQueryBuilder('s')
+            ->select(
+                'DISTINCT s.id AS id',
+                's.scheduledDate AS date',
+                'w.title AS workoutTitle',
+                's.title AS ownTitle',
+                's.status AS status',
+                's.startedAt AS startedAt',
+                's.endedAt AS endedAt',
+            )
             ->join('s.loggedExercises', 'le')
+            ->leftJoin('s.workout', 'w')
             ->andWhere('s.owner = :owner')
             ->setParameter('owner', $owner)
             ->orderBy('s.scheduledDate', 'DESC')
-            ->addOrderBy('s.id', 'DESC')
-            ->setMaxResults($limit)
-            ->getQuery()
-            ->getArrayResult();
+            ->addOrderBy('s.id', 'DESC');
 
-        if ([] === $sessions) {
-            return [];
+        if (null !== $start) {
+            $qb->andWhere('s.scheduledDate >= :windowStart')
+                ->setParameter('windowStart', $start, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE);
         }
 
-        return $this->createQueryBuilder('s')
-            // `le.exercise` est joint parce que LogMetrics lit les zones
-            // travaillées de la définition : sans lui, un N+1 par exercice.
-            ->addSelect('le', 'ls', 'e')
-            ->leftJoin('s.loggedExercises', 'le')
-            ->leftJoin('le.loggedSets', 'ls')
-            ->leftJoin('le.exercise', 'e')
-            ->andWhere('s.id IN (:sessions)')
-            ->setParameter('sessions', array_map(static fn (array $row): int => (int) $row['id'], $sessions))
-            ->orderBy('s.scheduledDate', 'DESC')
-            ->addOrderBy('s.id', 'DESC')
+        if (null !== $end) {
+            $qb->andWhere('s.scheduledDate <= :windowEnd')
+                ->setParameter('windowEnd', $end, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE);
+        }
+
+        if (null !== $limit) {
+            $qb->setMaxResults($limit);
+        }
+
+        return array_map(static fn (array $row): array => [
+            'id' => (int) $row['id'],
+            'date' => self::asDate($row['date']),
+            'workoutTitle' => $row['workoutTitle'],
+            'ownTitle' => $row['ownTitle'],
+            'status' => $row['status'] instanceof ScheduledStatus
+                ? $row['status']
+                : ScheduledStatus::from((string) $row['status']),
+            'startedAt' => self::asDate($row['startedAt']),
+            'endedAt' => self::asDate($row['endedAt']),
+        ], $qb->getQuery()->getArrayResult());
+    }
+
+    /**
+     * Le nombre de séances consignées d'un utilisateur, toutes fenêtres
+     * confondues. Un COUNT, pas un `count()` sur des lignes remontées : c'est ce
+     * qui permet à la fiche du coach de dire « les 10 dernières **sur 214** »
+     * sans lire les 214.
+     */
+    public function countLoggedForOwner(User $owner): int
+    {
+        return (int) $this->createQueryBuilder('s')
+            ->select('COUNT(DISTINCT s.id)')
+            ->join('s.loggedExercises', 'le')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('owner', $owner)
             ->getQuery()
-            ->getResult();
+            ->getSingleScalarResult();
+    }
+
+    /**
+     * Doctrine rend les dates en objet ou en chaîne selon le driver et le type
+     * de la colonne : les projections scalaires passent toutes par ici plutôt
+     * que de re-tester la forme à chaque champ.
+     */
+    private static function asDate(mixed $value): ?\DateTimeImmutable
+    {
+        return match (true) {
+            null === $value => null,
+            $value instanceof \DateTimeImmutable => $value,
+            $value instanceof \DateTimeInterface => \DateTimeImmutable::createFromInterface($value),
+            default => new \DateTimeImmutable((string) $value),
+        };
     }
 
     /**

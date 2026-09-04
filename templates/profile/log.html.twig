@@ -1,0 +1,105 @@
+{% extends 'base.html.twig' %}
+
+{# Journal du RÉALISÉ : les séances consignées d'une fenêtre, la plus récente
+   d'abord, chacune résumée en une ligne cliquable.
+
+   Elle répond à une question que les deux autres pages de lecture ne posaient
+   pas. `/profile/stats` AGRÈGE (« combien de tonnage sur six mois »),
+   `/profile/history` SITUE (un calendrier, sans chiffres) ; ici on PARCOURT les
+   séances une à une avec ce que chacune a pesé. C'est la sortie de la fiche
+   athlète du coach, qui n'en montre que les dix dernières.
+
+   Trois choses à ne pas défaire :
+
+   1. **Le template ne calcule rien.** `TrainingLog` livre des lignes déjà
+      résumées ; ici on met en forme, on groupe par mois, c'est tout. Même règle
+      que les statistiques et l'historique.
+
+   2. **La fenêtre est celle des statistiques** (`StatsPeriod`), et le sélecteur
+      est le même composant. Il n'y a qu'une façon de dire « quatre semaines »
+      dans l'app, et un lien vers une fenêtre se partage.
+
+   3. **`subject` = l'athlète regardé, ou null pour soi.** `TrainingLog` prend
+      n'importe quel `User` : même page, servie par `CoachController::athleteLog`.
+      Tout ce qui dépend du lecteur (titre, destinations, jeton de retour posé
+      sur chaque ligne) est calculé en tête de `body` — un lien interne oublié
+      renverrait le coach sur ses propres données au clic suivant. #}
+
+{% block title %}Journal{% if subject|default(null) %} — {{ subject.userIdentifier }}{% endif %} — Kadens{% endblock %}
+
+{% block body %}
+    {% set subject = subject|default(null) %}
+    {% set statsPath = subject ? path('app_coach_athlete_stats', {id: subject.id}) : path('app_profile_stats') %}
+    {% set historyPath = subject ? path('app_coach_athlete_history', {id: subject.id}) : path('app_profile_history') %}
+    {% set backPath = subject ? path('app_coach_athlete', {id: subject.id}) : path('app_profile') %}
+    {# Le contexte posé sur chaque ligne : d'ici, une séance ouverte revient ICI,
+       pas au calendrier du lecteur — qui, pour un coach, n'est même pas le sien. #}
+    {% set back = subject ? back_to('athlete-log', subject.id) : back_to('log') %}
+
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow kd-eyebrow--accent">Journal</p>
+            <h1 class="kd-title">{{ subject ? 'Ce qui a été consigné' : 'Ce que tu as consigné' }}</h1>
+            <p class="kd-pagehead__lead">
+                {%- if subject %}{{ subject.userIdentifier }} · {% endif -%}
+                {{ period.label }} ·
+                {{ sessions }} séance{{ sessions > 1 ? 's' }} consignée{{ sessions > 1 ? 's' }}
+                {%- if total > sessions %} · {{ total }} au total{% endif -%}
+            </p>
+        </div>
+        <div class="kd-actionbar__end">
+            <a href="{{ statsPath }}" class="kd-btn kd-btn--secondary">
+                {{ ux_icon('lucide:chart-column') }} Statistiques
+            </a>
+            <a href="{{ historyPath }}" class="kd-btn kd-btn--ghost">
+                {{ ux_icon('lucide:history') }} Historique
+            </a>
+            <a href="{{ backPath }}" class="kd-btn kd-btn--ghost">
+                {{ ux_icon('lucide:arrow-left') }} {{ subject ? 'Retour à sa fiche' : 'Retour au profil' }}
+            </a>
+        </div>
+    </div>
+
+    {{ include('profile/_stats_range.html.twig', {
+        period: period, ranges: ranges, months: months, subject: subject,
+        route: subject ? 'app_coach_athlete_log' : 'app_profile_log'
+    }) }}
+
+    {% if groups is empty %}
+        <div class="kd-empty kd-section__block">
+            {{ ux_icon('lucide:history') }}
+            <div>Aucune séance consignée sur cette fenêtre.</div>
+            <p class="kd-empty__hint">
+                {{- total > 0
+                    ? 'Élargis la fenêtre : il y a ' ~ total ~ ' séance' ~ (total > 1 ? 's') ~ ' consignée' ~ (total > 1 ? 's') ~ ' au total.'
+                    : 'Le détail série par série remonte du téléphone, une fois la séance terminée.' -}}
+            </p>
+        </div>
+    {% else %}
+        {# Un mois, son sous-total, ses séances. Les deux viennent déjà calculés
+           de TrainingLog : le mois est une rupture de lecture, pas un regroupement
+           refait ici. #}
+        {% for group in groups %}
+            <section class="kd-section kd-loggroup">
+                <div class="kd-loggroup__head">
+                    <h2 class="kd-title kd-title--sm">{{ group.label }}</h2>
+                    <p class="kd-loggroup__totals">
+                        {{- group.sessions }} séance{{ group.sessions > 1 ? 's' }}
+                        {%- if group.workingSets > 0 %} · {{ group.workingSets }} série{{ group.workingSets > 1 ? 's' }}{% endif -%}
+                        {%- if group.tonnageKg > 0 %} · {{ group.tonnageKg|round|number_format(0, ',', ' ') }} kg{% endif -%}
+                    </p>
+                </div>
+                {# La carte enveloppe la liste, elle ne se confond pas avec elle :
+                   `kd-card` et `kd-loglist` sur le même élément se battent pour
+                   `padding`, et le reset de liste gagne. #}
+                <div class="kd-card kd-section__block">
+                    <ul class="kd-loglist">
+                        {% for entry in group.entries %}
+                            {{ include('components/_log_entry.html.twig', {entry: entry, back: back}) }}
+                        {% endfor %}
+                    </ul>
+                </div>
+            </section>
+        {% endfor %}
+    {% endif %}
+{% endblock %}

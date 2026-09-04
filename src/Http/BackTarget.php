@@ -36,6 +36,9 @@ final class BackTarget
     public const PLAN_EDIT = 'plan-edit';
     public const CAL_WEEK = 'cal-week';
     public const CAL_MONTH = 'cal-month';
+    public const LOG = 'log';
+    public const ATHLETE = 'athlete';
+    public const ATHLETE_LOG = 'athlete-log';
 
     private function __construct(
         public readonly string $kind,
@@ -59,6 +62,17 @@ final class BackTarget
             return new self($m[1], $m[2]);
         }
 
+        // Même précaution d'ordre que ci-dessus : `athlete-log` avant `athlete`.
+        if (1 === preg_match('/^(athlete-log|athlete)-(\d+)$/', $raw, $m)) {
+            return new self($m[1], $m[2]);
+        }
+
+        // Le journal de son propre réalisé n'a pas d'identifiant : il n'y en a
+        // qu'un, celui du lecteur. Le jeton est donc le type seul.
+        if (self::LOG === $raw) {
+            return new self(self::LOG, '');
+        }
+
         if (1 === preg_match('/^cal-week-(\d{4}-\d{2}-\d{2})$/', $raw, $m)) {
             return self::isRealDate($m[1], 'Y-m-d') ? new self(self::CAL_WEEK, $m[1]) : null;
         }
@@ -74,9 +88,12 @@ final class BackTarget
      * Fabrique le jeton d'un contexte. Seul endroit qui connaît le format :
      * un template qui écrirait `'plan-' ~ id` à la main le figerait ici.
      */
-    public static function token(string $kind, string|int $value): string
+    public static function token(string $kind, string|int $value = ''): string
     {
-        return $kind.'-'.$value;
+        // Un contexte sans identifiant (le journal de son propre réalisé : il
+        // n'y en a qu'un) est le type nu, pas un type suivi d'un tiret orphelin
+        // — que `parse()` rejetterait.
+        return '' === (string) $value ? $kind : $kind.'-'.$value;
     }
 
     /**
