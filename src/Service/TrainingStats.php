@@ -524,15 +524,19 @@ final class TrainingStats
             $row['name'],
         );
 
-        $lifted = array_values(array_filter(
+        // Nommé à part des définitions : `$lifted` porte les Exercise, `$ranked`
+        // les lignes d'agrégat. Les confondre marcherait par accident (la
+        // fonction fléchée capture par valeur) et casserait au premier
+        // refactor.
+        $ranked = array_values(array_filter(
             $byExercise,
-            static fn(array $row): bool => null !== $row['topWeightKg'] && $row['topWeightKg'] > 0,
+            static fn (array $row): bool => null !== $row['topWeightKg'] && $row['topWeightKg'] > 0,
         ));
 
-        usort($lifted, static fn(array $a, array $b): int => $b['topWeightKg'] <=> $a['topWeightKg']);
+        usort($ranked, static fn (array $a, array $b): int => $b['topWeightKg'] <=> $a['topWeightKg']);
 
         $top = [];
-        foreach (\array_slice($lifted, 0, self::TOP_LIFTS) as $row) {
+        foreach (\array_slice($ranked, 0, self::TOP_LIFTS) as $row) {
             $top[] = [
                 'name' => $label($row),
                 'weightKg' => $row['topWeightKg'],
@@ -550,7 +554,7 @@ final class TrainingStats
         $previous = $this->loggedSets->maxWeightByExerciseBefore($user, $start);
 
         $new = [];
-        foreach ($lifted as $row) {
+        foreach ($ranked as $row) {
             $id = $row['exerciseId'];
             // Un exercice jamais chargé avant la fenêtre n'a rien à battre :
             // sa première charge est une première, pas un record.

@@ -267,10 +267,20 @@ class LoggedSetRepository extends ServiceEntityRepository
      * groupe musculaire (l'appelant croise `exerciseId` avec les `targetAreas`
      * de la bibliothèque) et le classement des charges de la fenêtre.
      *
-     * Le regroupement porte sur l'identifiant **et** le nom figé : un
-     * `LoggedExercise` dont la définition a été supprimée (SET NULL) n'a plus
-     * que son nom, et l'écarter ferait disparaître du volume réellement
-     * soulevé. L'appelant replie les lignes de même exercice.
+     * **Le regroupement porte sur l'identité, pas sur le libellé.**
+     * `LoggedExercise.exerciseName` est un instantané pris pendant la séance :
+     * renommer un exercice fait donc coexister plusieurs noms figés pour un
+     * même `exercise_id`. Grouper sur le nom scindait l'exercice en autant de
+     * lignes qu'il a porté de noms — et comme l'affichage résout le libellé
+     * VIVANT, le classement des charges montrait deux fois « Squat à la barre »
+     * avec deux maximums différents.
+     *
+     * Le nom figé reste sélectionné (`MAX()`, un représentant qui ne départage
+     * rien) parce qu'il est l'ultime repli : un `LoggedExercise` dont la
+     * définition a été supprimée (SET NULL) n'a plus que lui. Ces orphelins
+     * sont les seuls à se regrouper par nom — c'est leur seule identité
+     * restante — d'où le `CASE` en clé de groupe secondaire, vide (donc neutre)
+     * dès que l'exercice existe encore.
      *
      * @return list<array{exerciseId: int|null, name: string, workingSets: int, tonnageKg: float, topWeightKg: float|null, sessions: int}>
      */
@@ -279,14 +289,15 @@ class LoggedSetRepository extends ServiceEntityRepository
         $qb = $this->workingSetWindow($owner, $start, $end)
             ->select(
                 'IDENTITY(le.exercise) AS exerciseId',
-                'le.exerciseName AS name',
+                'MAX(le.exerciseName) AS name',
                 'COUNT(ls.id) AS workingSets',
                 'SUM(CASE WHEN ls.reps IS NOT NULL AND ls.weightKg IS NOT NULL THEN ls.reps * ls.weightKg ELSE 0 END) AS tonnage',
                 'MAX(ls.weightKg) AS topWeight',
                 'COUNT(DISTINCT s.id) AS sessions',
+                "CASE WHEN le.exercise IS NULL THEN le.exerciseName ELSE '' END AS HIDDEN orphanName",
             )
             ->groupBy('exerciseId')
-            ->addGroupBy('le.exerciseName')
+            ->addGroupBy('orphanName')
             ->orderBy('workingSets', 'DESC');
 
         return array_map(static fn (array $row): array => [
