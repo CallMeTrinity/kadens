@@ -50,6 +50,18 @@ final class ExportDesignTokensCommand extends Command
     /** Préfixe des primitives ; tout le reste est un token sémantique. */
     private const string PRIMITIVE_PREFIX = '--kd-';
 
+    /** Préfixe des tokens de couleur — les seuls que le jeu sombre redéclare. */
+    private const string COLOR_PREFIX = '--color-';
+
+    /**
+     * Le sélecteur du jeu sombre.
+     *
+     * Il n'est posé nulle part dans les gabarits, et c'est le point : le second
+     * jeu existe pour le mobile, le site n'en veut pas. Un test le vérifie
+     * plutôt que de le promettre en commentaire.
+     */
+    private const string DARK_SELECTOR = '[data-theme="dark"]';
+
     public function __construct(
         #[Autowire('%kernel.project_dir%')]
         private readonly string $projectDir,
@@ -101,9 +113,10 @@ final class ExportDesignTokensCommand extends Command
 
         $decoded = json_decode($json, true);
         $io->success(sprintf(
-            '%d primitives et %d tokens sémantiques écrits dans %s.',
+            '%d primitives, %d tokens sémantiques et 2 jeux de %d couleurs écrits dans %s.',
             \count($decoded['primitives']),
             \count($decoded['semantic']),
+            \count($decoded['themes']['light']),
             $input->getOption('output'),
         ));
 
@@ -134,15 +147,112 @@ final class ExportDesignTokensCommand extends Command
             }
         }
 
+        // Le jeu clair est résolu d'abord, et ce n'est pas un détail d'ordre :
+        // une référence morte ou un cycle doivent se dire avec leurs mots à eux,
+        // pas être masqués par « il manque un bloc sombre ».
+        $night = self::declarations($css, self::DARK_SELECTOR);
+
+        self::assertDarkMirrorsLight($raw, $night);
+
         return json_encode(
             [
                 'generator' => 'app:tokens:export',
                 'source' => self::SOURCE,
                 'primitives' => $primitives,
                 'semantic' => $semantic,
+                // Les deux jeux complets, indexés par leur nom. `semantic` garde
+                // exactement son sens — le jeu clair, dans l'ordre du fichier —
+                // pour qu'un client qui ignore cette clé continue de marcher. Le
+                // recoupement des ~2 ko qui en découle est assumé : le client
+                // itère alors deux jeux de la même forme au lieu d'aller
+                // chercher le clair ailleurs.
+                'themes' => [
+                    'light' => self::colorsOf($raw, $raw),
+                    // Le jeu sombre se résout contre le dictionnaire clair
+                    // SURCHARGÉ de ses propres déclarations : c'est ce que ferait
+                    // la cascade. Résoudre contre le seul bloc sombre laisserait
+                    // sans réponse les primitives qu'il ne redéclare pas — le
+                    // rouge d'accent, par exemple, qu'il cite exprès.
+                    'dark' => self::colorsOf($night, [...$raw, ...$night]),
+                ],
             ],
             \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE,
         )."\n";
+    }
+
+    /**
+     * Les tokens de couleur d'un jeu, résolus contre la portée donnée.
+     *
+     * @param array<string, string> $names les déclarations dont on veut la valeur
+     * @param array<string, string> $scope le dictionnaire où les `var()` se résolvent
+     *
+     * @return array<string, string>
+     */
+    private static function colorsOf(array $names, array $scope): array
+    {
+        $colors = [];
+
+        foreach (array_keys($names) as $name) {
+            if (str_starts_with($name, self::COLOR_PREFIX)) {
+                $colors[$name] = self::resolve($name, $scope);
+            }
+        }
+
+        return $colors;
+    }
+
+    /**
+     * Les trois gardes du jeu sombre, dans l'ordre de ce qu'elles coûtent quand
+     * elles manquent.
+     *
+     * 1. **Il ne redéclare que des couleurs.** Une police ou un espacement dans
+     *    ce bloc n'aurait de sens ni pour le mobile, qui n'a qu'une échelle, ni
+     *    pour le web, qui ne pose jamais le sélecteur.
+     * 2. **Il n'invente aucun nom.** Un `--color-` qui n'existe pas au jour est
+     *    une faute de frappe, et elle se verrait sur un téléphone plutôt qu'ici.
+     * 3. **Il n'en oublie aucun.** C'est celle qui vaut le plus cher : un token
+     *    de couleur ajouté dans six mois partirait sinon avec sa valeur papier
+     *    sur un écran nuit, sans que rien ne le signale.
+     *
+     * @param array<string, string> $light
+     * @param array<string, string> $dark
+     */
+    private static function assertDarkMirrorsLight(array $light, array $dark): void
+    {
+        $foreign = array_filter(
+            array_keys($dark),
+            static fn (string $name): bool => !str_starts_with($name, self::COLOR_PREFIX),
+        );
+
+        if ([] !== $foreign) {
+            throw new \RuntimeException(sprintf(
+                'Le jeu sombre ne redéclare que des couleurs ; il déclare aussi : %s.',
+                implode(', ', $foreign),
+            ));
+        }
+
+        $expected = array_filter(
+            array_keys($light),
+            static fn (string $name): bool => str_starts_with($name, self::COLOR_PREFIX),
+        );
+
+        $unknown = array_diff(array_keys($dark), $expected);
+
+        if ([] !== $unknown) {
+            throw new \RuntimeException(sprintf(
+                'Le jeu sombre déclare des tokens inconnus du jeu clair : %s.',
+                implode(', ', $unknown),
+            ));
+        }
+
+        $missing = array_diff($expected, array_keys($dark));
+
+        if ([] !== $missing) {
+            throw new \RuntimeException(sprintf(
+                'Le jeu sombre ne dit rien de : %s.',
+                implode(', ', $missing),
+            ));
+        }
     }
 
     /**
@@ -156,12 +266,16 @@ final class ExportDesignTokensCommand extends Command
      *
      * @return array<string, string>
      */
-    private static function declarations(string $css): array
+    private static function declarations(string $css, string $selector = ':root'): array
     {
         // Les commentaires citent des noms de tokens (« --kd-cat-*, --kd-chart-* »).
         $css = (string) preg_replace('#/\*.*?\*/#s', '', $css);
 
-        preg_match_all('/:root\s*\{([^}]*)\}/', $css, $blocks);
+        preg_match_all(
+            sprintf('/%s\s*\{([^}]*)\}/', preg_quote($selector, '/')),
+            $css,
+            $blocks,
+        );
 
         $declarations = [];
 
@@ -174,7 +288,10 @@ final class ExportDesignTokensCommand extends Command
         }
 
         if ([] === $declarations) {
-            throw new \RuntimeException('Aucune propriété personnalisée trouvée dans le bloc :root.');
+            throw new \RuntimeException(sprintf(
+                'Aucune propriété personnalisée trouvée dans le bloc %s.',
+                $selector,
+            ));
         }
 
         return $declarations;

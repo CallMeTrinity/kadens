@@ -362,7 +362,14 @@ Règles non négociables :
 5. Polices (Barlow Condensed / Barlow / IBM Plex Mono) **self-hostées**,
    régénérées par [`tools/fetch-fonts.sh`](./tools/fetch-fonts.sh) —
    `assets/styles/fonts.css` est généré, ne jamais l'éditer à la main.
-6. **Trois points de rupture, et rien d'autre : 560 / 900 / 1200.** Ils ne
+6. **Un token de couleur se déclare deux fois.** `tokens.css` porte un second
+   jeu, sous `[data-theme="dark"]`, que le **site n'active jamais** : il existe
+   pour le mobile, qui a un réglage de thème et un écran qu'on regarde une heure
+   en salle. `app:tokens:export` refuse de publier un `--color-*` qui ne serait
+   déclaré que d'un côté — sans quoi un token ajouté partirait avec sa valeur
+   papier sur un écran nuit, sans rien signaler. Règle de dérivation, table des
+   tokens immobiles et plancher AA : `docs/design-system.md` §10.
+7. **Trois points de rupture, et rien d'autre : 560 / 900 / 1200.** Ils ne
    peuvent pas être tokenisés (`@media` n'accepte pas `var()`, et il n'y a pas
    de build CSS) : c'est une convention documentée à tenir à la main.
 

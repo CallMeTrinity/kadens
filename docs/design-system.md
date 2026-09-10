@@ -561,8 +561,8 @@ tokens lui sont donc **publiés**, jamais recopiés :
 php bin/console app:tokens:export   →   public/design-tokens.json
 ```
 
-La commande lit `tokens.css`, résout les `var()` et rend deux objets,
-`primitives` et `semantic`, dans l'ordre du fichier. Trois choses à savoir :
+La commande lit `tokens.css`, résout les `var()` et rend `primitives`,
+`semantic` et `themes` (§10), dans l'ordre du fichier. Trois choses à savoir :
 
 - Elle **ne traduit pas**. Une pile de polices reste une pile de polices,
   `--color-scrim` reste un `color-mix()`. L'adaptation aux API natives vit dans
@@ -572,8 +572,9 @@ La commande lit `tokens.css`, résout les `var()` et rend deux objets,
   la main, relancer la commande. `ExportDesignTokensCommandTest` compare le
   fichier versionné à ce que la feuille produit et échoue à la moindre
   divergence.
-- Seuls les blocs `:root` sont lus. Une propriété personnalisée posée sur un
-  sélecteur de composant est une variable locale, pas un token.
+- Seuls les blocs `:root` et `[data-theme="dark"]` sont lus. Une propriété
+  personnalisée posée sur un sélecteur de composant est une variable locale, pas
+  un token.
 
 Les polices suivent le même canal : `tools/fetch-fonts.sh` dépose les `.ttf`
 dans `public/fonts/` (cf. §3).
@@ -588,3 +589,67 @@ sémantiques doit être classée côté mobile avant d'y arriver, et un rayon ou
 ombre non nuls demandent une décision explicite (ils sont vérifiés, pas
 recopiés). L'échelle typographique, elle, n'est pas tokenisée ici : le mobile la
 transpose à la main depuis §3.
+
+---
+
+## 10. Jeu sombre (mobile)
+
+Le mobile a **deux papiers**, le site un seul. Les deux sortent de `tokens.css`.
+
+### Pourquoi il existe, et pourquoi le site ne l'adopte pas
+
+Une séance dure une heure, écran allumé, dans une salle souvent mal éclairée :
+c'est le seul contexte de tout Kadens où la question se pose. Le site, lui, se
+consulte assis, et l'identité Presse y est du papier — le lui retirer coûterait
+une revue de chaque vue pour un besoin que personne n'a exprimé.
+
+Le jeu sombre vit donc sous `[data-theme="dark"]`, un sélecteur qu'**aucun
+gabarit ne pose** (`ExportDesignTokensCommandTest` le vérifie par un balayage de
+`templates/`, `assets/` et `src/`). Le rendu du site est identique au pixel près.
+Le jour où le web voudra le mode sombre, il posera l'attribut : il n'y aura rien
+à redéfinir.
+
+### La règle de dérivation
+
+**Ce qui porte du sens ne bouge pas, ce qui porte de la profondeur s'inverse.**
+
+Huit tokens sont donc identiques dans les deux jeux, et leur immobilité est une
+décision, pas un oubli :
+
+| Token | Pourquoi |
+|---|---|
+| `--color-primary` | Le rouge veut dire la même chose sur les deux papiers, et il tient ses 3:1 sur la page nuit. |
+| `--color-primary-hover` | Le blanc dessus reste à 7,4:1. L'éclaircir aurait fait passer le libellé du seul bouton qu'on tape sans regarder sous AA. |
+| `--color-primary-bright` | Même famille. |
+| `--color-on-primary` | Blanc sur l'accent : 4,98:1, inchangé. |
+| `--color-set-failure`, `--color-set-dropset` | L'axe rouge des pastilles de série, c'est l'accent. |
+| `--color-status-missed` | L'accent, encore. |
+| `--color-status-planned` | Gris médian : il tient des deux côtés comme objet graphique. |
+
+Le reste s'inverse, et trois familles demandent plus qu'une inversion mécanique :
+
+- **L'aplat encre** (`--color-surface-ink` et sa suite). Le token ne dit pas
+  « noir », il dit « la surface de contraste maximal contre la page » : de nuit
+  c'est un aplat **clair**, et `--color-on-ink` devient l'encre.
+- **L'échelle catégorielle** (`--color-cat-1..4`). Son ordre s'inverse aussi :
+  « du plus dense au plus clair » se mesure au contraste avec la page, donc le
+  plus dense est le presque-blanc.
+- **Les deux rouges qui écrivent** échangent leur rôle. `--color-primary-on-tint`
+  était le rouge foncé ; il tombe à 2,5:1 sur la page nuit, et c'est
+  `--kd-accent-on-ink` (`#f0544c`, commenté « accent lisible sur fond encre »)
+  qui prend sa place. `--color-primary-on-ink` fait le trajet inverse.
+
+Deux valeurs ont dû être choisies plutôt que dérivées : le vert du statut
+« fait » (`#006d14` tombe à 2,9:1 sur une surface nuit) et les cinq teintes de
+groupe musculaire, qui devaient remonter en luminosité **en gardant leur écart
+mutuel** — une pastille de 6 px ne porte que ça.
+
+### Le plancher AA vaut sur les deux papiers
+
+`kadens-mobile/src/theme/__tests__/contrast.test.ts` parcourt sa table de couples
+encre/fond **deux fois**, une par jeu. Un token dont la validité dépendrait du
+thème serait un piège pire que celui dont la validité dépend du fond.
+
+Corollaire pour qui ajoute un token de couleur : **le déclarer dans les deux
+blocs**. `app:tokens:export` échoue sinon, avant même que le mobile en entende
+parler.

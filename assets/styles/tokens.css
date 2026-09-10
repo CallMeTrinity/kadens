@@ -192,6 +192,108 @@
   --kd-tracking-eyebrow-xl: .16em;
 
   /* ------------------------------------------------------------------------
+     1 bis. PRIMITIVES NUIT — le second papier, pour le mobile
+
+     LE SITE NE LES CONSOMME JAMAIS. Aucun `--color-*` du bloc `:root` ne les
+     cite : elles ne sont référencées que depuis `[data-theme="dark"]`, plus
+     bas, et cet attribut n'est posé nulle part dans `templates/`. Le rendu du
+     site est donc identique au pixel près, et un test le vérifie.
+
+     Elles existent pour l'app mobile, qui a un réglage de thème et un écran
+     qu'on regarde une heure durant dans une salle mal éclairée.
+
+     Règle de dérivation, en une phrase : CE QUI PORTE DU SENS NE BOUGE PAS,
+     CE QUI PORTE DE LA PROFONDEUR S'INVERSE. Le rouge veut dire la même chose
+     sur les deux papiers ; les neutres, l'aplat encre et l'échelle
+     catégorielle se retournent. Détail et table des immobiles :
+     docs/design-system.md §10.
+     ------------------------------------------------------------------------ */
+
+  /* Neutres nuit. La profondeur s'inverse dans son inversion : plus une surface
+     est haute, plus elle est CLAIRE ici, là où le papier la voulait plus pâle
+     que la page. */
+  --kd-night-page:        #101010;
+  --kd-night-paper-50:    #191918;
+  --kd-night-paper-0:     #1f1f1e;
+  --kd-night-paper-100:   #1b1b1a;
+  --kd-night-paper-150:   #292928;
+  --kd-night-paper-200:   #333331;
+  --kd-night-paper-hover: #242423;
+
+  /* Encre nuit. Mesurées sur --kd-night-paper-0, comme les encres du jour le
+     sont sur le blanc. */
+  --kd-night-ink-900:     #ededea; /* texte principal        — 14.1:1 */
+  --kd-night-ink-800:     #dcdad6; /* texte fort            — 11.8:1 */
+  --kd-night-ink-700:     #c9c7c2;
+  --kd-night-ink-500:     #b0aea8;
+  --kd-night-ink-muted:   #a3a19a; /* texte secondaire       — 6.4:1 */
+  --kd-night-ink-soft:    #94928b; /* texte tertiaire        — 5.3:1 */
+  --kd-night-ink-placeholder: #8a887f;
+  /* Sous AA sur la page nuit (3.8:1), exactement comme son jumeau du jour l'est
+     sur le papier. Ce n'est pas un oubli : l'encre faible ne porte de texte
+     nulle part, et la suite de contraste l'assère dans les deux thèmes. */
+  --kd-night-ink-faint:   #6f6f68;
+
+  /* Filets nuit */
+  --kd-night-border:        #2f2f2d;
+  --kd-night-border-strong: #4a4a46;
+  --kd-night-border-pill:   #3a3a37;
+  --kd-night-divider-soft:  #232322;
+
+  /* Aplat encre, retourné. Le token ne dit pas « noir », il dit « la surface de
+     contraste maximal contre la page » : de nuit, c'est un aplat clair, et ce
+     qui s'écrit dessus devient sombre. */
+  --kd-night-ink-surface:       #ededea;
+  --kd-night-ink-surface-hover: #dcdad6;
+  --kd-night-on-ink:            #101010;
+  --kd-night-on-ink-muted:      rgba(0, 0, 0, .60);
+  --kd-night-on-ink-faint:      rgba(0, 0, 0, .45);
+  --kd-night-border-on-ink:     rgba(0, 0, 0, .18);
+  --kd-night-border-on-ink-strong: rgba(0, 0, 0, .35);
+
+  /* Voile de modale. Un voile tiré de l'encre serait CLAIR de nuit et ne
+     détacherait plus rien : il se prend au noir, et plus dense. */
+  --kd-night-scrim: color-mix(in srgb, #000000 62%, transparent);
+
+  /* Rouge : l'accent lui-même ne bouge pas (cf. le bloc sombre). Seuls ses
+     fonds teintés se retournent — un lavis rose sur une page nuit serait le
+     plus clair de l'écran. */
+  --kd-night-accent-tint:  #3a1310;
+  --kd-night-accent-track: #4d1a16;
+
+  /* Carte musculaire : l'échelle s'inverse avec le fond. Sans ça, le palier 1
+     serait plus clair que le muscle au repos et « touchée » se lirait plus
+     chargé que « le plus chargé ». */
+  --kd-night-bodymap-1: #3a1310;
+  --kd-night-bodymap-2: #b2534d;
+  --kd-night-bodymap-3: #f0544c;
+
+  /* Échelle catégorielle : l'ORDRE s'inverse. « Du plus dense au plus clair »
+     se mesure au contraste avec la page — le plus dense est donc le presque
+     blanc ici. */
+  --kd-night-cat-1: #ededea;
+  --kd-night-cat-2: #b0aea8;
+  --kd-night-cat-3: #7a7a73;
+  --kd-night-cat-4: #4a4a46;
+
+  /* Groupes musculaires : mêmes cinq teintes, remontées en luminosité. Leur
+     écart mutuel est ce qui compte — une pastille de 6 px ne porte que ça. */
+  --kd-night-muscle-legs:  #5f97c9;
+  --kd-night-muscle-chest: #d79b5e;
+  --kd-night-muscle-back:  #64ab8a;
+  --kd-night-muscle-arms:  #a97cad;
+  --kd-night-muscle-other: #a3a19a;
+
+  /* Types de série : les deux axes tiennent, l'encre se retourne. */
+  --kd-night-set-warm-tint: #1f1f1e;
+  --kd-night-set-degr-tint: #292928;
+  --kd-night-set-fail-tint: #3a1310;
+  --kd-night-set-drop-tint: #1f1f1e;
+
+  /* Le vert du « fait » : #006d14 tombe à 2.9:1 sur une surface nuit. */
+  --kd-night-status-done: #45a35a;
+
+  /* ------------------------------------------------------------------------
      2. TOKENS SÉMANTIQUES — à consommer dans les vues
      ------------------------------------------------------------------------ */
 
@@ -300,4 +402,121 @@
   --font-display:          var(--kd-font-display);
   --font-body:             var(--kd-font-sans);
   --font-mono:             var(--kd-font-mono);
+}
+
+/* ============================================================================
+   3. JEU SOMBRE — pour le client mobile
+
+   Un REMAPPAGE de la couche sémantique, jamais une valeur neuve : chaque ligne
+   cite une primitive, exactement comme dans `:root`. Un nom, une définition.
+
+   Les 68 tokens de couleur y sont, y compris les huit qui ne changent pas —
+   les redire est ce qui rend leur immobilité DÉCIDÉE plutôt qu'oubliée, et
+   `app:tokens:export` échoue si l'un d'eux manque. Ni police, ni espacement,
+   ni rayon : rien de tout ça ne dépend du papier.
+
+   Le sélecteur n'est posé nulle part par le site. Il est ici pour être exporté
+   vers le mobile, et le jour où le web voudra le mode sombre il lui suffira de
+   poser l'attribut — sans rien redéfinir.
+   ========================================================================== */
+
+[data-theme="dark"] {
+  /* Surfaces & fonds */
+  --color-bg:              var(--kd-night-page);
+  --color-surface:         var(--kd-night-paper-50);
+  --color-surface-raised:  var(--kd-night-paper-0);
+  --color-surface-subtle:  var(--kd-night-paper-100);
+  --color-surface-hover:   var(--kd-night-paper-hover);
+  --color-fill:            var(--kd-night-paper-150);
+  --color-track:           var(--kd-night-paper-200);
+  --color-scrim:           var(--kd-night-scrim);
+
+  /* Aplat encre — retourné en entier */
+  --color-surface-ink:       var(--kd-night-ink-surface);
+  --color-surface-ink-hover: var(--kd-night-ink-surface-hover);
+  --color-on-ink:            var(--kd-night-on-ink);
+  --color-on-ink-muted:      var(--kd-night-on-ink-muted);
+  --color-on-ink-faint:      var(--kd-night-on-ink-faint);
+  --color-border-on-ink:     var(--kd-night-border-on-ink);
+  --color-border-on-ink-strong: var(--kd-night-border-on-ink-strong);
+
+  /* Texte */
+  --color-text:            var(--kd-night-ink-900);
+  --color-text-strong:     var(--kd-night-ink-800);
+  --color-text-secondary:  var(--kd-night-ink-muted);
+  --color-text-soft:       var(--kd-night-ink-soft);
+  --color-text-faint:      var(--kd-night-ink-faint);
+  --color-text-placeholder: var(--kd-night-ink-placeholder);
+
+  /* Filets */
+  --color-border:          var(--kd-night-border);
+  --color-border-strong:   var(--kd-night-border-strong);
+  --color-border-cell:     var(--kd-night-border);
+  --color-border-pill:     var(--kd-night-border-pill);
+  --color-border-muted:    var(--kd-night-border-pill);
+  --color-divider:         var(--kd-night-border);
+  --color-divider-soft:    var(--kd-night-divider-soft);
+
+  /* Rouge — la couleur ne change pas de sens en changeant de papier.
+     L'accent plein, son survol et le blanc qu'il porte sont donc les mêmes
+     valeurs qu'au jour : #d8261e tient ses 3:1 sur la page nuit, et le blanc
+     dessus reste à 4.98:1. L'éclaircir aurait ramené ce libellé sous AA. */
+  --color-primary:         var(--kd-accent);
+  --color-primary-hover:   var(--kd-accent-dark);
+  --color-primary-bright:  var(--kd-accent-bright);
+  --color-on-primary:      #ffffff;
+  /* Les deux qui bougent, et ils échangent leur rôle. Le rouge qui ÉCRIT sur
+     une surface était le rouge foncé ; de nuit il tombe à 2.5:1 et c'est le
+     rouge clair qui prend sa place — la palette portait déjà la réponse sous
+     le nom qui la décrit, « accent lisible sur fond encre ». Le trajet inverse
+     vaut pour ce qui s'écrit SUR l'aplat encre, devenu clair. */
+  --color-primary-on-tint: var(--kd-accent-on-ink);
+  --color-primary-on-ink:  var(--kd-accent-dark);
+  --color-primary-tint:    var(--kd-night-accent-tint);
+  --color-primary-track:   var(--kd-night-accent-track);
+
+  /* Carte musculaire */
+  --color-bodymap-1:       var(--kd-night-bodymap-1);
+  --color-bodymap-2:       var(--kd-night-bodymap-2);
+  --color-bodymap-3:       var(--kd-night-bodymap-3);
+
+  /* Échelle catégorielle */
+  --color-cat-1:           var(--kd-night-cat-1);
+  --color-cat-2:           var(--kd-night-cat-2);
+  --color-cat-3:           var(--kd-night-cat-3);
+  --color-cat-4:           var(--kd-night-cat-4);
+
+  /* Groupes musculaires */
+  --color-muscle-legs:     var(--kd-night-muscle-legs);
+  --color-muscle-chest:    var(--kd-night-muscle-chest);
+  --color-muscle-back:     var(--kd-night-muscle-back);
+  --color-muscle-arms:     var(--kd-night-muscle-arms);
+  --color-muscle-other:    var(--kd-night-muscle-other);
+
+  /* Activités — alias de l'échelle catégorielle, comme au jour */
+  --color-activity-run:       var(--kd-night-cat-1);
+  --color-activity-run-tint:  var(--kd-night-paper-150);
+  --color-activity-run-text:  var(--kd-night-ink-muted);
+  --color-activity-gym:       var(--kd-night-cat-2);
+  --color-activity-gym-tint:  var(--kd-night-paper-150);
+  --color-activity-gym-text:  var(--kd-night-ink-muted);
+  --color-activity-swim:      var(--kd-night-cat-3);
+  --color-activity-bike:      var(--kd-night-cat-3);
+  --color-activity-mobility:  var(--kd-night-cat-4);
+
+  /* Types de série — deux axes tenus : encre ou rouge, plein ou contour */
+  --color-set-warmup:          var(--kd-night-ink-900);
+  --color-set-warmup-tint:     var(--kd-night-set-warm-tint);
+  --color-set-degressive:      var(--kd-night-ink-900);
+  --color-set-degressive-tint: var(--kd-night-set-degr-tint);
+  --color-set-failure:         var(--kd-accent);
+  --color-set-failure-tint:    var(--kd-night-set-fail-tint);
+  --color-set-dropset:         var(--kd-accent);
+  --color-set-dropset-tint:    var(--kd-night-set-drop-tint);
+
+  /* Statuts. Seul le vert bouge : le gris « prévu » tient des deux côtés, et
+     le rouge « manqué » est l'accent. */
+  --color-status-done:     var(--kd-night-status-done);
+  --color-status-planned:  var(--kd-status-planned);
+  --color-status-missed:   var(--kd-status-missed);
 }
