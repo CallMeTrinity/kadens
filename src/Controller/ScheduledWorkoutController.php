@@ -7,12 +7,14 @@ use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Enum\ScheduledStatus;
 use App\Form\PlanInstantiationType;
+use App\Repository\ImportedActivityRepository;
 use App\Repository\PlanTemplateRepository;
 use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\PlanTemplateVoter;
 use App\Security\Voter\ScheduledWorkoutVoter;
 use App\Security\Voter\WorkoutVoter;
+use App\Service\ImportedActivityPresenter;
 use App\Service\LogComparator;
 use App\Service\LogMetrics;
 use App\Service\PlanFlattener;
@@ -146,6 +148,8 @@ final class ScheduledWorkoutController extends AbstractController
         LogComparator $comparator,
         LogMetrics $logMetrics,
         VolumePanel $volumePanel,
+        ImportedActivityRepository $importedActivities,
+        ImportedActivityPresenter $activityPresenter,
     ): Response {
         $this->denyAccessUnlessGranted(ScheduledWorkoutVoter::VIEW, $scheduled);
 
@@ -167,10 +171,33 @@ final class ScheduledWorkoutController extends AbstractController
             'comparison' => $comparison,
             'logSummary' => $logMetrics->summary($scheduled),
             'defaultTab' => $this->defaultTab($scheduled, $comparison),
+        ] + $this->importedActivityContext($scheduled, $importedActivities, $activityPresenter) + [
             // Le volume PRÉVU, dans le HTML initial comme le reste de la page :
             // une vue de consultation ne charge rien après coup (cache offline).
             // Sans prescrit, il n'y a pas de volume prévu à annoncer.
         ] + (null === $workout ? [] : $volumePanel->for($workout, $viewer instanceof User ? $viewer : null)));
+    }
+
+    /**
+     * Le réalisé cardio importé (Intervals.icu) : les activités rattachées, lues
+     * par le propriétaire comme par son coach (VIEW), et les activités du même
+     * jour encore libres, proposées au rattachement au **seul** propriétaire —
+     * rattacher, c'est consigner (LOG). Au coach, la liste n'est même pas chargée.
+     *
+     * @return array{importedActivities: list<array<string, mixed>>, activityComparison: list<array<string, mixed>>, attachableActivities: list<\App\Entity\ImportedActivity>}
+     */
+    private function importedActivityContext(ScheduledWorkout $scheduled, ImportedActivityRepository $repository, ImportedActivityPresenter $presenter): array
+    {
+        $attached = $repository->findForScheduledWorkout($scheduled);
+        $owner = $scheduled->getOwner();
+
+        return [
+            'importedActivities' => array_map($presenter->present(...), $attached),
+            'activityComparison' => $presenter->comparison($scheduled->getWorkout(), $attached),
+            'attachableActivities' => null !== $owner && null !== $scheduled->getScheduledDate() && $this->isGranted(ScheduledWorkoutVoter::LOG, $scheduled)
+                ? $repository->findUnattachedForOwnerOn($owner, $scheduled->getScheduledDate())
+                : [],
+        ];
     }
 
     /**

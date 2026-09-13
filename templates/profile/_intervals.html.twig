@@ -1,0 +1,78 @@
+{# Section « Activités cardio » de /profile/settings : le compte Intervals.icu.
+
+   La montre synchronise vers Intervals.icu, Kadens relit ses activités et les
+   rattache aux séances datées. La clé collée ici n'est jamais réaffichée : elle
+   est chiffrée dès réception, le champ reste donc vide même une fois connecté.
+
+   Contexte : intervalsConnection (?IntervalsConnection), unattachedActivities (int). #}
+<section class="kd-card kd-formsection" id="intervals-panel">
+    <header class="kd-formsection__head">
+        <span class="kd-formsection__icon">{{ ux_icon('lucide:heart-pulse') }}</span>
+        <div>
+            <h2 class="kd-formsection__title">Activités cardio</h2>
+            <p class="kd-formsection__hint">Tes sorties course, vélo et natation enregistrées par ta montre, importées depuis <a href="https://intervals.icu" rel="noopener" target="_blank">Intervals.icu</a>. Elles deviennent le réalisé de tes séances : allure, fréquence cardiaque, temps en zones. Garmin doit être connecté <strong>directement</strong> à Intervals : les activités qui y arrivent par Strava ne sont pas transmises.</p>
+        </div>
+    </header>
+
+    {% if intervalsConnection %}
+        <div class="kd-device">
+            <div class="kd-device__id">
+                <p class="kd-device__name">{{ intervalsConnection.athleteLabel ?? 'Compte Intervals.icu' }}</p>
+                <dl class="kd-device__meta">
+                    <div>
+                        <dt>Connecté</dt>
+                        <dd>{{ intervalsConnection.createdAt|date('d/m/Y') }}</dd>
+                    </div>
+                    <div>
+                        <dt>Dernière synchro</dt>
+                        <dd>{{ intervalsConnection.lastSyncedAt ? intervalsConnection.lastSyncedAt|date('d/m/Y H:i') : 'jamais' }}</dd>
+                    </div>
+                    <div>
+                        {# Seulement les activités reconnues (course, vélo, natation) :
+                           une séance de renfo enregistrée à la montre n'attend rien. #}
+                        <dt>À rattacher</dt>
+                        <dd>{{ unattachedActivities }}</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <form method="post" class="kd-device__act" action="{{ path('app_intervals_sync') }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('intervals_sync') }}">
+                <button type="submit" class="kd-btn kd-btn--primary kd-btn--sm">
+                    {{ ux_icon('lucide:refresh-cw') }} Synchroniser
+                </button>
+            </form>
+        </div>
+
+        {% if unattachedActivities > 0 %}
+            <p class="kd-devices__hint">Une activité reste à rattacher quand aucune séance du même jour ne lui correspond, ou quand plusieurs pourraient. Rattache-la depuis la page de la séance.</p>
+        {% endif %}
+    {% endif %}
+
+    {# Connecter et remplacer la clé : le même formulaire. #}
+    <form method="post" class="kd-intervals__key" action="{{ path('app_intervals_connect') }}">
+        <input type="hidden" name="_token" value="{{ csrf_token('intervals_connect') }}">
+        <div class="kd-field">
+            <label class="kd-label" for="intervals-api-key">{{ intervalsConnection ? 'Remplacer la clé d\'API' : 'Clé d\'API Intervals.icu' }}</label>
+            <input type="password" name="apiKey" id="intervals-api-key" class="kd-input" autocomplete="off" spellcheck="false" maxlength="200" required
+                   placeholder="Settings › Developer Settings › API key">
+        </div>
+        <button type="submit" class="kd-btn kd-btn--ghost">
+            {{ ux_icon('lucide:link') }} {{ intervalsConnection ? 'Remplacer' : 'Connecter' }}
+        </button>
+    </form>
+
+    {% if intervalsConnection %}
+        <form method="post" class="kd-devices__all" action="{{ path('app_intervals_disconnect') }}"
+              onsubmit="return confirm('Déconnecter Intervals.icu ? La clé est supprimée de Kadens.');">
+            <input type="hidden" name="_token" value="{{ csrf_token('intervals_disconnect') }}">
+            <button type="submit" class="kd-btn kd-btn--ghost kd-btn--danger kd-btn--sm">
+                {{ ux_icon('lucide:unlink') }} Déconnecter
+            </button>
+            <label class="kd-check">
+                <input type="checkbox" name="purge" value="1">
+                Supprimer aussi les activités importées
+            </label>
+        </form>
+    {% endif %}
+</section>

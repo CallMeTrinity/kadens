@@ -17,8 +17,8 @@ périmètre :
 Webapp de **planification** d'entraînements sportifs (muscu, course/trail, vélo,
 natation, mobilité). L'objectif est l'amont : bibliothèque d'exercices → séances
 → plans multi-semaines → calendrier daté → boucle prévu vs réalisé. **Pas de
-tracking cardio** (Strava couvre déjà ça) ; le réalisé de la muscu, lui, se logue
-série par série — règle révisée, cf. §3.
+saisie cardio** : le réalisé d'une sortie s'**importe** de la montre via
+Intervals.icu ; celui de la muscu, lui, se logue série par série — cf. §3.
 
 ---
 
@@ -41,6 +41,10 @@ série par série — règle révisée, cf. §3.
 - **Docker** en dev uniquement. Prod = **hébergement mutualisé Infomaniak**
   (`kadens.antoninpamart.fr`), pas de conteneurs, pas de root.
 - CI/CD GitHub Actions, déploiement manuel validé (rsync + migrations + cache).
+- **Intervals.icu** : la seule API tierce appelée en prod (import du réalisé
+  cardio, clé d'API par utilisateur, chiffrée par `SecretBox` avec
+  `APP_SECRET_BOX_KEY`). À ne pas confondre avec la règle « aucune IA ».
+  Cadrage : [`docs/feature-activity-import.md`](./docs/feature-activity-import.md).
 
 ---
 
@@ -119,9 +123,13 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
 - **Template vs instance datée** : `PlanTemplate` (sans dates) ≠ `ScheduledWorkout`
   (daté). `ScheduledWorkout.workout` est une **référence vivante**, mais la clé
   étrangère est en **`SET NULL`**, pas en `CASCADE` (voir la puce suivante).
-- **Le réalisé se logue en muscu, jamais en cardio (règle révisée le 29/07/2026).**
+- **Le réalisé se logue en muscu, s'importe en cardio (règle révisée le 13/09/2026).**
   Une séance de force écrit son réalisé série par série sur la **séance datée** ;
-  une sortie course, vélo ou natation se contente du `ScheduledStatus`. Cadrage
+  une sortie course, vélo ou natation ne se saisit jamais : elle arrive de la
+  montre par Intervals.icu (`ImportedActivity`) et se **rattache** à la séance
+  datée, automatiquement s'il n'y a qu'une candidate, à la main sinon (attribut
+  `LOG`, propriétaire seul). Sans activité, le `ScheduledStatus` reste sa seule
+  trace. Invariants : [`docs/feature-activity-import.md`](./docs/feature-activity-import.md). Cadrage
   complet, principes et invariants à ne pas casser :
   [`docs/feature-live-tracking.md`](./docs/feature-live-tracking.md) §0.2-0.3.
 - **Statistiques : chaque chiffre vient de la source qui fait autorité sur lui.**
@@ -129,13 +137,14 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   `ProfileStats` n'en est que le résumé « depuis le début » — le profil et
   `/profile/stats` ne peuvent donc pas afficher deux tonnages différents. La
   **salle** se lit sur le RÉALISÉ (`LoggedSet`) : tonnage, séries, régions,
-  records. L'**endurance** se lit sur le PRESCRIT des séances faites, et ce n'est
-  pas un repli — le cardio ne se logue jamais, son prescrit est sa seule trace.
+  records. L'**endurance** se lit sur le RÉEL IMPORTÉ quand une activité est rattachée
+  à la séance faite (par activité, distance et durée ensemble), sur son PRESCRIT
+  sinon — sans activité, le prescrit est la seule trace.
   L'**observance** se lit sur le statut. Corollaire à ne pas « corriger » : une
   séance cochée faite sans réalisé compte en assiduité et ne porte aucun
   tonnage ; le combler avec le prescrit ferait passer une intention pour un
   fait. Contrainte de coût qui va avec : hors de cette unique passe hydratante
-  d'endurance (bornée), tout passe par des agrégats scalaires — sans quoi
+  d'endurance (bornée, le réel importé s'y greffe par un agrégat), tout passe par des agrégats scalaires — sans quoi
   « depuis le début » remonterait l'historique entier à chaque affichage.
   **Parcourir n'est pas agréger** : `TrainingLog` (journal, `/profile/log` et son
   jumeau coach) liste les séances consignées une à une, en trois requêtes

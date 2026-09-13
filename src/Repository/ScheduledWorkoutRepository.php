@@ -403,6 +403,34 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     }
 
     /**
+     * Les séances datées d'un utilisateur sur un jour, prévues ou faites, avec
+     * leur prescrit fetch-joint jusqu'à l'exercice : les candidates au
+     * rattachement d'une activité importée (`ActivityMatcher`). Une séance
+     * manquée n'en est pas une — une sortie courue ce jour-là contredit le statut,
+     * et c'est à l'utilisateur de trancher, pas à l'import.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findPlannedOrDoneWithContentForOwnerOn(User $owner, \DateTimeImmutable $day): array
+    {
+        return $this->createQueryBuilder('s')
+            ->addSelect('w', 'b', 'pe', 'e')
+            ->leftJoin('s.workout', 'w')
+            ->leftJoin('w.blocks', 'b')
+            ->leftJoin('b.prescribedExercises', 'pe')
+            ->leftJoin('pe.exercise', 'e')
+            ->andWhere('s.owner = :owner')
+            ->andWhere('s.scheduledDate = :day')
+            ->andWhere('s.status IN (:statuses)')
+            ->setParameter('owner', $owner)
+            ->setParameter('day', $day, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE)
+            ->setParameter('statuses', [ScheduledStatus::PLANNED->value, ScheduledStatus::DONE->value])
+            ->orderBy('s.id', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Séances FAITES d'un utilisateur, avec tout leur contenu fetch-joint
      * (blocs -> exercices prescrits -> exercice), pour agréger le volume réalisé
      * sur l'historique (tonnage, distances) sans N+1. Alimente ProfileStats.

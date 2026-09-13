@@ -3,6 +3,13 @@
 {% block title %}{{ scheduled.displayTitle }} — {{ scheduled.scheduledDate|date('d/m/Y') }}{% endblock %}
 
 {% block body %}
+    {# Les retours des gestes qui redirigent ici (rattacher une activité,
+       effacer le réalisé) : sans eux, le message restait en session et surgissait
+       sur une autre page. #}
+    {% for message in app.flashes('success') %}
+        <p class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }} {{ message }}</p>
+    {% endfor %}
+
     {# Séance dans son contexte daté. La page de bibliothèque (app_workout_show)
        montre la même séance mais ne connaît aucune date : c'est ici, et seulement
        ici, que se boucle le « prévu vs réalisé ».
@@ -72,6 +79,16 @@
             {% endif %}
         </article>
     {% endif %}
+
+    {# Le réalisé cardio importé. Hors du composant de lecture partagé : la
+       bibliothèque et la page publique ne connaissent aucune date, donc aucune
+       sortie réellement courue. #}
+    {{ include('components/_imported_activity.html.twig', {
+        scheduled: scheduled,
+        activities: importedActivities,
+        comparison: activityComparison,
+        attachable: attachableActivities
+    }, with_context = false) }}
 
     {# Boucler la séance : programmer, pas consigner. Bascule de statut, note
        d'écart léger, déplacement, retrait — tout ce que le coach fait aussi.

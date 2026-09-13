@@ -10,6 +10,9 @@
     {% for message in app.flashes('success') %}
         <p class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }} {{ message }}</p>
     {% endfor %}
+    {% for message in app.flashes('error') %}
+        <p class="kd-flash kd-flash--error" role="alert">{{ ux_icon('lucide:x') }} {{ message }}</p>
+    {% endfor %}
 
     <div class="kd-pagehead">
         <div>
@@ -66,6 +69,10 @@
            appareil : on le connecte, puis on le gère. #}
         {{ include('profile/_pairing.html.twig') }}
         {{ include('profile/_devices.html.twig') }}
+
+        {# Après les appareils : c'est aussi un compte qu'on connecte une fois
+           et qu'on gère ensuite, mais tiers, et facultatif. #}
+        {{ include('profile/_intervals.html.twig') }}
 
         {{ form_start(form, {attr: {class: 'kd-editform'}}) }}
             <section class="kd-card kd-formsection">

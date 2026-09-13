@@ -10496,3 +10496,142 @@ a.kd-coachitem__name:hover {
         text-align: left;
     }
 }
+
+/* ----------------------------------------------------------------------------
+   Réalisé cardio importé (Intervals.icu) — page d'une séance datée et carte de
+   /profile/settings. Réemploie les tuiles `.kd-wk__kpi`, le tableau
+   `.kd-settable` et les lignes `.kd-device` : seul ce qui n'existait pas est ici.
+   ---------------------------------------------------------------------------- */
+.kd-actimport__item {
+    margin: 0 0 var(--kd-space-10);
+}
+
+.kd-actimport__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--kd-space-7);
+    margin: 0 0 var(--kd-space-6);
+}
+
+/* Nom de l'activité = contenu saisi : Barlow, casse normale (§5 règle 4). */
+.kd-actimport__name {
+    margin: 0;
+    font-size: 17px;
+    font-weight: var(--kd-weight-semibold);
+    color: var(--color-text);
+    overflow-wrap: anywhere;
+}
+
+.kd-actimport__meta {
+    margin: var(--kd-space-2) 0 0;
+}
+
+.kd-actimport__caption {
+    margin: 0 0 var(--kd-space-3);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-text-secondary);
+    text-align: left;
+}
+
+.kd-actimport__note {
+    font-weight: normal;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.kd-actimport__vs {
+    margin: 0 0 var(--kd-space-10);
+}
+
+.kd-actimport__vs tbody th {
+    padding: var(--kd-space-3) var(--kd-space-6);
+    border-top: 1px solid var(--color-divider-soft);
+    background: var(--color-surface-raised);
+    font-weight: normal;
+    text-align: left;
+}
+
+.kd-actimport__zones,
+.kd-actimport__splits,
+.kd-actimport__attach {
+    margin: 0 0 var(--kd-space-9);
+}
+
+.kd-actimport__splits summary {
+    cursor: pointer;
+}
+
+.kd-intervals__key {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--kd-space-5);
+    margin: var(--kd-space-7) 0;
+}
+
+.kd-intervals__key .kd-field {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.kd-zonebars {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--kd-space-2);
+    max-width: 34rem;
+}
+
+.kd-zonebar {
+    display: grid;
+    grid-template-columns: 9rem minmax(0, 1fr) 7.5rem;
+    align-items: center;
+    gap: var(--kd-space-5);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.kd-zonebar__track {
+    display: block;
+    height: 8px;
+    background: var(--color-track);
+}
+
+.kd-zonebar__fill {
+    display: block;
+    height: 100%;
+    background: var(--color-text-secondary);
+}
+
+/* Le rouge dit l'intensité (§5 règle 2) : seuil et VO2max seulement. Les zones
+   basses restent à l'encre, elles ne sont pas une catégorie à coder. */
+.kd-zonebar__fill--z4,
+.kd-zonebar__fill--z5 {
+    background: var(--color-primary);
+}
+
+.kd-zonebar__value {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+    .kd-intervals__key {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .kd-zonebar {
+        grid-template-columns: 5.5rem minmax(0, 1fr) auto;
+    }
+
+    .kd-actimport__head {
+        flex-direction: column;
+    }
+}

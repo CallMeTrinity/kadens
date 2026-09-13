@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Enum\ActivityType;
 use App\Enum\StatsRange;
 use App\Repository\ExerciseRepository;
+use App\Repository\ImportedActivityRepository;
 use App\Repository\LoggedSetRepository;
 use App\Repository\ScheduledWorkoutRepository;
 
@@ -23,10 +24,12 @@ use App\Repository\ScheduledWorkoutRepository;
  *   ventilation par région, records, rampe hebdomadaire. Une séance cochée
  *   « faite » dit qu'elle a eu lieu, elle ne dit pas ce qui a été soulevé — et
  *   depuis Kadens Live, ce qui a été soulevé est en base.
- * - L'**endurance** se lit sur le PRESCRIT des séances faites. Ce n'est pas un
- *   repli : le cardio ne se logue jamais (règle du projet, cf. CLAUDE.md §3),
- *   son prescrit est la seule trace qui existe. Lui appliquer la règle du
- *   réalisé le ferait simplement disparaître.
+ * - L'**endurance** se lit sur le RÉEL IMPORTÉ (`ImportedActivity`) quand une
+ *   activité est rattachée à la séance faite, sur son PRESCRIT sinon. Le cardio
+ *   ne se saisit jamais dans Kadens (cf. CLAUDE.md §3) : son réalisé s'importe
+ *   de la montre, et tant qu'il n'y en a pas, le prescrit est la seule trace qui
+ *   existe. La substitution se fait **par activité** : une séance brique dont
+ *   seule la course a été enregistrée garde le vélo prescrit.
  * - L'**observance** se lit sur le statut des séances datées, qui est sa
  *   définition même.
  *
@@ -39,7 +42,8 @@ use App\Repository\ScheduledWorkoutRepository;
  * **Coût.** Cinq requêtes agrégées sans hydratation (statuts, dates faites,
  * volume salle par jour, volume salle par exercice, records antérieurs) plus
  * UNE seule passe hydratante, celle du prescrit d'endurance, bornée par la
- * fenêtre. C'est ce qui rend « depuis le début » aussi tenable que « quatre
+ * fenêtre. Le réel importé s'y greffe par un sixième agrégat, sans hydrater
+ * une seule activité. C'est ce qui rend « depuis le début » aussi tenable que « quatre
  * semaines » ; l'ancienne page remontait deux fois tout l'historique.
  *
  * @phpstan-import-type RegionShare from RegionBreakdown
@@ -71,6 +75,7 @@ final class TrainingStats
         private readonly RegionBreakdown $regions,
         private readonly UnitFormatter $units,
         private readonly ExerciseNaming $naming,
+        private readonly ImportedActivityRepository $importedActivities,
     ) {
     }
 
@@ -384,7 +389,8 @@ final class TrainingStats
 
     /**
      * L'UNIQUE passe hydratante : le prescrit des séances faites, dont on tire
-     * le volume d'endurance et la répartition par activité. Les deux sortent du
+     * le volume d'endurance et la répartition par activité — corrigés par le
+     * réel importé quand il existe. Les deux sortent du
      * même parcours — les calculer séparément voulait dire charger deux fois le
      * même historique, ce que faisait l'ancienne page.
      *
@@ -399,24 +405,44 @@ final class TrainingStats
         ];
         $activityCounts = [];
 
+        // Le réel importé, par séance puis par activité : un seul agrégat SQL.
+        $imported = $this->importedActivities->enduranceTotalsByScheduledWorkout($user, $period->start, $period->end);
+
         foreach ($this->scheduled->findDoneWithContentForOwner($user, $period->start, $period->end) as $sw) {
             $workout = $sw->getWorkout();
-            // Séance libre ou source supprimée : rien de prescrit à analyser.
-            if (null === $workout) {
+            $actual = $imported[(int) $sw->getId()] ?? [];
+
+            // Séance libre ou source supprimée, sans activité rattachée : rien à
+            // analyser. Avec une activité, la séance libre compte : une sortie
+            // courue n'a pas besoin d'avoir été prescrite pour avoir eu lieu.
+            if (null === $workout && [] === $actual) {
                 continue;
             }
 
-            foreach ($this->metrics->distinctActivities($workout) as $activity) {
-                $activityCounts[$activity->value] = ($activityCounts[$activity->value] ?? 0) + 1;
+            $activities = [];
+            foreach (null === $workout ? [] : $this->metrics->distinctActivities($workout) as $activity) {
+                $activities[$activity->value] = true;
+            }
+            foreach (array_keys($actual) as $key) {
+                $activities[$key] = true;
+            }
+            foreach (array_keys($activities) as $value) {
+                $activityCounts[$value] = ($activityCounts[$value] ?? 0) + 1;
             }
 
-            $volume = $this->metrics->volume($workout);
+            $volume = null === $workout ? null : $this->metrics->volume($workout);
             foreach ($endurance as $key => $_) {
-                if ($volume[$key]['meters'] > 0 || $volume[$key]['seconds'] > 0) {
+                // Par activité, le réel remplace le prescrit en bloc (distance ET
+                // durée) : mélanger la distance courue et la durée prévue ne
+                // décrirait aucune séance.
+                $meters = $actual[$key]['meters'] ?? $volume[$key]['meters'] ?? 0;
+                $seconds = $actual[$key]['seconds'] ?? $volume[$key]['seconds'] ?? 0;
+
+                if ($meters > 0 || $seconds > 0) {
                     ++$endurance[$key]['sessions'];
                 }
-                $endurance[$key]['meters'] += $volume[$key]['meters'];
-                $endurance[$key]['seconds'] += $volume[$key]['seconds'];
+                $endurance[$key]['meters'] += $meters;
+                $endurance[$key]['seconds'] += $seconds;
             }
         }
 

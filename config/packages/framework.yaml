@@ -5,6 +5,18 @@ framework:
     # Note that the session will be started ONLY if you read or write from it.
     session: true
 
+    http_client:
+        scoped_clients:
+            # Intervals.icu (import du réalisé cardio). Pas d'identifiants ici :
+            # chaque utilisateur apporte sa clé, posée appel par appel par
+            # `IntervalsClient`. Le délai borne ce qu'un clic « Synchroniser »
+            # peut coûter si Intervals répond mal.
+            intervals.client:
+                base_uri: 'https://intervals.icu/api/v1/'
+                timeout: 20
+                headers:
+                    Accept: 'application/json'
+
     #esi: true
     #fragments: true
 
