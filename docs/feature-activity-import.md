@@ -31,7 +31,28 @@ personnelle.
    Elle est validée par un appel réel avant d'être gardée.
 4. « Synchroniser » à chaque fois qu'on veut rapatrier ses sorties.
 
-## 3. Mise en route (serveur)
+## 3. Reprise d'historique (console)
+
+Le bouton ne remonte que 30 jours à la première synchro. Pour le passé :
+
+```bash
+php bin/console app:intervals:import athlete@example.com --since=2025-01-01           # dry-run
+php bin/console app:intervals:import athlete@example.com --since=2025-01-01 --force   # écrit
+```
+
+- Utilise la clé enregistrée dans `/profile/settings` : connecter d'abord.
+- **Dry-run par défaut**, comme les reprises de salle. Il calcule réellement le
+  rapprochement contre la base, sans demander de streams ni rien écrire.
+- **Séances libres** : une activité reconnue sans aucune séance prévue ce jour-là
+  devient une séance libre faite (titre = nom de la sortie). `--no-free-sessions`
+  les laisse à rattacher.
+- Rythme tenu automatiquement (400 ms entre deux streams, quota Intervals de
+  2 500 requêtes par 15 min) : compter environ 7 min pour 1 000 activités.
+- Écrit par lots de 40. Une panne ou un quota épuisé conserve ce qui précède ;
+  relancer la même commande reprend sans doublon.
+- Ne recule jamais la fenêtre du bouton web (`syncedThrough`).
+
+## 4. Mise en route (serveur)
 
 - `APP_SECRET_BOX_KEY` : 64 caractères hexadécimaux
   (`php -r 'echo bin2hex(random_bytes(32));'`), dans `.env.local` en prod. Les
@@ -41,7 +62,7 @@ personnelle.
 - `ext-sodium` doit être actif (livré par défaut avec PHP 8.4).
 - Migration `Version20260913100000`.
 
-## 4. Invariants à ne pas casser
+## 5. Invariants à ne pas casser
 
 - **Idempotence par (`source`, `externalId`).** Contrainte unique en base. La
   liste des identifiants connus est lue en une requête avant tout appel de
@@ -51,6 +72,18 @@ personnelle.
   rattachée, prescrit contenant l'activité. Une seule : on rattache et la séance
   passe en `DONE`. Zéro ou plusieurs : l'activité attend un rattachement manuel.
   Un faux rattachement déplace un chiffre des stats sans rien signaler.
+- **Séance libre : historique seulement, jamais au clic web.** Le cardio se
+  planifie dans Kadens ; au quotidien, une sortie sans séance prévue signale un
+  oubli de planification, pas une séance à inventer. Même en historique : jamais
+  quand plusieurs séances pouvaient correspondre, jamais pour un type non reconnu
+  (un renfo enregistré à la montre doublerait la séance loguée sur le mobile).
+- **Uuid déterministe de la séance libre** :
+  `TrainingHistoryImporter::uuidFor('intervals|<externalId>')`. Une séance déjà
+  présente sous cet uuid est reprise, jamais recréée.
+- **Détacher une activité de SA séance libre supprime la séance** si elle ne
+  porte rien d'autre (ni programme, ni réalisé de salle, ni autre activité).
+  Même règle quand la déconnexion purge les activités. Une séance libre créée à
+  la main, ou reconnue par un autre uuid, n'est jamais supprimée.
 - **Rattacher, c'est consigner : attribut `LOG`.** Le coach lit les activités
   rattachées (`VIEW`), il ne rattache ni ne détache, et n'a aucune action sur la
   connexion Intervals de son athlète.
@@ -76,10 +109,13 @@ personnelle.
 - **Allure dérivée**, jamais stockée (`ImportedActivity::getPaceSecondsPerKm`),
   sur le temps en mouvement.
 
-## 5. Limites connues
+## 6. Limites connues
 
 - Pas de synchro automatique (ni webhook ni cron) : c'est un bouton.
 - Une coquille Strava réapparaît dans le compteur « ignorée » à chaque synchro
   tant qu'elle est dans la fenêtre.
 - Les splits comptent le temps de pause qu'ils contiennent.
-- Le mobile n'affiche pas encore les activités importées.
+- Le mobile n'affiche pas encore les activités importées : une séance libre
+  créée par l'historique y apparaît faite, sans programme ni séries.
+- Une montre coupée puis relancée un jour sans séance prévue produit, en
+  historique, deux séances libres au lieu d'une.

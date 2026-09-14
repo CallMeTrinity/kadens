@@ -62,12 +62,18 @@ final class ImportedActivityController extends AbstractController
     /**
      * Détacher ne touche pas au statut : la séance a pu être faite sans que ce
      * soit cette activité-là (mauvais rattachement du même jour).
+     *
+     * Exception : la séance libre **créée par la reprise d'historique** pour
+     * cette activité, et qui ne porte rien d'autre. Détachée, elle resterait au
+     * calendrier cochée « Faite » sur rien ; elle est donc supprimée, et la page
+     * qui l'affichait avec elle — retour à la semaine.
      */
     #[Route('/{activityId}/detach', name: 'app_imported_activity_detach', methods: ['POST'], requirements: ['activityId' => '\d+'])]
     public function detach(
         Request $request,
         ScheduledWorkout $scheduled,
         #[MapEntity(id: 'activityId')] ImportedActivity $activity,
+        ActivityMatcher $matcher,
     ): Response {
         $this->denyAccessUnlessGranted(ScheduledWorkoutVoter::LOG, $scheduled);
 
@@ -76,7 +82,19 @@ final class ImportedActivityController extends AbstractController
         }
 
         if ($this->isCsrfTokenValid('activity_detach'.$activity->getId(), $request->getPayload()->getString('_token'))) {
+            $disposable = $matcher->isDisposableFreeSession($scheduled, $activity);
             $activity->setScheduledWorkout(null);
+
+            if ($disposable) {
+                $date = $scheduled->getScheduledDate();
+                $this->entityManager->remove($scheduled);
+                $this->entityManager->flush();
+
+                $this->addFlash('success', 'Activité détachée. Sa séance libre, vide sans elle, a été retirée du calendrier.');
+
+                return $this->redirectToRoute('app_calendar_week', ['date' => $date?->format('Y-m-d')]);
+            }
+
             $this->entityManager->flush();
 
             $this->addFlash('success', 'Activité détachée. Elle reste importée et peut être rattachée ailleurs.');

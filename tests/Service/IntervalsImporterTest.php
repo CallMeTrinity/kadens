@@ -52,6 +52,9 @@ final class IntervalsImporterTest extends KernelTestCase
 
     private int $status = 200;
 
+    /** @var list<array<string, mixed>> activités ajoutées à la réponse de liste par un test */
+    private array $extra = [];
+
     protected function setUp(): void
     {
         self::bootKernel();
@@ -120,6 +123,65 @@ final class IntervalsImporterTest extends KernelTestCase
         self::assertStringContainsString('oldest=2026-09-07', $this->requested[\count($this->requested) - 1]);
     }
 
+    /**
+     * Reprise d'historique : la sortie du 12 va à sa séance prévue, celle du 13
+     * reste à rattacher (deux candidates), et une sortie du 10 où rien n'était
+     * planifié devient une séance libre faite. Le renfo du 12 (type inconnu)
+     * n'en crée pas : il doublerait la séance de salle loguée sur le mobile.
+     */
+    public function testHistoryCreatesAFreeSessionOnlyWhenNothingWasPlanned(): void
+    {
+        $this->extra = [['id' => 'i0', 'source' => 'GARMIN_CONNECT', 'type' => 'Ride', 'name' => 'Tour du Vercors', 'start_date_local' => '2026-09-10T09:00:00', 'start_date' => '2026-09-10T07:00:00Z', 'distance' => 60000, 'moving_time' => 7200, 'elapsed_time' => 7800]];
+
+        $report = $this->importer()->importHistory($this->user, new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-09-14'), freeSessions: true, dryRun: false);
+
+        self::assertSame(4, $report->imported);
+        self::assertSame(1, $report->attached);
+        self::assertSame(1, $report->freeSessions);
+        self::assertSame(1, $report->ambiguous);
+
+        $this->em->clear();
+        $ride = $this->em->getRepository(ImportedActivity::class)->findOneBy(['externalId' => 'i0']);
+        $free = $ride->getScheduledWorkout();
+
+        self::assertNotNull($free);
+        self::assertNull($free->getWorkout());
+        self::assertSame('Tour du Vercors', $free->getTitle());
+        self::assertSame(ScheduledStatus::DONE, $free->getStatus());
+        self::assertSame('2026-09-10', $free->getScheduledDate()->format('Y-m-d'));
+        self::assertTrue(ActivityMatcher::freeSessionUuid($ride)->equals($free->getUuid()));
+
+        self::assertCount(4, $this->em->getRepository(ScheduledWorkout::class)->findAll(), 'Trois séances prévues, une seule séance libre.');
+    }
+
+    /** Le dry-run suit le même chemin, sans stream et sans rien écrire. */
+    public function testHistoryDryRunWritesNothingAndFetchesNoStream(): void
+    {
+        $report = $this->importer()->importHistory($this->user, new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-09-14'), freeSessions: true, dryRun: true);
+
+        self::assertSame(3, $report->imported);
+        self::assertSame([], array_filter($this->requested, static fn (string $url): bool => str_contains($url, 'streams')));
+        self::assertSame([], $this->em->getRepository(ImportedActivity::class)->findAll());
+        self::assertSame(ScheduledStatus::PLANNED, $this->em->getRepository(ScheduledWorkout::class)->findOneBy(['scheduledDate' => new \DateTimeImmutable('2026-09-12')])->getStatus());
+    }
+
+    /**
+     * Importer le passé ne recule jamais la fenêtre du bouton web : sinon chaque
+     * clic relirait toute la plage.
+     */
+    public function testHistoryNeverMovesTheWebWindowBackwards(): void
+    {
+        $connection = static::getContainer()->get(IntervalsConnectionRepository::class)->findForOwner($this->user);
+        $connection->setSyncedThrough(new \DateTimeImmutable('2026-09-01'));
+        $this->em->flush();
+
+        $this->importer()->importHistory($this->user, new \DateTimeImmutable('2025-01-01'), new \DateTimeImmutable('2025-12-31'), freeSessions: true, dryRun: false);
+
+        $this->em->clear();
+        $connection = static::getContainer()->get(IntervalsConnectionRepository::class)->findForOwner($this->em->find(User::class, $this->user->getId()));
+        self::assertSame('2026-09-01', $connection->getSyncedThrough()->format('Y-m-d'));
+    }
+
     public function testARefusedKeySurfacesAsAnAuthError(): void
     {
         $this->status = 401;
@@ -149,12 +211,12 @@ final class IntervalsImporterTest extends KernelTestCase
             }
 
             // Du plus récent au plus ancien, comme l'API.
-            return new MockResponse(json_encode([
+            return new MockResponse(json_encode([...[
                 ['id' => 'i4', 'source' => 'GARMIN_CONNECT', 'type' => 'WeightTraining', 'start_date_local' => '2026-09-12T18:00:00', 'moving_time' => 2400],
                 ['id' => 'i3', 'source' => 'STRAVA', 'type' => 'Run', 'start_date_local' => '2026-09-13T12:00:00'],
                 ['id' => 'i2', 'source' => 'GARMIN_CONNECT', 'type' => 'Run', 'start_date_local' => '2026-09-13T08:00:00', 'distance' => 8000, 'moving_time' => 2700],
                 ['id' => 'i1', 'source' => 'GARMIN_CONNECT', 'type' => 'Run', 'start_date_local' => '2026-09-12T07:00:00', 'start_date' => '2026-09-12T05:00:00Z', 'distance' => 10000, 'moving_time' => 3000, 'average_heartrate' => 150],
-            ]));
+            ], ...$this->extra]));
         }, 'https://intervals.icu/api/v1/');
 
         return new IntervalsImporter(
@@ -166,6 +228,7 @@ final class IntervalsImporterTest extends KernelTestCase
             new ActivityStreamAnalyzer(new HeartRateZones()),
             $container->get(ActivityMatcher::class),
             $this->em,
+            historyPauseMicroseconds: 0,
         );
     }
 

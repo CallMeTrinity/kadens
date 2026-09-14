@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace App\Service;
 
 /**
- * Ce qu'une synchronisation a fait, pour le dire en une phrase après le clic.
+ * Ce qu'une synchronisation a fait, pour le dire en une phrase après le clic
+ * (ou en tableau à la fin de la commande d'historique).
  */
 final readonly class SyncReport
 {
@@ -14,8 +15,12 @@ final readonly class SyncReport
         public int $attached,
         /** Activités vues mais inexploitables (arrivées via Strava, sans identifiant…). */
         public int $skipped,
-        /** Activités nouvelles laissées pour le prochain clic (lot borné). */
+        /** Activités nouvelles laissées pour le prochain passage (lot borné ou panne). */
         public int $remaining,
+        /** Séances libres créées pour des activités sans séance prévue (historique seulement). */
+        public int $freeSessions = 0,
+        /** Activités laissées à rattacher parce que plusieurs séances pouvaient leur correspondre. */
+        public int $ambiguous = 0,
     ) {
     }
 

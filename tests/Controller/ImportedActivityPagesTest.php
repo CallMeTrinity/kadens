@@ -148,6 +148,55 @@ final class ImportedActivityPagesTest extends WebTestCase
         self::assertResponseStatusCodeSame(403);
     }
 
+    /**
+     * Détacher une activité de la séance libre que l'historique avait créée pour
+     * elle retire la séance : vide, elle resterait « faite » sur rien. Une séance
+     * libre ordinaire, elle, reste en place.
+     */
+    public function testDetachingFromItsImportedFreeSessionRemovesThatSession(): void
+    {
+        $user = $this->createUser('athlete@example.com');
+        $activity = $this->activity($user, 'i1');
+        $free = (new ScheduledWorkout(\App\Service\ActivityMatcher::freeSessionUuid($activity)))
+            ->setOwner($user)
+            ->setTitle('Footing du matin')
+            ->setScheduledDate(new \DateTimeImmutable('2026-09-12'))
+            ->setStatus(ScheduledStatus::DONE);
+        $this->em->persist($free);
+        $activity->setScheduledWorkout($free);
+        $this->em->flush();
+        $freeId = $free->getId();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/schedule/'.$freeId);
+        $form = $crawler->filter('form[action="/schedule/'.$freeId.'/activity/'.$activity->getId().'/detach"]');
+
+        $this->client->request('POST', $form->attr('action'), ['_token' => $form->filter('input[name="_token"]')->attr('value')]);
+
+        self::assertResponseRedirects('/calendar/week/2026-09-12');
+        $this->em->clear();
+        self::assertNull($this->em->find(ScheduledWorkout::class, $freeId));
+        self::assertNotNull($this->em->find(ImportedActivity::class, $activity->getId()), 'L\'activité reste importée.');
+    }
+
+    public function testDetachingFromAnOrdinarySessionKeepsTheSession(): void
+    {
+        $user = $this->createUser('athlete@example.com');
+        $scheduled = $this->scheduled($user, '2026-09-12');
+        $activity = $this->activity($user, 'i1')->setScheduledWorkout($scheduled);
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/schedule/'.$scheduled->getId());
+        $form = $crawler->filter('form[action="/schedule/'.$scheduled->getId().'/activity/'.$activity->getId().'/detach"]');
+
+        $this->client->request('POST', $form->attr('action'), ['_token' => $form->filter('input[name="_token"]')->attr('value')]);
+
+        self::assertResponseRedirects('/schedule/'.$scheduled->getId());
+        $this->em->clear();
+        self::assertNotNull($this->em->find(ScheduledWorkout::class, $scheduled->getId()));
+    }
+
     /** L'activité d'un autre compte rend 404 : le refus ne confirme pas qu'elle existe. */
     public function testAttachingSomeoneElsesActivityIsNotFound(): void
     {

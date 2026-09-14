@@ -7,6 +7,7 @@ use App\Entity\User;
 use App\Enum\ActivitySource;
 use App\Repository\ImportedActivityRepository;
 use App\Repository\IntervalsConnectionRepository;
+use App\Service\ActivityMatcher;
 use App\Service\IntervalsAuthException;
 use App\Service\IntervalsClient;
 use App\Service\IntervalsImporter;
@@ -122,9 +123,13 @@ final class IntervalsController extends AbstractController
      * défaut : ce sont des sorties réellement faites, rattachées à des séances et
      * comptées dans les statistiques, pas une donnée de la connexion. Les effacer
      * est un choix explicite (case à cocher), jamais un effet de bord.
+     *
+     * Les effacer emporte les séances libres que la reprise d'historique avait
+     * créées pour elles et qui ne portent rien d'autre : sans leur activité,
+     * elles resteraient au calendrier, faites sur rien.
      */
     #[Route('/profile/intervals/disconnect', name: 'app_intervals_disconnect', methods: ['POST'])]
-    public function disconnect(Request $request, ImportedActivityRepository $activities): Response
+    public function disconnect(Request $request, ImportedActivityRepository $activities, ActivityMatcher $matcher): Response
     {
         /** @var User $user */
         $user = $this->getUser();
@@ -141,6 +146,15 @@ final class IntervalsController extends AbstractController
         }
 
         if ($request->getPayload()->getBoolean('purge')) {
+            foreach ($activities->findBy(['owner' => $user, 'source' => ActivitySource::INTERVALS]) as $activity) {
+                $scheduled = $activity->getScheduledWorkout();
+
+                if (null !== $scheduled && $matcher->isDisposableFreeSession($scheduled, $activity)) {
+                    $this->entityManager->remove($scheduled);
+                }
+            }
+            $this->entityManager->flush();
+
             $deleted = $activities->deleteForOwner($user, ActivitySource::INTERVALS);
 
             return $this->back('success', \sprintf('Compte Intervals.icu déconnecté, %d activité%s supprimée%s.', $deleted, $deleted > 1 ? 's' : '', $deleted > 1 ? 's' : ''));
