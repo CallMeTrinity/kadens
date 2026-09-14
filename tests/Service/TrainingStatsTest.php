@@ -4,6 +4,7 @@ namespace App\Tests\Service;
 
 use App\Entity\Block;
 use App\Entity\Exercise;
+use App\Entity\ImportedActivity;
 use App\Entity\LoggedExercise;
 use App\Entity\LoggedSet;
 use App\Entity\PlanTemplate;
@@ -11,6 +12,7 @@ use App\Entity\PrescribedExercise;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
+use App\Enum\ActivitySource;
 use App\Enum\ActivityType;
 use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
@@ -77,9 +79,9 @@ final class TrainingStatsTest extends KernelTestCase
     }
 
     /**
-     * Le pendant : l'endurance se lit sur le prescrit, parce qu'elle ne se logue
-     * jamais (règle du projet). Lui appliquer la règle du réalisé la ferait
-     * simplement disparaître de la page.
+     * Le pendant : sans activité importée, l'endurance se lit sur le prescrit,
+     * parce qu'elle ne se saisit jamais (règle du projet). Lui appliquer la règle
+     * du réalisé la ferait simplement disparaître de la page.
      */
     public function testEnduranceVolumeComesFromThePrescriptionOfDoneSessions(): void
     {
@@ -89,6 +91,48 @@ final class TrainingStatsTest extends KernelTestCase
         self::assertSame(1500, $volume['running']['seconds']);
         self::assertSame(1, $volume['running']['sessions']);
         self::assertSame('5 km', $volume['running']['distanceLabel']);
+    }
+
+    /**
+     * Avec une activité importée rattachée, c'est le RÉEL qui compte : 6,23 km en
+     * 30 min courus, pas les 5 km en 25 min prescrits. Distance et durée sont
+     * remplacées ensemble, jamais l'une sans l'autre.
+     */
+    public function testImportedActivityReplacesThePrescribedEnduranceOfItsSession(): void
+    {
+        $outing = $this->em->getRepository(ScheduledWorkout::class)->findOneBy(['scheduledDate' => new \DateTimeImmutable('2026-07-20')]);
+
+        $activity = (new ImportedActivity($this->user, ActivitySource::INTERVALS, 'i1001', 'Run', new \DateTimeImmutable('2026-07-20 07:00'), new \DateTimeImmutable('2026-07-20')))
+            ->setActivity(ActivityType::RUNNING)
+            ->setDistanceMeters(6230)
+            ->setMovingSeconds(1800)
+            ->setScheduledWorkout($outing);
+        $this->em->persist($activity);
+        $this->em->flush();
+
+        $running = $this->stats->over($this->user, StatsPeriod::month(2026, 7))['volume']['running'];
+
+        self::assertSame(6230, $running['meters']);
+        self::assertSame(1800, $running['seconds']);
+        self::assertSame(1, $running['sessions'], 'Le réel remplace le prescrit, il ne s\'y ajoute pas.');
+    }
+
+    /**
+     * Une activité importée mais NON rattachée ne compte nulle part : sans séance,
+     * elle n'a ni statut ni place dans la fenêtre des séances faites.
+     */
+    public function testUnattachedImportedActivityCountsNowhere(): void
+    {
+        $activity = (new ImportedActivity($this->user, ActivitySource::INTERVALS, 'i1002', 'Run', new \DateTimeImmutable('2026-07-21 07:00'), new \DateTimeImmutable('2026-07-21')))
+            ->setActivity(ActivityType::RUNNING)
+            ->setDistanceMeters(10000)
+            ->setMovingSeconds(3000);
+        $this->em->persist($activity);
+        $this->em->flush();
+
+        $running = $this->stats->over($this->user, StatsPeriod::month(2026, 7))['volume']['running'];
+
+        self::assertSame(5000, $running['meters']);
     }
 
     /**

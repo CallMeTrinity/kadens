@@ -27,3 +27,13 @@ framework:
             policy: 'fixed_window'
             limit: 10
             interval: '1 minute'
+
+        # « Synchroniser » (import Intervals.icu). Chaque clic relit la liste et
+        # jusqu'à `IntervalsImporter::BATCH` streams : pas un secret à protéger,
+        # un quota tiers à ménager (celui de Kadens chez Intervals). La clé est
+        # l'utilisateur, qui est ici authentifié ; deux par minute laissent le
+        # clic « continuer » d'un lot coupé.
+        intervals_sync:
+            policy: 'fixed_window'
+            limit: 2
+            interval: '1 minute'

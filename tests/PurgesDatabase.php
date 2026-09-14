@@ -7,6 +7,8 @@ use App\Entity\Coaching;
 use App\Entity\DeletedEntity;
 use App\Entity\Exercise;
 use App\Entity\Goal;
+use App\Entity\ImportedActivity;
+use App\Entity\IntervalsConnection;
 use App\Entity\PairingCode;
 use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
@@ -41,6 +43,8 @@ trait PurgesDatabase
     private function purgeDatabase(EntityManagerInterface $em): void
     {
         $classes = [
+            ImportedActivity::class,
+            IntervalsConnection::class,
             ApiToken::class,
             PairingCode::class,
             Coaching::class,

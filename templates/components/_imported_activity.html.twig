@@ -1,0 +1,206 @@
+{# ========================== LE RÉALISÉ CARDIO ==========================
+   Les activités importées (Intervals.icu) rattachées à une séance datée, et le
+   recours du rattachement manuel. Auto-suffisant : tout est rendu par le
+   serveur, aucun AJAX post-chargement (condition du cache offline).
+
+   Attendus :
+     scheduled   ScheduledWorkout (requis)
+     activities  list de ImportedActivityPresenter::present (requis, peut être vide)
+     comparison  list de ImportedActivityPresenter::comparison (requis, peut être vide)
+     attachable  list<ImportedActivity> du même jour, non rattachées — vide pour
+                 le coach : rattacher, c'est consigner (LOG)
+
+   Rien ne se rend quand les deux listes sont vides : une séance de muscu n'a
+   pas à annoncer qu'elle n'a pas de sortie Garmin.
+
+   Les zones sont celles du profil **au moment de l'import** : la légende le dit,
+   pour qu'un écart avec les bornes actuelles ne passe pas pour un bug. #}
+{% if activities is not empty or attachable is not empty %}
+    <section class="kd-wk__panel kd-actimport" aria-labelledby="wk-panel-cardio">
+        <h2 class="kd-wk__paneltitle" id="wk-panel-cardio">Réalisé cardio</h2>
+
+        {% if comparison is not empty %}
+            <div class="kd-settable__wrap">
+                <table class="kd-settable kd-actimport__vs">
+                    <caption class="kd-actimport__caption">Prévu contre réel</caption>
+                    <thead>
+                        <tr>
+                            <th scope="col">Activité</th>
+                            <th scope="col">Prévu</th>
+                            <th scope="col">Réel</th>
+                            <th scope="col">Écart</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in comparison %}
+                            {% if row.plannedDistance %}
+                                <tr>
+                                    <th scope="row">{{ row.activity.label }} · distance</th>
+                                    <td>{{ row.plannedDistance }}</td>
+                                    <td>{{ row.actualDistance }}</td>
+                                    <td>{{ row.distanceDelta }}</td>
+                                </tr>
+                            {% endif %}
+                            {% if row.plannedDuration %}
+                                <tr>
+                                    <th scope="row">{{ row.activity.label }} · durée</th>
+                                    <td>{{ row.plannedDuration }}</td>
+                                    <td>{{ row.actualDuration }}</td>
+                                    <td>{{ row.durationDelta }}</td>
+                                </tr>
+                            {% endif %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+
+        {% for activity in activities %}
+            <article class="kd-actimport__item">
+                <header class="kd-actimport__head">
+                    <div>
+                        {# Nom saisi dans la montre ou Intervals : contenu, casse normale. #}
+                        <p class="kd-actimport__name">{{ activity.title }}</p>
+                        <p class="kd-logmeta kd-actimport__meta">
+                            {{ ux_icon('lucide:activity') }}
+                            {{ activity.sport }} · départ à {{ activity.startedAt|date('H\\hi') }} · {{ activity.entity.source.label }}
+                        </p>
+                    </div>
+                    {% if is_granted('SCHEDULED_WORKOUT_LOG', scheduled) %}
+                        <form method="post" action="{{ path('app_imported_activity_detach', {id: scheduled.id, activityId: activity.entity.id}) }}">
+                            <input type="hidden" name="_token" value="{{ csrf_token('activity_detach' ~ activity.entity.id) }}">
+                            <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm">
+                                {{ ux_icon('lucide:unlink') }} Détacher
+                            </button>
+                        </form>
+                    {% endif %}
+                </header>
+
+                <dl class="kd-wk__kpis kd-wk__kpis--logged">
+                    {% if activity.distance %}
+                        <div class="kd-wk__kpi">
+                            <dt>Distance</dt>
+                            <dd>{{ activity.distance }}</dd>
+                            {% if activity.elevationGain %}<p class="kd-wk__kpimeta">D+ {{ activity.elevationGain }} m</p>{% endif %}
+                        </div>
+                    {% endif %}
+                    {% if activity.duration %}
+                        <div class="kd-wk__kpi">
+                            <dt>Durée en mouvement</dt>
+                            <dd>{{ activity.duration }}</dd>
+                            {% if activity.pace %}<p class="kd-wk__kpimeta">Allure {{ activity.pace }}</p>{% endif %}
+                        </div>
+                    {% endif %}
+                    {% if activity.averageHeartRate %}
+                        {# L'intensité est un des trois sens du rouge : la tuile cardio y a droit. #}
+                        <div class="kd-wk__kpi kd-wk__kpi--accent">
+                            <dt>FC moyenne</dt>
+                            <dd>{{ activity.averageHeartRate }}<span class="kd-wk__unit"> bpm</span></dd>
+                            {% if activity.maxHeartRate %}<p class="kd-wk__kpimeta">Max {{ activity.maxHeartRate }} bpm</p>{% endif %}
+                        </div>
+                    {% endif %}
+                    {% if activity.cadence or activity.watts %}
+                        <div class="kd-wk__kpi">
+                            {% if activity.watts %}
+                                <dt>Puissance moyenne</dt>
+                                <dd>{{ activity.watts }}<span class="kd-wk__unit"> W</span></dd>
+                                {% if activity.cadence %}<p class="kd-wk__kpimeta">Cadence {{ activity.cadence }}</p>{% endif %}
+                            {% else %}
+                                <dt>Cadence</dt>
+                                <dd>{{ activity.cadence }}</dd>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </dl>
+
+                {% if activity.zones is not empty %}
+                    <div class="kd-actimport__zones">
+                        <p class="kd-actimport__caption">Temps en zones <span class="kd-actimport__note">(zones du profil à l'import)</span></p>
+                        <ul class="kd-zonebars">
+                            {% for zone in activity.zones %}
+                                <li class="kd-zonebar">
+                                    <span class="kd-zonebar__label">{{ zone.zone.shortLabel }}</span>
+                                    <span class="kd-zonebar__track" aria-hidden="true">
+                                        {# Largeur = donnée, pas décor : c'est la seule
+                                           valeur de style posée en ligne. #}
+                                        <span class="kd-zonebar__fill kd-zonebar__fill--{{ zone.zone.value }}" style="width: {{ zone.percent }}%"></span>
+                                    </span>
+                                    <span class="kd-zonebar__value">{{ zone.duration }} · {{ zone.percent }} %</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                {% endif %}
+
+                {% if activity.splits is not empty %}
+                    <details class="kd-actimport__splits">
+                        <summary class="kd-actimport__caption">Splits ({{ activity.splits|length }})</summary>
+                        <div class="kd-settable__wrap">
+                            <table class="kd-settable">
+                                <thead>
+                                    <tr>
+                                        <th scope="col" class="kd-settable__c-num">#</th>
+                                        <th scope="col">Distance</th>
+                                        <th scope="col">Temps</th>
+                                        <th scope="col">Allure</th>
+                                        <th scope="col">FC</th>
+                                        <th scope="col">D+</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for split in activity.splits %}
+                                        <tr>
+                                            <td class="kd-settable__c-num">{{ loop.index }}</td>
+                                            <td>{{ split.distance }}</td>
+                                            <td>{{ split.duration }}</td>
+                                            <td>{{ split.pace ?? '–' }}</td>
+                                            <td>{{ split.averageHeartRate ?? '–' }}</td>
+                                            <td>{{ split.elevationGain is not null ? split.elevationGain ~ ' m' : '–' }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                {% endif %}
+            </article>
+        {% endfor %}
+
+        {% if attachable is not empty %}
+            <div class="kd-actimport__attach">
+                <p class="kd-actimport__caption">Activités du jour à rattacher</p>
+                <ul class="kd-devices">
+                    {% for candidate in attachable %}
+                        <li class="kd-device">
+                            <div class="kd-device__id">
+                                <p class="kd-device__name">{{ candidate.name ?? candidate.sportType }}</p>
+                                <dl class="kd-device__meta">
+                                    <div>
+                                        <dt>Type</dt>
+                                        <dd>{{ candidate.activity ? candidate.activity.label : candidate.sportType }}</dd>
+                                    </div>
+                                    <div>
+                                        <dt>Départ</dt>
+                                        <dd>{{ candidate.startedAt|date('H\\hi') }}</dd>
+                                    </div>
+                                    {% if candidate.distanceMeters %}
+                                        <div>
+                                            <dt>Distance</dt>
+                                            <dd>{{ (candidate.distanceMeters / 1000)|number_format(2, ',', ' ') }} km</dd>
+                                        </div>
+                                    {% endif %}
+                                </dl>
+                            </div>
+                            <form method="post" class="kd-device__act" action="{{ path('app_imported_activity_attach', {id: scheduled.id, activityId: candidate.id}) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('activity_attach' ~ candidate.id) }}">
+                                <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm">
+                                    {{ ux_icon('lucide:link') }} Rattacher
+                                </button>
+                            </form>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+    </section>
+{% endif %}

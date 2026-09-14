@@ -1,0 +1,263 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Tests\Service;
+
+use App\Entity\Block;
+use App\Entity\Exercise;
+use App\Entity\ImportedActivity;
+use App\Entity\IntervalsConnection;
+use App\Entity\PrescribedExercise;
+use App\Entity\ScheduledWorkout;
+use App\Entity\User;
+use App\Entity\Workout;
+use App\Enum\ActivityType;
+use App\Enum\BlockRole;
+use App\Enum\PrescriptionType;
+use App\Enum\ScheduledStatus;
+use App\Repository\ImportedActivityRepository;
+use App\Repository\IntervalsConnectionRepository;
+use App\Service\ActivityMatcher;
+use App\Service\ActivityStreamAnalyzer;
+use App\Service\HeartRateZones;
+use App\Service\ImportedActivityMapper;
+use App\Service\IntervalsAuthException;
+use App\Service\IntervalsClient;
+use App\Service\IntervalsImporter;
+use App\Service\SecretBox;
+use App\Tests\PurgesDatabase;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
+
+/**
+ * La synchronisation Intervals.icu, contre une vraie base et un faux Intervals.
+ *
+ * Seul le transport HTTP est simulé (`MockHttpClient`) : le client, le mapping,
+ * l'analyse des streams, le rapprochement et l'écriture sont les vrais. Ce que
+ * ces tests protègent : le rapprochement **unique ou rien**, l'**idempotence**
+ * (relancer ne réimporte rien et ne redemande aucun stream), et la fenêtre.
+ */
+final class IntervalsImporterTest extends KernelTestCase
+{
+    use PurgesDatabase;
+
+    private EntityManagerInterface $em;
+    private User $user;
+
+    /** @var list<string> */
+    private array $requested = [];
+
+    private int $status = 200;
+
+    /** @var list<array<string, mixed>> activités ajoutées à la réponse de liste par un test */
+    private array $extra = [];
+
+    protected function setUp(): void
+    {
+        self::bootKernel();
+        $this->em = static::getContainer()->get('doctrine.orm.entity_manager');
+        $this->purgeDatabase($this->em);
+
+        $this->user = (new User())->setEmail('coureur@example.com')->setPassword('x')->setMaxHeartRate(190)->setRestingHeartRate(50);
+        $this->em->persist($this->user);
+
+        $run = (new Exercise())->setOwner($this->user)->setName('Footing')->setActivity(ActivityType::RUNNING);
+        $this->em->persist($run);
+
+        // Le 12 : une seule séance course prévue, la candidate évidente.
+        $this->schedule($this->runWorkout($run), '2026-09-12');
+        // Le 13 : deux séances course prévues, l'import ne doit pas choisir.
+        $this->schedule($this->runWorkout($run), '2026-09-13');
+        $this->schedule($this->runWorkout($run), '2026-09-13');
+
+        $secretBox = static::getContainer()->get(SecretBox::class);
+        $this->em->persist(new IntervalsConnection($this->user, $secretBox->seal('cle-de-test'), 'Coureur'));
+        $this->em->flush();
+    }
+
+    public function testFirstSyncImportsAttachesWhenUnambiguousAndSkipsStravaStubs(): void
+    {
+        $report = $this->importer()->sync($this->user, new \DateTimeImmutable('2026-09-14'));
+
+        self::assertSame(3, $report->imported);
+        self::assertSame(1, $report->attached);
+        self::assertSame(1, $report->skipped);
+        self::assertSame(0, $report->remaining);
+
+        // Première synchro : les 30 derniers jours.
+        self::assertStringContainsString('oldest=2026-08-15', $this->requested[0]);
+
+        $this->em->clear();
+        $activities = $this->em->getRepository(ImportedActivity::class);
+
+        $morningRun = $activities->findOneBy(['externalId' => 'i1']);
+        self::assertNotNull($morningRun->getScheduledWorkout());
+        self::assertSame(ScheduledStatus::DONE, $morningRun->getScheduledWorkout()->getStatus(), 'Rattacher prouve que la séance a eu lieu.');
+        self::assertSame([0, 10, 0, 10, 0], $morningRun->getHrZoneSeconds());
+
+        self::assertNull($activities->findOneBy(['externalId' => 'i2'])->getScheduledWorkout(), 'Deux candidates : on ne devine pas.');
+        self::assertNull($activities->findOneBy(['externalId' => 'i4'])->getScheduledWorkout(), 'Un type non reconnu ne se rattache jamais seul.');
+        self::assertNull($activities->findOneBy(['externalId' => 'i3']), 'Coquille Strava : rien à importer.');
+
+        $connection = static::getContainer()->get(IntervalsConnectionRepository::class)->findForOwner($this->em->find(User::class, $this->user->getId()));
+        self::assertSame('2026-09-14', $connection->getSyncedThrough()->format('Y-m-d'));
+    }
+
+    public function testSyncingAgainImportsNothingAndFetchesNoStream(): void
+    {
+        $this->importer()->sync($this->user, new \DateTimeImmutable('2026-09-14'));
+        $streamsBefore = \count(array_filter($this->requested, static fn (string $url): bool => str_contains($url, 'streams')));
+
+        $this->em->clear();
+        $user = $this->em->find(User::class, $this->user->getId());
+        $report = $this->importer()->sync($user, new \DateTimeImmutable('2026-09-14'));
+
+        self::assertSame(0, $report->imported);
+        self::assertSame($streamsBefore, \count(array_filter($this->requested, static fn (string $url): bool => str_contains($url, 'streams'))));
+        self::assertCount(3, $this->em->getRepository(ImportedActivity::class)->findAll());
+
+        // Fenêtre glissante : la seconde synchro relit depuis syncedThrough − 7 jours.
+        self::assertStringContainsString('oldest=2026-09-07', $this->requested[\count($this->requested) - 1]);
+    }
+
+    /**
+     * Reprise d'historique : la sortie du 12 va à sa séance prévue, celle du 13
+     * reste à rattacher (deux candidates), et une sortie du 10 où rien n'était
+     * planifié devient une séance libre faite. Le renfo du 12 (type inconnu)
+     * n'en crée pas : il doublerait la séance de salle loguée sur le mobile.
+     */
+    public function testHistoryCreatesAFreeSessionOnlyWhenNothingWasPlanned(): void
+    {
+        $this->extra = [['id' => 'i0', 'source' => 'GARMIN_CONNECT', 'type' => 'Ride', 'name' => 'Tour du Vercors', 'start_date_local' => '2026-09-10T09:00:00', 'start_date' => '2026-09-10T07:00:00Z', 'distance' => 60000, 'moving_time' => 7200, 'elapsed_time' => 7800]];
+
+        $report = $this->importer()->importHistory($this->user, new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-09-14'), freeSessions: true, dryRun: false);
+
+        self::assertSame(4, $report->imported);
+        self::assertSame(1, $report->attached);
+        self::assertSame(1, $report->freeSessions);
+        self::assertSame(1, $report->ambiguous);
+
+        $this->em->clear();
+        $ride = $this->em->getRepository(ImportedActivity::class)->findOneBy(['externalId' => 'i0']);
+        $free = $ride->getScheduledWorkout();
+
+        self::assertNotNull($free);
+        self::assertNull($free->getWorkout());
+        self::assertSame('Tour du Vercors', $free->getTitle());
+        self::assertSame(ScheduledStatus::DONE, $free->getStatus());
+        self::assertSame('2026-09-10', $free->getScheduledDate()->format('Y-m-d'));
+        self::assertTrue(ActivityMatcher::freeSessionUuid($ride)->equals($free->getUuid()));
+
+        self::assertCount(4, $this->em->getRepository(ScheduledWorkout::class)->findAll(), 'Trois séances prévues, une seule séance libre.');
+    }
+
+    /** Le dry-run suit le même chemin, sans stream et sans rien écrire. */
+    public function testHistoryDryRunWritesNothingAndFetchesNoStream(): void
+    {
+        $report = $this->importer()->importHistory($this->user, new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-09-14'), freeSessions: true, dryRun: true);
+
+        self::assertSame(3, $report->imported);
+        self::assertSame([], array_filter($this->requested, static fn (string $url): bool => str_contains($url, 'streams')));
+        self::assertSame([], $this->em->getRepository(ImportedActivity::class)->findAll());
+        self::assertSame(ScheduledStatus::PLANNED, $this->em->getRepository(ScheduledWorkout::class)->findOneBy(['scheduledDate' => new \DateTimeImmutable('2026-09-12')])->getStatus());
+    }
+
+    /**
+     * Importer le passé ne recule jamais la fenêtre du bouton web : sinon chaque
+     * clic relirait toute la plage.
+     */
+    public function testHistoryNeverMovesTheWebWindowBackwards(): void
+    {
+        $connection = static::getContainer()->get(IntervalsConnectionRepository::class)->findForOwner($this->user);
+        $connection->setSyncedThrough(new \DateTimeImmutable('2026-09-01'));
+        $this->em->flush();
+
+        $this->importer()->importHistory($this->user, new \DateTimeImmutable('2025-01-01'), new \DateTimeImmutable('2025-12-31'), freeSessions: true, dryRun: false);
+
+        $this->em->clear();
+        $connection = static::getContainer()->get(IntervalsConnectionRepository::class)->findForOwner($this->em->find(User::class, $this->user->getId()));
+        self::assertSame('2026-09-01', $connection->getSyncedThrough()->format('Y-m-d'));
+    }
+
+    public function testARefusedKeySurfacesAsAnAuthError(): void
+    {
+        $this->status = 401;
+
+        $this->expectException(IntervalsAuthException::class);
+        $this->importer()->sync($this->user, new \DateTimeImmutable('2026-09-14'));
+    }
+
+    private function importer(): IntervalsImporter
+    {
+        $container = static::getContainer();
+        $http = new MockHttpClient(function (string $method, string $url, array $options): MockResponse {
+            $this->requested[] = $url;
+
+            $auth = $options['normalized_headers']['authorization'][0] ?? '';
+            self::assertSame('Authorization: Basic '.base64_encode('API_KEY:cle-de-test'), $auth);
+
+            if (200 !== $this->status) {
+                return new MockResponse('{}', ['http_code' => $this->status]);
+            }
+
+            if (str_contains($url, '/streams.json')) {
+                return new MockResponse(json_encode([
+                    ['type' => 'time', 'data' => range(0, 20)],
+                    ['type' => 'heartrate', 'data' => array_merge([140], array_fill(0, 10, 140), array_fill(0, 10, 170))],
+                ]));
+            }
+
+            // Du plus récent au plus ancien, comme l'API.
+            return new MockResponse(json_encode([...[
+                ['id' => 'i4', 'source' => 'GARMIN_CONNECT', 'type' => 'WeightTraining', 'start_date_local' => '2026-09-12T18:00:00', 'moving_time' => 2400],
+                ['id' => 'i3', 'source' => 'STRAVA', 'type' => 'Run', 'start_date_local' => '2026-09-13T12:00:00'],
+                ['id' => 'i2', 'source' => 'GARMIN_CONNECT', 'type' => 'Run', 'start_date_local' => '2026-09-13T08:00:00', 'distance' => 8000, 'moving_time' => 2700],
+                ['id' => 'i1', 'source' => 'GARMIN_CONNECT', 'type' => 'Run', 'start_date_local' => '2026-09-12T07:00:00', 'start_date' => '2026-09-12T05:00:00Z', 'distance' => 10000, 'moving_time' => 3000, 'average_heartrate' => 150],
+            ], ...$this->extra]));
+        }, 'https://intervals.icu/api/v1/');
+
+        return new IntervalsImporter(
+            $container->get(IntervalsConnectionRepository::class),
+            $container->get(ImportedActivityRepository::class),
+            new IntervalsClient($http),
+            $container->get(SecretBox::class),
+            new ImportedActivityMapper(),
+            new ActivityStreamAnalyzer(new HeartRateZones()),
+            $container->get(ActivityMatcher::class),
+            $this->em,
+            historyPauseMicroseconds: 0,
+        );
+    }
+
+    private function runWorkout(Exercise $run): Workout
+    {
+        $workout = (new Workout())->setOwner($this->user)->setTitle('Footing')->setSlug('footing-'.bin2hex(random_bytes(4)));
+        $block = (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(0);
+        $block->addPrescribedExercise(
+            (new PrescribedExercise())
+                ->setExercise($run)
+                ->setPosition(0)
+                ->setPrescriptionType(PrescriptionType::DISTANCE_PACE)
+                ->setDistanceMeters(10000),
+        );
+        $workout->addBlock($block);
+        $this->em->persist($workout);
+        $this->em->persist($block);
+
+        return $workout;
+    }
+
+    private function schedule(Workout $workout, string $date): void
+    {
+        $this->em->persist(
+            (new ScheduledWorkout())
+                ->setOwner($this->user)
+                ->setWorkout($workout)
+                ->setScheduledDate(new \DateTimeImmutable($date))
+                ->setStatus(ScheduledStatus::PLANNED),
+        );
+    }
+}

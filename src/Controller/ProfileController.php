@@ -13,6 +13,8 @@ use App\Form\ProfileType;
 use App\Repository\ApiTokenRepository;
 use App\Repository\CoachingRepository;
 use App\Repository\GoalRepository;
+use App\Repository\ImportedActivityRepository;
+use App\Repository\IntervalsConnectionRepository;
 use App\Repository\PairingCodeRepository;
 use App\Service\HeartRateZones;
 use App\Service\PairingQr;
@@ -47,6 +49,8 @@ final class ProfileController extends AbstractController
      */
     public function __construct(
         private readonly ApiTokenRepository $apiTokens,
+        private readonly IntervalsConnectionRepository $intervalsConnections,
+        private readonly ImportedActivityRepository $importedActivities,
     ) {
     }
 
@@ -256,7 +260,7 @@ final class ProfileController extends AbstractController
             'form' => $form,
             'display' => $display,
             'devices' => $this->apiTokens->findForOwner($user),
-        ]);
+        ] + $this->intervalsContext($user));
     }
 
     /**
@@ -322,7 +326,7 @@ final class ProfileController extends AbstractController
             'form' => $this->createForm(ChangePasswordType::class)->createView(),
             'display' => $this->createForm(DisplaySettingsType::class, $user)->createView(),
             'devices' => $this->apiTokens->findForOwner($user),
-        ]);
+        ] + $this->intervalsContext($user));
     }
 
     /**
@@ -411,6 +415,21 @@ final class ProfileController extends AbstractController
         $this->apiTokens->deleteForOwner($user);
 
         return $this->afterRevocation($request, $user, 'Tous les appareils ont été révoqués.');
+    }
+
+    /**
+     * Ce que la carte Intervals.icu de `/profile/settings` affiche. Même raison
+     * que la liste des appareils : deux points de rendu servent la page, un
+     * oubli casserait en `strict_variables`.
+     *
+     * @return array{intervalsConnection: ?\App\Entity\IntervalsConnection, unattachedActivities: int}
+     */
+    private function intervalsContext(User $user): array
+    {
+        return [
+            'intervalsConnection' => $this->intervalsConnections->findForOwner($user),
+            'unattachedActivities' => $this->importedActivities->countUnattachedForOwner($user),
+        ];
     }
 
     /**
