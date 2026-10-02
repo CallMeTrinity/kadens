@@ -151,23 +151,25 @@ final class WorkoutMetrics
 
     /**
      * Activités distinctes présentes dans une séance (via les exercices de ses
-     * blocs), dans l'ordre de première apparition. Helper absent des entités.
+     * blocs), de la **dominante** à la moins portée (`ActivityType::rankByCount`).
+     * La première colore la séance partout où elle s'affiche, la deuxième fait
+     * la bande. Helper absent des entités.
      *
      * @return list<ActivityType>
      */
     public function distinctActivities(Workout $workout): array
     {
-        $seen = [];
+        $counts = [];
         foreach ($workout->getBlocks() as $block) {
             foreach ($block->getPrescribedExercises() as $prescribed) {
                 $activity = $prescribed->getExercise()?->getActivity();
-                if (null !== $activity && !isset($seen[$activity->value])) {
-                    $seen[$activity->value] = $activity;
+                if (null !== $activity) {
+                    $counts[$activity->value] = ($counts[$activity->value] ?? 0) + 1;
                 }
             }
         }
 
-        return array_values($seen);
+        return ActivityType::rankByCount($counts);
     }
 
     public function exerciseCount(Workout $workout): int

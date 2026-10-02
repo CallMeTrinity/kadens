@@ -3,8 +3,10 @@
 namespace App\Twig;
 
 use App\Entity\Exercise;
+use App\Entity\User;
 use App\Enum\PrescriptionType;
 use App\Http\BackTarget;
+use App\Service\ActivityPalette;
 use App\Service\BackLink;
 use App\Service\ExerciseNaming;
 use Twig\Extension\AbstractExtension;
@@ -26,12 +28,16 @@ use Twig\TwigFunction;
  *   sortant, le reconduire d'un saut au suivant, l'afficher. `back_link()` sert
  *   le composant `components/_backlink.html.twig` et n'a pas à être appelé
  *   ailleurs.
+ * - `activity_palette_css()` rend les couleurs d'activité choisies par le
+ *   lecteur, en déclarations `:root` à poser dans `<head>` (`base.html.twig`).
+ *   Valeurs déjà validées par `ActivityPalette` (hex strict), d'où le `raw`.
  */
 final class AppExtension extends AbstractExtension
 {
     public function __construct(
         private readonly ExerciseNaming $naming,
         private readonly BackLink $backLink,
+        private readonly ActivityPalette $activityPalette,
     ) {
     }
 
@@ -49,7 +55,17 @@ final class AppExtension extends AbstractExtension
             // le calendrier le passe à sa pastille, qui le pose sur trois liens
             // et le reconduit par champ caché à travers le flux Turbo.
             new TwigFunction('back_token', [BackTarget::class, 'token']),
+            new TwigFunction('activity_palette_css', [$this, 'activityPaletteCss'], ['is_safe' => ['html']]),
         ];
+    }
+
+    /**
+     * `app.user` peut être autre chose qu'un `User` en théorie (UserInterface) :
+     * tout ce qui n'en est pas un lit la palette par défaut.
+     */
+    public function activityPaletteCss(mixed $user): ?string
+    {
+        return $this->activityPalette->cssOverrides($user instanceof User ? $user : null);
     }
 
     /**

@@ -134,5 +134,16 @@
     background: none;
     color: var(--color-text);
     border-bottom: 2px solid var(--color-text);
+    box-shadow: none;
+  }
+
+  /* Les navigateurs n'impriment pas les fonds par défaut : un aplat d'activité
+     sous du texte blanc (pastille du calendrier, badge, case de plan)
+     deviendrait blanc sur blanc. On garde ses couleurs. Le hero, lui, repasse
+     en encre sur papier juste au-dessus : ses badges doivent donc garder les
+     leurs. */
+  [class*="kd-act--"] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 }

@@ -62,6 +62,8 @@
     <div data-controller="caladd">
         {{ include('calendar/_addbar.html.twig') }}
 
+        {{ include('calendar/_activity_legend.html.twig') }}
+
         <div class="kd-cal">
             <div class="kd-cal__grid">
                 {% for iso, label in dayNames %}

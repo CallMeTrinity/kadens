@@ -3,8 +3,13 @@
    (`calendar/index`) et la vue semaine (`calendar/week`).
 
    Trois zones cliquables : la séance datée, le cycle rapide du statut (prévu →
-   fait → manqué) et un œil vers la même page. Filet gauche = statut (seul cas où
-   la couleur code l'état, pas l'activité).
+   fait → manqué) et un œil vers la même page.
+
+   **Couleur** : une séance qui a une activité prend en aplat la couleur de sa
+   dominante, la deuxième en bande (`activity.surface()`, piste 1b) ; le statut
+   passe alors par l'icône du bouton de cycle, la manquée se hachure. Sans
+   activité (séance vide, libre), la pastille reste neutre et son filet gauche
+   code le statut.
 
    **Disposition** : le contenu prend la case entière, les deux actions passent en
    rangée dessous. Sur ordinateur une colonne de calendrier est plus étroite que
@@ -55,8 +60,9 @@
 {% set nextStatus = scheduled.status.next %}
 {% set detailed = detailed|default(false) %}
 {% set overdue = overdue|default(false) %}
+{% set colored = fw and fw.activities|length > 0 %}
 
-<div id="cal-event-{{ scheduled.id }}" class="kd-calevent kd-calevent--{{ st }}{{ detailed ? ' kd-calevent--detailed' }}{{ overdue ? ' is-overdue' }}"
+<div id="cal-event-{{ scheduled.id }}" class="kd-calevent kd-calevent--{{ st }}{{ colored ? ' kd-calevent--act ' ~ activity.surface(fw.activities) }}{{ detailed ? ' kd-calevent--detailed' }}{{ overdue ? ' is-overdue' }}"
      data-controller="dialog preview"
      data-action="mouseenter->preview#show mouseleave->preview#hide">
     {# La séance datée. Modale au pointeur fin, navigation au doigt. #}
@@ -70,7 +76,7 @@
         {% elseif fw and (fw.activities|length or workout.estimatedDurationMinutes) %}
             <span class="kd-calevent__meta">
                 {% for act in fw.activities %}
-                    <span class="kd-calevent__act kd-calevent__act--{{ activity.modifier(act) ?: 'neutral' }}"
+                    <span class="kd-calevent__act"
                           title="{{ act.label }}">{{ ux_icon(activity.icon(act)|trim) }}</span>
                 {% endfor %}
                 {% if workout.estimatedDurationMinutes %}

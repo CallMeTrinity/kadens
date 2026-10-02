@@ -57,6 +57,7 @@
                 <div class="kd-formgrid kd-formgrid--full">
                     {{ form_row(display.exerciseLanguage) }}
                     {{ form_row(display.bodySilhouette) }}
+                    {{ include('profile/_activity_colors.html.twig', {field: display.activityColors}) }}
                 </div>
                 <div class="kd-formactions">
                     <button type="submit" class="kd-btn kd-btn--primary">Enregistrer</button>

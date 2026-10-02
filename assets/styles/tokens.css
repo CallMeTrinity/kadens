@@ -86,9 +86,14 @@
   --kd-on-ink-faint:     rgba(255, 255, 255, .45);
   --kd-border-on-ink:    rgba(255, 255, 255, .18);
   --kd-border-on-ink-strong: rgba(255, 255, 255, .35);
+  /* Texte secondaire sur un aplat d'activité : plus couvrant que
+     --kd-on-ink-muted, parce que l'aplat est moins sombre que l'encre et que
+     la méta y fait 10 px (≥ 4.5:1 sur chaque teinte par défaut). */
+  --kd-on-act-muted:     rgba(255, 255, 255, .90);
 
-  /* Échelle catégorielle ordonnée — remplace l'ancien code couleur par
-     activité. Elle sert aux SÉRIES d'un graphique et aux aplats de catégorie,
+  /* Échelle catégorielle ordonnée — régions anatomiques, rôles de bloc (les
+     activités ont leur propre palette, plus bas). Elle sert aux SÉRIES d'un
+     graphique et aux aplats de catégorie,
      jamais à du texte : ordonnée du plus dense au plus clair, elle se lit en
      niveaux de gris comme une hiérarchie de volume. */
   --kd-cat-1: #0b0b0b;
@@ -107,14 +112,37 @@
      échec). Comme l'échelle catégorielle, elles ne portent JAMAIS de texte :
      aplats de pastille et carrés de légende, rien d'autre.
 
-     Portée : cet écran seul. Toute autre catégorie — activité, région
-     anatomique, rôle de bloc — reste sur --color-cat-1..4. Voir
-     docs/design-system.md §2. */
+     Portée : cet écran seul. Les régions anatomiques et les rôles de bloc
+     restent sur --color-cat-1..4 ; les activités ont leur palette, ci-dessous.
+     Voir docs/design-system.md §2. */
   --kd-muscle-legs:  #1d4e7a; /* bleu d'encre */
   --kd-muscle-chest: #a8632a; /* ocre brûlé */
   --kd-muscle-back:  #2f6b4f; /* vert bouteille */
   --kd-muscle-arms:  #6b3b6e; /* prune */
   --kd-muscle-other: #7a7a73; /* gris (même valeur que --kd-ink-outside) */
+
+  /* Activités — palette « Vif » (maquette Couleurs activités, piste 1b).
+     L'activité dominante d'une séance colore tout l'aplat (carte du
+     calendrier, hero, case de plan) SOUS DU TEXTE BLANC : chaque teinte tient
+     au moins 5:1 avec le blanc. La salle est tirée vers le carmin pour ne pas
+     se confondre avec l'accent #d8261e (actions, « aujourd'hui »).
+
+     Défaut seulement : chaque lecteur peut surcharger --color-activity-* dans
+     ses réglages (ActivityPalette, injecté en <style>:root). Ces valeurs sont
+     recopiées dans ActivityPalette::DEFAULTS — les deux bougent ensemble.
+     Le voile (-tint) = 12 % de la teinte sur blanc. */
+  --kd-act-gym:           #bd1f44; /* carmin */
+  --kd-act-gym-tint:      #f7e4e9;
+  --kd-act-run:           #aa5300; /* ocre */
+  --kd-act-run-tint:      #f5eae0;
+  --kd-act-swim:          #006bbb; /* bleu */
+  --kd-act-swim-tint:     #e0edf7;
+  --kd-act-bike:          #7945ab; /* violet */
+  --kd-act-bike-tint:     #efe9f5;
+  --kd-act-mobility:      #007979; /* sarcelle */
+  --kd-act-mobility-tint: #e0efef;
+  --kd-act-other:         #5c5c56; /* gris d'encre */
+  --kd-act-other-tint:    #ebebeb;
 
   /* Statuts prévu / réalisé — sémantiques, donc distincts de l'échelle
      catégorielle : fait = vert, prévu = gris, manqué = rouge (le rouge
@@ -250,6 +278,7 @@
   --kd-night-on-ink-faint:      rgba(0, 0, 0, .45);
   --kd-night-border-on-ink:     rgba(0, 0, 0, .18);
   --kd-night-border-on-ink-strong: rgba(0, 0, 0, .35);
+  --kd-night-on-act-muted:      rgba(0, 0, 0, .70);
 
   /* Voile de modale. Un voile tiré de l'encre serait CLAIR de nuit et ne
      détacherait plus rien : il se prend au noir, et plus dense. */
@@ -284,6 +313,21 @@
   --kd-night-muscle-arms:  #a97cad;
   --kd-night-muscle-other: #a3a19a;
 
+  /* Activités : mêmes teintes, remontées en luminosité (oklch L 0.72). Sur
+     ces aplats clairs, le texte se lit en encre et non plus en blanc. */
+  --kd-night-act-gym:           #f87584;
+  --kd-night-act-gym-tint:      #573a3c;
+  --kd-night-act-run:           #de8f58;
+  --kd-night-act-run-tint:      #513f33;
+  --kd-night-act-swim:          #62aaf1;
+  --kd-night-act-swim-tint:     #364554;
+  --kd-night-act-bike:          #b88de9;
+  --kd-night-act-bike-tint:     #483f52;
+  --kd-night-act-mobility:      #67b4b3;
+  --kd-night-act-mobility-tint: #374847;
+  --kd-night-act-other:         #a3a19a;
+  --kd-night-act-other-tint:    #444341;
+
   /* Types de série : les deux axes tiennent, l'encre se retourne. */
   --kd-night-set-warm-tint: #1f1f1e;
   --kd-night-set-degr-tint: #292928;
@@ -317,6 +361,13 @@
   --color-on-ink-faint:      var(--kd-on-ink-faint);
   --color-border-on-ink:     var(--kd-border-on-ink);
   --color-border-on-ink-strong: var(--kd-border-on-ink-strong);
+  /* Ce qui s'écrit sur un aplat d'activité (--color-activity-*) */
+  --color-on-activity:       var(--kd-on-ink);
+  --color-on-activity-muted: var(--kd-on-act-muted);
+  /* Ce avec quoi on fonce un aplat coloré (color-mix) : rangée de statut,
+     hachures, survol. Distinct de --color-surface-ink, que le hero coloré
+     redéfinit localement. */
+  --color-shade:             var(--kd-ink-surface);
 
   /* Texte — tous garantis ≥ 4.5:1 sur --color-surface-raised */
   --color-text:            var(--kd-ink-900);
@@ -366,18 +417,29 @@
   --color-muscle-arms:     var(--kd-muscle-arms);
   --color-muscle-other:    var(--kd-muscle-other);
 
-  /* Accents d'activité — l'activité est portée par l'ICÔNE, la couleur ne fait
-     que la ranger dans l'échelle catégorielle. Les cinq activités sont
-     couvertes (l'ancienne palette n'en codait que deux). */
-  --color-activity-run:       var(--kd-cat-1); /* course / trail */
-  --color-activity-run-tint:  var(--kd-paper-150);
-  --color-activity-run-text:  var(--kd-ink-muted);
-  --color-activity-gym:       var(--kd-cat-2); /* muscu / renfo */
-  --color-activity-gym-tint:  var(--kd-paper-150);
-  --color-activity-gym-text:  var(--kd-ink-muted);
-  --color-activity-swim:      var(--kd-cat-3); /* natation */
-  --color-activity-bike:      var(--kd-cat-3); /* vélo */
-  --color-activity-mobility:  var(--kd-cat-4); /* mobilité */
+  /* Activités — aplat (sous texte blanc), voile clair, variante texte. Les
+     composants ne les lisent pas directement : ils passent par les classes
+     porteuses .kd-act--{clé} / .kd-act2--{clé} (components.css), qui posent
+     --act / --act-tint / --act-text / --act2. Surchargés par lecteur
+     (ActivityPalette::cssOverrides). Cf. docs/design-system.md §2. */
+  --color-activity-run:           var(--kd-act-run);
+  --color-activity-run-tint:      var(--kd-act-run-tint);
+  --color-activity-run-text:      var(--kd-act-run);
+  --color-activity-gym:           var(--kd-act-gym);
+  --color-activity-gym-tint:      var(--kd-act-gym-tint);
+  --color-activity-gym-text:      var(--kd-act-gym);
+  --color-activity-swim:          var(--kd-act-swim);
+  --color-activity-swim-tint:     var(--kd-act-swim-tint);
+  --color-activity-swim-text:     var(--kd-act-swim);
+  --color-activity-bike:          var(--kd-act-bike);
+  --color-activity-bike-tint:     var(--kd-act-bike-tint);
+  --color-activity-bike-text:     var(--kd-act-bike);
+  --color-activity-mobility:      var(--kd-act-mobility);
+  --color-activity-mobility-tint: var(--kd-act-mobility-tint);
+  --color-activity-mobility-text: var(--kd-act-mobility);
+  --color-activity-other:         var(--kd-act-other);
+  --color-activity-other-tint:    var(--kd-act-other-tint);
+  --color-activity-other-text:    var(--kd-act-other);
 
   /* Types de série détaillée (pastille lettre) */
   --color-set-warmup:          var(--kd-set-warm);
@@ -439,6 +501,9 @@
   --color-on-ink-faint:      var(--kd-night-on-ink-faint);
   --color-border-on-ink:     var(--kd-night-border-on-ink);
   --color-border-on-ink-strong: var(--kd-night-border-on-ink-strong);
+  --color-on-activity:       var(--kd-night-on-ink);
+  --color-on-activity-muted: var(--kd-night-on-act-muted);
+  --color-shade:             var(--kd-night-on-ink);
 
   /* Texte */
   --color-text:            var(--kd-night-ink-900);
@@ -493,16 +558,25 @@
   --color-muscle-arms:     var(--kd-night-muscle-arms);
   --color-muscle-other:    var(--kd-night-muscle-other);
 
-  /* Activités — alias de l'échelle catégorielle, comme au jour */
-  --color-activity-run:       var(--kd-night-cat-1);
-  --color-activity-run-tint:  var(--kd-night-paper-150);
-  --color-activity-run-text:  var(--kd-night-ink-muted);
-  --color-activity-gym:       var(--kd-night-cat-2);
-  --color-activity-gym-tint:  var(--kd-night-paper-150);
-  --color-activity-gym-text:  var(--kd-night-ink-muted);
-  --color-activity-swim:      var(--kd-night-cat-3);
-  --color-activity-bike:      var(--kd-night-cat-3);
-  --color-activity-mobility:  var(--kd-night-cat-4);
+  /* Activités — mêmes rôles, teintes remontées */
+  --color-activity-run:           var(--kd-night-act-run);
+  --color-activity-run-tint:      var(--kd-night-act-run-tint);
+  --color-activity-run-text:      var(--kd-night-act-run);
+  --color-activity-gym:           var(--kd-night-act-gym);
+  --color-activity-gym-tint:      var(--kd-night-act-gym-tint);
+  --color-activity-gym-text:      var(--kd-night-act-gym);
+  --color-activity-swim:          var(--kd-night-act-swim);
+  --color-activity-swim-tint:     var(--kd-night-act-swim-tint);
+  --color-activity-swim-text:     var(--kd-night-act-swim);
+  --color-activity-bike:          var(--kd-night-act-bike);
+  --color-activity-bike-tint:     var(--kd-night-act-bike-tint);
+  --color-activity-bike-text:     var(--kd-night-act-bike);
+  --color-activity-mobility:      var(--kd-night-act-mobility);
+  --color-activity-mobility-tint: var(--kd-night-act-mobility-tint);
+  --color-activity-mobility-text: var(--kd-night-act-mobility);
+  --color-activity-other:         var(--kd-night-act-other);
+  --color-activity-other-tint:    var(--kd-night-act-other-tint);
+  --color-activity-other-text:    var(--kd-night-act-other);
 
   /* Types de série — deux axes tenus : encre ou rouge, plein ou contour */
   --color-set-warmup:          var(--kd-night-ink-900);

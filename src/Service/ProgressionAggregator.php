@@ -180,11 +180,11 @@ final class ProgressionAggregator
 
         $series = [
             $this->buildSeries($acc, $realized, 'minutes', 'minutes', 'Temps', '', fn (float $v): string => $this->humanMinutes((int) $v)),
-            $this->buildSeries($acc, $realized, 'tonnage', 'tonnage', 'Tonnage', 'gym', fn (float $v): string => $this->units->weight($v)),
-            $this->buildSeries($acc, $realized, 'sets', 'sets', 'Séries', 'gym', fn (float $v): string => $this->plural((int) $v, 'série')),
-            $this->buildSeries($acc, $realized, 'running', null, 'Course', 'run', fn (float $v): string => $this->units->distance((int) $v)),
-            $this->buildSeries($acc, $realized, 'cycling', null, 'Vélo', '', fn (float $v): string => $this->units->distance((int) $v)),
-            $this->buildSeries($acc, $realized, 'swimming', null, 'Natation', '', fn (float $v): string => $this->units->distance((int) $v)),
+            $this->buildSeries($acc, $realized, 'tonnage', 'tonnage', 'Tonnage', ActivityType::GYM->cssKey(), fn (float $v): string => $this->units->weight($v)),
+            $this->buildSeries($acc, $realized, 'sets', 'sets', 'Séries', ActivityType::GYM->cssKey(), fn (float $v): string => $this->plural((int) $v, 'série')),
+            $this->buildSeries($acc, $realized, 'running', null, 'Course', ActivityType::RUNNING->cssKey(), fn (float $v): string => $this->units->distance((int) $v)),
+            $this->buildSeries($acc, $realized, 'cycling', null, 'Vélo', ActivityType::CYCLING->cssKey(), fn (float $v): string => $this->units->distance((int) $v)),
+            $this->buildSeries($acc, $realized, 'swimming', null, 'Natation', ActivityType::SWIMMING->cssKey(), fn (float $v): string => $this->units->distance((int) $v)),
         ];
 
         return array_values(array_filter($series, static fn (array $s): bool => $s['max'] > 0.0));

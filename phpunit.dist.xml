@@ -13,6 +13,11 @@
     <php>
         <ini name="display_errors" value="1" />
         <ini name="error_reporting" value="-1" />
+        <!-- Toute la suite tourne dans un seul processus (un noyau par test
+             WebTestCase), et l'export Excel (ZipStream) alloue par blocs de
+             16 Mo : les 128 Mo du php.ini Homebrew ne suffisent plus. Sans
+             limite, comme en CI (setup-php pose memory_limit=-1). -->
+        <ini name="memory_limit" value="-1" />
         <server name="APP_ENV" value="test" force="true" />
         <server name="SHELL_VERBOSITY" value="-1" />
     </php>

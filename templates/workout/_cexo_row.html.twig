@@ -35,7 +35,7 @@
         {% if groupLabel %}
             <span class="kd-cexo__rank" title="{{ groupKind == 'circuit' ? 'Circuit' : 'Superset' }} — enchaîné sans repos">{{ groupLabel }}</span>
         {% endif %}
-        <span class="kd-cexo__code{{ mod ? ' kd-cexo__code--' ~ mod }}">{{ ex ? exercise_name(ex)|slice(0, 2)|upper : '??' }}</span>
+        <span class="kd-cexo__code{{ mod ? ' kd-cexo__code--act kd-act--' ~ mod }}">{{ ex ? exercise_name(ex)|slice(0, 2)|upper : '??' }}</span>
         <span class="kd-cexo__body">
             <span class="kd-cexo__name">{{ ex ? exercise_name(ex) : 'Exercice supprimé' }}</span>
 

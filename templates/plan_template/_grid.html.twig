@@ -72,7 +72,7 @@
                     </span>
                     {% for chip in vol.chips %}
                         {% set mod = activity.modifier(chip.activity) %}
-                        <span class="kd-weekvol__chip{{ mod ? ' kd-weekvol__chip--' ~ mod }}">
+                        <span class="kd-weekvol__chip{{ mod ? ' kd-weekvol__chip--act kd-act--' ~ mod }}">
                             {{ ux_icon(activity.icon(chip.activity)|trim) }} {{ chip.label }} · {{ chip.value }}
                         </span>
                     {% endfor %}
@@ -105,7 +105,7 @@
                                          data-move-url="{{ path('app_plan_template_item_move', {id: template.id, itemId: entry.item.id}) }}"
                                          data-move-token="{{ csrf_token('item_move' ~ entry.item.id) }}"
                                          data-action="mouseenter->plangrid#showPreview mouseleave->plangrid#hidePreview">
-                                        <div class="kd-planitem">
+                                        <div class="kd-planitem{{ entry.workout.activities ? ' kd-planitem--act ' ~ activity.surface(entry.workout.activities) }}">
                                             <button type="button" class="kd-planitem__link"
                                                     data-action="plangrid#edit"
                                                     data-panel-url="{{ path('app_workout_quick_panel', {id: entry.item.workout.id}) }}"

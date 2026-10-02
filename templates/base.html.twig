@@ -19,6 +19,17 @@
         {% block javascripts %}
             {% block importmap %}{{ importmap('app') }}{% endblock %}
         {% endblock %}
+
+        {# Couleurs d'activité du LECTEUR (réglage d'affichage) : rien pour qui
+           suit le défaut, ni pour un anonyme. Après la feuille de style, pour
+           gagner à spécificité égale. `dynamic` : Turbo Drive retire ce bloc
+           quand la page suivante n'en a plus (retour au défaut), au lieu de le
+           garder en tête de document. Inline plutôt qu'une route CSS : il voyage
+           avec la page dans le cache hors ligne du service worker. #}
+        {% set activity_palette = activity_palette_css(app.user) %}
+        {% if activity_palette %}
+            <style data-turbo-track="dynamic">{{ activity_palette }}</style>
+        {% endif %}
     </head>
     <body>
         {# Évitement du chrome : le header est collant et porte 4 entrées + un

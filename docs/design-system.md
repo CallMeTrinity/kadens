@@ -21,10 +21,12 @@ vient du contraste typographique, pas de la couleur.
 
 Deux principes tiennent tout le reste :
 
-1. **La couleur porte du sens — et il n'y en a qu'une.** Le rouge marque les
-   actions primaires, l'intensité et l'échec. Tout le reste vit en niveaux de
-   gris. Une catégorie (activité, région musculaire, rôle de bloc) se code par
-   sa **place dans l'échelle catégorielle**, pas par une teinte propre.
+1. **La couleur porte du sens.** Le rouge marque les actions primaires,
+   l'intensité et l'échec. Les **activités** ont leur propre palette, que chaque
+   lecteur peut changer (§2, « Code activité ») : c'est ce qu'on cherche d'un
+   regard dans un calendrier. Le reste vit en niveaux de gris : une région
+   musculaire ou un rôle de bloc se code par sa **place dans l'échelle
+   catégorielle**, pas par une teinte propre.
 2. **Le contraste avant la pâleur.** Un texte estompé l'est parce que l'encre
    pleine est à 19:1, pas parce qu'il est pâle. Tout token `--color-text-*` tient
    au moins 4.5:1 sur `--color-surface-raised`.
@@ -88,9 +90,10 @@ Tous ces tokens sont garantis **≥ 4.5:1 sur `--color-surface-raised`**.
 > **foncer**. Confondre les deux donne un bouton primaire qui s'éteint.
 
 ### Échelle catégorielle
-Remplace l'ancien code couleur par activité. Elle sert aux **séries d'un
-graphique** et aux aplats de catégorie, jamais à du texte : ordonnée du plus
-dense au plus clair, elle se lit comme une hiérarchie de volume.
+Pour les catégories qui se **comparent en volume** : régions anatomiques, rôles
+de bloc. Elle sert aux **séries d'un graphique** et aux aplats de catégorie,
+jamais à du texte : ordonnée du plus dense au plus clair, elle se lit comme une
+hiérarchie de volume. Les activités n'y sont plus (cf. ci-dessous).
 
 | Token | Valeur | Classe utilitaire |
 |---|---|---|
@@ -99,19 +102,72 @@ dense au plus clair, elle se lit comme une hiérarchie de volume.
 | `--color-cat-3` | `#8a8a82` | `.kd-cat--3` |
 | `--color-cat-4` | `#c9c9c2` | `.kd-cat--4` |
 
-### Code activité
-L'activité est portée par l'**icône** (voir `_activity.html.twig`, source unique
-du couple icône ↔ modificateur). Le rang catégoriel ne fait que la classer. Les
-cinq activités sont couvertes — l'ancienne palette n'en codait que deux, faute
-d'une troisième couleur disponible.
+### Code activité — palette « Vif », personnalisable
+Issue de la maquette Claude Design « Couleurs activités » (issue #35, piste
+**1b**). Une activité se lit deux fois : par son **icône**, toujours présente,
+et par sa **couleur**. La règle commune à tous les écrans : **la couleur de
+l'activité dominante en aplat, la deuxième activité en bande de 3 à 6 px,
+l'icône toujours là.**
 
-| Famille | Modificateur | Rang |
-|---|---|---|
-| Course / trail | `run` | `--color-activity-run` = cat-1 |
-| Muscu / renfo | `gym` | `--color-activity-gym` = cat-2 |
-| Natation | `swim` | `--color-activity-swim` = cat-3 |
-| Vélo | `bike` | `--color-activity-bike` = cat-3 |
-| Mobilité | `mobility` | `--color-activity-mobility` = cat-4 |
+| Activité | Clé (`cssKey`) | Token | Défaut |
+|---|---|---|---|
+| Salle de sport | `gym` | `--color-activity-gym` | `#bd1f44` carmin |
+| Course à pied | `run` | `--color-activity-run` | `#aa5300` ocre |
+| Natation | `swim` | `--color-activity-swim` | `#006bbb` bleu |
+| Cyclisme | `bike` | `--color-activity-bike` | `#7945ab` violet |
+| Mobilité | `mobility` | `--color-activity-mobility` | `#007979` sarcelle |
+| Autre | `other` | `--color-activity-other` | `#5c5c56` gris d'encre |
+
+Chaque activité a trois tokens : l'aplat, son voile `-tint` (12 % sur blanc :
+puce, fond d'icône) et `-text` (la teinte, lisible sur papier). Ce qui s'écrit
+sur l'aplat passe par `--color-on-activity` / `--color-on-activity-muted`, et ce
+qui le fonce (rangée de statut, hachures, survol) par
+`color-mix(… var(--act) N%, var(--color-shade))`.
+
+**Pourquoi ces teintes.** Elles portent du **texte blanc** de 10 à 12 px : chacune
+tient au moins 5,2:1 avec le blanc. La salle est tirée vers le carmin pour ne pas
+se confondre avec l'accent `#d8261e`, qui garde son sens (action, « aujourd'hui »,
+échec). Le gris « Autre » est volontairement le moins voyant.
+
+**Les classes porteuses, seule entrée côté composant.** Aucun composant ne lit
+`--color-activity-*` directement. Le macro `activity.surface(activities)`
+(`components/_activity.html.twig`) rend `kd-act--{dominante} kd-act2--{deuxième}`,
+qui posent `--act`, `--act-tint`, `--act-text` et `--act2` ; le composant ne lit
+que ces variables (`background: var(--act)`,
+`box-shadow: inset 0 -4px 0 var(--act2, transparent)`). `.kd-act--*` remet
+`--act2` à `transparent`, pour qu'un élément d'une seule activité niché dans une
+séance à deux n'hérite pas de la bande.
+
+**Activité dominante** = celle qui porte le plus d'exercices, à égalité l'ordre
+de l'enum (`ActivityType::rankByCount`). `WorkoutMetrics::distinctActivities`
+rend les activités dans cet ordre, et l'historique (`TrainingHistory`) départage
+avec la même fonction : une séance ne change pas de couleur d'un écran à l'autre.
+
+| Écran | Rendu |
+|---|---|
+| Calendrier (`_cal_event`) | carte entière en aplat, bande 4 px ; le statut passe par l'icône du bouton de cycle sur une rangée foncée (82 %), la manquée se hachure, la faite se barre ; le retard devient un contour pointillé rouge. Une séance sans activité garde la pastille neutre à filet de statut. Légende des six couleurs au-dessus de la grille. |
+| Hero de séance | l'aplat encre devient l'aplat d'activité, bande 6 px. Le hero redéfinit **localement** les tokens « sur encre » (`--color-on-ink*`, `--color-primary-on-ink`) plutôt que de doubler ses règles. |
+| Bibliothèques | filet gauche + pastille d'icône pleine (icône de la dominante). Les cartes de plan restent neutres : un plan mélange les activités. |
+| Trame de plan | consultation : séances en aplat, bande 3 px. Éditeur : filet gauche seulement (kebab, survol et glisser-déposer vivent sur la case). |
+| Badge d'activité | plein, texte et icône blancs. |
+| Statistiques, progression, compositeur | barres, points et codes à la couleur. |
+
+**Personnalisation par le lecteur.** Dans `/profile/settings` (section
+Affichage), chaque activité prend une des huit pastilles
+(`ActivityPalette::SWATCHES`) ou une couleur libre. `User.activityColors` ne
+garde que les **écarts** au défaut ; `ActivityPalette::cssOverrides()` les rend
+en `<style data-turbo-track="dynamic">:root{…}</style>` dans `base.html.twig`,
+après la feuille de style. C'est un réglage **du lecteur**, comme la silhouette :
+un coach voit ses couleurs chez son athlète, un anonyme voit le défaut.
+Trois invariants :
+- **Plancher AA** : une couleur sous 4,5:1 avec le blanc est refusée par le
+  formulaire, et ignorée si elle se trouvait en base. Une couleur illisible ne
+  s'affiche jamais.
+- **Le défaut vit deux fois**, `ActivityPalette::DEFAULTS` et les primitives
+  `--kd-act-*` : `ActivityPaletteTest` vérifie qu'elles sont égales.
+- **Inline, pas une route CSS** : le bloc voyage avec la page dans le cache hors
+  ligne du service worker. `dynamic` fait retirer le bloc par Turbo Drive quand
+  la page suivante n'en a plus (retour au défaut).
 
 ### Régions anatomiques
 `TargetRegion` regroupe les 17 `TargetArea` en quatre grands ensembles, qui se
@@ -164,9 +220,9 @@ Les mêmes trois valeurs vivent côté mobile (`colors.bodymap*`), servies par
 
 ### Groupes musculaires — l'exception colorée
 
-**C'est la seule entorse à la règle 2, et elle est bornée à un écran :
-`/profile/history`.** À lire comme telle : ailleurs, une catégorie passe par
-`--color-cat-1..4`, sans discussion.
+**Avec la palette d'activité, c'est la seule teinte hors accent, et elle est
+bornée à un écran : `/profile/history`.** À lire comme telle : ailleurs, une
+catégorie autre qu'une activité passe par `--color-cat-1..4`, sans discussion.
 
 Pourquoi elle existe. Cette page code cinq groupes d'entraînement (`MuscleGroup` :
 jambes, pectoraux, dos, bras, autres) sur des **pastilles de 6 px**, jusqu'à cinq
@@ -400,8 +456,9 @@ Classes `.kd-*` dans `assets/styles/components.css`.
 - **Boutons** (`.kd-btn`) : display 700 15px, uppercase, `letter-spacing .1em`.
   `--primary` (aplat rouge), `--secondary` (contour encre, s'inverse au survol),
   `--ghost`, `--onink` (variante sur aplat encre), `--sm`, `--block`, `--danger`.
-- **Badge** (`.kd-badge`) : mono capitales, contour `1px`, transparent. Le code
-  activité pose un filet gauche `3px` au rang catégoriel.
+- **Badge** (`.kd-badge`) : mono capitales, contour `1px`, transparent. Le
+  badge d'activité (`.kd-badge--act`, macro `activity.badge()`) est plein, à la
+  couleur de l'activité, texte et icône blancs.
 - **Menu de compte** (`.kd-usermenu`) et **kebab** (`.kd-kebab`) : `<details>`
   natif + contrôleur `dismiss` (clic extérieur, Échap) pour le seul confort.
   Panneau à contour encre.
@@ -514,8 +571,9 @@ répond de l'étendue complète et n'a donc aucun paramètre d'URL.
   la ligne, triées par volume décroissant — la première se lit comme le thème du
   jour. L'**icône** (`.kd-histsess--endurance`) dit la nature de la séance, et
   c'est elle qui rend une sortie course, vélo ou natation visible là où elle
-  n'aurait qu'une case creuse. Conforme à la règle générale : « l'activité est
-  portée par l'icône » — aucune couleur n'est inventée pour elle.
+  n'aurait qu'une case creuse. Sur cet écran, la couleur est déjà prise par les
+  groupes musculaires : l'activité y reste portée par l'icône seule, sans sa
+  couleur de palette, pour ne pas faire coexister deux codes colorés.
 - **Décompte par nature** (`.kd-metric`, en tête de page) : chaque séance
   comptée **une fois**, sous son activité dominante, donc la somme vaut le total
   affiché. À ne pas confondre avec la répartition de `/profile/stats`, qui compte
@@ -538,11 +596,14 @@ répond de l'étendue complète et n'a donc aucun paramètre d'URL.
 
 1. **Jamais de couleur/typo en dur** dans un template ou un composant. Toujours
    via un token sémantique (`--color-*`, `--font-*`).
-2. **La couleur porte du sens, et il n'y a qu'une couleur.** Le rouge est
-   réservé aux actions primaires, à l'intensité et à l'échec. Une catégorie se
-   code par son rang dans `--color-cat-*`, pas par une teinte inventée. **Une
-   seule exception, bornée à `/profile/history`** : les cinq groupes musculaires
-   (`--color-muscle-*`), cf. §2 — elle ne s'étend à aucun autre écran.
+2. **La couleur porte du sens.** Le rouge est réservé aux actions primaires, à
+   l'intensité et à l'échec. Les **activités** ont leur palette
+   (`--color-activity-*`, personnalisable par le lecteur, plancher AA sous texte
+   blanc), consommée uniquement via les classes porteuses `kd-act--*` (cf. §2).
+   Toute autre catégorie (région, rôle de bloc) se code par son rang dans
+   `--color-cat-*`, pas par une teinte inventée. **Une exception, bornée à
+   `/profile/history`** : les cinq groupes musculaires (`--color-muscle-*`) —
+   elle ne s'étend à aucun autre écran.
 3. **Nouvelle valeur = nouvelle primitive `--kd-*` d'abord**, puis token
    sémantique. On n'expose jamais une primitive directement aux vues.
 4. **Le condensé capitales ne touche pas au contenu saisi** (cf. §3).
@@ -639,10 +700,14 @@ Le reste s'inverse, et trois familles demandent plus qu'une inversion mécanique
   `--kd-accent-on-ink` (`#f0544c`, commenté « accent lisible sur fond encre »)
   qui prend sa place. `--color-primary-on-ink` fait le trajet inverse.
 
-Deux valeurs ont dû être choisies plutôt que dérivées : le vert du statut
-« fait » (`#006d14` tombe à 2,9:1 sur une surface nuit) et les cinq teintes de
+Trois familles ont dû être choisies plutôt que dérivées : le vert du statut
+« fait » (`#006d14` tombe à 2,9:1 sur une surface nuit), les cinq teintes de
 groupe musculaire, qui devaient remonter en luminosité **en gardant leur écart
-mutuel** — une pastille de 6 px ne porte que ça.
+mutuel** — une pastille de 6 px ne porte que ça — et les six couleurs
+d'activité, remontées de la même façon (oklch L 0,72). Sur ces aplats devenus
+clairs, `--color-on-activity` passe à l'encre, comme `--color-on-ink`. Les
+couleurs personnalisées, elles, ne vivent que sur le site, en jeu clair : le
+mobile ne reçoit que la palette par défaut.
 
 ### Le plancher AA vaut sur les deux papiers
 

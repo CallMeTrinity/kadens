@@ -46,7 +46,7 @@
     <div class="kd-libpanel__list" data-composer-target="library">
         {% for ex in library %}
             {% set mod = activity.modifier(ex.activity) %}
-            <button type="button" class="kd-libx{{ mod ? ' kd-libx--' ~ mod }}"
+            <button type="button" class="kd-libx{{ mod ? ' kd-libx--act kd-act--' ~ mod }}"
                     data-composer-target="libcard"
                     data-exercise-id="{{ ex.id }}"
                     data-activity="{{ ex.activity.value }}"

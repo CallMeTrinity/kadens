@@ -1,0 +1,15 @@
+{# ============================================================================
+   Légende des couleurs d'activité, au-dessus de la grille (vue mois et vue
+   semaine). Toutes les activités, pas seulement celles du mois : la légende
+   sert aussi à retrouver sa palette, et une ligne qui change d'un mois à
+   l'autre se relirait à chaque fois. Les couleurs sont celles du lecteur.
+   ============================================================================ #}
+{% import 'components/_activity.html.twig' as activity %}
+<ul class="kd-legend kd-legend--cal" aria-label="Couleurs des activités">
+    {% for act in enum_cases('App\\Enum\\ActivityType') %}
+        <li class="kd-legend__item">
+            <span class="kd-legend__key kd-legend__key--act kd-act--{{ activity.modifier(act) }}" aria-hidden="true"></span>
+            {{ act.label }}
+        </li>
+    {% endfor %}
+</ul>

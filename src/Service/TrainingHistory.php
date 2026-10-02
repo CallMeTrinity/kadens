@@ -220,26 +220,20 @@ final class TrainingHistory
      */
     private function pickDominant(array $rows): array
     {
-        $order = [];
-        foreach (ActivityType::cases() as $index => $case) {
-            $order[$case->value] = $index;
+        $counts = [];
+        foreach ($rows as $row) {
+            $counts[$row['scheduledId']][$row['activity']->value] = $row['exercises'];
         }
 
-        $best = [];
-        foreach ($rows as $row) {
-            $current = $best[$row['scheduledId']] ?? null;
-
-            if (
-                null === $current
-                || $row['exercises'] > $current['exercises']
-                || ($row['exercises'] === $current['exercises']
-                    && $order[$row['activity']->value] < $order[$current['activity']->value])
-            ) {
-                $best[$row['scheduledId']] = ['activity' => $row['activity'], 'exercises' => $row['exercises']];
+        $dominant = [];
+        foreach ($counts as $scheduledId => $byActivity) {
+            $ranked = ActivityType::rankByCount($byActivity);
+            if ([] !== $ranked) {
+                $dominant[$scheduledId] = $ranked[0];
             }
         }
 
-        return array_map(static fn (array $row): ActivityType => $row['activity'], $best);
+        return $dominant;
     }
 
     /**
