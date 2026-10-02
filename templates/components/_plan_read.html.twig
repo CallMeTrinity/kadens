@@ -7,6 +7,7 @@
      publique (/s/{slug}) et non la route propriétaire (auth-gated).
    - `weeks` (défaut null) : liste de numéros de semaines à afficher (partage d'une
      plage). Null = toutes. #}
+{% import 'components/_activity.html.twig' as activity %}
 {% set template = flat.template %}
 {% set public = public|default(false) %}
 {% set weeks = weeks|default(null) %}
@@ -57,11 +58,12 @@
                                     {# `back_to` seulement hors page publique : la
                                        page partagée n'a pas de retour applicatif
                                        à porter, et le plan y est auth-gated. #}
-                                    <a class="kd-planday__item"
+                                    {% set acts = entry.workout.activities %}
+                                    <a class="kd-planday__item{{ acts ? ' kd-planday__item--act ' ~ activity.surface(acts) }}"
                                        href="{{ public
                                            ? path('app_public_share', {slug: entry.workout.workout.slug})
                                            : path('app_workout_show', {id: entry.item.workout.id}|merge(back_to('plan', template.id))) }}">
-                                        {{ ux_icon('lucide:clipboard-list') }}
+                                        {{ ux_icon(acts ? activity.icon(acts|first)|trim : 'lucide:clipboard-list') }}
                                         <span>{{ entry.workout.workout.title }}</span>
                                     </a>
                                     {% if entry.item.notes %}<p class="kd-planday__notes">{{ entry.item.notes|nl2br }}</p>{% endif %}

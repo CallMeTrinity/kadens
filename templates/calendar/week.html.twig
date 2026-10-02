@@ -74,6 +74,8 @@
     <div data-controller="caladd">
         {{ include('calendar/_addbar.html.twig', {year: monthPivot.year, month: monthPivot.month}) }}
 
+        {{ include('calendar/_activity_legend.html.twig') }}
+
         <div class="kd-week">
             {% for day in days %}
                 <section class="kd-weekday{{ day.isToday ? ' kd-weekday--today' }}{{ day.weekend ? ' kd-weekday--weekend' }}{{ day.isPast and not day.isToday ? ' kd-weekday--past' }}">

@@ -206,6 +206,96 @@ final class ProfileControllerTest extends WebTestCase
         );
     }
 
+    // --- Couleurs des activités ----------------------------------------------
+
+    /**
+     * Le réglage se stocke en écart au défaut, et se voit : la page suivante
+     * porte la surcharge dans son `<head>`, que lisent tous les composants.
+     */
+    public function testAnActivityColorIsSavedAndInjected(): void
+    {
+        $user = $this->createUser('owner@example.com');
+
+        $this->client->loginUser($user);
+        $this->submitActivityColors(['gym' => '#3b7a2c']);
+
+        self::assertResponseRedirects('/profile/settings');
+
+        $this->em->clear();
+        self::assertSame(
+            ['gym' => '#3b7a2c'],
+            $this->em->getRepository(User::class)->findOneBy(['email' => 'owner@example.com'])?->getActivityColors(),
+        );
+
+        $crawler = $this->client->request('GET', '/profile/settings');
+        $style = $crawler->filter('head style[data-turbo-track="dynamic"]');
+        self::assertCount(1, $style);
+        self::assertStringContainsString('--color-activity-gym:#3b7a2c', $style->text());
+        self::assertStringNotContainsString('--color-activity-run', $style->text(), 'Seules les activités surchargées sont réécrites.');
+    }
+
+    /**
+     * Le plancher de lisibilité : du texte blanc s'écrit sur ces couleurs. Un
+     * jaune clair est refusé, avec son contraste, et rien n'est enregistré.
+     */
+    public function testAColorTooLightForWhiteTextIsRefused(): void
+    {
+        $user = $this->createUser('owner@example.com');
+
+        $this->client->loginUser($user);
+        $this->submitActivityColors(['running' => '#ffff66']);
+
+        self::assertResponseStatusCodeSame(422);
+        self::assertSelectorTextContains('.kd-actcolors .kd-errors', 'Trop clair pour du texte blanc');
+
+        $this->em->clear();
+        self::assertSame(
+            [],
+            $this->em->getRepository(User::class)->findOneBy(['email' => 'owner@example.com'])?->getActivityColors(),
+        );
+    }
+
+    /**
+     * Revenir à la couleur par défaut retire la clé (et la surcharge de la
+     * page) : un changement futur de la palette atteindra aussi ce compte.
+     */
+    public function testChoosingTheDefaultAgainClearsTheOverride(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $user->setActivityColors(['gym' => '#3b7a2c']);
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $this->submitActivityColors(['gym' => '#bd1f44']);
+
+        self::assertResponseRedirects('/profile/settings');
+
+        $this->em->clear();
+        self::assertSame(
+            [],
+            $this->em->getRepository(User::class)->findOneBy(['email' => 'owner@example.com'])?->getActivityColors(),
+        );
+
+        $crawler = $this->client->request('GET', '/profile/settings');
+        self::assertCount(0, $crawler->filter('head style[data-turbo-track="dynamic"]'));
+    }
+
+    /**
+     * Couleurs du LECTEUR : un visiteur anonyme lit la palette par défaut, quel
+     * que soit le réglage des comptes existants.
+     */
+    public function testAnAnonymousReaderGetsTheDefaultPalette(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $user->setActivityColors(['gym' => '#3b7a2c']);
+        $this->em->flush();
+
+        $crawler = $this->client->request('GET', '/login');
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(0, $crawler->filter('head style[data-turbo-track="dynamic"]'));
+    }
+
     // --- Fiche athlète : les records suivent le réalisé ----------------------
 
     /**
@@ -274,6 +364,23 @@ final class ProfileControllerTest extends WebTestCase
 
         $form = $crawler->filter('form[name="display_settings"]')->form();
         $form['display_settings[exerciseLanguage]'] = $language->value;
+
+        return $this->client->submit($form);
+    }
+
+    /**
+     * @param array<string, string> $colors `ActivityType::value` → hex ; les autres
+     *                                      activités gardent leur valeur pré-remplie
+     */
+    private function submitActivityColors(array $colors): Crawler
+    {
+        $crawler = $this->client->request('GET', '/profile/settings');
+        self::assertResponseIsSuccessful();
+
+        $form = $crawler->filter('form[name="display_settings"]')->form();
+        foreach ($colors as $activity => $color) {
+            $form['display_settings[activityColors]['.$activity.']'] = $color;
+        }
 
         return $this->client->submit($form);
     }

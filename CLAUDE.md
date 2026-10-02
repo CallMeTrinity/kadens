@@ -354,13 +354,18 @@ généralisation. Remplace l'ancienne identité « Carnet clair ».
 Règles non négociables :
 1. **Jamais de couleur ou de police en dur** dans un template/composant. Toujours
    un token sémantique.
-2. **La couleur porte du sens, et il n'y a qu'une couleur.** Le rouge est
-   réservé aux actions primaires, à l'intensité et à l'échec. Toute **catégorie**
-   (activité, région musculaire, rôle de bloc) se code par son rang dans
-   l'échelle de gris `--color-cat-1..4`, jamais par une teinte inventée — c'est
-   ce qui permet de couvrir les cinq activités là où l'ancienne palette n'en
-   codait que deux. Les statuts gardent leurs tokens dédiés ; les types de série
-   détaillée se réduisent à deux axes (encre/rouge, plein/contour). **Une seule
+2. **La couleur porte du sens.** Le rouge est réservé aux actions primaires, à
+   l'intensité et à l'échec. Les **activités** ont leur palette « Vif »
+   (`--color-activity-*`) : la dominante d'une séance en aplat, la deuxième en
+   bande, l'icône toujours là. Elle est **personnalisable par le lecteur**
+   (`User.activityColors`, écarts au défaut seulement, injectés en
+   `<style>:root` par `ActivityPalette`), avec un plancher AA sous texte blanc.
+   Un composant ne la lit **que** via les classes porteuses `kd-act--*` /
+   `kd-act2--*` (macro `activity.surface()`), jamais `--color-activity-*` en
+   direct. Toute autre **catégorie** (région musculaire, rôle de bloc) se code
+   par son rang dans l'échelle de gris `--color-cat-1..4`, jamais par une teinte
+   inventée. Les statuts gardent leurs tokens dédiés ; les types de série
+   détaillée se réduisent à deux axes (encre/rouge, plein/contour). **Une
    exception, bornée à `/profile/history`** : les cinq groupes musculaires
    (`--color-muscle-*`), qui ne tiennent pas dans quatre gris sur une pastille de
    6 px — cadrage et portée dans `docs/design-system.md` §2, à ne pas étendre.

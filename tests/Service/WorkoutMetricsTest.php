@@ -28,12 +28,14 @@ final class WorkoutMetricsTest extends TestCase
         $this->metrics = new WorkoutMetrics(new WorkoutEstimator(), new SupersetGrouper(), new RegionBreakdown());
     }
 
-    public function testDistinctActivitiesInOrderOfAppearance(): void
+    public function testDistinctActivitiesPutTheDominantFirst(): void
     {
+        // La course apparaît en premier, mais la salle porte deux exercices :
+        // c'est elle qui colore la séance.
         $workout = $this->workout([
             $this->block(BlockRole::MAIN, 1, [
-                $this->prescribed(ActivityType::GYM, PrescriptionType::SETS_REPS, [TargetArea::CHEST]),
                 $this->prescribed(ActivityType::RUNNING, PrescriptionType::DISTANCE_PACE, []),
+                $this->prescribed(ActivityType::GYM, PrescriptionType::SETS_REPS, [TargetArea::CHEST]),
                 $this->prescribed(ActivityType::GYM, PrescriptionType::SETS_REPS, [TargetArea::BACK]),
             ]),
         ]);
@@ -43,6 +45,23 @@ final class WorkoutMetricsTest extends TestCase
             $this->metrics->distinctActivities($workout),
         );
         self::assertSame(3, $this->metrics->exerciseCount($workout));
+    }
+
+    public function testDistinctActivitiesBreakTiesByEnumOrder(): void
+    {
+        // Vélo puis course, un exercice chacun : l'ordre de l'enum tranche, comme
+        // pour l'activité dominante de l'historique (TrainingHistory).
+        $workout = $this->workout([
+            $this->block(BlockRole::MAIN, 1, [
+                $this->prescribed(ActivityType::CYCLING, PrescriptionType::DISTANCE_PACE, []),
+                $this->prescribed(ActivityType::RUNNING, PrescriptionType::DISTANCE_PACE, []),
+            ]),
+        ]);
+
+        self::assertSame(
+            [ActivityType::RUNNING, ActivityType::CYCLING],
+            $this->metrics->distinctActivities($workout),
+        );
     }
 
     public function testGymVolumeAttributesSetsPerAreaWithRoundsAndTonnage(): void

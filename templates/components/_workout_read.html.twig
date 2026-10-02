@@ -48,7 +48,9 @@
 <article class="kd-wk">
 
     {# ---------------------------------------------------------------- Hero #}
-    <header class="kd-wk__hero">
+    {# Couleur de l'activité dominante en aplat, la deuxième en bande ; sans
+       activité (séance vide), le hero garde son aplat encre. #}
+    <header class="kd-wk__hero{{ flat.activities is not empty ? ' kd-wk__hero--act ' ~ activity.surface(flat.activities) }}">
         <div class="kd-wk__heroinner">
             {% block actions %}{% endblock %}
 

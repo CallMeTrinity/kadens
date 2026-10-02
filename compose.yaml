@@ -15,6 +15,9 @@ services:
       start_period: 60s
     volumes:
       - database_data:/var/lib/mysql:rw
+      # Base de test `<db>_test` + droits de l'utilisateur applicatif, créés au
+      # premier démarrage d'un volume vide (cf. docker/db/init/).
+      - ./docker/db/init:/docker-entrypoint-initdb.d:ro
       # You may use a bind-mounted host directory instead, so that it is harder to accidentally remove the volume and lose all your data!
       # - ./docker/db/data:/var/lib/mysql:rw
 ###< doctrine/doctrine-bundle ###

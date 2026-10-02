@@ -67,6 +67,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(enumType: BodySilhouette::class, options: ['default' => 'male'])]
     private BodySilhouette $bodySilhouette = BodySilhouette::MALE;
 
+    // Les couleurs d'activité choisies par l'utilisateur, et elles SEULES : une
+    // carte `ActivityType::value => '#rrggbb'` qui ne garde que les écarts à la
+    // palette par défaut (cf. ActivityPalette). Une activité absente suit le
+    // défaut, y compris s'il change un jour. Réglage du LECTEUR, comme la
+    // silhouette : il colore tout ce que l'on regarde, son contenu ou celui d'un
+    // autre.
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $activityColors = null;
+
     // --- Fiche athlète : identité -------------------------------------------
 
     #[ORM\Column(type: 'date_immutable', nullable: true)]
@@ -353,6 +362,26 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setBodySilhouette(BodySilhouette $bodySilhouette): static
     {
         $this->bodySilhouette = $bodySilhouette;
+
+        return $this;
+    }
+
+    /**
+     * @return array<string, string> les seules couleurs qui s'écartent du défaut
+     */
+    public function getActivityColors(): array
+    {
+        return $this->activityColors ?? [];
+    }
+
+    /**
+     * @param array<string, string> $activityColors
+     */
+    public function setActivityColors(array $activityColors): static
+    {
+        // Vide = « tout par défaut » : NULL plutôt que `[]`, une seule façon de
+        // dire qu'il n'y a rien à surcharger.
+        $this->activityColors = [] === $activityColors ? null : $activityColors;
 
         return $this;
     }

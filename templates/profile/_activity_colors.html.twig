@@ -1,0 +1,73 @@
+{# ============================================================================
+   Réglage « Couleurs des activités » (maquette Couleurs activités, piste 1b).
+
+   Une ligne par activité : sa pastille (aperçu, icône blanche sur la couleur),
+   les pastilles proposées, puis le sélecteur libre — le vrai champ, un
+   <input type="color">. Les pastilles ne sont qu'un raccourci vers lui : sans
+   JS, le sélecteur natif suffit et le formulaire reste complet.
+
+   Le contrôleur `activity-colors` ajoute l'aperçu en direct, le signalement
+   d'un doublon (« = Natation », il n'empêche rien) et « Par défaut ». La garde
+   de lisibilité, elle, est côté serveur (ActivityColorsType).
+
+   La couleur de chaque pastille est une DONNÉE (ActivityPalette::SWATCHES),
+   d'où la propriété `--swatch` posée en ligne : ce n'est pas une couleur
+   écrite dans le gabarit.
+
+   Attend : field = display.activityColors (ActivityColorsType)
+   ============================================================================ #}
+{% import 'components/_activity.html.twig' as activity %}
+<fieldset class="kd-field kd-actcolors" data-controller="activity-colors"
+          aria-describedby="{{ field.vars.id }}_help">
+    {# La légende doit rester le premier enfant du fieldset pour le nommer. #}
+    <legend class="kd-label">{{ field.vars.label }}</legend>
+    <div class="kd-actcolors__head">
+        <p class="kd-help" id="{{ field.vars.id }}_help">{{ field.vars.help }}</p>
+        <button type="button" class="kd-btn kd-btn--ghost kd-btn--sm" data-action="activity-colors#reset">
+            {{ ux_icon('lucide:rotate-ccw') }} Par défaut
+        </button>
+    </div>
+
+    {{ form_errors(field) }}
+
+    <div class="kd-actcolors__rows">
+        {% for act in field.vars.activities %}
+            {% set input = field[act.value] %}
+            <div class="kd-actcolors__row kd-act--{{ activity.modifier(act) }}"
+                 data-activity-colors-target="row"
+                 data-label="{{ act.label }}">
+                <label class="kd-actcolors__name" for="{{ input.vars.id }}">
+                    <span class="kd-actcolors__chip" aria-hidden="true">{{ ux_icon(activity.icon(act)|trim) }}</span>
+                    {{ act.label }}
+                </label>
+
+                <div class="kd-actcolors__picks">
+                    {% for color in field.vars.swatches %}
+                        <button type="button" class="kd-actcolors__swatch"
+                                style="--swatch: {{ color }}"
+                                data-action="activity-colors#pick"
+                                data-color="{{ color }}"
+                                aria-pressed="{{ input.vars.value|lower == color ? 'true' : 'false' }}"
+                                aria-label="{{ act.label }} : {{ color }}"
+                                title="{{ color }}"></button>
+                    {% endfor %}
+
+                    {{ form_widget(input, {attr: {
+                        class: 'kd-actcolors__input',
+                        title: 'Couleur libre',
+                        'data-activity-colors-target': 'input',
+                        'data-action': 'input->activity-colors#sync',
+                        'data-default': field.vars.defaults[act.value],
+                    }}) }}
+
+                    <span class="kd-actcolors__clash" data-activity-colors-target="clash" hidden></span>
+                </div>
+
+                {{ form_errors(input) }}
+            </div>
+        {% endfor %}
+    </div>
+</fieldset>
+{# Champs rendus un à un : sans ça, `form_end()` rappellerait `form_rest()`, qui
+   re-rendrait le groupe entier et doublerait chaque sélecteur. #}
+{% do field.setRendered %}

@@ -13,8 +13,8 @@ use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 /**
- * Les préférences d'affichage du compte : la langue des **noms d'exercices**, et
- * la silhouette dessinée par la carte musculaire.
+ * Les préférences d'affichage du compte : la langue des **noms d'exercices**, la
+ * silhouette dessinée par la carte musculaire, et les couleurs des activités.
  *
  * `expanded` plutôt qu'un `<select>` : deux valeurs mutuellement exclusives, une
  * pastille se lit et se touche mieux qu'une liste déroulante, et l'écran de
@@ -44,6 +44,14 @@ final class DisplaySettingsType extends AbstractType
             'multiple' => false,
             'choice_label' => fn (BodySilhouette $silhouette): string => $silhouette->getLabel(),
             'help' => "Le dessin des zones travaillées, dans le compositeur de séance. Sans rapport avec le sexe de la fiche athlète, qui sert au score de force.",
+        ]);
+
+        // Mappé sur `User::get/setActivityColors()`, qui ne portent que les
+        // écarts au défaut : la traduction palette complète ↔ écarts est dans
+        // ActivityColorsType.
+        $builder->add('activityColors', ActivityColorsType::class, [
+            'label' => 'Couleurs des activités',
+            'help' => 'Elles colorent le calendrier, les séances, les plans et les statistiques. Pour toi seulement : ton coach ou tes athlètes gardent les leurs.',
         ]);
     }
 

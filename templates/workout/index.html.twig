@@ -50,7 +50,9 @@
             <div class="kd-grid kd-grid--3" data-filter-target="list">
                 {% for item in items %}
                     {% set workout = item.workout %}
-                    <article class="kd-libcard"
+                    {# Couleur et icône de l'activité dominante ; la séance vide garde la
+                       carte neutre et l'icône générique. #}
+                    <article class="kd-libcard{{ item.activities ? ' kd-libcard--act ' ~ activity.surface(item.activities) }}"
                              data-filter-target="item"
                              data-filter-name="{{ workout.title }}"
                              data-filter-text="{{ workout.title }} {% for a in item.activities %}{{ a.label }} {% endfor %}{{ workout.owner ? workout.owner.userIdentifier }}"
@@ -61,7 +63,7 @@
                              data-sort-duration="{{ workout.estimatedDurationMinutes ?? 0 }}"
                              data-sort-blocks="{{ workout.blocks|length }}">
                         <div class="kd-libcard__head">
-                            <span class="kd-libcard__icon">{{ ux_icon('lucide:clipboard-list') }}</span>
+                            <span class="kd-libcard__icon">{{ ux_icon(item.activities ? activity.icon(item.activities|first)|trim : 'lucide:clipboard-list') }}</span>
                             <div class="kd-libcard__body">
                                 <a class="kd-libcard__name" href="{{ path('app_workout_show', {id: workout.id}) }}">{{ workout.title }}</a>
                                 <div class="kd-libcard__meta">

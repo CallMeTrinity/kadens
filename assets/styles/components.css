@@ -576,26 +576,89 @@ turbo-frame {
     white-space: nowrap;
 }
 
-/* Code activité : l'icône dit laquelle, le filet gauche la range dans
-   l'échelle catégorielle. Les cinq activités sont couvertes. */
-.kd-badge--run {
-    border-left: 3px solid var(--color-activity-run);
+/* ----------------------------------------------------------------------------
+   Couleur d'activité — classes porteuses
+   ----------------------------------------------------------------------------
+   Une seule façon de colorer par activité : la classe .kd-act--{clé} pose
+   --act (aplat, sous texte blanc), --act-tint (voile clair) et --act-text
+   (teinte lisible sur papier) ; .kd-act2--{clé} pose --act2, la DEUXIÈME
+   activité d'une séance, dessinée en bande basse (inset box-shadow).
+   .kd-act--* remet --act2 à transparent : un élément d'une seule activité
+   niché dans une séance à deux n'hérite pas de la bande de son parent.
+   Les composants ne lisent que --act* : la palette (défaut ou réglage du
+   lecteur, cf. ActivityPalette) se change en un seul endroit. La clé vient de
+   ActivityType::cssKey(), via le macro Twig activity.surface(). */
+.kd-act--run {
+    --act: var(--color-activity-run);
+    --act-tint: var(--color-activity-run-tint);
+    --act-text: var(--color-activity-run-text);
+    --act2: transparent;
 }
 
-.kd-badge--gym {
-    border-left: 3px solid var(--color-activity-gym);
+.kd-act--gym {
+    --act: var(--color-activity-gym);
+    --act-tint: var(--color-activity-gym-tint);
+    --act-text: var(--color-activity-gym-text);
+    --act2: transparent;
 }
 
-.kd-badge--swim {
-    border-left: 3px solid var(--color-activity-swim);
+.kd-act--swim {
+    --act: var(--color-activity-swim);
+    --act-tint: var(--color-activity-swim-tint);
+    --act-text: var(--color-activity-swim-text);
+    --act2: transparent;
 }
 
-.kd-badge--bike {
-    border-left: 3px solid var(--color-activity-bike);
+.kd-act--bike {
+    --act: var(--color-activity-bike);
+    --act-tint: var(--color-activity-bike-tint);
+    --act-text: var(--color-activity-bike-text);
+    --act2: transparent;
 }
 
-.kd-badge--mobility {
-    border-left: 3px solid var(--color-activity-mobility);
+.kd-act--mobility {
+    --act: var(--color-activity-mobility);
+    --act-tint: var(--color-activity-mobility-tint);
+    --act-text: var(--color-activity-mobility-text);
+    --act2: transparent;
+}
+
+.kd-act--other {
+    --act: var(--color-activity-other);
+    --act-tint: var(--color-activity-other-tint);
+    --act-text: var(--color-activity-other-text);
+    --act2: transparent;
+}
+
+.kd-act2--run {
+    --act2: var(--color-activity-run);
+}
+
+.kd-act2--gym {
+    --act2: var(--color-activity-gym);
+}
+
+.kd-act2--swim {
+    --act2: var(--color-activity-swim);
+}
+
+.kd-act2--bike {
+    --act2: var(--color-activity-bike);
+}
+
+.kd-act2--mobility {
+    --act2: var(--color-activity-mobility);
+}
+
+.kd-act2--other {
+    --act2: var(--color-activity-other);
+}
+
+/* Code activité : aplat plein de la couleur, texte et icône blancs. */
+.kd-badge--act {
+    background: var(--act);
+    border-color: var(--act);
+    color: var(--color-on-activity);
 }
 
 /* Accent — réservé à l'objectif (le seul aplat rouge non actionnable). */
@@ -1037,12 +1100,11 @@ turbo-frame {
     transform: translateY(-2px);
 }
 
-.kd-libcard--run {
-    border-left-color: var(--color-activity-run);
-}
-
-.kd-libcard--gym {
-    border-left-color: var(--color-activity-gym);
+/* Carte d'une activité (exercice) ou d'une séance qui en a : filet gauche et
+   pastille d'icône à la couleur de la dominante (--act), la deuxième activité
+   en bande basse de la pastille (--act2). */
+.kd-libcard--act {
+    border-left-color: var(--act);
 }
 
 .kd-libcard__head {
@@ -1068,14 +1130,10 @@ turbo-frame {
     height: 19px;
 }
 
-.kd-libcard--run .kd-libcard__icon {
-    background: var(--color-activity-run-tint);
-    color: var(--color-activity-run);
-}
-
-.kd-libcard--gym .kd-libcard__icon {
-    background: var(--color-activity-gym-tint);
-    color: var(--color-activity-gym);
+.kd-libcard--act .kd-libcard__icon {
+    background: var(--act);
+    box-shadow: inset 0 -4px 0 var(--act2, transparent);
+    color: var(--color-on-activity);
 }
 
 .kd-libcard__body {
@@ -1379,6 +1437,141 @@ a.kd-scope--link:hover {
     color: var(--color-status-missed);
 }
 
+/* ----------------------------------------------------------------------------
+   Réglage des couleurs d'activité (/profile/settings)
+   ----------------------------------------------------------------------------
+   Une ligne par activité : nom + pastille d'aperçu, puis les pastilles
+   proposées et le sélecteur libre. La pastille d'aperçu lit --act, posé par
+   la classe porteuse de la ligne et réécrit en direct par le contrôleur
+   `activity-colors`. */
+.kd-actcolors {
+    min-inline-size: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.kd-actcolors > legend {
+    padding: 0;
+}
+
+.kd-actcolors__head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--kd-space-5);
+}
+
+.kd-actcolors__rows {
+    display: flex;
+    flex-direction: column;
+}
+
+.kd-actcolors__row {
+    display: grid;
+    grid-template-columns: 160px minmax(0, 1fr);
+    align-items: center;
+    gap: var(--kd-space-2) var(--kd-space-5);
+    padding: var(--kd-space-3) 0;
+    border-bottom: 1px solid var(--color-divider);
+}
+
+.kd-actcolors__row:last-child {
+    border-bottom: 0;
+}
+
+.kd-actcolors__row > .kd-errors {
+    grid-column: 2;
+    margin: 0;
+}
+
+.kd-actcolors__name {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-3);
+    font-size: 14px;
+    font-weight: var(--kd-weight-semibold);
+    color: var(--color-text-strong);
+}
+
+.kd-actcolors__chip {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: var(--act);
+    color: var(--color-on-activity);
+}
+
+.kd-actcolors__chip svg {
+    width: 14px;
+    height: 14px;
+}
+
+.kd-actcolors__picks {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--kd-space-2);
+}
+
+.kd-actcolors__swatch {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: 0;
+    background: var(--swatch);
+    cursor: pointer;
+}
+
+.kd-actcolors__swatch[aria-pressed="true"] {
+    outline: 2px solid var(--color-text);
+    outline-offset: 2px;
+}
+
+/* Le sélecteur libre, au format d'une pastille, séparé des pastilles par un
+   filet : c'est lui qui porte la valeur envoyée. */
+.kd-actcolors__input.kd-input {
+    width: 36px;
+    height: 28px;
+    margin-left: var(--kd-space-3);
+    padding: 2px;
+    cursor: pointer;
+}
+
+.kd-actcolors__clash {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-text-secondary);
+}
+
+/* Au doigt : huit pastilles par ligne, 44px ne tiendraient pas sur un
+   téléphone. 32px et un écart de 8px ; le sélecteur natif de la ligne reste
+   la cible pleine taille. Après la définition du composant, comme toute
+   surcharge @media (cf. design-system §5). */
+@media (pointer: coarse) {
+    .kd-actcolors__swatch {
+        width: 32px;
+        height: 32px;
+    }
+
+    .kd-actcolors__picks {
+        gap: var(--kd-space-3);
+    }
+}
+
+@media (max-width: 560px) {
+    .kd-actcolors__row {
+        grid-template-columns: 1fr;
+    }
+
+    .kd-actcolors__row > .kd-errors {
+        grid-column: 1;
+    }
+}
+
 .kd-help {
     font-size: 12px;
     color: var(--color-text-soft);
@@ -1631,7 +1824,7 @@ a.kd-scope--link:hover {
 .kd-actionbar__feedback {
     font-family: var(--font-mono);
     font-size: 11px;
-    color: var(--color-activity-gym-text);
+    color: var(--color-text-secondary);
 }
 
 /* Sélecteur de plage de semaines à partager (page de consultation d'un plan). */
@@ -1801,10 +1994,33 @@ a.kd-scope--link:hover {
     padding: 0;
 }
 
-/* Les badges d'activité passent en inversé sur l'aplat encre. */
+/* Les badges d'activité passent en inversé sur l'aplat encre. Sur un hero
+   coloré, le filet clair les détache du fond quand ils portent la même teinte
+   que lui (la dominante). */
 .kd-wk__heroacts .kd-badge {
     border-color: var(--color-border-on-ink-strong);
     color: var(--color-on-ink-muted);
+}
+
+/* Hero coloré (piste 1b) : l'aplat encre prend la couleur de l'activité
+   dominante, la deuxième fait une bande basse de 6 px. Plutôt que de doubler
+   chaque règle du hero, on redéfinit LOCALEMENT les tokens « sur encre » qu'il
+   consomme : tout ce qui s'écrivait en blanc sur l'encre s'écrit en blanc sur
+   la couleur, et le rouge « sur encre » (sourcil, date) passe en blanc — il ne
+   se lirait pas sur un carmin ou un ocre. */
+.kd-wk__hero--act {
+    --color-surface-ink: var(--act);
+    --color-on-ink: var(--color-on-activity);
+    --color-on-ink-muted: var(--color-on-activity-muted);
+    --color-on-ink-faint: var(--color-on-activity-muted);
+    --color-primary-on-ink: var(--color-on-activity);
+    box-shadow: inset 0 -6px 0 var(--act2, transparent);
+}
+
+.kd-wk__hero--act .kd-wk__missed {
+    color: var(--color-on-activity);
+    border-color: var(--color-border-on-ink-strong);
+    background: color-mix(in srgb, var(--act) 75%, var(--color-shade));
 }
 
 /* ---- Barre d'actions, posée en tête du hero ---- */
@@ -2910,6 +3126,24 @@ a.kd-scope--link:hover {
     font-weight: var(--kd-weight-semibold);
 }
 
+/* Clé de couleur d'activité (palette du lecteur), et la légende du calendrier
+   qui les aligne au-dessus de la grille. */
+.kd-legend__key--act {
+    width: 12px;
+    height: 12px;
+    background: var(--act);
+}
+
+.kd-legend--cal {
+    gap: var(--kd-space-3) var(--kd-space-7);
+    margin: 0 0 var(--kd-space-5);
+}
+
+.kd-legend--cal .kd-legend__item {
+    gap: var(--kd-space-2);
+    font-size: 10px;
+}
+
 /* Barres horizontales (volume par bloc) */
 .kd-bars {
     list-style: none;
@@ -3626,6 +3860,23 @@ a.kd-scope--link:hover {
     color: var(--color-text-faint);
 }
 
+/* Séance placée dans la trame (consultation) : en aplat de sa dominante, comme
+   au calendrier, la deuxième activité en bande basse de 3 px. */
+.kd-planday__item--act {
+    background: var(--act);
+    border-color: var(--act);
+    box-shadow: inset 0 -3px 0 var(--act2, transparent);
+    color: var(--color-on-activity);
+}
+
+.kd-planday__item--act:hover {
+    background: color-mix(in srgb, var(--act) 88%, var(--color-shade));
+}
+
+.kd-planday__item--act svg {
+    color: var(--color-on-activity);
+}
+
 a.kd-planday__item:hover {
     border-color: var(--color-primary);
     color: var(--color-primary);
@@ -3660,6 +3911,13 @@ a.kd-planday__item:hover svg {
     border: 1px solid var(--color-border);
     border-radius: var(--kd-radius-sm);
     padding: var(--kd-space-1) var(--kd-space-1) var(--kd-space-1) var(--kd-space-3);
+}
+
+/* Dans l'éditeur, la case garde son fond clair (kebab, survol, glisser-déposer
+   y vivent) : la dominante passe au filet gauche, comme les cartes de
+   bibliothèque. Les badges disent le reste. */
+.kd-planitem--act {
+    border-left: 3px solid var(--act);
 }
 
 .kd-planitem__link {
@@ -4146,7 +4404,7 @@ a.kd-planday__item:hover svg {
 }
 
 /* Méta compacte de la pastille : icônes d'activité + durée estimée (+ nb d'exos
-   en vue semaine). Couleur d'icône par activité (run/gym), reste neutre. */
+   en vue semaine). Les icônes suivent la couleur du texte de la pastille. */
 .kd-calevent__meta {
     display: flex;
     flex-wrap: wrap;
@@ -4170,18 +4428,6 @@ a.kd-planday__item:hover svg {
 .kd-calevent__act svg {
     width: 12px;
     height: 12px;
-}
-
-.kd-calevent__act--run {
-    color: var(--color-primary);
-}
-
-.kd-calevent__act--gym {
-    color: var(--color-activity-gym);
-}
-
-.kd-calevent__act--neutral {
-    color: var(--color-text-faint);
 }
 
 .kd-calevent__dur {
@@ -4254,6 +4500,95 @@ a.kd-planday__item:hover svg {
     height: 11px;
 }
 
+/* Pastille colorée (piste 1b « Vif ») : dès que la séance a une activité, la
+   carte entière prend la couleur de la DOMINANTE (--act, posé par
+   activity.surface()), la deuxième activité fait une bande basse de 4 px
+   (--act2). Le filet gauche ne code donc plus le statut : c'est l'icône du
+   bouton de cycle qui le porte, en blanc sur une rangée assombrie, et la
+   manquée se hachure. Une séance sans activité (vide, libre) garde la pastille
+   neutre à filet de statut ci-dessus.
+   Les couleurs s'appliquent aux ZONES (contenu, rangée), jamais à la racine :
+   la modale et l'aperçu vivent dans la pastille et hériteraient du blanc. */
+.kd-calevent--act,
+.kd-calevent--act:hover {
+    border-color: var(--act);
+    border-left: 1px solid var(--act);
+    background: var(--act);
+}
+
+.kd-calevent--act .kd-calevent__open {
+    background: var(--act);
+    box-shadow: inset 0 -4px 0 var(--act2, transparent);
+    color: var(--color-on-activity);
+}
+
+.kd-calevent--act .kd-calevent__open:hover {
+    background: color-mix(in srgb, var(--act) 88%, var(--color-shade));
+}
+
+.kd-calevent--act.kd-calevent--missed .kd-calevent__open {
+    background: repeating-linear-gradient(
+        135deg,
+        var(--act) 0 6px,
+        color-mix(in srgb, var(--act) 75%, var(--color-shade)) 6px 12px
+    );
+}
+
+.kd-calevent--act .kd-calevent__meta {
+    color: var(--color-on-activity-muted);
+}
+
+.kd-calevent--act .kd-calevent__act {
+    color: var(--color-on-activity);
+}
+
+.kd-calevent--act .kd-calevent__exos {
+    background: transparent;
+    box-shadow: inset 0 0 0 1px var(--color-border-on-ink-strong);
+    color: var(--color-on-activity-muted);
+}
+
+.kd-calevent--act.kd-calevent--done .kd-calevent__title {
+    text-decoration-color: var(--color-on-activity-muted);
+}
+
+/* Le rouge de « en retard » ne se lit pas sur un aplat coloré : le drapeau
+   passe en blanc, et c'est le contour pointillé ci-dessous qui garde l'accent. */
+.kd-calevent--act .kd-calevent__flag {
+    color: var(--color-on-activity);
+}
+
+.kd-calevent--act .kd-calevent__statusform,
+.kd-calevent--act .kd-calevent__eye {
+    border-top-color: var(--color-border-on-ink);
+    background: color-mix(in srgb, var(--act) 82%, var(--color-shade));
+}
+
+.kd-calevent--act .kd-calevent__toggle,
+.kd-calevent--act.kd-calevent--done .kd-calevent__toggle,
+.kd-calevent--act.kd-calevent--missed .kd-calevent__toggle {
+    border-right-color: var(--color-border-on-ink);
+    color: var(--color-on-activity);
+}
+
+.kd-calevent--act .kd-calevent__eye {
+    color: var(--color-on-activity-muted);
+}
+
+.kd-calevent--act .kd-calevent__toggle:hover,
+.kd-calevent--act .kd-calevent__eye:hover {
+    background: color-mix(in srgb, var(--act) 65%, var(--color-shade));
+    color: var(--color-on-activity);
+}
+
+/* En retard : le filet gauche pointillé n'existe plus sur la pastille colorée,
+   le contour pointillé rouge prend le relais, hors de l'aplat. */
+.kd-calevent--act.is-overdue {
+    border-left: 1px solid var(--act);
+    outline: 2px dashed var(--color-primary);
+    outline-offset: 1px;
+}
+
 /* Variante détaillée (vue semaine) : la pastille respire un peu plus. */
 .kd-calevent--detailed .kd-calevent__open {
     padding: var(--kd-space-3) var(--kd-space-4);
@@ -4297,6 +4632,10 @@ a.kd-planday__item:hover svg {
         padding-block: 0;
         border-top: 0;
         border-left: 1px solid var(--color-divider);
+    }
+
+    .kd-calevent--act .kd-calevent__eye {
+        border-left-color: var(--color-border-on-ink);
     }
 }
 
@@ -5287,12 +5626,8 @@ button.kd-libx:active {
     cursor: pointer;
 }
 
-.kd-libx--run {
-    border-left-color: var(--color-activity-run);
-}
-
-.kd-libx--gym {
-    border-left-color: var(--color-activity-gym);
+.kd-libx--act {
+    border-left-color: var(--act);
 }
 
 .kd-libx__code {
@@ -5310,14 +5645,9 @@ button.kd-libx:active {
     color: var(--color-text-secondary);
 }
 
-.kd-libx--run .kd-libx__code {
-    background: var(--color-activity-run-tint);
-    color: var(--color-activity-run);
-}
-
-.kd-libx--gym .kd-libx__code {
-    background: var(--color-activity-gym-tint);
-    color: var(--color-activity-gym);
+.kd-libx--act .kd-libx__code {
+    background: var(--act);
+    color: var(--color-on-activity);
 }
 
 /* `display: flex` et non un bloc implicite : le corps de carte est fait de <span>
@@ -5953,14 +6283,9 @@ button.kd-libx:active {
     color: var(--color-text-secondary);
 }
 
-.kd-cexo__code--run {
-    background: var(--color-activity-run-tint);
-    color: var(--color-activity-run);
-}
-
-.kd-cexo__code--gym {
-    background: var(--color-activity-gym-tint);
-    color: var(--color-activity-gym);
+.kd-cexo__code--act {
+    background: var(--act);
+    color: var(--color-on-activity);
 }
 
 .kd-cexo__body {
@@ -6701,14 +7026,9 @@ button.kd-libx:active {
     height: 12px;
 }
 
-.kd-weekvol__chip--run {
-    background: var(--color-activity-run-tint);
-    color: var(--color-activity-run-text);
-}
-
-.kd-weekvol__chip--gym {
-    background: var(--color-activity-gym-tint);
-    color: var(--color-activity-gym-text);
+.kd-weekvol__chip--act {
+    background: var(--act-tint);
+    color: var(--act-text);
 }
 
 .kd-weekvol__detail {
@@ -7958,12 +8278,8 @@ textarea.kd-inlineedit__input {
     transition: width .2s ease;
 }
 
-.kd-actbar__fill--run {
-    background: var(--color-activity-run);
-}
-
-.kd-actbar__fill--gym {
-    background: var(--color-activity-gym);
+.kd-actbar__fill--act {
+    background: var(--act);
 }
 
 /* ── Fiche : définitions « ligne à ligne » (label à gauche, valeur à droite,
@@ -8084,14 +8400,9 @@ textarea.kd-inlineedit__input {
     height: 19px;
 }
 
-.kd-formsection__icon--run {
-    background: var(--color-activity-run-tint);
-    color: var(--color-activity-run);
-}
-
-.kd-formsection__icon--gym {
-    background: var(--color-activity-gym-tint);
-    color: var(--color-activity-gym);
+.kd-formsection__icon--act {
+    background: var(--act-tint);
+    color: var(--act-text);
 }
 
 .kd-formsection__title {
@@ -8872,12 +9183,8 @@ textarea.kd-inlineedit__input {
     flex: 0 0 auto;
 }
 
-.kd-prog__dot--run {
-    background: var(--color-activity-run);
-}
-
-.kd-prog__dot--gym {
-    background: var(--color-activity-gym);
+.kd-prog__dot--act {
+    background: var(--act);
 }
 
 /* Grille de colonnes : une par semaine, barre alignée en bas */
@@ -8919,12 +9226,8 @@ textarea.kd-inlineedit__input {
     background: var(--color-border-strong);
 }
 
-.kd-prog__bar--run {
-    background: var(--color-activity-run);
-}
-
-.kd-prog__bar--gym {
-    background: var(--color-activity-gym);
+.kd-prog__bar--act {
+    background: var(--act);
 }
 
 /* Réalisé (KL-49) : plus étroit et en encre pleine, donc lisible par-dessus la

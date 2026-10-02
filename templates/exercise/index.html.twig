@@ -68,7 +68,7 @@
                 {% for exercise in exercises %}
                     {% set mod = activity.modifier(exercise.activity)|trim %}
                     {% set used = usage[exercise.id]|default(null) %}
-                    <article class="kd-libcard{{ mod ? ' kd-libcard--' ~ mod }}"
+                    <article class="kd-libcard{{ mod ? ' kd-libcard--act kd-act--' ~ mod }}"
                              data-filter-target="item"
                              {# `data-filter-name` = le libellé AFFICHÉ (il pilote le palier
                                 exact/préfixe), `data-filter-text` = tout le reste, les DEUX

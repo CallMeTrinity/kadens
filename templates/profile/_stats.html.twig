@@ -116,7 +116,7 @@
                                 <span class="kd-actbar__count">{{ row.sessions }} séance{{ row.sessions > 1 ? 's' }}</span>
                             </div>
                             <div class="kd-actbar__track">
-                                <span class="kd-actbar__fill kd-actbar__fill--{{ activity.modifier(row.activity) ?: 'neutral' }}"
+                                <span class="kd-actbar__fill{{ row.activity ? ' kd-actbar__fill--act kd-act--' ~ activity.modifier(row.activity) }}"
                                       style="width:{{ maxSessions > 0 ? (row.sessions / maxSessions * 100)|round : 0 }}%"></span>
                             </div>
                         </li>
