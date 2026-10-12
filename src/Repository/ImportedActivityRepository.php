@@ -112,6 +112,40 @@ class ImportedActivityRepository extends ServiceEntityRepository
     }
 
     /**
+     * Les activités importées rattachées à chaque séance FAITE, avec leur nombre :
+     * le pendant, côté montre, de `ScheduledWorkoutRepository::doneActivityCountsForOwner()`.
+     *
+     * Sert à dire la nature d'une séance qui n'a ni prescrit ni réalisé logué —
+     * la séance libre que crée la reprise d'historique Intervals
+     * (`ActivityMatcher`, `workout = null`). Son activité importée est la seule
+     * chose qui dise ce qu'elle était.
+     *
+     * @return list<array{scheduledId: int, activity: ActivityType, activities: int}>
+     */
+    public function doneActivityCountsByScheduledWorkout(User $owner): array
+    {
+        $rows = $this->createQueryBuilder('a')
+            ->select('IDENTITY(a.scheduledWorkout) AS sid', 'a.activity AS activity', 'COUNT(a.id) AS activities')
+            ->join('a.scheduledWorkout', 's')
+            ->andWhere('s.owner = :owner')
+            ->andWhere('s.status = :done')
+            ->andWhere('a.activity IS NOT NULL')
+            ->setParameter('owner', $owner)
+            ->setParameter('done', ScheduledStatus::DONE)
+            ->groupBy('sid', 'a.activity')
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_map(static fn (array $row): array => [
+            'scheduledId' => (int) $row['sid'],
+            'activity' => $row['activity'] instanceof ActivityType
+                ? $row['activity']
+                : ActivityType::from((string) $row['activity']),
+            'activities' => (int) $row['activities'],
+        ], $rows);
+    }
+
+    /**
      * Le volume d'endurance **réel** des séances faites d'une fenêtre, par séance
      * et par activité, en un seul agrégat SQL. C'est ce que `TrainingStats` substitue
      * au prescrit quand il existe, sans hydrater une seule activité.
