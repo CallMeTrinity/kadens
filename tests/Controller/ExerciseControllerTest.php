@@ -13,6 +13,7 @@ use App\Enum\ActivityType;
 use App\Enum\ExerciseLanguage;
 use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
+use App\Enum\TargetArea;
 use App\Repository\LoggedExerciseRepository;
 use Doctrine\Bundle\DoctrineBundle\Middleware\BacktraceDebugDataHolder;
 use Doctrine\ORM\EntityManagerInterface;
@@ -159,14 +160,16 @@ final class ExerciseControllerTest extends WebTestCase
         $last = $this->log($user, $exercise, '2026-03-08', [[SetType::NORMAL, 6, 90.0], [SetType::NORMAL, 6, 90.0]]);
 
         $this->client->loginUser($user);
-        $crawler = $this->client->request('GET', '/exercise/'.$exercise->getId());
+        // `all` : les dates sont fixes, la fenêtre par défaut (un an) les
+        // perdrait un jour.
+        $crawler = $this->client->request('GET', '/exercise/'.$exercise->getId().'?range=all');
 
         self::assertResponseIsSuccessful();
         self::assertSelectorExists('.kd-extraj');
         // Le record est la charge la plus lourde, l'échauffement n'en fait jamais partie.
         self::assertSelectorTextContains('.kd-wk__kpi--accent dd', '90');
-        // Deux séances chargées : la courbe existe, avec un point par séance.
-        self::assertCount(2, $crawler->filter('.kd-extraj .kd-prog__col'));
+        // Deux séances chargées : la courbe de charge existe, un point par séance.
+        self::assertCount(2, $crawler->filter('.kd-excurve')->first()->filter('.kd-excurve__pt'));
         // Chaque séance renvoie vers sa séance datée.
         self::assertSelectorExists('a[href="/schedule/'.$first->getId().'"]');
         self::assertSelectorExists('a[href="/schedule/'.$last->getId().'"]');
@@ -198,6 +201,94 @@ final class ExerciseControllerTest extends WebTestCase
         self::assertSelectorTextNotContains('.kd-extraj', '180');
         // Et surtout : aucun lien vers la séance datée de l'autre.
         self::assertSelectorNotExists('a[href="/schedule/'.$theirs->getId().'"]');
+    }
+
+    // --- Silhouette et courbes de progression -------------------------------
+
+    /** Les zones déclarées se peignent ; « corps entier » seul ne peint rien. */
+    public function testShowPaintsTheDeclaredAreasOnTheBodyMap(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $bench = $this->createExercise($user, 'Développé couché')
+            ->setTargetAreas([TargetArea::CHEST, TargetArea::TRICEPS]);
+        $burpee = $this->createExercise($user, 'Burpee')
+            ->setTargetAreas([TargetArea::FULL_BODY]);
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/exercise/'.$bench->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertCount(2, $crawler->filter('.kd-exsheet .kd-bodymap__plate'));
+        self::assertGreaterThan(0, $crawler->filter('.kd-bodymap path[fill="var(--color-bodymap-3)"]')->count());
+
+        $this->client->request('GET', '/exercise/'.$burpee->getId());
+        self::assertResponseIsSuccessful();
+        self::assertSelectorNotExists('.kd-bodymap');
+    }
+
+    /**
+     * La fenêtre filtre les séances tracées, et le sélecteur ne propose pas
+     * « Plan » quand aucun plan ne court : par défaut, un an.
+     */
+    public function testProgressFollowsTheChosenWindow(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise($user, 'Squat');
+
+        $this->log($user, $exercise, (new \DateTimeImmutable('-500 days'))->format('Y-m-d'), [[SetType::NORMAL, 5, 80.0]]);
+        $this->log($user, $exercise, (new \DateTimeImmutable('-300 days'))->format('Y-m-d'), [[SetType::NORMAL, 5, 90.0]]);
+        $this->log($user, $exercise, (new \DateTimeImmutable('-20 days'))->format('Y-m-d'), [[SetType::NORMAL, 5, 100.0]]);
+        $this->log($user, $exercise, (new \DateTimeImmutable('-10 days'))->format('Y-m-d'), [[SetType::NORMAL, 5, 105.0]]);
+
+        $this->client->loginUser($user);
+        $url = '/exercise/'.$exercise->getId();
+
+        $crawler = $this->client->request('GET', $url);
+        self::assertResponseIsSuccessful();
+        self::assertSelectorNotExists('a.kd-rangetab[href^="'.$url.'?range=plan"]');
+        self::assertSelectorTextContains('.kd-rangetab.is-active', '1 an');
+        self::assertCount(3, $crawler->filter('.kd-excurve')->first()->filter('.kd-excurve__pt'));
+
+        $crawler = $this->client->request('GET', $url.'?range=6m');
+        self::assertCount(2, $crawler->filter('.kd-excurve')->first()->filter('.kd-excurve__pt'));
+        self::assertSelectorTextContains('.kd-excurve', '100 kg → 105 kg');
+
+        $crawler = $this->client->request('GET', $url.'?range=all');
+        self::assertCount(4, $crawler->filter('.kd-excurve')->first()->filter('.kd-excurve__pt'));
+
+        // Une valeur inconnue (ou « plan » sans plan) retombe sur le défaut.
+        $this->client->request('GET', $url.'?range=plan');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.kd-rangetab.is-active', '1 an');
+    }
+
+    /** Un plan en cours ouvre la fenêtre « Plan », bornée à ses séances datées, et la sélectionne. */
+    public function testProgressDefaultsToTheCurrentPlan(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise($user, 'Squat');
+
+        $this->log($user, $exercise, (new \DateTimeImmutable('-60 days'))->format('Y-m-d'), [[SetType::NORMAL, 5, 80.0]]);
+
+        $template = (new PlanTemplate())->setOwner($user)->setTitle('Prépa force')->setSlug('prepa-force')->setDurationWeeks(4);
+        $this->em->persist($template);
+        $anchor = new \DateTimeImmutable('-14 days');
+        foreach (['-14 days', '-7 days', '+7 days'] as $offset) {
+            $date = (new \DateTimeImmutable($offset))->format('Y-m-d');
+            $scheduled = $this->log($user, $exercise, $date, '+7 days' === $offset ? [] : [[SetType::NORMAL, 5, '-14 days' === $offset ? 90.0 : 95.0]]);
+            $scheduled->setSourcePlanTemplate($template)->setPlanAnchorDate($anchor);
+        }
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/exercise/'.$exercise->getId());
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.kd-rangetab.is-active', 'Plan');
+        self::assertSelectorTextContains('.kd-excurve__window', 'Prépa force');
+        // La séance d'il y a deux mois est hors du plan.
+        self::assertCount(2, $crawler->filter('.kd-excurve')->first()->filter('.kd-excurve__pt'));
     }
 
     // --- KL-51 : le tri de la bibliothèque par usage réel ---------------------

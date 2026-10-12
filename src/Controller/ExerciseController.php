@@ -9,6 +9,8 @@ use App\Form\ExerciseType;
 use App\Repository\ExerciseRepository;
 use App\Repository\LoggedExerciseRepository;
 use App\Security\Voter\ExerciseVoter;
+use App\Service\ExerciseBodyMap;
+use App\Service\ExerciseProgress;
 use App\Service\ExerciseTrajectory;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -88,8 +90,9 @@ final class ExerciseController extends AbstractController
     }
 
     /**
-     * La fiche d'un exercice, et sous elle **sa trajectoire** (KL-50) : record,
-     * dernière performance, courbe de charge et dix dernières séances.
+     * La fiche d'un exercice, sa silhouette (les zones qu'il déclare), et sous
+     * elle **sa trajectoire** (KL-50) : record, dernière performance, courbes de
+     * progression sur une fenêtre choisie (`?range=`) et dix dernières séances.
      *
      * L'historique est scopé sur `$this->getUser()`, et c'est ici volontaire — pas
      * un oubli du « scoper sur l'owner » que suit le reste des vues ouvertes au
@@ -98,15 +101,26 @@ final class ExerciseController extends AbstractController
      * dire que « moi ». Personne ne lit ici le réalisé d'un autre.
      */
     #[Route('/{id}', name: 'app_exercise_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(Exercise $exercise, ExerciseTrajectory $trajectory): Response
-    {
+    public function show(
+        Request $request,
+        Exercise $exercise,
+        ExerciseTrajectory $trajectory,
+        ExerciseProgress $progress,
+        ExerciseBodyMap $bodyMap,
+    ): Response {
         $this->denyAccessUnlessGranted(ExerciseVoter::VIEW, $exercise);
 
         $user = $this->getUser();
+        $user = $user instanceof User ? $user : null;
+        $path = null === $user ? null : $trajectory->for($user, $exercise);
 
         return $this->render('exercise/show.html.twig', [
             'exercise' => $exercise,
-            'trajectory' => $user instanceof User ? $trajectory->for($user, $exercise) : null,
+            'bodyMap' => $bodyMap->for($exercise, $user),
+            'trajectory' => $path,
+            // Pas de courbe sans historique : la trajectoire nulle ne rend rien,
+            // la lecture des pics n'a pas à être faite.
+            'progress' => null === $path || null === $user ? null : $progress->for($user, $exercise, $request->query->getString('range')),
         ]);
     }
 

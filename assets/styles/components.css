@@ -9431,6 +9431,197 @@ textarea.kd-inlineedit__input {
     flex: 0 0 auto;
 }
 
+/* ---- Fiche : silhouette + définitions côte à côte ----
+   Même mise en page que le bandeau de volume (`.kd-wkvol__body`) : le dessin à
+   gauche, le texte prend le reste et passe dessous quand il n'a plus la place. */
+.kd-exsheet {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--kd-space-8);
+    flex-wrap: wrap;
+}
+
+.kd-exsheet__body {
+    flex: none;
+    max-width: 100%;
+}
+
+.kd-exsheet__facts {
+    flex: 1 1 320px;
+    min-width: 0;
+}
+
+/* ---- Courbes de progression (components/_exercise_progress) ----
+   Repères à gauche, tracé à droite. Le tracé est un SVG déformable dont le trait
+   garde son épaisseur ; points et repères sont du HTML posé en % par-dessus, la
+   géométrie vient toute calculée d'ExerciseProgress. */
+.kd-excurve__window {
+    margin: 0 0 var(--kd-space-7);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+}
+
+.kd-excurve__window strong {
+    font-weight: var(--kd-weight-semibold);
+    color: var(--color-text-strong);
+}
+
+.kd-excurve {
+    margin: 0;
+}
+
+.kd-excurve + .kd-excurve {
+    margin-top: var(--kd-space-9);
+}
+
+.kd-excurve__frame {
+    display: flex;
+    gap: var(--kd-space-3);
+}
+
+.kd-excurve__axis {
+    position: relative;
+    flex: 0 0 56px;
+    height: 140px;
+}
+
+.kd-excurve__tick {
+    position: absolute;
+    right: 0;
+    transform: translateY(-50%);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-text-faint);
+    white-space: nowrap;
+}
+
+.kd-excurve__plot {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 140px;
+    background: var(--color-surface-subtle);
+    border-radius: var(--kd-radius-sm);
+}
+
+.kd-excurve__grid {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 1px solid var(--color-divider-soft);
+}
+
+.kd-excurve__svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+}
+
+.kd-excurve__svg polyline {
+    stroke: var(--color-text-strong);
+    stroke-width: 2;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
+
+/* Le lien est la cible (24 px, au-delà du marqueur) ; le marqueur est son
+   ::before. Carré, comme toute pastille de l'identité (rayon 0). */
+.kd-excurve__pt {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    transform: translate(-50%, -50%);
+}
+
+.kd-excurve__pt::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 8px;
+    height: 8px;
+    transform: translate(-50%, -50%);
+    background: var(--color-text-strong);
+    border: 2px solid var(--color-surface-subtle);
+    box-sizing: content-box;
+    transition: transform .12s ease;
+}
+
+/* Le maximum de la période : l'intensité, l'un des sens autorisés du rouge,
+   comme la tuile « Record » au-dessus. Il est aussi dit en toutes lettres
+   (légende et `aria-label`), le rouge n'est pas seul à le porter. */
+.kd-excurve__pt.is-best::before {
+    background: var(--color-primary);
+}
+
+.kd-excurve__pt:hover::before,
+.kd-excurve__pt:focus-visible::before {
+    transform: translate(-50%, -50%) scale(1.4);
+}
+
+/* Infobulle sans JS : le libellé du point au survol et au focus. Alignée sur le
+   bord le plus proche aux extrémités, pour ne jamais sortir du cadre. */
+.kd-excurve__pt::after {
+    content: attr(data-label);
+    position: absolute;
+    bottom: calc(100% + 2px);
+    left: 50%;
+    transform: translateX(-50%);
+    padding: var(--kd-space-2) var(--kd-space-3);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    white-space: nowrap;
+    color: var(--color-on-ink);
+    background: var(--color-surface-ink);
+    pointer-events: none;
+    opacity: 0;
+    z-index: 2;
+    transition: opacity .12s ease;
+}
+
+.kd-excurve__pt.is-start::after {
+    left: 0;
+    transform: none;
+}
+
+.kd-excurve__pt.is-end::after {
+    left: auto;
+    right: 0;
+    transform: none;
+}
+
+.kd-excurve__pt:hover::after,
+.kd-excurve__pt:focus-visible::after {
+    opacity: 1;
+}
+
+/* Au-delà de quarante séances, les marqueurs se recouvrent et font un trait
+   épais : seuls restent le maximum et le survol, la cible reste entière. */
+.kd-excurve--dense .kd-excurve__pt:not(.is-best):not(:hover):not(:focus-visible)::before {
+    opacity: 0;
+}
+
+.kd-excurve__dates {
+    display: flex;
+    justify-content: space-between;
+    margin: var(--kd-space-2) 0 0 calc(56px + var(--kd-space-3));
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-text-faint);
+}
+
+@media (max-width: 560px) {
+    .kd-excurve__axis {
+        flex-basis: 44px;
+    }
+
+    .kd-excurve__dates {
+        margin-left: calc(44px + var(--kd-space-3));
+    }
+}
+
 /* ============================================================================
    COACHING — relation coach ↔ athlète (page unique /coaching, fiche de travail
    par athlète sous /coach).

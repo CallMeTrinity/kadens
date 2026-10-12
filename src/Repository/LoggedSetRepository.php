@@ -16,6 +16,13 @@ use Symfony\Component\Uid\Uuid;
  */
 class LoggedSetRepository extends ServiceEntityRepository
 {
+    /**
+     * Au-delà de ce nombre de répétitions, une série ne dit plus rien d'un
+     * maximum : Epley extrapole de plus en plus mal, et 30 reps à 20 kg ne font
+     * pas un 1RM de 40 kg. La série reste dans la charge max, pas dans le 1RM.
+     */
+    public const E1RM_MAX_REPS = 12;
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, LoggedSet::class);
@@ -209,6 +216,75 @@ class LoggedSetRepository extends ServiceEntityRepository
             ->setParameter('sessions', array_map(static fn (array $row): int => (int) $row['id'], $sessions));
 
         return $this->hydrateRows($qb->getQuery()->getArrayResult());
+    }
+
+    /**
+     * Les pics de chaque séance où un exercice a été fait, dans une fenêtre :
+     * la matière des courbes de progression de `/exercise/{id}`.
+     *
+     * **Une requête d'agrégat, une ligne par séance**, quelle que soit la
+     * fenêtre : « tout » grossit en nombre de séances, jamais en nombre de
+     * séries. Même périmètre que les autres lectures de performance
+     * (`workingSetScope()`), sans quoi la courbe et le record ne parleraient
+     * pas du même réalisé.
+     *
+     * Quatre pics, chacun à 0 quand la séance n'a rien à en dire (l'appelant
+     * le lit comme une absence) :
+     * - `topWeight` : la série de travail la plus lourde ;
+     * - `e1rm` : le meilleur 1RM estimé (Epley, `w × (30 + r) / 30`), une
+     *   série à une répétition valant sa charge, au-delà de `E1RM_MAX_REPS`
+     *   aucune ;
+     * - `unloadedReps` : le plus de répétitions **sans charge ajoutée** (même
+     *   définition du poids du corps que le record, cf. `unloaded()`) ;
+     * - `duration` : la plus longue tenue.
+     *
+     * Rendu de la plus ancienne à la plus récente : l'ordre d'une courbe.
+     *
+     * @return list<array{scheduledWorkoutId: int, date: \DateTimeImmutable, topWeight: float, e1rm: float, unloadedReps: int, duration: int}>
+     */
+    public function sessionPeaksForExercise(User $owner, int $exerciseId, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
+    {
+        $qb = $this->workingSetScope($owner, [$exerciseId])
+            ->select(
+                's.id AS scheduledWorkoutId',
+                's.scheduledDate AS date',
+                'MAX(CASE WHEN ls.weightKg > 0 THEN ls.weightKg ELSE 0 END) AS topWeight',
+                sprintf(
+                    'MAX(CASE WHEN ls.weightKg > 0 AND ls.reps = 1 THEN ls.weightKg'
+                    .' WHEN ls.weightKg > 0 AND ls.reps > 1 AND ls.reps <= %d THEN ls.weightKg * (30 + ls.reps) / 30'
+                    .' ELSE 0 END) AS e1rm',
+                    self::E1RM_MAX_REPS,
+                ),
+                sprintf('MAX(CASE WHEN %s THEN COALESCE(ls.reps, 0) ELSE 0 END) AS unloadedReps', self::unloaded('ls')),
+                'MAX(COALESCE(ls.durationSeconds, 0)) AS duration',
+            )
+            ->groupBy('s.id')
+            ->addGroupBy('s.scheduledDate')
+            ->orderBy('s.scheduledDate', 'ASC')
+            ->addOrderBy('s.id', 'ASC');
+
+        if (null !== $start) {
+            $qb->andWhere('s.scheduledDate >= :windowStart')
+                ->setParameter('windowStart', $start, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE);
+        }
+
+        if (null !== $end) {
+            $qb->andWhere('s.scheduledDate <= :windowEnd')
+                ->setParameter('windowEnd', $end, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE);
+        }
+
+        return array_map(static function (array $row): array {
+            $date = $row['date'];
+
+            return [
+                'scheduledWorkoutId' => (int) $row['scheduledWorkoutId'],
+                'date' => $date instanceof \DateTimeImmutable ? $date : new \DateTimeImmutable((string) $date),
+                'topWeight' => (float) $row['topWeight'],
+                'e1rm' => (float) $row['e1rm'],
+                'unloadedReps' => (int) $row['unloadedReps'],
+                'duration' => (int) $row['duration'],
+            ];
+        }, $qb->getQuery()->getArrayResult());
     }
 
     /**

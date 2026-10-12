@@ -1,7 +1,9 @@
 {# Bloc « Ma trajectoire » sur la fiche d'un exercice (KL-50) : record, dernière
-   performance, courbe de charge et dix dernières séances.
+   performance, courbes de progression et dix dernières séances.
 
-   Attend `trajectory` = sortie de ExerciseTrajectory::for(), ou null. **Null =
+   Attend `trajectory` = sortie de ExerciseTrajectory::for(), ou null, et
+   `progress` = sortie de ExerciseProgress::for() (courbes fenêtrées), qui
+   demande aussi `exercise` pour construire les liens de fenêtre. **Null =
    rien** : un exercice jamais fait n'affiche pas un cadre vide, il n'affiche pas
    de bloc. C'est la seule condition de rendu, et elle est ici.
 
@@ -12,11 +14,11 @@
    jamais laisser douter de qui l'a produit. Le contrôleur est garant de la
    correspondance entre `subject` et l'historique passé.
 
-   Barres réutilisées telles quelles de `_progression` (`.kd-prog__bars`) : c'est
-   le même dessin, servi par la même règle d'échelle. Une deuxième famille de
-   classes pour le même trait finirait par diverger. #}
+   Les courbes ont leur propre composant (`_exercise_progress`), qui porte sa
+   fenêtre de temps. #}
 {% import 'components/_set_type.html.twig' as settype %}
 {% set subject = subject|default(null) %}
+{% set progress = progress|default(null) %}
 
 {% if trajectory %}
     <section class="kd-card kd-extraj">
@@ -62,34 +64,13 @@
             </div>
         </dl>
 
-        {# Pas de courbe sous deux séances chargées : un point unique n'est pas une
-           trajectoire, et la liste ci-dessous le dit déjà mieux. #}
-        {% if trajectory.points is not empty %}
-            <div class="kd-extraj__part">
-                <div class="kd-prog__trajhead">
-                    <h3 class="kd-prog__subtitle">Charge dans le temps</h3>
-                    {% if trajectory.direction != 'flat' %}
-                        <span class="kd-prog__trend kd-prog__trend--{{ trajectory.direction }}">
-                            {{ ux_icon(trajectory.direction == 'up' ? 'lucide:trending-up' : 'lucide:trending-down') }}
-                            {{ trajectory.firstLabel }} → {{ trajectory.lastLabel }}
-                        </span>
-                    {% endif %}
-                </div>
-
-                <div class="kd-prog__bars">
-                    {% for p in trajectory.points %}
-                        <div class="kd-prog__col">
-                            <span class="kd-prog__val">{{ p.label }}</span>
-                            <div class="kd-prog__track">
-                                <span class="kd-prog__bar" style="height: {{ p.heightPct }}%"
-                                      title="{{ p.date|date('d/m/Y') }} · {{ p.label }}"></span>
-                            </div>
-                            <span class="kd-prog__wk">{{ p.date|date('d/m') }}</span>
-                        </div>
-                    {% endfor %}
-                </div>
-                <p class="kd-prog__hint">Meilleure série de travail de chaque séance. L'échauffement n'y entre pas.</p>
-            </div>
+        {# Les courbes sur une fenêtre choisie (plan, 6 mois, 1 an, tout). Elles
+           prennent la place de l'ancienne courbe des dix dernières séances : la
+           liste ci-dessous dit déjà ces dix-là, mieux qu'un dessin. #}
+        {% if progress %}
+            {{ include('components/_exercise_progress.html.twig', {
+                exercise: exercise, progress: progress, subject: subject
+            }, with_context = false) }}
         {% endif %}
 
         <div class="kd-extraj__part">
