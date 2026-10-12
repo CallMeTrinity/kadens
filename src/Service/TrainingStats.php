@@ -390,7 +390,8 @@ final class TrainingStats
     /**
      * L'UNIQUE passe hydratante : le prescrit des séances faites, dont on tire
      * le volume d'endurance et la répartition par activité — corrigés par le
-     * réel importé quand il existe. Les deux sortent du
+     * réel importé quand il existe, et complétés par le réalisé logué pour les
+     * séances sans prescrit. Les deux sortent du
      * même parcours — les calculer séparément voulait dire charger deux fois le
      * même historique, ce que faisait l'ancienne page.
      *
@@ -408,26 +409,42 @@ final class TrainingStats
         // Le réel importé, par séance puis par activité : un seul agrégat SQL.
         $imported = $this->importedActivities->enduranceTotalsByScheduledWorkout($user, $period->start, $period->end);
 
+        // Les activités du réalisé logué, par séance : un second agrégat. Elles ne
+        // servent qu'aux séances sans prescrit — tout l'historique importé
+        // (`TrainingHistoryImporter`, `workout = null`) et les séances dont la
+        // source a été supprimée. Sans elles, ces séances de salle ne comptaient
+        // nulle part. Même règle que `TrainingHistory::dominantActivities()` :
+        // le réalisé complète le prescrit, il ne le corrige jamais.
+        $logged = [];
+        foreach ($this->scheduled->doneLoggedActivityCountsForOwner($user, $period->start, $period->end) as $row) {
+            $logged[$row['scheduledId']][$row['activity']->value] = true;
+        }
+
         foreach ($this->scheduled->findDoneWithContentForOwner($user, $period->start, $period->end) as $sw) {
             $workout = $sw->getWorkout();
-            $actual = $imported[(int) $sw->getId()] ?? [];
-
-            // Séance libre ou source supprimée, sans activité rattachée : rien à
-            // analyser. Avec une activité, la séance libre compte : une sortie
-            // courue n'a pas besoin d'avoir été prescrite pour avoir eu lieu.
-            if (null === $workout && [] === $actual) {
-                continue;
-            }
+            $id = (int) $sw->getId();
+            $actual = $imported[$id] ?? [];
 
             $activities = [];
             foreach (null === $workout ? [] : $this->metrics->distinctActivities($workout) as $activity) {
                 $activities[$activity->value] = true;
+            }
+            if ([] === $activities) {
+                $activities = $logged[$id] ?? [];
             }
             foreach (array_keys($actual) as $key) {
                 $activities[$key] = true;
             }
             foreach (array_keys($activities) as $value) {
                 $activityCounts[$value] = ($activityCounts[$value] ?? 0) + 1;
+            }
+
+            // Séance libre ou source supprimée, sans activité rattachée : pas de
+            // volume d'endurance à lire. Avec une activité, la séance libre
+            // compte : une sortie courue n'a pas besoin d'avoir été prescrite
+            // pour avoir eu lieu.
+            if (null === $workout && [] === $actual) {
+                continue;
             }
 
             $volume = null === $workout ? null : $this->metrics->volume($workout);

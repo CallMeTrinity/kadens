@@ -136,6 +136,41 @@ final class TrainingStatsTest extends KernelTestCase
     }
 
     /**
+     * Une séance SANS prescrit (historique importé, source supprimée) se range
+     * dans la répartition par son réalisé : sans ça, des centaines de séances de
+     * salle importées ne comptaient nulle part. Le réalisé ne fait que combler :
+     * la sortie course où l'on aurait logué du développé couché reste une course.
+     */
+    public function testSessionWithoutPrescriptionIsCountedByItsLog(): void
+    {
+        $bench = $this->em->getRepository(Exercise::class)->findOneBy(['name' => 'Développé couché']);
+        $outing = $this->em->getRepository(ScheduledWorkout::class)->findOneBy(['scheduledDate' => new \DateTimeImmutable('2026-07-20')]);
+
+        $free = (new ScheduledWorkout())
+            ->setOwner($this->user)
+            ->setTitle('Séance importée')
+            ->setScheduledDate(new \DateTimeImmutable('2026-07-18'))
+            ->setStatus(ScheduledStatus::DONE);
+        $free->addLoggedExercise(
+            (new LoggedExercise())->setExerciseName('Développé couché')->setExercise($bench)->setPosition(0)
+                ->addLoggedSet((new LoggedSet())->setPosition(0)->setSetType(SetType::NORMAL)->setReps(5)->setWeightKg(90.0)),
+        );
+        $this->em->persist($free);
+
+        $outing->addLoggedExercise(
+            (new LoggedExercise())->setExerciseName('Développé couché')->setExercise($bench)->setPosition(0),
+        );
+        $this->em->flush();
+
+        $counts = [];
+        foreach ($this->stats->over($this->user, StatsPeriod::month(2026, 7))['activityCounts'] as $row) {
+            $counts[$row['activity']->value] = $row['sessions'];
+        }
+
+        self::assertSame(['gym' => 2, 'running' => 1], $counts);
+    }
+
+    /**
      * Une séance cochée « faite » sans aucune série loguée compte en assiduité
      * et en régularité, et ne porte pas de tonnage. C'est exact, pas cassé :
      * elle a bien eu lieu, on ne sait simplement pas ce qu'elle pesait.
