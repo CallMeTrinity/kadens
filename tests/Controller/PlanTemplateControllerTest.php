@@ -5,12 +5,14 @@ namespace App\Tests\Controller;
 use App\Entity\Block;
 use App\Entity\Exercise;
 use App\Entity\Goal;
+use App\Entity\ImportedActivity;
 use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
 use App\Entity\PrescribedExercise;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
+use App\Enum\ActivitySource;
 use App\Enum\ActivityType;
 use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
@@ -348,6 +350,48 @@ final class PlanTemplateControllerTest extends WebTestCase
      * Un retour vers `/workout` menait donc à un index où la séance qu'on venait
      * de quitter n'apparaît pas.
      */
+    /**
+     * Le réalisé d'une sortie vient de la montre : une activité importée rattachée
+     * à une séance du plan pose sa barre sur la série de course, et la page le dit
+     * en toutes lettres dans l'en-tête de la série. De bout en bout : agrégat SQL,
+     * contrôleur, rendu.
+     */
+    public function testShowOverlaysTheImportedActivityOnTheEnduranceSeries(): void
+    {
+        $owner = $this->createUser('owner@example.com');
+        $template = $this->createPlanTemplate($owner, 'Plan 10k', 2);
+        $item = (new PlanItem())->setWeekNumber(1)->setDayOfWeek(3)->setWorkout($this->createRunWorkout($owner, 'Sortie tempo', 8000));
+        $template->addPlanItem($item);
+        $this->em->flush();
+
+        $session = $this->scheduleFromPlan($owner, $template, $item, '2026-03-02', '2026-03-04', ScheduledStatus::DONE);
+        $activity = (new ImportedActivity($owner, ActivitySource::INTERVALS, 'i9001', 'Run', new \DateTimeImmutable('2026-03-04 07:00'), new \DateTimeImmutable('2026-03-04')))
+            ->setActivity(ActivityType::RUNNING)
+            ->setDistanceMeters(8400)
+            ->setMovingSeconds(2520)
+            ->setScheduledWorkout($session);
+        $this->em->persist($activity);
+        $this->em->flush();
+
+        $this->client->loginUser($owner);
+        $crawler = $this->client->request('GET', '/plan-template/'.$template->getId());
+
+        self::assertResponseIsSuccessful();
+        $heads = $crawler->filter('.kd-prog__rowhead')->each(static fn ($node): string => preg_replace('/\s+/', ' ', $node->text()));
+        $running = array_values(array_filter($heads, static fn (string $head): bool => str_contains($head, 'Course')));
+        self::assertCount(1, $running);
+        self::assertStringContainsString('en distance', $running[0]);
+        self::assertStringContainsString('prévu 8 km', $running[0]);
+        self::assertStringContainsString('fait 8,4 km', $running[0]);
+        // Sous les barres : la distance courue sur la course, et son temps en
+        // mouvement sur la ligne « Temps ».
+        $reals = $crawler->filter('.kd-prog__val--real')->each(static fn ($node): string => trim($node->text()));
+        self::assertContains('8,4 km', $reals);
+        self::assertContains('42 min', $reals);
+        // Une activité importée est du réalisé : l'indice « rien de remonté » se tait.
+        self::assertSelectorTextNotContains('.kd-prog__legend', 'Rien de remonté');
+    }
+
     public function testTheComposerOpenedFromThePlanEditorReturnsToIt(): void
     {
         $user = $this->createUser('owner@example.com');
@@ -454,6 +498,31 @@ final class PlanTemplateControllerTest extends WebTestCase
                     ->setSets(5)
                     ->setReps(5)
                     ->setWeightKg(100.0)
+            )
+        );
+
+        $this->em->persist($workout);
+        $this->em->flush();
+
+        return $workout;
+    }
+
+    private function createRunWorkout(User $owner, string $title, int $meters): Workout
+    {
+        $exercise = (new Exercise())->setName('Course à pied')->setActivity(ActivityType::RUNNING);
+        $this->em->persist($exercise);
+
+        $workout = (new Workout())
+            ->setOwner($owner)
+            ->setTitle($title)
+            ->setSlug(strtolower(str_replace(' ', '-', $title)).'-'.uniqid());
+        $workout->addBlock(
+            (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(1)->addPrescribedExercise(
+                (new PrescribedExercise())
+                    ->setExercise($exercise)
+                    ->setPosition(1)
+                    ->setPrescriptionType(PrescriptionType::DISTANCE_PACE)
+                    ->setDistanceMeters($meters)
             )
         );
 

@@ -10,6 +10,7 @@ use App\Enum\ActivityType;
 use App\Enum\ScheduledStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Types\Types;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
@@ -154,16 +155,12 @@ class ImportedActivityRepository extends ServiceEntityRepository
      */
     public function enduranceTotalsByScheduledWorkout(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
     {
-        $qb = $this->createQueryBuilder('a')
-            ->select('IDENTITY(a.scheduledWorkout) AS sid', 'a.activity AS activity', 'COALESCE(SUM(a.distanceMeters), 0) AS meters', 'COALESCE(SUM(a.movingSeconds), 0) AS seconds')
+        $qb = $this->enduranceTotalsQuery()
             ->join('a.scheduledWorkout', 's')
             ->andWhere('s.owner = :owner')
             ->andWhere('s.status = :done')
-            ->andWhere('a.activity IN (:endurance)')
             ->setParameter('owner', $owner)
-            ->setParameter('done', ScheduledStatus::DONE)
-            ->setParameter('endurance', [ActivityType::RUNNING->value, ActivityType::CYCLING->value, ActivityType::SWIMMING->value])
-            ->groupBy('sid', 'a.activity');
+            ->setParameter('done', ScheduledStatus::DONE);
 
         if (null !== $start) {
             $qb->andWhere('s.scheduledDate >= :windowStart')->setParameter('windowStart', $start, Types::DATE_IMMUTABLE);
@@ -173,8 +170,52 @@ class ImportedActivityRepository extends ServiceEntityRepository
             $qb->andWhere('s.scheduledDate <= :windowEnd')->setParameter('windowEnd', $end, Types::DATE_IMMUTABLE);
         }
 
+        return $this->foldEnduranceTotals($qb->getQuery()->getArrayResult());
+    }
+
+    /**
+     * Le même agrégat, borné à des séances désignées : celles d'une instanciation
+     * de plan, que `ProgressionAggregator::realizedRun()` replie sur ses semaines.
+     * Le rattachement suffit (pas de filtre de statut) : une activité posée sur
+     * une séance dit qu'elle a eu lieu, et le rattachement la passe déjà en DONE.
+     *
+     * @param list<int> $scheduledIds
+     *
+     * @return array<int, array<string, array{meters: int, seconds: int}>> id de séance => activité => volume
+     */
+    public function enduranceTotalsForScheduledIds(array $scheduledIds): array
+    {
+        if ([] === $scheduledIds) {
+            return [];
+        }
+
+        $rows = $this->enduranceTotalsQuery()
+            ->andWhere('a.scheduledWorkout IN (:ids)')
+            ->setParameter('ids', $scheduledIds)
+            ->getQuery()
+            ->getArrayResult();
+
+        return $this->foldEnduranceTotals($rows);
+    }
+
+    private function enduranceTotalsQuery(): QueryBuilder
+    {
+        return $this->createQueryBuilder('a')
+            ->select('IDENTITY(a.scheduledWorkout) AS sid', 'a.activity AS activity', 'COALESCE(SUM(a.distanceMeters), 0) AS meters', 'COALESCE(SUM(a.movingSeconds), 0) AS seconds')
+            ->andWhere('a.activity IN (:endurance)')
+            ->setParameter('endurance', [ActivityType::RUNNING->value, ActivityType::CYCLING->value, ActivityType::SWIMMING->value])
+            ->groupBy('sid', 'a.activity');
+    }
+
+    /**
+     * @param list<array<string, mixed>> $rows
+     *
+     * @return array<int, array<string, array{meters: int, seconds: int}>>
+     */
+    private function foldEnduranceTotals(array $rows): array
+    {
         $totals = [];
-        foreach ($qb->getQuery()->getArrayResult() as $row) {
+        foreach ($rows as $row) {
             $activity = $row['activity'] instanceof ActivityType ? $row['activity']->value : (string) $row['activity'];
             $totals[(int) $row['sid']][$activity] = [
                 'meters' => (int) $row['meters'],

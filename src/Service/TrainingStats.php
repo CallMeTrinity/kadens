@@ -49,7 +49,8 @@ use App\Repository\ScheduledWorkoutRepository;
  * @phpstan-import-type RegionShare from RegionBreakdown
  *
  * @phpstan-type Adherence array{done: int, missed: int, planned: int, total: int, adherence: float|null}
- * @phpstan-type EnduranceVolume array{meters: int, seconds: int, sessions: int, distanceLabel: string, durationLabel: string}
+ * @phpstan-type EnduranceVolume array{meters: int, seconds: int, sessions: int, derivedMeters: int, derivedSeconds: int, distanceLabel: string|null, durationLabel: string|null}
+ * @phpstan-type EnduranceRaw array{meters: int, seconds: int, sessions: int, derivedMeters: int, derivedSeconds: int}
  * @phpstan-type Bucket array{label: string, short: string, tonnageKg: float, sessions: int, workingSets: int, tonnageLabel: string, tonnageHeightPct: int, sessionsHeightPct: int}
  * @phpstan-type TopLift array{name: string, weightKg: float, weightLabel: string, workingSets: int, sessions: int}
  * @phpstan-type NewRecord array{name: string, weightKg: float, weightLabel: string, previousKg: float, previousLabel: string, gainKg: float, gainLabel: string}
@@ -372,7 +373,12 @@ final class TrainingStats
     }
 
     /**
-     * @param array{meters: int, seconds: int, sessions: int} $raw
+     * `meters` et `seconds` sont des totaux, part déduite de l'allure COMPRISE ;
+     * `derivedMeters` / `derivedSeconds` disent combien de ce total est un calcul,
+     * pour que l'écran le marque « ≈ ». Un total nul n'a pas de libellé : « 0 m »
+     * pour une sortie prescrite en durée se lirait « rien couru ».
+     *
+     * @param EnduranceRaw $raw
      *
      * @return EnduranceVolume
      */
@@ -382,8 +388,14 @@ final class TrainingStats
             'meters' => $raw['meters'],
             'seconds' => $raw['seconds'],
             'sessions' => $raw['sessions'],
-            'distanceLabel' => $this->units->distance($raw['meters']),
-            'durationLabel' => $this->units->duration($raw['seconds']),
+            'derivedMeters' => $raw['derivedMeters'],
+            'derivedSeconds' => $raw['derivedSeconds'],
+            'distanceLabel' => $raw['meters'] > 0
+                ? ($raw['derivedMeters'] > 0 ? '≈ ' : '').$this->units->distance($raw['meters'])
+                : null,
+            'durationLabel' => $raw['seconds'] > 0
+                ? ($raw['derivedSeconds'] > 0 ? '≈ ' : '').$this->units->duration($raw['seconds'])
+                : null,
         ];
     }
 
@@ -395,15 +407,18 @@ final class TrainingStats
      * même parcours — les calculer séparément voulait dire charger deux fois le
      * même historique, ce que faisait l'ancienne page.
      *
-     * @return array{endurance: array<string, array{meters: int, seconds: int, sessions: int}>, activities: list<array{activity: ActivityType, sessions: int}>}
+     * Le prescrit d'une sortie se décrit en distance OU en durée : sans activité
+     * importée, la grandeur absente se déduit de l'autre et de l'allure quand il
+     * y en a une (`WorkoutMetrics::volume()`), et elle est comptée à part pour
+     * être dite estimée. Sans allure, elle reste à zéro : on n'invente pas une
+     * allure. Le réel importé, lui, porte toujours les deux et ne déduit rien.
+     *
+     * @return array{endurance: array<string, EnduranceRaw>, activities: list<array{activity: ActivityType, sessions: int}>}
      */
     private function prescribedPass(User $user, StatsPeriod $period): array
     {
-        $endurance = [
-            'running' => ['meters' => 0, 'seconds' => 0, 'sessions' => 0],
-            'cycling' => ['meters' => 0, 'seconds' => 0, 'sessions' => 0],
-            'swimming' => ['meters' => 0, 'seconds' => 0, 'sessions' => 0],
-        ];
+        $empty = ['meters' => 0, 'seconds' => 0, 'sessions' => 0, 'derivedMeters' => 0, 'derivedSeconds' => 0];
+        $endurance = ['running' => $empty, 'cycling' => $empty, 'swimming' => $empty];
         $activityCounts = [];
 
         // Le réel importé, par séance puis par activité : un seul agrégat SQL.
@@ -452,14 +467,25 @@ final class TrainingStats
                 // Par activité, le réel remplace le prescrit en bloc (distance ET
                 // durée) : mélanger la distance courue et la durée prévue ne
                 // décrirait aucune séance.
-                $meters = $actual[$key]['meters'] ?? $volume[$key]['meters'] ?? 0;
-                $seconds = $actual[$key]['seconds'] ?? $volume[$key]['seconds'] ?? 0;
+                if (isset($actual[$key])) {
+                    $meters = $actual[$key]['meters'];
+                    $seconds = $actual[$key]['seconds'];
+                    $derivedMeters = 0;
+                    $derivedSeconds = 0;
+                } else {
+                    $derivedMeters = $volume[$key]['derivedMeters'] ?? 0;
+                    $derivedSeconds = $volume[$key]['derivedSeconds'] ?? 0;
+                    $meters = ($volume[$key]['meters'] ?? 0) + $derivedMeters;
+                    $seconds = ($volume[$key]['seconds'] ?? 0) + $derivedSeconds;
+                }
 
                 if ($meters > 0 || $seconds > 0) {
                     ++$endurance[$key]['sessions'];
                 }
                 $endurance[$key]['meters'] += $meters;
                 $endurance[$key]['seconds'] += $seconds;
+                $endurance[$key]['derivedMeters'] += $derivedMeters;
+                $endurance[$key]['derivedSeconds'] += $derivedSeconds;
             }
         }
 

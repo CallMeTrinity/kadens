@@ -15,19 +15,26 @@
    pas de lib de charts, cohérent AssetMapper. Le prévu est une barre pleine
    neutre, le réalisé une barre d'encre plus étroite POSÉE DESSUS — les deux sont
    mises à l'échelle sur le même maximum côté PHP, c'est ce qui rend la
-   comparaison des hauteurs honnête. #}
+   comparaison des hauteurs honnête. Les valeurs s'écrivent au-dessus (prévu,
+   puis réalisé en encre) : un graphique qu'il faut survoler pour lire n'est
+   pas lisible sur mobile. Une barre hachurée est INCOMPLÈTE : un effort de la
+   semaine ne se chiffre pas dans l'unité de la série. #}
 {% import 'components/_activity.html.twig' as activity %}
 
-{% macro bars(points, modifier, showVal) %}
+{% macro bars(points, modifier, showVal, missingNoun = null) %}
     <div class="kd-prog__bars">
         {% for p in points %}
-            <div class="kd-prog__col{{ p.value is null or p.value == 0 ? ' is-empty' }}">
-                {% if showVal %}<span class="kd-prog__val">{{ p.label ?? '—' }}</span>{% endif %}
+            {% set missing = p.missing ?? 0 %}
+            <div class="kd-prog__col{{ (p.value is null or p.value == 0) and not p.realLabel ? ' is-empty' }}">
+                {% if showVal %}
+                    <span class="kd-prog__val">{{ p.label ?? '—' }}</span>
+                    {% if p.realLabel %}<span class="kd-prog__val kd-prog__val--real">{{ p.realLabel }}</span>{% endif %}
+                {% endif %}
                 <div class="kd-prog__track">
                     {% if p.heightPct > 0 %}
-                        <span class="kd-prog__bar{{ modifier ? ' kd-prog__bar--act kd-act--' ~ modifier }}"
+                        <span class="kd-prog__bar{{ modifier ? ' kd-prog__bar--act kd-act--' ~ modifier }}{{ missing > 0 ? ' is-partial' }}"
                               style="height: {{ p.heightPct }}%"
-                              title="S{{ p.week }} · prévu {{ p.label ?? '—' }}"></span>
+                              title="S{{ p.week }} · prévu {{ p.label ?? '—' }}{{ missing > 0 ? ' · ' ~ missing ~ ' effort' ~ (missing > 1 ? 's') ~ ' sans ' ~ missingNoun }}"></span>
                     {% endif %}
                     {% if p.realHeightPct > 0 %}
                         <span class="kd-prog__bar kd-prog__bar--real"
@@ -89,8 +96,8 @@
             <p class="kd-prog__legend">
                 <span class="kd-prog__key"><span class="kd-prog__keybar"></span> Prévu</span>
                 <span class="kd-prog__key"><span class="kd-prog__keybar kd-prog__keybar--real"></span> Réalisé</span>
-                {% if adherence.logged == 0 %}
-                    <span class="kd-prog__hint">Aucun détail série par série remonté sur cette instanciation.</span>
+                {% if adherence.logged == 0 and adherence.imported == 0 %}
+                    <span class="kd-prog__hint">Rien de remonté sur cette instanciation : ni série loguée, ni activité importée.</span>
                 {% endif %}
             </p>
         {% else %}
@@ -106,8 +113,21 @@
                             <div class="kd-prog__rowhead">
                                 <span class="kd-prog__dot{{ s.modifier ? ' kd-prog__dot--act kd-act--' ~ s.modifier }}"></span>
                                 {{ s.label }}
+                                {% if s.unitLabel %}<span class="kd-prog__unit">{{ s.unitLabel }}</span>{% endif %}
+                                <span class="kd-prog__totals">
+                                    {% if s.totalLabel %}prévu {{ s.totalLabel }}{% endif %}
+                                    {% if s.realTotalLabel %}<strong>· fait {{ s.realTotalLabel }}</strong>{% endif %}
+                                </span>
                             </div>
-                            {{ _self.bars(s.points, s.modifier, false) }}
+                            {{ _self.bars(s.points, s.modifier, true, s.missingNoun) }}
+                            {% if s.points|filter(p => p.estimated)|length > 0 %}
+                                <p class="kd-prog__hint">≈ : {{ s.missingNoun }} déduite de l'allure prescrite.</p>
+                            {% endif %}
+                            {% if s.partialWeeks is not empty %}
+                                <p class="kd-prog__hint">
+                                    Barre hachurée ({{ s.partialWeeks|map(w => 'S' ~ w)|join(', ') }}) : un effort sans {{ s.missingNoun }} ni allure n'y est pas compté.
+                                </p>
+                            {% endif %}
                         </div>
                     {% endfor %}
                 </div>

@@ -202,14 +202,23 @@
                 {% else %}
                     <div class="kd-profile__tiles">
                         {% for e in endurance %}
+                            {% set v = vol[e.key] %}
                             <div class="kd-profile__tile">
                                 <span class="kd-profile__tileicon">{{ ux_icon(e.icon) }}</span>
-                                <div class="kd-stat__value">{{ vol[e.key].distanceLabel }}</div>
-                                <div class="kd-stat__label">{{ e.label }} · {{ vol[e.key].durationLabel }} · {{ vol[e.key].sessions }} sortie{{ vol[e.key].sessions > 1 ? 's' }}</div>
+                                {# Distance en valeur principale, durée en repli : une
+                                   sortie prescrite en durée sans allure n'a pas de
+                                   distance, et « 0 m » se lirait « rien couru ». #}
+                                <div class="kd-stat__value">{{ v.distanceLabel ?? v.durationLabel }}</div>
+                                <div class="kd-stat__label">{{ e.label }}{{ v.distanceLabel and v.durationLabel ? ' · ' ~ v.durationLabel }} · {{ v.sessions }} sortie{{ v.sessions > 1 ? 's' }}</div>
                             </div>
                         {% endfor %}
                     </div>
-                    <p class="kd-card__note">Lu sur le prescrit des séances faites : le cardio ne se logue pas.</p>
+                    <p class="kd-card__note">
+                        Lu sur l'activité importée quand elle est rattachée à la séance faite, sur son prescrit sinon.
+                        {% if endurance|filter(e => vol[e.key].derivedMeters > 0 or vol[e.key].derivedSeconds > 0) is not empty %}
+                            ≈ : en partie déduit de l'allure prescrite.
+                        {% endif %}
+                    </p>
                 {% endif %}
             </section>
         </div>

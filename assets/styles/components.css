@@ -9167,12 +9167,35 @@ textarea.kd-inlineedit__input {
 .kd-prog__rowhead {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: var(--kd-space-3);
     font-family: var(--font-body);
     font-size: 13px;
     font-weight: var(--kd-weight-semibold);
     color: var(--color-text-strong);
     margin-bottom: var(--kd-space-4);
+}
+
+/* Unité de la série et totaux du plan : l'en-tête dit ce qu'on lit avant les barres */
+.kd-prog__unit {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: var(--kd-weight-regular);
+    color: var(--color-text-faint);
+}
+
+.kd-prog__totals {
+    margin-left: auto;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: var(--kd-weight-regular);
+    color: var(--color-text-secondary);
+    white-space: nowrap;
+}
+
+.kd-prog__totals strong {
+    font-weight: var(--kd-weight-semibold);
+    color: var(--color-text-strong);
 }
 
 .kd-prog__dot {
@@ -9239,6 +9262,12 @@ textarea.kd-inlineedit__input {
     background: var(--color-text-strong);
 }
 
+/* Semaine incomplète : un effort ne se chiffre pas dans l'unité de la série.
+   Hachurée plutôt que pâlie — pâle, elle se lirait « vide ». */
+.kd-prog__bar.is-partial {
+    background-image: repeating-linear-gradient(135deg, transparent 0 4px, var(--color-surface-raised) 4px 6px);
+}
+
 .kd-prog__col.is-empty .kd-prog__track {
     opacity: .5;
 }
@@ -9250,6 +9279,10 @@ textarea.kd-inlineedit__input {
     text-align: center;
     line-height: 1.2;
     min-height: 1.2em;
+}
+
+.kd-prog__val--real {
+    color: var(--color-text-strong);
 }
 
 .kd-prog__wk {

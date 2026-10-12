@@ -78,22 +78,22 @@
                 {% if vol.running.meters > 0 or vol.running.seconds > 0 %}
                     <div class="kd-profile__tile">
                         <span class="kd-profile__tileicon">{{ ux_icon('lucide:footprints') }}</span>
-                        <div class="kd-stat__value">{{ vol.running.distanceLabel }}</div>
-                        <div class="kd-stat__label">Course · {{ vol.running.durationLabel }}</div>
+                        <div class="kd-stat__value">{{ vol.running.distanceLabel ?? vol.running.durationLabel }}</div>
+                        <div class="kd-stat__label">Course{{ vol.running.distanceLabel and vol.running.durationLabel ? ' · ' ~ vol.running.durationLabel }}</div>
                     </div>
                 {% endif %}
                 {% if vol.cycling.meters > 0 or vol.cycling.seconds > 0 %}
                     <div class="kd-profile__tile">
                         <span class="kd-profile__tileicon">{{ ux_icon('lucide:bike') }}</span>
-                        <div class="kd-stat__value">{{ vol.cycling.distanceLabel }}</div>
-                        <div class="kd-stat__label">Vélo · {{ vol.cycling.durationLabel }}</div>
+                        <div class="kd-stat__value">{{ vol.cycling.distanceLabel ?? vol.cycling.durationLabel }}</div>
+                        <div class="kd-stat__label">Vélo{{ vol.cycling.distanceLabel and vol.cycling.durationLabel ? ' · ' ~ vol.cycling.durationLabel }}</div>
                     </div>
                 {% endif %}
                 {% if vol.swimming.meters > 0 or vol.swimming.seconds > 0 %}
                     <div class="kd-profile__tile">
                         <span class="kd-profile__tileicon">{{ ux_icon('lucide:waves') }}</span>
-                        <div class="kd-stat__value">{{ vol.swimming.distanceLabel }}</div>
-                        <div class="kd-stat__label">Natation · {{ vol.swimming.durationLabel }}</div>
+                        <div class="kd-stat__value">{{ vol.swimming.distanceLabel ?? vol.swimming.durationLabel }}</div>
+                        <div class="kd-stat__label">Natation{{ vol.swimming.distanceLabel and vol.swimming.durationLabel ? ' · ' ~ vol.swimming.durationLabel }}</div>
                     </div>
                 {% endif %}
             </div>

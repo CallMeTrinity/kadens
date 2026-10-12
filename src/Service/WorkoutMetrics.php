@@ -23,7 +23,7 @@ use App\Enum\ActivityType;
  * @phpstan-import-type RegionShare from RegionBreakdown
  *
  * @phpstan-type GymVolume array{setsByArea: array<string, int>, tonnageKg: float, totalSets: int, unmappedSets: int}
- * @phpstan-type EnduranceVolume array{meters: int, seconds: int, derivedMeters: int}
+ * @phpstan-type EnduranceVolume array{meters: int, seconds: int, derivedMeters: int, derivedSeconds: int, efforts: int, withoutDistance: int, withoutDuration: int}
  * @phpstan-type WorkoutVolume array{gym: GymVolume, running: EnduranceVolume, cycling: EnduranceVolume, swimming: EnduranceVolume}
  * @phpstan-type TopLift array{exercise: string, weightKg: float, sets: int}
  * @phpstan-type WorkoutSummary array{tonnageKg: float, workingSets: int, exerciseCount: int, blockCount: int, supersets: int, circuits: int, averageRpe: float|null, topLift: TopLift|null, regions: list<RegionShare>}
@@ -205,6 +205,14 @@ final class WorkoutMetrics
      *   la distance n'est pas saisie. C'est un calcul, pas une déclaration : la
      *   verser dans `meters` ferait passer une estimation pour une consigne. Sans
      *   allure, elle reste à zéro et l'appelant n'affiche rien.
+     *   `derivedSeconds` est son symétrique : la durée déduite d'une distance et
+     *   d'une allure, quand la durée n'est pas saisie.
+     *
+     * Et trois compteurs d'efforts (une ligne prescrite, pas une répétition) pour
+     * qui doit savoir si un total est COMPLET : `efforts` au total, et parmi eux
+     * ceux qui ne se chiffrent ni en distance (`withoutDistance`) ni en durée
+     * (`withoutDuration`), même par déduction. « 10 km » sans allure n'a pas de
+     * durée ; une somme de durées qui l'omet n'est qu'un plancher.
      *
      * @return WorkoutVolume
      */
@@ -214,11 +222,8 @@ final class WorkoutMetrics
         $gymTonnage = 0.0;
         $gymTotalSets = 0;
         $gymUnmappedSets = 0;
-        $endurance = [
-            'running' => ['meters' => 0, 'seconds' => 0, 'derivedMeters' => 0],
-            'cycling' => ['meters' => 0, 'seconds' => 0, 'derivedMeters' => 0],
-            'swimming' => ['meters' => 0, 'seconds' => 0, 'derivedMeters' => 0],
-        ];
+        $empty = ['meters' => 0, 'seconds' => 0, 'derivedMeters' => 0, 'derivedSeconds' => 0, 'efforts' => 0, 'withoutDistance' => 0, 'withoutDuration' => 0];
+        $endurance = ['running' => $empty, 'cycling' => $empty, 'swimming' => $empty];
 
         foreach ($workout->getBlocks() as $block) {
             $rounds = max(1, $block->getRounds() ?? 1);
@@ -280,8 +285,20 @@ final class WorkoutMetrics
                 // seulement quand la distance n'a PAS été posée — une consigne
                 // saisie fait toujours autorité sur un produit de deux autres
                 // champs, et les additionner compterait la sortie deux fois.
-                if (null === $distance && null !== $seconds && null !== $pace && $pace > 0) {
+                $hasPace = null !== $pace && $pace > 0;
+                if (null === $distance && null !== $seconds && $hasPace) {
                     $endurance[$key]['derivedMeters'] += (int) round($seconds / $pace * 1000) * $repeats;
+                }
+                if (null === $seconds && null !== $distance && $hasPace) {
+                    $endurance[$key]['derivedSeconds'] += (int) round($distance / 1000 * $pace) * $repeats;
+                }
+
+                ++$endurance[$key]['efforts'];
+                if (null === $distance && (null === $seconds || !$hasPace)) {
+                    ++$endurance[$key]['withoutDistance'];
+                }
+                if (null === $seconds && (null === $distance || !$hasPace)) {
+                    ++$endurance[$key]['withoutDuration'];
                 }
             }
         }
