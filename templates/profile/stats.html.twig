@@ -262,8 +262,7 @@
                 {% else %}
                     <p class="kd-card__note">
                         Tonnage de salle par {{ prog.granularity == 'week' ? 'semaine' : 'mois' }}.
-                        {% if prog.truncated %}Les 24 dernières seulement — au-delà, les barres ne se lisent plus.{% endif %}
-                        Les périodes vides sont conservées : un trou est une information.
+                        {% if prog.truncated %}Les 24 dernières seulement{% endif %}
                     </p>
 
                     <div class="kd-statbars">
