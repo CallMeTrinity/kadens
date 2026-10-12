@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Enum\ActivityType;
 use App\Enum\MuscleGroup;
 use App\Repository\ExerciseRepository;
+use App\Repository\ImportedActivityRepository;
 use App\Repository\LoggedSetRepository;
 use App\Repository\ScheduledWorkoutRepository;
 
@@ -40,11 +41,12 @@ use App\Repository\ScheduledWorkoutRepository;
  * dedans — c'est la seule chose que le projet accepte de lire là, et elle suffit
  * à la rendre visible plutôt que de la laisser en case creuse.
  *
- * **Coût.** Cinq lectures, aucune hydratation de séance : les bornes, les
- * séances faites, leurs activités prescrites, le volume par (séance × exercice),
- * et les définitions des seuls exercices travaillés. Les quatre premières sont
- * des projections scalaires ; la dernière est bornée par la pratique (le nombre
- * d'exercices distincts qu'on pratique), pas par la profondeur de l'historique.
+ * **Coût.** Sept lectures, aucune hydratation de séance : les bornes, les
+ * séances faites, leurs activités prescrites, importées et loguées, le volume
+ * par (séance × exercice), et les définitions des seuls exercices travaillés.
+ * Les six premières sont des projections scalaires ; la dernière est bornée
+ * par la pratique (le nombre d'exercices distincts qu'on pratique), pas par la
+ * profondeur de l'historique.
  * Le nombre de requêtes est **constant**, il ne dépend pas du nombre de mois
  * affichés — un test le vérifie et fige le chiffre.
  *
@@ -71,6 +73,7 @@ final class TrainingHistory
         private readonly ScheduledWorkoutRepository $scheduled,
         private readonly LoggedSetRepository $loggedSets,
         private readonly ExerciseRepository $exercises,
+        private readonly ImportedActivityRepository $importedActivities,
     ) {
     }
 
@@ -179,6 +182,14 @@ final class TrainingHistory
      * jour où l'on voudrait le contraire, ce serait une décision à prendre, pas
      * un effet de bord à laisser arriver.
      *
+     * **Entre les deux, l'activité importée de la montre.** La reprise
+     * d'historique Intervals (`ActivityMatcher`) crée elle aussi des séances
+     * libres, mais qui ne loguent rien : ni prescrit ni réalisé, seule leur
+     * activité rattachée dit qu'elles étaient une course. Elle passe AVANT le
+     * réalisé logué parce qu'elle est mesurée, pas saisie : une sortie importée
+     * où l'on aurait logué du gainage reste une sortie. Elle passe APRÈS le
+     * prescrit pour la même raison que le réalisé — compléter, jamais corriger.
+     *
      * **Une séance ne relève que d'une nature ici, et c'est un choix.** Le
      * `activityCounts` de `TrainingStats` compte au contraire une séance dans
      * CHACUNE de ses activités — il répond à « combien de mes séances ont touché
@@ -199,13 +210,21 @@ final class TrainingHistory
             $this->scheduled->doneActivityCountsForOwner($user, null, null)
         );
 
+        // Même départage que les deux autres sources : le poids d'une activité
+        // y est son nombre de sorties rattachées au lieu d'un nombre d'exercices.
+        $imported = $this->pickDominant(array_map(
+            static fn (array $row): array => ['scheduledId' => $row['scheduledId'], 'activity' => $row['activity'], 'exercises' => $row['activities']],
+            $this->importedActivities->doneActivityCountsByScheduledWorkout($user),
+        ));
+
         $logged = $this->pickDominant(
             $this->scheduled->doneLoggedActivityCountsForOwner($user, null, null)
         );
 
         // `+` sur des tableaux garde la valeur de GAUCHE en cas de clé commune :
-        // le prescrit prime, le réalisé ne comble que les séances qu'il ignore.
-        return $prescribed + $logged;
+        // le prescrit prime, l'importé puis le réalisé ne comblent que les
+        // séances que les sources précédentes ignorent.
+        return $prescribed + $imported + $logged;
     }
 
     /**

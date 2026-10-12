@@ -832,6 +832,11 @@ final class CoachControllerTest extends WebTestCase
         // La page dit de qui elle parle : un chiffre de performance ne doit pas
         // laisser douter de qui l'a produit.
         self::assertStringContainsString('athlete@example.com', $trajectory);
+        // Changer de fenêtre garde la page de l'athlète : un lien vers
+        // `/exercise/{id}` ramènerait le coach sur ses propres courbes.
+        $athleteUrl = '/coach/athlete/'.$athlete->getId().'/exercise/'.$exercise->getId();
+        self::assertSelectorExists('a.kd-rangetab[href="'.$athleteUrl.'?range=all#progression"]');
+        self::assertSelectorNotExists('a.kd-rangetab[href^="/exercise/"]');
 
         // La page « moi » n'a pas bougé pour autant : elle répond toujours de soi.
         $crawler = $this->client->request('GET', '/exercise/'.$exercise->getId());

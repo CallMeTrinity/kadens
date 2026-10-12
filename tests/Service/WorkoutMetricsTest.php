@@ -173,6 +173,36 @@ final class WorkoutMetricsTest extends TestCase
         self::assertSame(1200, $vol['running']['seconds']);
     }
 
+    public function testDerivedDurationIsTheMirrorOfDerivedDistance(): void
+    {
+        // 10 km à 5:00/km = 50 min, durée non saisie : on la déduit, à part.
+        $run = $this->prescribed(ActivityType::RUNNING, PrescriptionType::DISTANCE_PACE, []);
+        $run->setDistanceMeters(10000)->setPaceSecondsPerKm(300);
+
+        $vol = $this->metrics->volume($this->workout([$this->block(BlockRole::MAIN, 1, [$run])]));
+
+        self::assertSame(3000, $vol['running']['derivedSeconds']);
+        self::assertSame(0, $vol['running']['seconds']);
+    }
+
+    public function testEffortsThatCannotBeQuantifiedAreCountedPerUnit(): void
+    {
+        // Distance sans allure : pas de durée. Durée sans allure : pas de distance.
+        // Durée avec allure : les deux se chiffrent.
+        $distanceOnly = $this->prescribed(ActivityType::RUNNING, PrescriptionType::DISTANCE_PACE, []);
+        $distanceOnly->setDistanceMeters(8000);
+        $durationOnly = $this->prescribed(ActivityType::RUNNING, PrescriptionType::DURATION, []);
+        $durationOnly->setDurationSeconds(2700);
+        $both = $this->prescribed(ActivityType::RUNNING, PrescriptionType::DURATION, []);
+        $both->setDurationSeconds(1800)->setPaceSecondsPerKm(300);
+
+        $vol = $this->metrics->volume($this->workout([$this->block(BlockRole::MAIN, 1, [$distanceOnly, $durationOnly, $both])]));
+
+        self::assertSame(3, $vol['running']['efforts']);
+        self::assertSame(1, $vol['running']['withoutDistance']);
+        self::assertSame(1, $vol['running']['withoutDuration']);
+    }
+
     public function testUnmappedSetsCountGymExercisesWithoutTargetArea(): void
     {
         // Un exercice de renforcement sans zone déclarée entre bien dans le total

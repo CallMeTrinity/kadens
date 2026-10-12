@@ -16,6 +16,8 @@ use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\ExerciseVoter;
 use App\Service\CoachingResolver;
+use App\Service\ExerciseBodyMap;
+use App\Service\ExerciseProgress;
 use App\Service\ExerciseTrajectory;
 use App\Service\HeartRateZones;
 use App\Service\PlanScheduler;
@@ -127,16 +129,26 @@ final class CoachController extends AbstractController
      */
     #[Route('/athlete/{id}/exercise/{exerciseId}', name: 'app_coach_athlete_exercise', methods: ['GET'], requirements: ['id' => '\d+', 'exerciseId' => '\d+'])]
     public function athleteExercise(
+        Request $request,
         #[MapEntity(id: 'id')] User $athlete,
         #[MapEntity(id: 'exerciseId')] Exercise $exercise,
         ExerciseTrajectory $trajectory,
+        ExerciseProgress $progress,
+        ExerciseBodyMap $bodyMap,
     ): Response {
         $this->denyUnlessCoachOf($athlete);
         $this->denyAccessUnlessGranted(ExerciseVoter::VIEW, $exercise);
 
+        $path = $trajectory->for($athlete, $exercise);
+        $viewer = $this->getUser();
+
         return $this->render('exercise/show.html.twig', [
             'exercise' => $exercise,
-            'trajectory' => $trajectory->for($athlete, $exercise),
+            // La silhouette reste celle du coach (réglage d'affichage), les
+            // courbes et le plan en cours sont ceux de l'athlète.
+            'bodyMap' => $bodyMap->for($exercise, $viewer instanceof User ? $viewer : null),
+            'trajectory' => $path,
+            'progress' => null === $path ? null : $progress->for($athlete, $exercise, $request->query->getString('range')),
             'subject' => $athlete,
         ]);
     }

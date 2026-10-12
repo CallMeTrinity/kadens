@@ -118,6 +118,79 @@ final class TrainingStatsTest extends KernelTestCase
     }
 
     /**
+     * Une sortie prescrite en DURÉE n'a pas de distance saisie. Avec une allure,
+     * la distance s'en déduit (45 min à 5:00/km = 9 km) et entre au total, dite
+     * estimée ; avant, elle pesait zéro et la sortie disparaissait des kilomètres.
+     */
+    public function testDurationPrescribedOutingCountsItsDistanceDerivedFromPace(): void
+    {
+        $this->scheduleOuting('2026-07-27', PrescriptionType::DURATION, null, 2700, 300);
+
+        $running = $this->stats->over($this->user, StatsPeriod::month(2026, 7))['volume']['running'];
+
+        self::assertSame(14000, $running['meters']);
+        self::assertSame(9000, $running['derivedMeters']);
+        self::assertSame(4200, $running['seconds']);
+        self::assertSame(2, $running['sessions']);
+        self::assertSame('≈ 14 km', $running['distanceLabel']);
+    }
+
+    /**
+     * Sans allure, rien ne se déduit : la sortie garde sa durée et n'a pas de
+     * distance — pas de « 0 m », qui se lirait « rien couru ».
+     */
+    public function testDurationWithoutPaceKeepsTheDurationAndNoDistance(): void
+    {
+        $this->scheduleOuting('2026-08-03', PrescriptionType::DURATION, null, 2700, null);
+
+        $running = $this->stats->over($this->user, StatsPeriod::month(2026, 8))['volume']['running'];
+
+        self::assertSame(0, $running['meters']);
+        self::assertNull($running['distanceLabel']);
+        self::assertSame(2700, $running['seconds']);
+        self::assertNotNull($running['durationLabel']);
+        self::assertSame(1, $running['sessions']);
+    }
+
+    /**
+     * Le pendant : une sortie prescrite en distance avec allure a une durée
+     * déduite, elle aussi marquée estimée.
+     */
+    public function testDistancePrescribedOutingCountsItsDurationDerivedFromPace(): void
+    {
+        $this->scheduleOuting('2026-08-05', PrescriptionType::DISTANCE_PACE, 10000, null, 300);
+
+        $running = $this->stats->over($this->user, StatsPeriod::month(2026, 8))['volume']['running'];
+
+        self::assertSame(3000, $running['seconds']);
+        self::assertSame(3000, $running['derivedSeconds']);
+        self::assertSame('10 km', $running['distanceLabel']);
+        self::assertStringStartsWith('≈ ', (string) $running['durationLabel']);
+    }
+
+    /**
+     * Le réel importé ne déduit rien : il porte distance et durée mesurées, et
+     * remplace la part estimée du prescrit au lieu de s'y ajouter.
+     */
+    public function testImportedActivityReplacesTheDerivedPrescription(): void
+    {
+        $outing = $this->scheduleOuting('2026-08-10', PrescriptionType::DURATION, null, 2700, 300);
+        $activity = (new ImportedActivity($this->user, ActivitySource::INTERVALS, 'i1003', 'Run', new \DateTimeImmutable('2026-08-10 07:00'), new \DateTimeImmutable('2026-08-10')))
+            ->setActivity(ActivityType::RUNNING)
+            ->setDistanceMeters(8700)
+            ->setMovingSeconds(2650)
+            ->setScheduledWorkout($outing);
+        $this->em->persist($activity);
+        $this->em->flush();
+
+        $running = $this->stats->over($this->user, StatsPeriod::month(2026, 8))['volume']['running'];
+
+        self::assertSame(8700, $running['meters']);
+        self::assertSame(0, $running['derivedMeters']);
+        self::assertSame('8,7 km', $running['distanceLabel']);
+    }
+
+    /**
      * Une activité importée mais NON rattachée ne compte nulle part : sans séance,
      * elle n'a ni statut ni place dans la fenêtre des séances faites.
      */
@@ -133,6 +206,41 @@ final class TrainingStatsTest extends KernelTestCase
         $running = $this->stats->over($this->user, StatsPeriod::month(2026, 7))['volume']['running'];
 
         self::assertSame(5000, $running['meters']);
+    }
+
+    /**
+     * Une séance SANS prescrit (historique importé, source supprimée) se range
+     * dans la répartition par son réalisé : sans ça, des centaines de séances de
+     * salle importées ne comptaient nulle part. Le réalisé ne fait que combler :
+     * la sortie course où l'on aurait logué du développé couché reste une course.
+     */
+    public function testSessionWithoutPrescriptionIsCountedByItsLog(): void
+    {
+        $bench = $this->em->getRepository(Exercise::class)->findOneBy(['name' => 'Développé couché']);
+        $outing = $this->em->getRepository(ScheduledWorkout::class)->findOneBy(['scheduledDate' => new \DateTimeImmutable('2026-07-20')]);
+
+        $free = (new ScheduledWorkout())
+            ->setOwner($this->user)
+            ->setTitle('Séance importée')
+            ->setScheduledDate(new \DateTimeImmutable('2026-07-18'))
+            ->setStatus(ScheduledStatus::DONE);
+        $free->addLoggedExercise(
+            (new LoggedExercise())->setExerciseName('Développé couché')->setExercise($bench)->setPosition(0)
+                ->addLoggedSet((new LoggedSet())->setPosition(0)->setSetType(SetType::NORMAL)->setReps(5)->setWeightKg(90.0)),
+        );
+        $this->em->persist($free);
+
+        $outing->addLoggedExercise(
+            (new LoggedExercise())->setExerciseName('Développé couché')->setExercise($bench)->setPosition(0),
+        );
+        $this->em->flush();
+
+        $counts = [];
+        foreach ($this->stats->over($this->user, StatsPeriod::month(2026, 7))['activityCounts'] as $row) {
+            $counts[$row['activity']->value] = $row['sessions'];
+        }
+
+        self::assertSame(['gym' => 2, 'running' => 1], $counts);
     }
 
     /**
@@ -419,6 +527,35 @@ final class TrainingStatsTest extends KernelTestCase
         $this->schedule($july, '2026-07-25', ScheduledStatus::PLANNED);
 
         $this->em->flush();
+    }
+
+    /** Une sortie de course faite, prescrite au choix en distance ou en durée. */
+    private function scheduleOuting(string $date, PrescriptionType $type, ?int $meters, ?int $seconds, ?int $pace): ScheduledWorkout
+    {
+        $run = $this->em->getRepository(Exercise::class)->findOneBy(['name' => 'Footing']);
+
+        $workout = (new Workout())
+            ->setOwner($this->user)
+            ->setTitle('Sortie')
+            ->setSlug('sortie-'.bin2hex(random_bytes(4)));
+        $block = (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(0);
+        $block->addPrescribedExercise(
+            (new PrescribedExercise())
+                ->setExercise($run)
+                ->setPosition(0)
+                ->setPrescriptionType($type)
+                ->setDistanceMeters($meters)
+                ->setDurationSeconds($seconds)
+                ->setPaceSecondsPerKm($pace),
+        );
+        $workout->addBlock($block);
+        $this->em->persist($workout);
+        $this->em->persist($block);
+
+        $scheduled = $this->schedule($workout, $date, ScheduledStatus::DONE);
+        $this->em->flush();
+
+        return $scheduled;
     }
 
     private function gymWorkout(Exercise $exercise, string $title): Workout

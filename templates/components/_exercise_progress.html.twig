@@ -1,0 +1,109 @@
+{# Courbes de progression d'un exercice sur une fenêtre de temps : charge max,
+   1RM estimé, répétitions et tenue — chacune seulement si elle a au moins deux
+   points dans la fenêtre.
+
+   Attend :
+     exercise  l'exercice affiché (pour les liens de fenêtre)
+     progress  sortie de ExerciseProgress::for()
+     subject   l'athlète regardé, ou null pour soi
+
+   ## La fenêtre est un paramètre d'URL
+   Comme sur les statistiques : chaque fenêtre a son lien, la page reste
+   auto-suffisante (cache offline) et le sélecteur marche sans JS. Les liens se
+   calculent depuis `subject` — un lien vers `app_exercise_show` posé sur la page
+   coach ramènerait le coach sur son propre historique au premier clic.
+
+   ## Une courbe par mesure, jamais deux échelles
+   Charge et 1RM sont en kilos, mais pas à la même hauteur : sur un même cadre,
+   l'une écraserait l'autre. Chaque mesure a son cadre, ses repères et son titre.
+
+   ## Le dessin et ce qu'il dit
+   La géométrie arrive en pourcentages (ExerciseProgress) : le tracé est un SVG
+   déformable (`preserveAspectRatio="none"`, trait à épaisseur fixe), les points
+   et les repères sont du HTML posé par-dessus — un cercle SVG déformé deviendrait
+   une ellipse. Chaque point est un lien vers sa séance datée, focusable, avec son
+   libellé en toutes lettres (`aria-label`) et une infobulle CSS au survol et au
+   focus. Rien n'y est porté par la couleur seule. #}
+{% set subject = subject|default(null) %}
+{% set route = subject ? 'app_coach_athlete_exercise' : 'app_exercise_show' %}
+{% set params = subject ? {id: subject.id, exerciseId: exercise.id} : {id: exercise.id} %}
+
+<div class="kd-extraj__part" id="progression">
+    <div class="kd-prog__trajhead">
+        <h3 class="kd-prog__subtitle">Progression</h3>
+        <div class="kd-rangepick__tabs" role="group" aria-label="Fenêtre de temps">
+            {% for range in progress.ranges %}
+                <a href="{{ path(route, params|merge({range: range.value})) }}#progression"
+                   class="kd-rangetab{{ progress.range == range ? ' is-active' }}"
+                   {{ progress.range == range ? 'aria-current="page"' : '' }}>
+                    {{ range.shortLabel }}
+                </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <p class="kd-excurve__window">
+        {%- if progress.range.value == 'plan' and progress.plan -%}
+            Plan en cours : <strong>{{ progress.plan.title }}</strong>, depuis le {{ progress.start|date('d/m/Y') }}
+        {%- elseif progress.start -%}
+            Depuis le {{ progress.start|date('d/m/Y') }}
+        {%- else -%}
+            Tout l'historique
+        {%- endif -%}
+        {{- ' · ' ~ progress.sessions ~ ' séance' ~ (progress.sessions > 1 ? 's') -}}
+    </p>
+
+    {% if progress.charts is empty %}
+        <p class="kd-prog__hint">
+            {{ progress.sessions == 0 ? 'Aucune séance sur cette période.' : 'Une seule séance sur cette période : pas encore de pente à tracer.' }}
+        </p>
+    {% endif %}
+
+    {% for chart in progress.charts %}
+        <figure class="kd-excurve{{ chart.points|length > 40 ? ' kd-excurve--dense' }}">
+            <figcaption class="kd-prog__caption">
+                <span class="kd-prog__exname">{{ chart.title }}</span>
+                <span class="kd-prog__metric">max {{ chart.best.label }}</span>
+                {% if chart.direction != 'flat' %}
+                    <span class="kd-prog__trend kd-prog__trend--{{ chart.direction }}">
+                        {{ ux_icon(chart.direction == 'up' ? 'lucide:trending-up' : 'lucide:trending-down') }}
+                        {{ chart.first.label }} → {{ chart.last.label }}
+                    </span>
+                {% endif %}
+            </figcaption>
+
+            <div class="kd-excurve__frame">
+                <div class="kd-excurve__axis" aria-hidden="true">
+                    {% for tick in chart.ticks %}
+                        <span class="kd-excurve__tick" style="top: {{ tick.y }}%">{{ tick.label }}</span>
+                    {% endfor %}
+                </div>
+
+                <div class="kd-excurve__plot">
+                    {% for tick in chart.ticks %}
+                        <span class="kd-excurve__grid" style="top: {{ tick.y }}%" aria-hidden="true"></span>
+                    {% endfor %}
+
+                    <svg class="kd-excurve__svg" viewBox="0 0 100 100" preserveAspectRatio="none"
+                         aria-hidden="true" focusable="false">
+                        <polyline points="{{ chart.line }}" fill="none" vector-effect="non-scaling-stroke"/>
+                    </svg>
+
+                    {% for p in chart.points %}
+                        {% set text = p.date|date('d/m/Y') ~ ' · ' ~ p.label ~ (p.isBest ? ' · max de la période') %}
+                        <a href="{{ path('app_scheduled_workout_show', {id: p.scheduledWorkoutId}) }}"
+                           class="kd-excurve__pt{{ p.isBest ? ' is-best' }}{{ p.x > 75 ? ' is-end' : (p.x < 25 ? ' is-start') }}"
+                           style="left: {{ p.x }}%; top: {{ p.y }}%"
+                           data-label="{{ text }}" aria-label="{{ chart.title }} : {{ text }}"></a>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="kd-excurve__dates" aria-hidden="true">
+                <span>{{ chart.first.date|date('d/m/Y') }}</span>
+                <span>{{ chart.last.date|date('d/m/Y') }}</span>
+            </div>
+            <p class="kd-prog__hint">{{ chart.hint }} L'échauffement n'y entre pas.</p>
+        </figure>
+    {% endfor %}
+</div>

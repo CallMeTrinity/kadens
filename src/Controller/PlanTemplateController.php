@@ -4,11 +4,13 @@ namespace App\Controller;
 
 use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
+use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\ScheduledStatus;
 use App\Repository\GoalRepository;
+use App\Repository\ImportedActivityRepository;
 use App\Repository\PlanTemplateRepository;
 use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
@@ -156,6 +158,7 @@ final class PlanTemplateController extends AbstractController
         SlugGenerator $slugGenerator,
         PlanTemplateRepository $planTemplateRepository,
         ScheduledWorkoutRepository $scheduledWorkoutRepository,
+        ImportedActivityRepository $importedActivityRepository,
         ProgressionAggregator $progression,
     ): Response {
         $this->denyAccessUnlessGranted(PlanTemplateVoter::VIEW, $template);
@@ -169,9 +172,16 @@ final class PlanTemplateController extends AbstractController
         $anchors = null !== $owner ? $scheduledWorkoutRepository->findPlanAnchorsForOwner($template, $owner) : [];
         $anchor = $this->pickAnchor($anchors, $request->query->getString('run'));
 
-        $realized = null !== $owner && [] !== $anchors
-            ? $progression->realizedRun($loaded, $scheduledWorkoutRepository->findPlanRunWithLog($template, $owner, $anchor))
-            : null;
+        $realized = null;
+        if (null !== $owner && [] !== $anchors) {
+            // Le réalisé de l'endurance ne se logue pas, il s'importe : un agrégat
+            // SQL de plus, borné aux séances de l'instanciation regardée.
+            $run = $scheduledWorkoutRepository->findPlanRunWithLog($template, $owner, $anchor);
+            $imported = $importedActivityRepository->enduranceTotalsForScheduledIds(
+                array_map(static fn (ScheduledWorkout $s): int => (int) $s->getId(), $run),
+            );
+            $realized = $progression->realizedRun($loaded, $run, $imported);
+        }
 
         return $this->render('plan_template/show.html.twig', [
             'flat' => $this->planFlattener->flattenPlanTemplate($loaded),

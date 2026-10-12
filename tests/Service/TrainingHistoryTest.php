@@ -4,12 +4,14 @@ namespace App\Tests\Service;
 
 use App\Entity\Block;
 use App\Entity\Exercise;
+use App\Entity\ImportedActivity;
 use App\Entity\LoggedExercise;
 use App\Entity\LoggedSet;
 use App\Entity\PrescribedExercise;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
+use App\Enum\ActivitySource;
 use App\Enum\ActivityType;
 use App\Enum\BlockRole;
 use App\Enum\MuscleGroup;
@@ -447,6 +449,50 @@ final class TrainingHistoryTest extends KernelTestCase
     }
 
     /**
+     * La séance libre créée par la reprise d'historique Intervals n'a ni
+     * prescrit ni réalisé : son activité importée est la seule chose qui dise
+     * que c'était une course. Sans elle, toutes ces sorties se rangeaient sous
+     * « activité inconnue ».
+     */
+    public function testAFreeSessionTakesItsNatureFromItsImportedActivity(): void
+    {
+        $outing = $this->scheduleFree('Sortie longue', '2026-08-04');
+        $this->import($outing, 'i1', ActivityType::RUNNING);
+        $this->em->flush();
+
+        $result = $this->history->calendar($this->user, $this->now);
+
+        self::assertSame([['activity' => ActivityType::RUNNING, 'sessions' => 1]], $result['totals']['byActivity']);
+        self::assertTrue($this->day($result, '2026-08-04')['sessions'][0]['endurance']);
+    }
+
+    /**
+     * L'activité importée passe avant le réalisé logué (elle est mesurée, pas
+     * saisie), mais après le prescrit : compléter, jamais corriger.
+     */
+    public function testTheImportedActivitySitsBetweenThePrescriptionAndTheLog(): void
+    {
+        $plank = $this->exercise('Gainage', ActivityType::GYM, [TargetArea::ABS]);
+        $bench = $this->exercise('Développé couché', ActivityType::GYM, [TargetArea::CHEST]);
+
+        // Sortie libre importée, gainage logué par-dessus : reste une course.
+        $free = $this->scheduleFree('Sortie + gainage', '2026-08-04');
+        $this->import($free, 'i1', ActivityType::RUNNING);
+        $this->log($free, $plank, [[SetType::NORMAL, 30, null], [SetType::NORMAL, 30, null]]);
+
+        // Séance prescrite en salle à laquelle on aurait rattaché un vélo : reste
+        // de la salle.
+        $gym = $this->schedule($this->workout($bench, 'Haut'), '2026-08-05', ScheduledStatus::DONE);
+        $this->import($gym, 'i2', ActivityType::CYCLING);
+        $this->em->flush();
+
+        $result = $this->history->calendar($this->user, $this->now);
+
+        self::assertSame(ActivityType::RUNNING, $this->day($result, '2026-08-04')['sessions'][0]['activity']);
+        self::assertSame(ActivityType::GYM, $this->day($result, '2026-08-05')['sessions'][0]['activity']);
+    }
+
+    /**
      * Une séance cochée faite et restée VIDE — ni prescrit ni réalisé — n'a
      * aucune nature à déclarer. Elle est comptée à part plutôt que rangée
      * d'office en salle : la mettre ailleurs ferait mentir le décompte, la taire
@@ -533,10 +579,10 @@ final class TrainingHistoryTest extends KernelTestCase
         ));
 
         // Le chiffre est figé volontairement : bornes, séances faites, leurs
-        // activités prescrites, celles de leur réalisé, volume par
-        // (séance × exercice), définitions des exercices. Une septième requête
+        // activités prescrites, importées, celles de leur réalisé, volume par
+        // (séance × exercice), définitions des exercices. Une huitième requête
         // qui apparaîtrait est une régression à justifier, pas à entériner.
-        self::assertSame(6, $deep);
+        self::assertSame(7, $deep);
     }
 
     /** Chaque semaine fait sept cases, sans quoi les colonnes se décalent. */
@@ -682,6 +728,17 @@ final class TrainingHistoryTest extends KernelTestCase
         $this->em->persist($scheduled);
 
         return $scheduled;
+    }
+
+    private function import(ScheduledWorkout $scheduled, string $externalId, ActivityType $activity): void
+    {
+        $this->em->persist(
+            (new ImportedActivity($this->user, ActivitySource::INTERVALS, $externalId, 'Run', $scheduled->getScheduledDate()->setTime(7, 0), $scheduled->getScheduledDate()))
+                ->setActivity($activity)
+                ->setDistanceMeters(10000)
+                ->setMovingSeconds(3000)
+                ->setScheduledWorkout($scheduled),
+        );
     }
 
     /** @param list<array{SetType, int|null, float|null}> $sets */

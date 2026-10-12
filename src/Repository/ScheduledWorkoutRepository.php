@@ -823,6 +823,56 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     }
 
     /**
+     * Le plan **en cours** chez un utilisateur : l'instanciation (trame + ancre)
+     * dont les séances datées encadrent `$today`, la plus récemment commencée si
+     * deux se chevauchent. null quand aucun plan ne court aujourd'hui — un plan
+     * terminé hier n'est plus « en cours », et la fenêtre « Plan » des courbes de
+     * progression disparaît avec lui.
+     *
+     * Une instanciation se reconnaît à sa paire (trame, ancre), comme dans
+     * `findPlanAnchorsForOwner()` : la même trame posée deux fois fait deux plans.
+     * Ses bornes sont celles de ses séances datées, pas une durée recalculée
+     * depuis la trame, qui a pu changer depuis.
+     *
+     * @return array{template: PlanTemplate, start: \DateTimeImmutable, end: \DateTimeImmutable}|null
+     */
+    public function findCurrentPlanRun(User $owner, \DateTimeImmutable $today): ?array
+    {
+        $rows = $this->createQueryBuilder('s')
+            ->select(
+                'IDENTITY(s.sourcePlanTemplate) AS templateId',
+                'MIN(s.scheduledDate) AS firstDate',
+                'MAX(s.scheduledDate) AS lastDate',
+            )
+            ->andWhere('s.owner = :owner')
+            ->andWhere('s.sourcePlanTemplate IS NOT NULL')
+            ->groupBy('s.sourcePlanTemplate')
+            ->addGroupBy('s.planAnchorDate')
+            ->having('MIN(s.scheduledDate) <= :today')
+            ->andHaving('MAX(s.scheduledDate) >= :today')
+            ->setParameter('owner', $owner)
+            ->setParameter('today', $today, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE)
+            ->orderBy('firstDate', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getArrayResult();
+
+        if ([] === $rows) {
+            return null;
+        }
+
+        $template = $this->getEntityManager()->find(PlanTemplate::class, (int) $rows[0]['templateId']);
+        $start = self::asDate($rows[0]['firstDate']);
+        $end = self::asDate($rows[0]['lastDate']);
+
+        if (null === $template || null === $start || null === $end) {
+            return null;
+        }
+
+        return ['template' => $template, 'start' => $start, 'end' => $end];
+    }
+
+    /**
      * Séances datées issues d'une case précise du plan. Sert au retrait d'une case :
      * on retire les séances encore PLANNED, on préserve celles DONE/MISSED.
      *

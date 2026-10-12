@@ -53,49 +53,63 @@
     </div>
 
     <div class="kd-card">
-        <dl class="kd-deflist">
-            <dt>Activité</dt>
-            <dd>{{ exercise.activity.label }}</dd>
+        <div class="kd-exsheet">
+            {# Les zones que l'exercice déclare, sur le dessin du volume d'une séance.
+               Le dessin ne porte rien seul : chaque zone peinte est nommée en toutes
+               lettres juste à côté (« Zones travaillées »), d'où le `aria-hidden` du
+               composant. Absent quand il n'y a rien à peindre (aucune zone, ou
+               « corps entier » seul). #}
+            {% if bodyMap|default(null) %}
+                <div class="kd-exsheet__body">
+                    {{ include('components/_body_map.html.twig', {plates: bodyMap.plates, levels: bodyMap.levels, height: 220}, with_context = false) }}
+                </div>
+            {% endif %}
+            <dl class="kd-deflist kd-exsheet__facts">
+                <dt>Activité</dt>
+                <dd>{{ exercise.activity.label }}</dd>
 
-            <dt>Zones travaillées</dt>
-            <dd>
-                {% if exercise.targetAreas is not empty %}
-                    <div class="kd-tags">
-                        {% for area in exercise.targetAreas %}
-                            <span class="kd-tag">{{ area.label }}</span>
-                        {% endfor %}
-                    </div>
-                {% else %}
-                    <span style="color:var(--color-text-placeholder);">—</span>
-                {% endif %}
-            </dd>
+                <dt>Zones travaillées</dt>
+                <dd>
+                    {% if exercise.targetAreas is not empty %}
+                        <div class="kd-tags">
+                            {% for area in exercise.targetAreas %}
+                                <span class="kd-tag">{{ area.label }}</span>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <span style="color:var(--color-text-placeholder);">—</span>
+                    {% endif %}
+                </dd>
 
-            <dt>Description</dt>
-            <dd>
-                {% if exercise.description %}
-                    {{ exercise.description|nl2br }}
-                {% else %}
-                    <span style="color:var(--color-text-placeholder);">—</span>
-                {% endif %}
-            </dd>
+                <dt>Description</dt>
+                <dd>
+                    {% if exercise.description %}
+                        {{ exercise.description|nl2br }}
+                    {% else %}
+                        <span style="color:var(--color-text-placeholder);">—</span>
+                    {% endif %}
+                </dd>
 
-            <dt>Média</dt>
-            <dd>
-                {% if exercise.mediaUrl %}
-                    <a href="{{ exercise.mediaUrl }}" target="_blank" rel="noopener"
-                       class="kd-btn kd-btn--ghost kd-btn--sm" style="padding-left:0;">
-                        {{ ux_icon('lucide:external-link') }} Ouvrir le lien
-                    </a>
-                {% else %}
-                    <span style="color:var(--color-text-placeholder);">—</span>
-                {% endif %}
-            </dd>
-        </dl>
+                <dt>Média</dt>
+                <dd>
+                    {% if exercise.mediaUrl %}
+                        <a href="{{ exercise.mediaUrl }}" target="_blank" rel="noopener"
+                           class="kd-btn kd-btn--ghost kd-btn--sm" style="padding-left:0;">
+                            {{ ux_icon('lucide:external-link') }} Ouvrir le lien
+                        </a>
+                    {% else %}
+                        <span style="color:var(--color-text-placeholder);">—</span>
+                    {% endif %}
+                </dd>
+            </dl>
+        </div>
     </div>
 
     {# KL-50 : la seule page qui réponde à « est-ce que je progresse sur cet
        exercice ? » sans passer par un plan — « est-ce que MON ATHLÈTE progresse »
        quand `subject` est posé. Rien du tout quand l'exercice n'a jamais été fait
        — le composant en est garant. #}
-    {{ include('components/_exercise_trajectory.html.twig', {trajectory: trajectory, subject: subject}) }}
+    {{ include('components/_exercise_trajectory.html.twig', {
+        exercise: exercise, trajectory: trajectory, progress: progress|default(null), subject: subject
+    }, with_context = false) }}
 {% endblock %}

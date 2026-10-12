@@ -217,11 +217,11 @@ final class ProgressionAggregatorTest extends TestCase
     }
 
     /**
-     * Rien n'est superposé sur ce qui ne se logue pas : la course, le vélo et la
-     * natation n'ont pas de deuxième barre — et surtout pas une barre à zéro, qui
-     * se lirait « rien fait ».
+     * Sans activité importée, une série d'endurance n'a pas de deuxième barre —
+     * et surtout pas une barre à zéro, qui se lirait « rien fait ». Une séance
+     * cochée faite n'en invente pas une.
      */
-    public function testDistanceSeriesNeverCarriesRealized(): void
+    public function testEnduranceSeriesWithoutImportCarriesNoRealized(): void
     {
         $run = $this->exercise(2, 'Sortie tempo', ActivityType::RUNNING);
         $template = $this->template(2, [
@@ -236,10 +236,86 @@ final class ProgressionAggregatorTest extends TestCase
         $running = $this->seriesByKey($this->aggregator->weeklyVolume($template, $realized['weeks']), 'running');
 
         self::assertFalse($running['hasRealized']);
+        self::assertNull($running['realTotalLabel']);
         foreach ($running['points'] as $point) {
             self::assertNull($point['realValue']);
             self::assertSame(0, $point['realHeightPct']);
         }
+    }
+
+    /**
+     * Le réalisé d'une sortie vient de la montre : l'activité importée se pose
+     * sur la semaine de sa séance datée, dans l'unité de la série, et son temps
+     * en mouvement nourrit la ligne « Temps ».
+     */
+    public function testImportedActivityIsTheRealizedOfEndurance(): void
+    {
+        $run = $this->exercise(2, 'Sortie tempo', ActivityType::RUNNING);
+        $template = $this->template(2, [
+            $this->item(1, 3, $this->workoutWith($run, PrescriptionType::DISTANCE_PACE, ['distanceMeters' => 8000])),
+            $this->item(2, 3, $this->workoutWith($run, PrescriptionType::DISTANCE_PACE, ['distanceMeters' => 10000])),
+        ]);
+        $session = $this->scheduled($template, 1, '2026-03-04', ScheduledStatus::DONE, []);
+        (new \ReflectionProperty(ScheduledWorkout::class, 'id'))->setValue($session, 42);
+
+        $realized = $this->aggregator->realizedRun($template, [$session], [42 => ['running' => ['meters' => 8400, 'seconds' => 2520]]]);
+
+        self::assertSame(1, $realized['adherence']['imported']);
+        self::assertSame(42, $realized['weeks'][1]['minutes']);
+
+        $volume = $this->aggregator->weeklyVolume($template, $realized['weeks']);
+        $running = $this->seriesByKey($volume, 'running');
+        self::assertTrue($running['hasRealized']);
+        self::assertSame(8400.0, $running['points'][0]['realValue']);
+        self::assertSame('8,4 km', $running['points'][0]['realLabel']);
+        // Semaine sans activité : pas de barre, pas de zéro.
+        self::assertNull($running['points'][1]['realValue']);
+        self::assertSame('8,4 km', $running['realTotalLabel']);
+    }
+
+    /**
+     * Le cas qui cassait le plan hybride : une sortie prescrite en distance
+     * certaines semaines et en durée d'autres. Sans allure, ni l'une ni l'autre ne
+     * se convertit ; la série retient l'unité qui chiffre le plus de semaines et
+     * signale les autres comme incomplètes au lieu de les montrer vides.
+     */
+    public function testEnduranceUnitFollowsWhatThePlanPrescribes(): void
+    {
+        $bike = $this->exercise(3, 'Sortie vélo', ActivityType::CYCLING);
+        $template = $this->template(3, [
+            $this->item(1, 2, $this->workoutWith($bike, PrescriptionType::DURATION, ['durationSeconds' => 3600])),
+            $this->item(2, 2, $this->workoutWith($bike, PrescriptionType::DURATION, ['durationSeconds' => 5400])),
+            // Distance + allure : la durée s'en déduit (40 km à 2:00/km = 80 min).
+            $this->item(3, 2, $this->workoutWith($bike, PrescriptionType::DISTANCE_PACE, ['distanceMeters' => 40000, 'paceSecondsPerKm' => 120])),
+        ]);
+
+        $cycling = $this->seriesByKey($this->aggregator->weeklyVolume($template), 'cycling');
+
+        self::assertSame('en durée', $cycling['unitLabel']);
+        self::assertSame([3600.0, 5400.0, 4800.0], array_map(static fn (array $p): float => $p['value'], $cycling['points']));
+        self::assertFalse($cycling['points'][0]['estimated']);
+        self::assertTrue($cycling['points'][2]['estimated']);
+        self::assertSame('≈ 1h20', $cycling['points'][2]['label']);
+        self::assertSame([], $cycling['partialWeeks']);
+        self::assertSame('≈ 3h50', $cycling['totalLabel']);
+    }
+
+    public function testWeekThatCannotBeQuantifiedInTheSeriesUnitIsFlaggedPartial(): void
+    {
+        $run = $this->exercise(2, 'Footing', ActivityType::RUNNING);
+        $template = $this->template(3, [
+            $this->item(1, 3, $this->workoutWith($run, PrescriptionType::DISTANCE_PACE, ['distanceMeters' => 8000])),
+            $this->item(2, 3, $this->workoutWith($run, PrescriptionType::DISTANCE_PACE, ['distanceMeters' => 10000])),
+            // Durée sans allure : aucune distance ne s'en déduit.
+            $this->item(3, 3, $this->workoutWith($run, PrescriptionType::DURATION, ['durationSeconds' => 2700])),
+        ]);
+
+        $running = $this->seriesByKey($this->aggregator->weeklyVolume($template), 'running');
+
+        self::assertSame('en distance', $running['unitLabel']);
+        self::assertSame([3], $running['partialWeeks']);
+        self::assertSame(1, $running['points'][2]['missing']);
+        self::assertSame(0.0, $running['points'][2]['value']);
     }
 
     /** La trajectoire d'un exercice porte la charge réellement soulevée, semaine par semaine. */

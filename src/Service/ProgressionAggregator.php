@@ -25,10 +25,17 @@ use App\Enum\ScheduledStatus;
  *   instanciation, désignée par son `planAnchorDate` ; l'appelant choisit
  *   laquelle (la plus récente par défaut) et la lit avec
  *   `ScheduledWorkoutRepository::findPlanRunWithLog()`.
- * - **Rien n'est superposé sur ce qui ne se logue pas.** Seule la muscu écrit du
- *   réalisé (règle du projet) : les séries de distance (course, vélo, natation)
- *   n'ont pas de deuxième barre, et n'en auront pas une à zéro non plus — une
- *   barre absente et une barre nulle ne disent pas la même chose.
+ * - **Chaque réalisé vient de sa source.** La muscu se logue (LogMetrics) ; la
+ *   course, le vélo et la natation s'importent de la montre (`ImportedActivity`,
+ *   agrégat passé par l'appelant). Sans activité rattachée, une série
+ *   d'endurance n'a pas de deuxième barre — et surtout pas une barre à zéro :
+ *   une barre absente et une barre nulle ne disent pas la même chose.
+ * - **L'endurance se mesure dans l'unité que le plan permet.** Une sortie se
+ *   prescrit en distance OU en durée, et un plan passe souvent de l'une à l'autre
+ *   en cours de route. Chaque activité est donc tracée dans l'unité qui chiffre le
+ *   plus de semaines (déduite de l'allure au besoin, marquée « ≈ »), et une
+ *   semaine dont un effort ne se chiffre pas dans cette unité est signalée
+ *   incomplète plutôt que montrée basse en silence.
  *
  * Consomme WorkoutMetrics (volume prescrit par séance), LogMetrics (son pendant
  * réalisé) et UnitFormatter (formatage) : jamais de reparsing ni de mise à plat
@@ -37,17 +44,26 @@ use App\Enum\ScheduledStatus;
  * l'échelle sur le **même** maximum — sans quoi deux barres de même hauteur
  * vaudraient deux valeurs différentes.
  *
- * @phpstan-type VolumePoint array{week: int, value: float, label: string, heightPct: int, realValue: float|null, realLabel: string|null, realHeightPct: int}
- * @phpstan-type VolumeSeries array{key: string, label: string, modifier: string, points: list<VolumePoint>, max: float, hasRealized: bool}
+ * @phpstan-type VolumePoint array{week: int, value: float, label: string, heightPct: int, estimated: bool, missing: int, realValue: float|null, realLabel: string|null, realHeightPct: int}
+ * @phpstan-type VolumeSeries array{key: string, label: string, unitLabel: string|null, missingNoun: string|null, modifier: string, points: list<VolumePoint>, max: float, hasRealized: bool, totalLabel: string|null, realTotalLabel: string|null, partialWeeks: list<int>}
+ * @phpstan-type PlannedWeek array{value: float, estimated: bool, missing: int}
+ * @phpstan-type EnduranceTotals array<int, array<string, array{meters: int, seconds: int}>>
  * @phpstan-type TrajPoint array{week: int, value: float|null, label: string|null, present: bool, heightPct: int, realValue: float|null, realLabel: string|null, realHeightPct: int}
  * @phpstan-type Trajectory array{exercise: Exercise, metric: string, metricLabel: string, lowerIsBetter: bool, points: list<TrajPoint>, min: float, max: float, weeksPresent: int, direction: string, firstLabel: string|null, lastLabel: string|null, hasRealized: bool}
- * @phpstan-type RealizedWeek array{minutes: int, tonnage: float, sets: int}
+ * @phpstan-type RealizedWeek array{minutes: int, tonnage: float, sets: int, endurance: array<string, array{meters: int, seconds: int}>}
  * @phpstan-type RealizedExerciseWeek array{weight: float|null, sets: float|null, duration: float|null}
- * @phpstan-type Adherence array{done: int, missed: int, planned: int, total: int, percent: int, logged: int}
+ * @phpstan-type Adherence array{done: int, missed: int, planned: int, total: int, percent: int, logged: int, imported: int}
  * @phpstan-type RealizedRun array{weeks: array<int, RealizedWeek>, exercises: array<int, array<int, RealizedExerciseWeek>>, adherence: Adherence}
  */
 final class ProgressionAggregator
 {
+    /** Les activités d'endurance tracées, dans l'ordre d'affichage : clé de volume => [libellé, activité]. */
+    private const ENDURANCE = [
+        'running' => ['Course', ActivityType::RUNNING],
+        'cycling' => ['Vélo', ActivityType::CYCLING],
+        'swimming' => ['Natation', ActivityType::SWIMMING],
+    ];
+
     public function __construct(
         private readonly UnitFormatter $units,
         private readonly WorkoutMetrics $metrics,
@@ -70,11 +86,16 @@ final class ProgressionAggregator
      * aucune semaine mais compte quand même dans l'observance : elle a bien été
      * posée par ce plan.
      *
+     * `$imported` = le réel importé de ces séances
+     * (`ImportedActivityRepository::enduranceTotalsForScheduledIds()`), indexé par
+     * id de séance datée. C'est le réalisé de l'endurance, qui ne se logue jamais.
+     *
      * @param list<ScheduledWorkout> $scheduled séances datées d'UNE instanciation
+     * @param EnduranceTotals        $imported
      *
      * @return RealizedRun|null
      */
-    public function realizedRun(PlanTemplate $template, array $scheduled): ?array
+    public function realizedRun(PlanTemplate $template, array $scheduled, array $imported = []): ?array
     {
         if ([] === $scheduled) {
             return null;
@@ -84,12 +105,13 @@ final class ProgressionAggregator
 
         $weeks = [];
         for ($w = 1; $w <= $weeksCount; ++$w) {
-            $weeks[$w] = ['minutes' => 0, 'tonnage' => 0.0, 'sets' => 0];
+            $weeks[$w] = ['minutes' => 0, 'tonnage' => 0.0, 'sets' => 0, 'endurance' => []];
         }
 
         $exercises = [];
         $counts = [ScheduledStatus::DONE->value => 0, ScheduledStatus::MISSED->value => 0, ScheduledStatus::PLANNED->value => 0];
         $logged = 0;
+        $importedSessions = 0;
 
         foreach ($scheduled as $session) {
             $status = $session->getStatus();
@@ -99,17 +121,33 @@ final class ProgressionAggregator
             if ($session->hasLog()) {
                 ++$logged;
             }
+            $actual = $imported[(int) $session->getId()] ?? [];
+            if ([] !== $actual) {
+                ++$importedSessions;
+            }
 
             $week = $this->weekOf($session, $weeksCount);
             if (null === $week) {
                 continue;
             }
 
-            // Durée RÉELLE (bornes écrites par le mobile), pas la durée estimée
-            // du prescrit : c'est l'unique chiffre de temps que le réalisé porte.
+            // Durée RÉELLE, jamais l'estimée du prescrit : les bornes écrites par
+            // le mobile, ou le temps en mouvement de la montre. Les deux mesurent
+            // la même séance quand une sortie est rattachée à une séance loguée :
+            // on garde la plus longue, les additionner compterait le recouvrement
+            // deux fois.
             $duration = $this->logMetrics->durationSeconds($session);
-            if (null !== $duration) {
-                $weeks[$week]['minutes'] += (int) round($duration / 60);
+            $importedSeconds = array_sum(array_column($actual, 'seconds'));
+            if (null !== $duration || $importedSeconds > 0) {
+                $weeks[$week]['minutes'] += (int) round(max($duration ?? 0, $importedSeconds) / 60);
+            }
+
+            foreach ($actual as $activity => $volume) {
+                $slot = $weeks[$week]['endurance'][$activity] ?? ['meters' => 0, 'seconds' => 0];
+                $weeks[$week]['endurance'][$activity] = [
+                    'meters' => $slot['meters'] + $volume['meters'],
+                    'seconds' => $slot['seconds'] + $volume['seconds'],
+                ];
             }
 
             // Tonnage et séries de travail : LogMetrics est le pendant exact de
@@ -136,19 +174,20 @@ final class ProgressionAggregator
                 'total' => $total,
                 'percent' => $total > 0 ? (int) round($counts[ScheduledStatus::DONE->value] / $total * 100) : 0,
                 'logged' => $logged,
+                'imported' => $importedSessions,
             ],
         ];
     }
 
     /**
      * Charge par semaine, ventilée en séries traçables (temps estimé, tonnage,
-     * séries, distances par activité). Une série n'est renvoyée que si elle porte
-     * au moins une valeur non nulle sur le plan. Montre la périodisation (montée
-     * en charge, semaine de décharge).
+     * séries, endurance par activité). Une série n'est renvoyée que si elle porte
+     * au moins une valeur non nulle, prévue ou réalisée. Montre la périodisation
+     * (montée en charge, semaine de décharge).
      *
      * `$realized` = la clé `weeks` de `realizedRun()`, ou `[]` pour n'avoir que la
-     * rampe prévue. Trois séries seulement acceptent une superposition — le temps,
-     * le tonnage et les séries : ce sont les seules dont le réalisé existe.
+     * rampe prévue. Le temps, le tonnage et les séries se superposent au réalisé
+     * logué ; les activités d'endurance, au réel importé de la montre.
      *
      * @param array<int, RealizedWeek> $realized
      *
@@ -158,9 +197,17 @@ final class ProgressionAggregator
     {
         $weeksCount = max(1, (int) $template->getDurationWeeks());
 
+        $emptyEndurance = ['meters' => 0, 'derivedMeters' => 0, 'seconds' => 0, 'derivedSeconds' => 0, 'efforts' => 0, 'withoutDistance' => 0, 'withoutDuration' => 0];
         $acc = [];
         for ($w = 1; $w <= $weeksCount; ++$w) {
-            $acc[$w] = ['minutes' => 0, 'tonnage' => 0.0, 'sets' => 0, 'running' => 0, 'cycling' => 0, 'swimming' => 0];
+            $acc[$w] = [
+                'minutes' => 0,
+                'tonnage' => 0.0,
+                'sets' => 0,
+                'running' => $emptyEndurance,
+                'cycling' => $emptyEndurance,
+                'swimming' => $emptyEndurance,
+            ];
         }
 
         foreach ($template->getPlanItems() as $item) {
@@ -173,19 +220,31 @@ final class ProgressionAggregator
             $acc[$week]['minutes'] += (int) ($workout->getEstimatedDurationMinutes() ?? 0);
             $acc[$week]['tonnage'] += $vol['gym']['tonnageKg'];
             $acc[$week]['sets'] += $vol['gym']['totalSets'];
-            $acc[$week]['running'] += $vol['running']['meters'];
-            $acc[$week]['cycling'] += $vol['cycling']['meters'];
-            $acc[$week]['swimming'] += $vol['swimming']['meters'];
+            foreach (self::ENDURANCE as $key => $_) {
+                foreach ($emptyEndurance as $field => $__) {
+                    $acc[$week][$key][$field] += $vol[$key][$field];
+                }
+            }
         }
 
+        $scalar = static fn (string $key): array => array_map(
+            static fn (array $row): array => ['value' => (float) $row[$key], 'estimated' => false, 'missing' => 0],
+            $acc,
+        );
+        $realOf = static fn (string $key): array => array_map(
+            static fn (array $week): ?float => (float) $week[$key],
+            $realized,
+        );
+
         $series = [
-            $this->buildSeries($acc, $realized, 'minutes', 'minutes', 'Temps', '', fn (float $v): string => $this->humanMinutes((int) $v)),
-            $this->buildSeries($acc, $realized, 'tonnage', 'tonnage', 'Tonnage', ActivityType::GYM->cssKey(), fn (float $v): string => $this->units->weight($v)),
-            $this->buildSeries($acc, $realized, 'sets', 'sets', 'Séries', ActivityType::GYM->cssKey(), fn (float $v): string => $this->plural((int) $v, 'série')),
-            $this->buildSeries($acc, $realized, 'running', null, 'Course', ActivityType::RUNNING->cssKey(), fn (float $v): string => $this->units->distance((int) $v)),
-            $this->buildSeries($acc, $realized, 'cycling', null, 'Vélo', ActivityType::CYCLING->cssKey(), fn (float $v): string => $this->units->distance((int) $v)),
-            $this->buildSeries($acc, $realized, 'swimming', null, 'Natation', ActivityType::SWIMMING->cssKey(), fn (float $v): string => $this->units->distance((int) $v)),
+            $this->buildSeries('minutes', 'Temps', 'durée estimée', '', $scalar('minutes'), $realOf('minutes'), null, fn (float $v): string => $this->humanMinutes((int) $v)),
+            $this->buildSeries('tonnage', 'Tonnage', null, ActivityType::GYM->cssKey(), $scalar('tonnage'), $realOf('tonnage'), null, fn (float $v): string => $this->compactTonnage($v)),
+            $this->buildSeries('sets', 'Séries', 'de travail', ActivityType::GYM->cssKey(), $scalar('sets'), $realOf('sets'), null, static fn (float $v): string => (string) (int) $v),
         ];
+
+        foreach (self::ENDURANCE as $key => [$label, $activity]) {
+            $series[] = $this->enduranceSeries($key, $label, $activity, array_column($acc, $key, null), $realized);
+        }
 
         return array_values(array_filter($series, static fn (array $s): bool => $s['max'] > 0.0));
     }
@@ -255,55 +314,121 @@ final class ProgressionAggregator
     }
 
     /**
-     * @param array<int, array<string, float|int>> $acc
-     * @param array<int, RealizedWeek>             $realized
-     * @param string|null                          $realKey clé du réalisé, null quand la métrique ne s'en logue pas
-     * @param callable(float): string              $format
+     * Une activité d'endurance, dans l'unité qui chiffre le plus de semaines du
+     * plan : distance (saisie, ou déduite de durée × allure) ou durée (saisie, ou
+     * déduite de distance × allure). À égalité, la distance — c'est l'unité dans
+     * laquelle une sortie se raconte. Le réel importé portant les deux, il suit
+     * l'unité retenue.
+     *
+     * @param list<array<string, int>>  $weeks    volume prescrit par semaine (index 0 = S1)
+     * @param array<int, RealizedWeek>  $realized
      *
      * @return VolumeSeries
      */
-    private function buildSeries(array $acc, array $realized, string $key, ?string $realKey, string $label, string $modifier, callable $format): array
+    private function enduranceSeries(string $key, string $label, ActivityType $activity, array $weeks, array $realized): array
+    {
+        $byDistance = 0;
+        $byDuration = 0;
+        foreach ($weeks as $week) {
+            if ($week['efforts'] > 0) {
+                $byDistance += 0 === $week['withoutDistance'] ? 1 : 0;
+                $byDuration += 0 === $week['withoutDuration'] ? 1 : 0;
+            }
+        }
+        $distance = $byDistance >= $byDuration;
+
+        $planned = [];
+        foreach ($weeks as $i => $week) {
+            $derived = $distance ? $week['derivedMeters'] : $week['derivedSeconds'];
+            $planned[$i + 1] = [
+                'value' => (float) (($distance ? $week['meters'] : $week['seconds']) + $derived),
+                'estimated' => $derived > 0,
+                'missing' => $distance ? $week['withoutDistance'] : $week['withoutDuration'],
+            ];
+        }
+
+        $real = [];
+        foreach ($realized as $w => $week) {
+            $volume = $week['endurance'][$key] ?? null;
+            $real[$w] = null === $volume ? null : (float) ($distance ? $volume['meters'] : $volume['seconds']);
+        }
+
+        return $this->buildSeries(
+            $key,
+            $label,
+            $distance ? 'en distance' : 'en durée',
+            $activity->cssKey(),
+            $planned,
+            $real,
+            $distance ? 'distance' : 'durée',
+            $distance
+                ? fn (float $v): string => $this->compactDistance($v)
+                : fn (float $v): string => $this->humanMinutes((int) round($v / 60)),
+        );
+    }
+
+    /**
+     * @param array<int, PlannedWeek>  $planned semaine => prévu
+     * @param array<int, float|null>   $real    semaine => réalisé, null = rien de remonté
+     * @param string|null              $missingNoun ce qui manque à un effort non chiffré (« distance »), null si sans objet
+     * @param callable(float): string  $format
+     *
+     * @return VolumeSeries
+     */
+    private function buildSeries(string $key, string $label, ?string $unitLabel, string $modifier, array $planned, array $real, ?string $missingNoun, callable $format): array
     {
         // Une échelle unique pour les deux barres : c'est ce qui rend la
         // superposition lisible. Un maximum par barre les rendrait comparables
         // entre semaines mais plus entre elles, ce qui est tout l'objet du bloc.
         $max = 0.0;
-        foreach ($acc as $week => $row) {
-            $max = max($max, (float) $row[$key], $this->realValue($realized, $realKey, $week) ?? 0.0);
+        foreach ($planned as $week => $row) {
+            $max = max($max, $row['value'], $real[$week] ?? 0.0);
         }
 
         $hasRealized = false;
+        $anyEstimated = false;
+        $total = 0.0;
+        $realTotal = 0.0;
+        $partialWeeks = [];
         $points = [];
-        foreach ($acc as $week => $row) {
-            $value = (float) $row[$key];
-            $realValue = $this->realValue($realized, $realKey, $week);
+        foreach ($planned as $week => $row) {
+            $value = $row['value'];
+            $realValue = $real[$week] ?? null;
             $hasRealized = $hasRealized || (null !== $realValue && $realValue > 0.0);
+            $anyEstimated = $anyEstimated || $row['estimated'];
+            $total += $value;
+            $realTotal += $realValue ?? 0.0;
+            if ($row['missing'] > 0) {
+                $partialWeeks[] = $week;
+            }
 
             $points[] = [
                 'week' => $week,
                 'value' => $value,
-                'label' => $value > 0.0 ? $format($value) : '—',
+                'label' => $value > 0.0 ? ($row['estimated'] ? '≈ ' : '').$format($value) : '—',
                 // Neutre : la barre représente une quantité, jamais un « mieux ».
                 'heightPct' => $this->heightPct($value, $max),
+                'estimated' => $row['estimated'],
+                'missing' => $row['missing'],
                 'realValue' => $realValue,
                 'realLabel' => (null !== $realValue && $realValue > 0.0) ? $format($realValue) : null,
                 'realHeightPct' => $this->heightPct($realValue ?? 0.0, $max),
             ];
         }
 
-        return ['key' => $key, 'label' => $label, 'modifier' => $modifier, 'points' => $points, 'max' => $max, 'hasRealized' => $hasRealized];
-    }
-
-    /**
-     * @param array<int, RealizedWeek> $realized
-     */
-    private function realValue(array $realized, ?string $key, int $week): ?float
-    {
-        if (null === $key || !isset($realized[$week])) {
-            return null;
-        }
-
-        return (float) $realized[$week][$key];
+        return [
+            'key' => $key,
+            'label' => $label,
+            'unitLabel' => $unitLabel,
+            'missingNoun' => $missingNoun,
+            'modifier' => $modifier,
+            'points' => $points,
+            'max' => $max,
+            'hasRealized' => $hasRealized,
+            'totalLabel' => $total > 0.0 ? ($anyEstimated ? '≈ ' : '').$format($total) : null,
+            'realTotalLabel' => $hasRealized ? $format($realTotal) : null,
+            'partialWeeks' => $partialWeeks,
+        ];
     }
 
     private function heightPct(float $value, float $max): int
@@ -574,6 +699,33 @@ final class ProgressionAggregator
     private function plural(int $n, string $noun): string
     {
         return sprintf('%d %s%s', $n, $noun, $n > 1 ? 's' : '');
+    }
+
+    /**
+     * Formats courts des barres de charge : une colonne de semaine fait parfois
+     * 28 px, « 32 626,5 kg » n'y tient pas. Une décimale suffit à lire une rampe.
+     */
+    private function compactTonnage(float $kg): string
+    {
+        if ($kg < 1000) {
+            return $this->units->weight(round($kg));
+        }
+
+        return $this->oneDecimal($kg / 1000).' t';
+    }
+
+    private function compactDistance(float $meters): string
+    {
+        if ($meters < 1000) {
+            return $this->units->distance((int) round($meters));
+        }
+
+        return $this->oneDecimal($meters / 1000).' km';
+    }
+
+    private function oneDecimal(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 1, ',', ' '), '0'), ',');
     }
 
     private function humanMinutes(int $minutes): string
