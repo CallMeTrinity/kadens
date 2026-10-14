@@ -237,12 +237,12 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
 
         $this->applyDateWindow($qb, $start, $end);
 
-        return array_map(
+        return array_values(array_map(
             static fn (array $row): \DateTimeImmutable => $row['date'] instanceof \DateTimeImmutable
                 ? $row['date']
                 : new \DateTimeImmutable((string) $row['date']),
             $qb->getQuery()->getArrayResult(),
-        );
+        ));
     }
 
     /**
@@ -277,13 +277,13 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
 
         $this->applyDateWindow($qb, $start, $end);
 
-        return array_map(static fn (array $row): array => [
+        return array_values(array_map(static fn (array $row): array => [
             'id' => (int) $row['id'],
             'date' => $row['date'] instanceof \DateTimeImmutable
                 ? $row['date']
                 : new \DateTimeImmutable((string) $row['date']),
             'title' => (string) ($row['title'] ?? $row['workoutTitle'] ?? 'Séance'),
-        ], $qb->getQuery()->getArrayResult());
+        ], $qb->getQuery()->getArrayResult()));
     }
 
     /**
@@ -319,13 +319,13 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
 
         $this->applyDateWindow($qb, $start, $end);
 
-        return array_map(static fn (array $row): array => [
+        return array_values(array_map(static fn (array $row): array => [
             'scheduledId' => (int) $row['scheduledId'],
             'activity' => $row['activity'] instanceof ActivityType
                 ? $row['activity']
                 : ActivityType::from((string) $row['activity']),
             'exercises' => (int) $row['exercises'],
-        ], $qb->getQuery()->getArrayResult());
+        ], $qb->getQuery()->getArrayResult()));
     }
 
     /**
@@ -364,13 +364,13 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
 
         $this->applyDateWindow($qb, $start, $end);
 
-        return array_map(static fn (array $row): array => [
+        return array_values(array_map(static fn (array $row): array => [
             'scheduledId' => (int) $row['scheduledId'],
             'activity' => $row['activity'] instanceof ActivityType
                 ? $row['activity']
                 : ActivityType::from((string) $row['activity']),
             'exercises' => (int) $row['exercises'],
-        ], $qb->getQuery()->getArrayResult());
+        ], $qb->getQuery()->getArrayResult()));
     }
 
     /**
@@ -685,17 +685,18 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
             $qb->setMaxResults($limit);
         }
 
-        return array_map(static fn (array $row): array => [
+        return array_values(array_map(static fn (array $row): array => [
             'id' => (int) $row['id'],
-            'date' => self::asDate($row['date']),
-            'workoutTitle' => $row['workoutTitle'],
-            'ownTitle' => $row['ownTitle'],
+            // scheduledDate est NOT NULL : une ligne sans date trahirait le mapping.
+            'date' => self::asDate($row['date']) ?? throw new \UnexpectedValueException('Séance consignée sans date.'),
+            'workoutTitle' => null !== $row['workoutTitle'] ? (string) $row['workoutTitle'] : null,
+            'ownTitle' => null !== $row['ownTitle'] ? (string) $row['ownTitle'] : null,
             'status' => $row['status'] instanceof ScheduledStatus
                 ? $row['status']
                 : ScheduledStatus::from((string) $row['status']),
             'startedAt' => self::asDate($row['startedAt']),
             'endedAt' => self::asDate($row['endedAt']),
-        ], $qb->getQuery()->getArrayResult());
+        ], $qb->getQuery()->getArrayResult()));
     }
 
     /**
@@ -754,7 +755,7 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
             ->getQuery()
             ->getArrayResult();
 
-        return array_map(static function (array $row): ?\DateTimeImmutable {
+        return array_values(array_map(static function (array $row): ?\DateTimeImmutable {
             $anchor = $row['anchor'];
 
             return match (true) {
@@ -762,7 +763,7 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
                 $anchor instanceof \DateTimeImmutable => $anchor,
                 default => new \DateTimeImmutable((string) $anchor),
             };
-        }, $rows);
+        }, $rows));
     }
 
     /**

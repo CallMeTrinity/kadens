@@ -22,6 +22,8 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
  *
  * Le partage public en lecture (Phase 4) passera par une route slug dédiée,
  * pas par ce voter.
+ *
+ * @extends Voter<string, Workout>
  */
 final class WorkoutVoter extends Voter
 {

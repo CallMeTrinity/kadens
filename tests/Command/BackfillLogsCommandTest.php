@@ -14,6 +14,7 @@ use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
 use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
+use App\Tests\FindsEntities;
 use App\Tests\PurgesDatabase;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -32,6 +33,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 final class BackfillLogsCommandTest extends KernelTestCase
 {
     use PurgesDatabase;
+    use FindsEntities;
 
     private EntityManagerInterface $em;
 
@@ -64,12 +66,14 @@ final class BackfillLogsCommandTest extends KernelTestCase
         self::assertCount(1, $reloaded->getLoggedExercises());
 
         $logged = $reloaded->getLoggedExercises()->first();
+        self::assertNotFalse($logged);
         self::assertSame('Développé couché', $logged->getExerciseName());
         self::assertNotNull($logged->getSourcePrescribedExercise());
         self::assertCount(4, $logged->getLoggedSets());
         self::assertSame(4, $logged->getWorkingSetCount());
 
         $first = $logged->getLoggedSets()->first();
+        self::assertNotFalse($first);
         self::assertSame(8, $first->getReps());
         self::assertSame(80.0, $first->getWeightKg());
         self::assertSame(SetType::NORMAL, $first->getSetType());
@@ -134,13 +138,16 @@ final class BackfillLogsCommandTest extends KernelTestCase
 
         $this->em->clear();
         $logged = $this->em->find(ScheduledWorkout::class, $scheduled->getId())?->getLoggedExercises()->first();
+        self::assertNotNull($logged);
         self::assertNotFalse($logged);
 
         // Les détaillées priment sur le scalaire (2 séries), et les tours
         // multiplient : 3 × 2 = 6 lignes, dont 4 de travail.
         self::assertCount(6, $logged->getLoggedSets());
         self::assertSame(4, $logged->getWorkingSetCount());
-        self::assertSame(SetType::WARMUP, $logged->getLoggedSets()->first()->getSetType());
+        $first = $logged->getLoggedSets()->first();
+        self::assertNotFalse($first);
+        self::assertSame(SetType::WARMUP, $first->getSetType());
 
         $positions = array_map(
             static fn ($set): ?int => $set->getPosition(),
@@ -190,7 +197,7 @@ final class BackfillLogsCommandTest extends KernelTestCase
         $this->em->clear();
         foreach ([$missed, $planned, $future, $running] as $untouched) {
             self::assertFalse(
-                $this->em->find(ScheduledWorkout::class, $untouched->getId())->hasLog(),
+                $this->mustFind(ScheduledWorkout::class, $untouched->getId())->hasLog(),
                 'Une séance hors assiette a été touchée.',
             );
         }
@@ -218,8 +225,11 @@ final class BackfillLogsCommandTest extends KernelTestCase
 
         $this->em->clear();
         $reloaded = $this->em->find(ScheduledWorkout::class, $scheduled->getId());
+        self::assertNotNull($reloaded);
         self::assertCount(1, $reloaded->getLoggedExercises());
-        self::assertCount(5, $reloaded->getLoggedExercises()->first()->getLoggedSets());
+        $loggedExercise = $reloaded->getLoggedExercises()->first();
+        self::assertNotFalse($loggedExercise);
+        self::assertCount(5, $loggedExercise->getLoggedSets());
     }
 
     public function testTheUserFilterScopesTheRun(): void
@@ -243,8 +253,8 @@ final class BackfillLogsCommandTest extends KernelTestCase
         $this->launch(['--force' => true, '--user' => 'moi@example.com']);
 
         $this->em->clear();
-        self::assertTrue($this->em->find(ScheduledWorkout::class, $ours->getId())->hasLog());
-        self::assertFalse($this->em->find(ScheduledWorkout::class, $theirs->getId())->hasLog());
+        self::assertTrue($this->mustFind(ScheduledWorkout::class, $ours->getId())->hasLog());
+        self::assertFalse($this->mustFind(ScheduledWorkout::class, $theirs->getId())->hasLog());
     }
 
     public function testAnUnknownAccountIsRefused(): void
@@ -262,6 +272,7 @@ final class BackfillLogsCommandTest extends KernelTestCase
      */
     private function launch(array $arguments): CommandTester
     {
+        self::assertNotNull(self::$kernel);
         $tester = new CommandTester((new Application(self::$kernel))->find('app:log:backfill'));
         $tester->execute($arguments);
 

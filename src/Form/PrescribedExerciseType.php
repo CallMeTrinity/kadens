@@ -33,6 +33,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  * et en double saisie contradictoire avec l'éditeur de séries.
  * `sets`, lui, reste déclaré : c'est le compteur de séries de travail, synchronisé
  * dans les deux sens avec la collection détaillée (cf. SetSynchronizer).
+ *
+ * @extends AbstractType<PrescribedExercise>
  */
 class PrescribedExerciseType extends AbstractType
 {

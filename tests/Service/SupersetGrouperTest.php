@@ -62,8 +62,10 @@ final class SupersetGrouperTest extends TestCase
     public function testLinkToPreviousDoesNothingAtTheTopOfTheBlock(): void
     {
         $block = $this->block([null, null]);
+        $top = $block->getPrescribedExercises()->first();
+        self::assertNotFalse($top);
 
-        $this->grouper->linkToPrevious($block->getPrescribedExercises()->first());
+        $this->grouper->linkToPrevious($top);
 
         self::assertSame([null, null], $this->groupsOf($block));
     }
@@ -87,7 +89,9 @@ final class SupersetGrouperTest extends TestCase
         $exercises = $block->getPrescribedExercises()->toArray();
         $names = ['A', 'B', 'C'];
         foreach ($exercises as $i => $exercise) {
-            $exercise->getExercise()->setName($names[$i]);
+            $movement = $exercise->getExercise();
+            self::assertNotNull($movement);
+            $movement->setName($names[$i]);
         }
 
         $this->grouper->detach($exercises[1]);
@@ -99,8 +103,10 @@ final class SupersetGrouperTest extends TestCase
     public function testDetachOfATwoMemberGroupDissolvesIt(): void
     {
         $block = $this->block([1, 1]);
+        $first = $block->getPrescribedExercises()->first();
+        self::assertNotFalse($first);
 
-        $this->grouper->detach($block->getPrescribedExercises()->first());
+        $this->grouper->detach($first);
 
         self::assertSame([null, null], $this->groupsOf($block));
     }
@@ -190,6 +196,6 @@ final class SupersetGrouperTest extends TestCase
         $exercises = $block->getPrescribedExercises()->toArray();
         usort($exercises, static fn (PrescribedExercise $a, PrescribedExercise $b) => $a->getPosition() <=> $b->getPosition());
 
-        return array_values($exercises);
+        return $exercises;
     }
 }

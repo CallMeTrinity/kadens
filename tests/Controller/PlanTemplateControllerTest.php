@@ -17,6 +17,7 @@ use App\Enum\ActivityType;
 use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
 use App\Enum\ScheduledStatus;
+use App\Tests\FindsEntities;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -24,6 +25,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class PlanTemplateControllerTest extends WebTestCase
 {
+    use FindsEntities;
+
     private KernelBrowser $client;
     private EntityManagerInterface $em;
 
@@ -100,16 +103,16 @@ final class PlanTemplateControllerTest extends WebTestCase
 
         $this->client->request('POST', $url, ['_token' => $token]);
         $this->em->clear();
-        self::assertSame(5, $this->em->getRepository(PlanTemplate::class)->find($template->getId())->getDurationWeeks());
+        self::assertSame(5, $this->mustFind(PlanTemplate::class, $template->getId())->getDurationWeeks());
 
         $this->client->request('POST', $url, ['_token' => $token, 'count' => 6]);
         $this->em->clear();
-        self::assertSame(11, $this->em->getRepository(PlanTemplate::class)->find($template->getId())->getDurationWeeks());
+        self::assertSame(11, $this->mustFind(PlanTemplate::class, $template->getId())->getDurationWeeks());
 
         // Paquet qui dépasse : borné à 52, pas rejeté.
         $this->client->request('POST', $url, ['_token' => $token, 'count' => 90]);
         $this->em->clear();
-        self::assertSame(52, $this->em->getRepository(PlanTemplate::class)->find($template->getId())->getDurationWeeks());
+        self::assertSame(52, $this->mustFind(PlanTemplate::class, $template->getId())->getDurationWeeks());
     }
 
     /**
@@ -138,11 +141,11 @@ final class PlanTemplateControllerTest extends WebTestCase
 
         $this->client->request('POST', $url, ['_token' => $token, 'action' => 'attach', 'goalId' => $goal->getId()]);
         $this->em->clear();
-        self::assertCount(1, $this->em->getRepository(PlanTemplate::class)->find($templateId)->getGoals());
+        self::assertCount(1, $this->mustFind(PlanTemplate::class, $templateId)->getGoals());
 
         $this->client->request('POST', $url, ['_token' => $token, 'action' => 'detach', 'goalId' => $goal->getId()]);
         $this->em->clear();
-        self::assertCount(0, $this->em->getRepository(PlanTemplate::class)->find($templateId)->getGoals());
+        self::assertCount(0, $this->mustFind(PlanTemplate::class, $templateId)->getGoals());
     }
 
     public function testPlaceItemForksWorkoutInCell(): void
@@ -173,9 +176,11 @@ final class PlanTemplateControllerTest extends WebTestCase
         self::assertSame(1, $item->getDayOfWeek());
         // Fork à la pose : la case porte une COPIE privée (planLocal), pas la
         // séance de bibliothèque elle-même.
-        self::assertNotSame($workout->getId(), $item->getWorkout()->getId());
-        self::assertTrue($item->getWorkout()->isPlanLocal());
-        self::assertSame('Sortie longue', $item->getWorkout()->getTitle());
+        $fork = $item->getWorkout();
+        self::assertNotNull($fork);
+        self::assertNotSame($workout->getId(), $fork->getId());
+        self::assertTrue($fork->isPlanLocal());
+        self::assertSame('Sortie longue', $fork->getTitle());
     }
 
     /**
@@ -211,6 +216,7 @@ final class PlanTemplateControllerTest extends WebTestCase
 
         $this->em->clear();
         $moved = $this->em->getRepository(PlanItem::class)->find($itemId);
+        self::assertNotNull($moved);
         self::assertSame(3, $moved->getWeekNumber());
         self::assertSame(6, $moved->getDayOfWeek());
     }
@@ -233,19 +239,22 @@ final class PlanTemplateControllerTest extends WebTestCase
 
         $copy = $this->em->getRepository(PlanTemplate::class)->findOneBy(['title' => 'Plan 5k (copie)']);
         self::assertNotNull($copy);
-        self::assertSame($user->getId(), $copy->getOwner()->getId());
+        self::assertSame($user->getId(), $copy->getOwner()?->getId());
         self::assertSame(2, $copy->getDurationWeeks());
         self::assertNotSame($template->getSlug(), $copy->getSlug());
         self::assertCount(1, $copy->getPlanItems());
 
         $copiedItem = $copy->getPlanItems()->first();
+        self::assertNotFalse($copiedItem);
         self::assertSame(2, $copiedItem->getWeekNumber());
         self::assertSame(5, $copiedItem->getDayOfWeek());
         // Duplication de plan = plans indépendants : la case porte une COPIE clonée
         // (planLocal), pas la même séance, pour que les progressions ne se partagent pas.
-        self::assertNotSame($workout->getId(), $copiedItem->getWorkout()->getId());
-        self::assertSame('Sortie longue', $copiedItem->getWorkout()->getTitle());
-        self::assertTrue($copiedItem->getWorkout()->isPlanLocal());
+        $copiedWorkout = $copiedItem->getWorkout();
+        self::assertNotNull($copiedWorkout);
+        self::assertNotSame($workout->getId(), $copiedWorkout->getId());
+        self::assertSame('Sortie longue', $copiedWorkout->getTitle());
+        self::assertTrue($copiedWorkout->isPlanLocal());
         self::assertResponseRedirects('/plan-template/'.$copy->getId().'/edit');
     }
 
@@ -377,7 +386,7 @@ final class PlanTemplateControllerTest extends WebTestCase
         $crawler = $this->client->request('GET', '/plan-template/'.$template->getId());
 
         self::assertResponseIsSuccessful();
-        $heads = $crawler->filter('.kd-prog__rowhead')->each(static fn ($node): string => preg_replace('/\s+/', ' ', $node->text()));
+        $heads = $crawler->filter('.kd-prog__rowhead')->each(static fn ($node): string => (string) preg_replace('/\s+/', ' ', $node->text()));
         $running = array_values(array_filter($heads, static fn (string $head): bool => str_contains($head, 'Course')));
         self::assertCount(1, $running);
         self::assertStringContainsString('en distance', $running[0]);

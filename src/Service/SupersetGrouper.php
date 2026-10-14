@@ -265,11 +265,13 @@ final class SupersetGrouper
         $exercises = $block->getPrescribedExercises()->toArray();
         usort($exercises, static fn (PrescribedExercise $a, PrescribedExercise $b) => $a->getPosition() <=> $b->getPosition());
 
-        return array_values($exercises);
+        return $exercises;
     }
 
     /**
      * @param list<PrescribedExercise> $ordered
+     *
+     * @return int<0, max>|null
      */
     private function indexOf(array $ordered, PrescribedExercise $exercise): ?int
     {

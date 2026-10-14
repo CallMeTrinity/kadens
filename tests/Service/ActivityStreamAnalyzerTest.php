@@ -44,6 +44,7 @@ final class ActivityStreamAnalyzerTest extends TestCase
             'heartrate' => [140, 140, 140, 140],
         ]);
 
+        self::assertNotNull($result['hrZoneSeconds']);
         self::assertSame(10, array_sum($result['hrZoneSeconds']));
     }
 
@@ -65,6 +66,7 @@ final class ActivityStreamAnalyzerTest extends TestCase
 
         $splits = $this->analyzer->analyze(new User(), ['time' => $time, 'distance' => $distance])['splits'];
 
+        self::assertNotNull($splits);
         self::assertCount(3, $splits);
         self::assertSame(1000, $splits[0]['meters']);
         self::assertSame(200, $splits[0]['seconds']);
@@ -82,6 +84,7 @@ final class ActivityStreamAnalyzerTest extends TestCase
         $altitude = array_map(static fn (int $t): float => $t <= 100 ? $t / 10 : 20 - $t / 10, $time);
 
         $splits = $this->analyzer->analyze(new User(), ['time' => $time, 'distance' => $distance, 'heartrate' => $hr, 'altitude' => $altitude])['splits'];
+        self::assertNotNull($splits);
 
         self::assertSame(150, $splits[0]['averageHeartRate']);
         self::assertSame(10, $splits[0]['elevationGain']);

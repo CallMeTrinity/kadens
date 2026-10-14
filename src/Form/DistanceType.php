@@ -14,6 +14,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  * km pour la course et le vélo, mètres pour la natation (et le reste). La valeur
  * est transformée vers/depuis les mètres stockés en base (unité normalisée, cf.
  * DistanceUnit). L'utilisateur ne fait jamais la conversion lui-même.
+ *
+ * @extends AbstractType<int|null>
  */
 final class DistanceType extends AbstractType
 {

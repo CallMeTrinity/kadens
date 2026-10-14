@@ -74,10 +74,14 @@ final class GoalController extends AbstractController
         // l'objectif de son athlète, et c'est le contenu de l'ATHLÈTE qu'il doit
         // voir (ses plans, ses séances datées).
         $owner = $goal->getOwner();
+        $target = $goal->getTargetDate();
+        if (null === $owner || null === $target) {
+            throw $this->createNotFoundException();
+        }
 
         // Séances datées menant à l'échéance (fenêtre : ~16 semaines avant → jour J).
-        $windowStart = $goal->getTargetDate()->modify('-16 weeks');
-        $leadUp = $scheduledWorkoutRepository->findByOwnerBetween($owner, $windowStart, $goal->getTargetDate());
+        $windowStart = $target->modify('-16 weeks');
+        $leadUp = $scheduledWorkoutRepository->findByOwnerBetween($owner, $windowStart, $target);
 
         $plans = $planTemplateRepository->findBy(['owner' => $owner], ['title' => 'ASC']);
 
@@ -233,6 +237,9 @@ final class GoalController extends AbstractController
 
         $weeks = max(1, $plan->getDurationWeeks() ?? 1);
         $target = $goal->getTargetDate();
+        if (null === $target) {
+            throw $this->createNotFoundException();
+        }
         // Lundi ISO de la semaine de l'échéance, puis on remonte de (semaines - 1)
         // pour que la dernière semaine du plan couvre la semaine du jour J.
         $goalMonday = $target->setTime(0, 0)->modify(sprintf('-%d days', (int) $target->format('N') - 1));

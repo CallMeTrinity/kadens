@@ -35,9 +35,10 @@ final class ExerciseController extends AbstractController
     #[Route('', name: 'app_exercise_index', methods: ['GET'])]
     public function index(ExerciseRepository $exerciseRepository, LoggedExerciseRepository $loggedExerciseRepository): Response
     {
+        /** @var User $user */
         $user = $this->getUser();
         $exercises = $exerciseRepository->findLibraryForUser($user);
-        $usage = $user instanceof User ? $loggedExerciseRepository->usageForOwner($user) : [];
+        $usage = $loggedExerciseRepository->usageForOwner($user);
 
         // Puces d'activité présentes (chaque exercice porte une activité).
         $counts = [];
@@ -74,7 +75,9 @@ final class ExerciseController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $exercise->setOwner($this->isGranted('ROLE_ADMIN') ? null : $this->getUser());
+            /** @var User $user */
+            $user = $this->getUser();
+            $exercise->setOwner($this->isGranted('ROLE_ADMIN') ? null : $user);
             $entityManager->persist($exercise);
             $entityManager->flush();
 
@@ -120,7 +123,7 @@ final class ExerciseController extends AbstractController
             'trajectory' => $path,
             // Pas de courbe sans historique : la trajectoire nulle ne rend rien,
             // la lecture des pics n'a pas à être faite.
-            'progress' => null === $path || null === $user ? null : $progress->for($user, $exercise, $request->query->getString('range')),
+            'progress' => null === $path ? null : $progress->for($user, $exercise, $request->query->getString('range')),
         ]);
     }
 

@@ -42,7 +42,7 @@ class Goal
     private ?ActivityType $activity = null;
 
     #[ORM\Column(length: 20, enumType: GoalPriority::class, options: ['default' => GoalPriority::A->value])]
-    private ?GoalPriority $priority = GoalPriority::A;
+    private GoalPriority $priority = GoalPriority::A;
 
     #[ORM\Column(type: Types::DATE_IMMUTABLE)]
     private ?\DateTimeImmutable $targetDate = null;
@@ -137,7 +137,7 @@ class Goal
         return $this;
     }
 
-    public function getPriority(): ?GoalPriority
+    public function getPriority(): GoalPriority
     {
         return $this->priority;
     }

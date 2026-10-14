@@ -18,6 +18,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  * Formulaire d'objectif daté. Les champs de résultat (outcome / resultNote) ne
  * sont pertinents qu'une fois l'échéance passée : ils sont rendus dans une section
  * « Résultat » à part côté template.
+ *
+ * @extends AbstractType<Goal>
  */
 class GoalType extends AbstractType
 {

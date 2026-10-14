@@ -17,6 +17,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  * dépend du type de force parent (reps pour SETS_REPS, durée pour SETS_TIME) : on
  * n'affiche jamais un champ hors-sujet. Chaque champ s'auto-enregistre au
  * changement (le compositeur intercepte la soumission), donc pas de bouton.
+ *
+ * @extends AbstractType<PrescribedSet>
  */
 class PrescribedSetType extends AbstractType
 {

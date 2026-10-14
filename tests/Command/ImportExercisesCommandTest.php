@@ -370,6 +370,8 @@ final class ImportExercisesCommandTest extends KernelTestCase
         $file = $arguments[0] ?? null;
         unset($arguments[0]);
 
+        self::assertNotNull(self::$kernel);
+
         $tester = new CommandTester((new Application(self::$kernel))->find('app:import-exercises'));
         $tester->execute(null === $file ? $arguments : ['file' => $file] + $arguments);
 

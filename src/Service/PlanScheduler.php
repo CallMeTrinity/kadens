@@ -85,13 +85,13 @@ final class PlanScheduler
         foreach ($existing as $scheduled) {
             $sourceItem = $scheduled->getSourcePlanItem();
             if (null !== $sourceItem) {
-                $scheduledItemIds[$sourceItem->getId()] = true;
+                $scheduledItemIds[(int) $sourceItem->getId()] = true;
             }
         }
 
         $created = [];
         foreach ($template->getPlanItems() as $item) {
-            if (!isset($scheduledItemIds[$item->getId()])) {
+            if (!isset($scheduledItemIds[(int) $item->getId()])) {
                 $created[] = $this->createScheduled($template, $owner, $item, $anchor);
             }
         }
@@ -213,7 +213,7 @@ final class PlanScheduler
 
         foreach ($existing as $scheduled) {
             $item = $scheduled->getSourcePlanItem();
-            if (null !== $item && null !== $scheduled->getScheduledDate()) {
+            if (null !== $item) {
                 $offsetDays = ($item->getWeekNumber() - 1) * 7 + ($item->getDayOfWeek() - 1);
 
                 return $scheduled->getScheduledDate()->modify(sprintf('-%d days', $offsetDays));
@@ -224,7 +224,7 @@ final class PlanScheduler
         $earliest = null;
         foreach ($existing as $scheduled) {
             $date = $scheduled->getScheduledDate();
-            if (null !== $date && (null === $earliest || $date < $earliest)) {
+            if (null === $earliest || $date < $earliest) {
                 $earliest = $date;
             }
         }

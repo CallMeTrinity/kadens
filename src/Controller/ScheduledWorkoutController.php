@@ -77,7 +77,9 @@ final class ScheduledWorkoutController extends AbstractController
         $scheduled = new ScheduledWorkout();
         $scheduled->setWorkout($workout);
         $scheduled->setScheduledDate($date);
-        $scheduled->setOwner($this->getUser());
+        /** @var \App\Entity\User $user */
+        $user = $this->getUser();
+        $scheduled->setOwner($user);
         $scheduled->setStatus(ScheduledStatus::PLANNED);
         $this->entityManager->persist($scheduled);
         $this->entityManager->flush();
@@ -97,8 +99,10 @@ final class ScheduledWorkoutController extends AbstractController
         PlanTemplateRepository $planTemplateRepository,
         PlanScheduler $planScheduler,
     ): Response {
+        /** @var \App\Entity\User $user */
+        $user = $this->getUser();
         $form = $this->createForm(PlanInstantiationType::class, null, [
-            'planTemplates' => $planTemplateRepository->findBy(['owner' => $this->getUser()]),
+            'planTemplates' => $planTemplateRepository->findBy(['owner' => $user]),
         ]);
         $form->handleRequest($request);
 
@@ -110,8 +114,8 @@ final class ScheduledWorkoutController extends AbstractController
 
             $this->denyAccessUnlessGranted(PlanTemplateVoter::VIEW, $template);
 
-            $alreadyOnCalendar = $planScheduler->isInstantiated($template, $this->getUser());
-            $created = $planScheduler->instantiate($template, $this->getUser(), $startDate);
+            $alreadyOnCalendar = $planScheduler->isInstantiated($template, $user);
+            $created = $planScheduler->instantiate($template, $user, $startDate);
 
             $this->addFlash('success', $alreadyOnCalendar
                 ? sprintf('Plan resynchronisé : %d nouvelle(s) séance(s) ajoutée(s).', count($created))
@@ -194,7 +198,7 @@ final class ScheduledWorkoutController extends AbstractController
         return [
             'importedActivities' => array_map($presenter->present(...), $attached),
             'activityComparison' => $presenter->comparison($scheduled->getWorkout(), $attached),
-            'attachableActivities' => null !== $owner && null !== $scheduled->getScheduledDate() && $this->isGranted(ScheduledWorkoutVoter::LOG, $scheduled)
+            'attachableActivities' => null !== $owner && $this->isGranted(ScheduledWorkoutVoter::LOG, $scheduled)
                 ? $repository->findUnattachedForOwnerOn($owner, $scheduled->getScheduledDate())
                 : [],
         ];
@@ -499,6 +503,8 @@ final class ScheduledWorkoutController extends AbstractController
      * Redirige vers le mois de calendrier porté par le formulaire (champs cachés
      * year/month), avec repli sur le mois courant si absent ou invalide. Respecte
      * la vue préférée (semaine → semaine contenant le 1er du mois visé).
+     *
+     * @param \Symfony\Component\HttpFoundation\InputBag<bool|float|int|string> $payload
      */
     private function monthFromPayload(\Symfony\Component\HttpFoundation\InputBag $payload): Response
     {

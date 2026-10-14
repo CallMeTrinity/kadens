@@ -132,9 +132,41 @@ jobs:
         env:
           APP_ENV: test
 
+  phpstan:
+    name: PHPStan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: ctype, iconv, intl, pdo_mysql
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer
+        uses: actions/cache@v4
+        with:
+          path: ~/.composer/cache
+          key: composer-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-
+
+      - name: Installer les dépendances
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # PHPStan lit le conteneur compilé de l'env dev (services, paramètres) et
+      # boote le noyau pour le mapping Doctrine. Aucune connexion à la base :
+      # seul le serverVersion de DATABASE_URL est lu, d'où l'absence de service.
+      - name: Compiler le conteneur dev
+        run: php bin/console cache:warmup --env=dev
+
+      - name: Analyse statique (niveau 8)
+        run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress --error-format=github
+
   deploy:
     name: Deploy production
-    needs: [build, test]
+    needs: [build, test, phpstan]
     runs-on: ubuntu-latest
     # Le gate manuel. Le job reste en "Waiting" jusqu'à ton approbation dans
     # l'onglet Actions. Sans approbation : pas de mise en prod, et rien de cassé.

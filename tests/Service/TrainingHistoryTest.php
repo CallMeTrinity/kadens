@@ -20,6 +20,7 @@ use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
 use App\Enum\TargetArea;
 use App\Service\TrainingHistory;
+use App\Tests\FindsEntities;
 use App\Tests\PurgesDatabase;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -41,6 +42,7 @@ use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 final class TrainingHistoryTest extends KernelTestCase
 {
     use PurgesDatabase;
+    use FindsEntities;
 
     private EntityManagerInterface $em;
     private TrainingHistory $history;
@@ -199,7 +201,7 @@ final class TrainingHistoryTest extends KernelTestCase
         // imbriqué de TombstoneListener le redécouvre comme une entité neuve.
         $id = $ghost->getId();
         $this->em->clear();
-        $this->em->remove($this->em->find(Exercise::class, $id));
+        $this->em->remove($this->mustFind(Exercise::class, $id));
         $this->em->flush();
         $this->em->clear();
 
@@ -551,9 +553,9 @@ final class TrainingHistoryTest extends KernelTestCase
 
         // `countQueries` vide l'unité de travail : les fixtures doivent être
         // reprises avant de continuer à écrire.
-        $this->user = $this->em->find(User::class, $userId);
-        $bench = $this->em->find(Exercise::class, $bench->getId());
-        $workout = $this->em->find(Workout::class, $workout->getId());
+        $this->user = $this->mustFind(User::class, $userId);
+        $bench = $this->mustFind(Exercise::class, $bench->getId());
+        $workout = $this->mustFind(Workout::class, $workout->getId());
 
         // Deux ans de plus, une séance loguée par mois : la grille passe de deux
         // mois à vingt-six.
@@ -617,7 +619,11 @@ final class TrainingHistoryTest extends KernelTestCase
         return \count($holder->getData()['default'] ?? []);
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param array<string, mixed> $result
+     *
+     * @return array<string, mixed>
+     */
     private function day(array $result, string $date): array
     {
         foreach ($result['years'] as $year) {
@@ -635,7 +641,11 @@ final class TrainingHistoryTest extends KernelTestCase
         self::fail(sprintf('Aucune case « dans le mois » pour %s.', $date));
     }
 
-    /** @return array<string, mixed> */
+    /**
+     * @param array<string, mixed> $result
+     *
+     * @return array<string, mixed>
+     */
     private function month(array $result, string $label): array
     {
         foreach ($result['years'] as $year) {
@@ -668,7 +678,7 @@ final class TrainingHistoryTest extends KernelTestCase
         $workout = (new Workout())
             ->setOwner($this->user)
             ->setTitle($title)
-            ->setSlug(strtolower(preg_replace('/[^a-z]+/i', '-', $title)).'-'.bin2hex(random_bytes(4)));
+            ->setSlug(strtolower((string) preg_replace('/[^a-z]+/i', '-', $title)).'-'.bin2hex(random_bytes(4)));
 
         $block = (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(0);
         $block->addPrescribedExercise(
@@ -690,6 +700,7 @@ final class TrainingHistoryTest extends KernelTestCase
     private function addExercise(Workout $workout, Exercise $exercise): void
     {
         $block = $workout->getBlocks()->first();
+        self::assertNotFalse($block);
         $block->addPrescribedExercise(
             (new PrescribedExercise())
                 ->setExercise($exercise)

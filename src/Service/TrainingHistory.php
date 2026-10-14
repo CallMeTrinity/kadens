@@ -305,10 +305,10 @@ final class TrainingHistory
             arsort($session['sets']);
 
             $byScheduled[$id] = [
-                'groups' => array_values(array_map(
+                'groups' => array_map(
                     static fn(string $value): MuscleGroup => MuscleGroup::from($value),
                     array_keys($session['sets']),
-                )),
+                ),
                 'workingSets' => $session['workingSets'],
             ];
         }

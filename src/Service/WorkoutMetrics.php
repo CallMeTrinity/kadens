@@ -63,7 +63,7 @@ final class WorkoutMetrics
         $topSets = 0;
 
         foreach ($workout->getBlocks() as $block) {
-            $rounds = max(1, $block->getRounds() ?? 1);
+            $rounds = max(1, $block->getRounds());
 
             // Les enchaînements se comptent au groupe LIÉ, pas au bloc : un bloc
             // peut n'en porter aucun, ou plusieurs. Superset = 2 exercices liés,
@@ -121,7 +121,7 @@ final class WorkoutMetrics
         $stats = [];
 
         foreach ($workout->getBlocks() as $block) {
-            $rounds = max(1, $block->getRounds() ?? 1);
+            $rounds = max(1, $block->getRounds());
             $sets = 0;
             $tonnage = 0.0;
 
@@ -226,7 +226,7 @@ final class WorkoutMetrics
         $endurance = ['running' => $empty, 'cycling' => $empty, 'swimming' => $empty];
 
         foreach ($workout->getBlocks() as $block) {
-            $rounds = max(1, $block->getRounds() ?? 1);
+            $rounds = max(1, $block->getRounds());
 
             foreach ($block->getPrescribedExercises() as $pe) {
                 $exercise = $pe->getExercise();

@@ -53,6 +53,8 @@ final class PurgePairingCodesCommandTest extends KernelTestCase
             ['Pixel 8', $expiredAndUsed->getId()],
         );
 
+        self::assertNotNull(self::$kernel);
+
         $tester = new CommandTester((new Application(self::$kernel))->find('app:pairing:purge'));
         $tester->execute([]);
 

@@ -18,6 +18,8 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
  * co-éditeur : la page athlète affiche ses prochaines échéances et l'éditeur de
  * plan permet d'y rattacher un objectif. Sans cette branche, un coach qui clique
  * l'objectif de son athlète prenait un 403.
+ *
+ * @extends Voter<string, Goal>
  */
 final class GoalVoter extends Voter
 {

@@ -106,7 +106,7 @@ final class SetSynchronizer
         $sets = $prescribed->getDetailedSets()->toArray();
         usort($sets, static fn (PrescribedSet $a, PrescribedSet $b) => $a->getPosition() <=> $b->getPosition());
 
-        return array_values($sets);
+        return $sets;
     }
 
     /** @return list<PrescribedSet> séries de travail triées (échauffement exclu) */

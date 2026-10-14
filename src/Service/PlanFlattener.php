@@ -56,7 +56,7 @@ final class PlanFlattener
         // Indexation des items par semaine/jour pour un accès direct par case.
         $byCell = [];
         foreach ($template->getPlanItems() as $item) {
-            $byCell[$item->getWeekNumber()][$item->getDayOfWeek()][] = $item;
+            $byCell[(int) $item->getWeekNumber()][(int) $item->getDayOfWeek()][] = $item;
         }
 
         $weeks = [];
@@ -65,9 +65,14 @@ final class PlanFlattener
             for ($day = 1; $day <= 7; ++$day) {
                 $items = [];
                 foreach ($byCell[$week][$day] ?? [] as $item) {
+                    // Même repli que les agrégateurs : une case sans séance n'a rien à montrer.
+                    $workout = $item->getWorkout();
+                    if (null === $workout) {
+                        continue;
+                    }
                     $items[] = [
                         'item' => $item,
-                        'workout' => $this->flattenWorkout($item->getWorkout()),
+                        'workout' => $this->flattenWorkout($workout),
                     ];
                 }
 

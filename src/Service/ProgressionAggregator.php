@@ -103,6 +103,7 @@ final class ProgressionAggregator
 
         $weeksCount = max(1, (int) $template->getDurationWeeks());
 
+        /** @var array<int, RealizedWeek> $weeks */
         $weeks = [];
         for ($w = 1; $w <= $weeksCount; ++$w) {
             $weeks[$w] = ['minutes' => 0, 'tonnage' => 0.0, 'sets' => 0, 'endurance' => []];
@@ -114,10 +115,7 @@ final class ProgressionAggregator
         $importedSessions = 0;
 
         foreach ($scheduled as $session) {
-            $status = $session->getStatus();
-            if (null !== $status) {
-                ++$counts[$status->value];
-            }
+            ++$counts[$session->getStatus()->value];
             if ($session->hasLog()) {
                 ++$logged;
             }
@@ -126,8 +124,9 @@ final class ProgressionAggregator
                 ++$importedSessions;
             }
 
+            // weekOf() borne déjà la semaine ; isset() le dit à l'analyse statique.
             $week = $this->weekOf($session, $weeksCount);
-            if (null === $week) {
+            if (null === $week || !isset($weeks[$week])) {
                 continue;
             }
 
@@ -172,7 +171,8 @@ final class ProgressionAggregator
                 'missed' => $counts[ScheduledStatus::MISSED->value],
                 'planned' => $counts[ScheduledStatus::PLANNED->value],
                 'total' => $total,
-                'percent' => $total > 0 ? (int) round($counts[ScheduledStatus::DONE->value] / $total * 100) : 0,
+                // $scheduled n'est jamais vide ici (garde en tête de méthode).
+                'percent' => (int) round($counts[ScheduledStatus::DONE->value] / $total * 100),
                 'logged' => $logged,
                 'imported' => $importedSessions,
             ],
@@ -211,7 +211,7 @@ final class ProgressionAggregator
         }
 
         foreach ($template->getPlanItems() as $item) {
-            $week = $item->getWeekNumber();
+            $week = (int) $item->getWeekNumber();
             $workout = $item->getWorkout();
             if (!isset($acc[$week]) || null === $workout) {
                 continue;
@@ -232,7 +232,7 @@ final class ProgressionAggregator
             $acc,
         );
         $realOf = static fn (string $key): array => array_map(
-            static fn (array $week): ?float => (float) $week[$key],
+            static fn (array $week): float => (float) $week[$key],
             $realized,
         );
 
@@ -278,7 +278,7 @@ final class ProgressionAggregator
                 continue;
             }
             foreach ($workout->getBlocks() as $block) {
-                $rounds = max(1, $block->getRounds() ?? 1);
+                $rounds = max(1, $block->getRounds());
                 foreach ($block->getPrescribedExercises() as $pe) {
                     $exercise = $pe->getExercise();
                     $id = $exercise?->getId();
@@ -580,11 +580,10 @@ final class ProgressionAggregator
 
         if (null === $week) {
             $anchor = $scheduled->getPlanAnchorDate();
-            $date = $scheduled->getScheduledDate();
-            if (null === $anchor || null === $date) {
+            if (null === $anchor) {
                 return null;
             }
-            $week = intdiv((int) $anchor->diff($date)->format('%r%a'), 7) + 1;
+            $week = intdiv((int) $anchor->diff($scheduled->getScheduledDate())->format('%r%a'), 7) + 1;
         }
 
         return ($week >= 1 && $week <= $weeksCount) ? $week : null;

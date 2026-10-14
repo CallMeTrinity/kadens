@@ -14,7 +14,6 @@ use App\Service\AthleteRecords;
 use App\Service\PerformanceHistory;
 use App\Service\UnitFormatter;
 use App\Tests\PurgesDatabase;
-use Doctrine\Bundle\DoctrineBundle\Middleware\BacktraceDebugDataHolder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
@@ -409,7 +408,6 @@ final class AthleteRecordsTest extends KernelTestCase
         }
 
         $holder = static::getContainer()->get('doctrine.debug_data_holder');
-        self::assertInstanceOf(BacktraceDebugDataHolder::class, $holder);
         $holder->reset();
 
         $this->records->strengthFor($user);
@@ -481,7 +479,7 @@ final class AthleteRecordsTest extends KernelTestCase
 
         $logged = (new LoggedExercise())
             ->setExercise($exercise)
-            ->setExerciseName($exercise->getName())
+            ->setExerciseName((string) $exercise->getName())
             ->setPosition(1)
             ->setSkipped(false);
 

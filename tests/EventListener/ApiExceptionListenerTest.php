@@ -5,6 +5,7 @@ namespace App\Tests\EventListener;
 use App\EventListener\ApiExceptionListener;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\ExceptionEvent;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
@@ -41,7 +42,7 @@ final class ApiExceptionListenerTest extends TestCase
         self::assertSame(500, $response->getStatusCode());
         self::assertSame('application/problem+json', $response->headers->get('Content-Type'));
 
-        $body = $response->getContent();
+        $body = (string) $response->getContent();
         self::assertStringNotContainsString('SQLSTATE', $body);
         self::assertStringNotContainsString('RuntimeException', $body);
         self::assertStringNotContainsString(__FILE__, $body);
@@ -67,7 +68,7 @@ final class ApiExceptionListenerTest extends TestCase
     {
         $event = $this->dispatch(new \RuntimeException('quelque chose a cassé'), debug: true);
 
-        $payload = json_decode($event->getResponse()->getContent(), true);
+        $payload = json_decode((string) $this->responseOf($event)->getContent(), true);
 
         self::assertSame('Une erreur interne est survenue.', $payload['detail']);
         self::assertStringContainsString('quelque chose a cassé', $payload['exception']);
@@ -80,13 +81,13 @@ final class ApiExceptionListenerTest extends TestCase
     {
         $event = $this->dispatch(new HttpException(404, 'App\Entity\Workout object not found by the @MapEntity annotation'), debug: true);
 
-        $payload = json_decode($event->getResponse()->getContent(), true);
+        $payload = json_decode((string) $this->responseOf($event)->getContent(), true);
 
-        self::assertSame(404, $event->getResponse()->getStatusCode());
+        self::assertSame(404, $this->responseOf($event)->getStatusCode());
         self::assertSame('Ressource introuvable.', $payload['detail']);
         self::assertArrayNotHasKey('exception', $payload);
         // Le message du framework nomme une classe interne : il ne sort pas.
-        self::assertStringNotContainsString('Workout', $event->getResponse()->getContent());
+        self::assertStringNotContainsString('Workout', (string) $this->responseOf($event)->getContent());
     }
 
     /**
@@ -97,8 +98,8 @@ final class ApiExceptionListenerTest extends TestCase
     {
         $event = $this->dispatch(new MethodNotAllowedHttpException(['POST']), debug: false);
 
-        self::assertSame(405, $event->getResponse()->getStatusCode());
-        self::assertSame('POST', $event->getResponse()->headers->get('Allow'));
+        self::assertSame(405, $this->responseOf($event)->getStatusCode());
+        self::assertSame('POST', $this->responseOf($event)->headers->get('Allow'));
     }
 
     /** Une validation nue est un 422, pas une panne : le client a mal rempli. */
@@ -106,9 +107,9 @@ final class ApiExceptionListenerTest extends TestCase
     {
         $event = $this->dispatch($this->validationFailure(), debug: false);
 
-        self::assertSame(422, $event->getResponse()->getStatusCode());
+        self::assertSame(422, $this->responseOf($event)->getStatusCode());
 
-        $payload = json_decode($event->getResponse()->getContent(), true);
+        $payload = json_decode((string) $this->responseOf($event)->getContent(), true);
         self::assertSame('Les données envoyées sont invalides.', $payload['detail']);
         self::assertSame(
             [
@@ -132,9 +133,9 @@ final class ApiExceptionListenerTest extends TestCase
             debug: false,
         );
 
-        $payload = json_decode($event->getResponse()->getContent(), true);
+        $payload = json_decode((string) $this->responseOf($event)->getContent(), true);
 
-        self::assertSame(422, $event->getResponse()->getStatusCode());
+        self::assertSame(422, $this->responseOf($event)->getStatusCode());
         self::assertCount(2, $payload['violations']);
     }
 
@@ -157,6 +158,15 @@ final class ApiExceptionListenerTest extends TestCase
             new ConstraintViolation('Cette valeur doit être positive.', null, [], null, 'weightKg', -10),
             new ConstraintViolation('Cette valeur ne doit pas être vide.', null, [], null, 'sets[0].reps', null),
         ]));
+    }
+
+    /** Sur une route d'API, le listener pose toujours une réponse : son absence est l'échec. */
+    private function responseOf(ExceptionEvent $event): Response
+    {
+        $response = $event->getResponse();
+        self::assertNotNull($response, 'Le listener n\'a posé aucune réponse.');
+
+        return $response;
     }
 
     private function dispatch(\Throwable $throwable, bool $debug, string $path = '/api/schedule/42'): ExceptionEvent

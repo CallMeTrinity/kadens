@@ -15,7 +15,7 @@ class PwaHeadTest extends WebTestCase
     {
         $client = static::createClient();
         $client->request('GET', '/login');
-        $html = $client->getResponse()->getContent();
+        $html = (string) $client->getResponse()->getContent();
 
         foreach ([
             '<link rel="manifest" href="/manifest.json">',
@@ -43,7 +43,7 @@ class PwaHeadTest extends WebTestCase
     {
         $client = static::createClient();
         $client->request('GET', '/login');
-        $html = $client->getResponse()->getContent();
+        $html = (string) $client->getResponse()->getContent();
 
         preg_match_all('~rel="apple-touch-startup-image" href="(/pwa/splash/[^"]+)"~', $html, $matches);
         self::assertNotEmpty($matches[1], 'Aucun écran de démarrage iOS déclaré.');
@@ -55,7 +55,7 @@ class PwaHeadTest extends WebTestCase
 
         $onDisk = array_map(
             static fn (string $path): string => '/pwa/splash/' . basename($path),
-            glob($public . '/pwa/splash/*.png')
+            glob($public . '/pwa/splash/*.png') ?: []
         );
         self::assertSame([], array_values(array_diff($onDisk, $matches[1])), 'Écran de démarrage sans <link> correspondant.');
     }
@@ -63,7 +63,7 @@ class PwaHeadTest extends WebTestCase
     public function testManifestIconsExist(): void
     {
         $public = \dirname(__DIR__, 2) . '/public';
-        $manifest = json_decode(file_get_contents($public . '/manifest.json'), true, 512, JSON_THROW_ON_ERROR);
+        $manifest = json_decode((string) file_get_contents($public . '/manifest.json'), true, 512, JSON_THROW_ON_ERROR);
 
         self::assertSame('standalone', $manifest['display']);
         self::assertNotEmpty($manifest['icons']);

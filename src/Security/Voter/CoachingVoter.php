@@ -16,6 +16,8 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
  * - RESPOND : le seul destinataire de la demande. L'émetteur ne peut pas
  *   auto-accepter, sinon n'importe qui s'auto-nommerait coach.
  * - END : les deux parties (chacun peut mettre fin à la relation).
+ *
+ * @extends Voter<string, Coaching>
  */
 final class CoachingVoter extends Voter
 {

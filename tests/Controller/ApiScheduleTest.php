@@ -308,6 +308,7 @@ final class ApiScheduleTest extends WebTestCase
 
         $this->em->clear();
         $reloaded = $this->em->getRepository(ScheduledWorkout::class)->findOneBy(['uuid' => $scheduled->getUuid()]);
+        self::assertNotNull($reloaded);
         self::assertNotNull($reloaded->getSourcePlanTemplate(), 'Le rattachement au plan survit à une écriture du réalisé.');
         self::assertNotNull($reloaded->getPlanAnchorDate());
     }
@@ -669,7 +670,7 @@ final class ApiScheduleTest extends WebTestCase
 
         if ([] !== $logged) {
             $loggedExercise = (new LoggedExercise())
-                ->setExerciseName($exercise->getName())
+                ->setExerciseName((string) $exercise->getName())
                 ->setExercise($exercise)
                 ->setSourcePrescribedExercise($prescribed)
                 ->setPosition(0);

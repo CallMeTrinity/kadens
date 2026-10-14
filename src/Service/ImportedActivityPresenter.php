@@ -72,10 +72,10 @@ final class ImportedActivityPresenter
         $rows = [];
 
         foreach ([ActivityType::RUNNING, ActivityType::CYCLING, ActivityType::SWIMMING] as $type) {
-            $planned = $volume[$type->value] ?? null;
+            $planned = $volume[$type->value];
             $mine = array_filter($activities, static fn (ImportedActivity $a): bool => $type === $a->getActivity());
 
-            if (null === $planned || [] === $mine || (0 === $planned['meters'] && 0 === $planned['seconds'])) {
+            if ([] === $mine || (0 === $planned['meters'] && 0 === $planned['seconds'])) {
                 continue;
             }
 

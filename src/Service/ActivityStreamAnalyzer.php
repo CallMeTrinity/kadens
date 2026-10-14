@@ -85,7 +85,7 @@ final class ActivityStreamAnalyzer
             $counted = true;
         }
 
-        return $counted ? array_map(static fn (float|int $s): int => (int) round($s), $seconds) : null;
+        return $counted ? array_values(array_map(static fn (float|int $s): int => (int) round($s), $seconds)) : null;
     }
 
     /**

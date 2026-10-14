@@ -20,9 +20,11 @@ use App\Enum\PrescriptionType;
 use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
 use App\Tests\PurgesDatabase;
+use Doctrine\Bundle\DoctrineBundle\DataCollector\DoctrineDataCollector;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\HttpKernel\Profiler\Profile;
 
 /**
  * `GET /api/bootstrap` (KL-14) : l'hydratation complète de la base locale du
@@ -422,6 +424,7 @@ final class ApiBootstrapTest extends WebTestCase
     {
         $user = $this->createUser('athlete@example.com');
         [$scheduled, $prescribed] = $this->createSession($user, new \DateTimeImmutable('-1 day'));
+        self::assertNotNull($prescribed);
 
         $scheduled->getWorkout()?->setNotes('Brouillon privé : penser à alléger la semaine 3.');
         $prescribed->setNotes('Coudes serrés.');
@@ -489,6 +492,7 @@ final class ApiBootstrapTest extends WebTestCase
 
         $this->em->clear();
         $token = $this->em->getRepository(ApiToken::class)->findOneBy(['tokenHash' => ApiToken::hash($secret)]);
+        self::assertNotNull($token);
         self::assertNotNull($token->getLastUsedAt());
         self::assertNull($token->getLastBootstrapAt(), 'Une sonde ne synchronise rien.');
 
@@ -497,6 +501,7 @@ final class ApiBootstrapTest extends WebTestCase
 
         $this->em->clear();
         $token = $this->em->getRepository(ApiToken::class)->findOneBy(['tokenHash' => ApiToken::hash($secret)]);
+        self::assertNotNull($token);
         self::assertNotNull($token->getLastBootstrapAt());
     }
 
@@ -562,7 +567,11 @@ final class ApiBootstrapTest extends WebTestCase
         $bytes = \strlen((string) $this->client->getResponse()->getContent());
         self::assertLessThan(1_000_000, $bytes, sprintf('Charge utile de %d octets.', $bytes));
 
-        $queries = $this->client->getProfile()->getCollector('db')->getQueryCount();
+        $profile = $this->client->getProfile();
+        self::assertInstanceOf(Profile::class, $profile);
+        $collector = $profile->getCollector('db');
+        self::assertInstanceOf(DoctrineDataCollector::class, $collector);
+        $queries = $collector->getQueryCount();
         self::assertLessThan(20, $queries, sprintf('%d requêtes : un N+1 s\'est glissé dans le bootstrap.', $queries));
     }
 
@@ -655,7 +664,7 @@ final class ApiBootstrapTest extends WebTestCase
      * @param list<array{SetType, int|null, float|null}> $logged
      * @param list<Exercise>|null                        $exercises null = un seul « Développé couché » créé pour l'occasion
      *
-     * @return array{ScheduledWorkout, PrescribedExercise}
+     * @return array{ScheduledWorkout, PrescribedExercise|null} null quand `exercises` est vide
      */
     private function createSession(
         User $owner,
@@ -695,7 +704,7 @@ final class ApiBootstrapTest extends WebTestCase
 
         if ([] !== $logged) {
             $loggedExercise = (new LoggedExercise())
-                ->setExerciseName($exercises[0]->getName())
+                ->setExerciseName((string) $exercises[0]->getName())
                 ->setExercise($exercises[0])
                 ->setSourcePrescribedExercise($first)
                 ->setPosition(0);

@@ -69,6 +69,8 @@ final class LogComparatorTest extends TestCase
             self::assertSame($index + 1, $line['index']);
             self::assertSame(LogDeviation::HELD, $line['status']);
             // La colonne « Réalisé » se rend avec la même forme que « Prévu ».
+            self::assertNotNull($line['planned']);
+            self::assertNotNull($line['logged']);
             self::assertSame($line['planned']['effort'], $line['logged']['effort']);
             self::assertSame(80.0, $line['logged']['weightKg']);
         }
@@ -136,7 +138,7 @@ final class LogComparatorTest extends TestCase
         $lines = $comparison[0]['lines'];
         self::assertCount(3, $lines);
         // L'échauffement reste une ligne visible, simplement non réalisée.
-        self::assertSame(SetType::WARMUP, $lines[0]['planned']['type']);
+        self::assertSame(SetType::WARMUP, $lines[0]['planned']['type'] ?? null);
         self::assertNull($lines[0]['logged']);
         self::assertSame(LogDeviation::NOT_LOGGED, $lines[0]['status']);
         self::assertSame(LogDeviation::HELD, $lines[1]['status']);
@@ -238,7 +240,7 @@ final class LogComparatorTest extends TestCase
 
         self::assertCount(1, $comparison);
         self::assertSame(LogDeviation::HELD, $comparison[0]['status']);
-        self::assertSame($prescribed, $comparison[0]['planned']['prescribed']);
+        self::assertSame($prescribed, $comparison[0]['planned']['prescribed'] ?? null);
     }
 
     public function testExplicitSourceWinsOverTheExerciseOrder(): void
@@ -269,7 +271,7 @@ final class LogComparatorTest extends TestCase
         self::assertSame(LogDeviation::UNPLANNED, $comparison[0]['status']);
         self::assertNull($comparison[0]['planned']);
         self::assertNull($comparison[0]['prescribedId']);
-        self::assertSame('10 reps', $comparison[0]['lines'][0]['logged']['effort']);
+        self::assertSame('10 reps', $comparison[0]['lines'][0]['logged']['effort'] ?? null);
     }
 
     public function testDeletedExerciseKeepsItsSnapshotName(): void
@@ -305,7 +307,7 @@ final class LogComparatorTest extends TestCase
         self::assertSame(LogDeviation::HELD, $comparison[0]['lines'][0]['status']);
         self::assertSame(LogDeviation::LIGHTENED, $comparison[0]['lines'][2]['status']);
         self::assertSame(LogDeviation::LIGHTENED, $comparison[0]['status']);
-        self::assertSame('1:00', $comparison[0]['lines'][0]['logged']['effort']);
+        self::assertSame('1:00', $comparison[0]['lines'][0]['logged']['effort'] ?? null);
     }
 
     public function testCardioPrescriptionIsNotJudgedOnSetsItDoesNotHave(): void

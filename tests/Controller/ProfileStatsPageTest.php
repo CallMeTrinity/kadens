@@ -123,7 +123,7 @@ final class ProfileStatsPageTest extends WebTestCase
 
         self::assertCount(0, $crawler->filter('turbo-frame'));
         self::assertCount(3, $crawler->filter('.kd-rangetab'));
-        self::assertSame('get', strtolower($crawler->filter('.kd-rangepick__month')->attr('method')));
+        self::assertSame('get', strtolower((string) $crawler->filter('.kd-rangepick__month')->attr('method')));
     }
 
     /**

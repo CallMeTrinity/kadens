@@ -57,7 +57,7 @@ final class ApiErrorResponseTest extends WebTestCase
     {
         $this->client->request('GET', '/api/cette-route-nexiste-pas');
 
-        self::assertStringNotContainsString('No route found', $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('No route found', (string) $this->client->getResponse()->getContent());
     }
 
     /**
@@ -71,7 +71,7 @@ final class ApiErrorResponseTest extends WebTestCase
 
         self::assertResponseStatusCodeSame(405);
         self::assertResponseHeaderSame('Content-Type', 'application/problem+json');
-        self::assertStringContainsString('POST', $this->client->getResponse()->headers->get('Allow'));
+        self::assertStringContainsString('POST', (string) $this->client->getResponse()->headers->get('Allow'));
         self::assertSame('Méthode non autorisée sur cette ressource.', $this->json()['detail']);
     }
 
@@ -101,7 +101,7 @@ final class ApiErrorResponseTest extends WebTestCase
         $this->client->request('GET', '/cette-page-nexiste-pas');
 
         self::assertResponseStatusCodeSame(404);
-        self::assertStringContainsString('text/html', $this->client->getResponse()->headers->get('Content-Type'));
+        self::assertStringContainsString('text/html', (string) $this->client->getResponse()->headers->get('Content-Type'));
     }
 
     /**
@@ -109,6 +109,6 @@ final class ApiErrorResponseTest extends WebTestCase
      */
     private function json(): array
     {
-        return json_decode($this->client->getResponse()->getContent(), true);
+        return json_decode((string) $this->client->getResponse()->getContent(), true);
     }
 }

@@ -13,7 +13,6 @@ use App\Enum\SetType;
 use App\Service\PerformanceHistory;
 use App\Service\UnitFormatter;
 use App\Tests\PurgesDatabase;
-use Doctrine\Bundle\DoctrineBundle\Middleware\BacktraceDebugDataHolder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
@@ -304,7 +303,6 @@ final class PerformanceHistoryTest extends KernelTestCase
         $exercises[] = $orphan;
 
         $holder = static::getContainer()->get('doctrine.debug_data_holder');
-        self::assertInstanceOf(BacktraceDebugDataHolder::class, $holder);
         $holder->reset();
 
         $bulk = $this->history->bulkFor($user, $exercises);
@@ -316,7 +314,8 @@ final class PerformanceHistoryTest extends KernelTestCase
         self::assertCount(12, $bulk);
         self::assertArrayNotHasKey($orphan->getId(), $bulk);
 
-        $first = $bulk[$exercises[0]->getId()];
+        $first = $bulk[(int) $exercises[0]->getId()] ?? null;
+        self::assertNotNull($first);
         self::assertNotNull($first['last']);
         self::assertNotNull($first['best']);
         self::assertSame(51.0, $first['best']['weightKg']);
@@ -374,7 +373,6 @@ final class PerformanceHistoryTest extends KernelTestCase
         }
 
         $holder = static::getContainer()->get('doctrine.debug_data_holder');
-        self::assertInstanceOf(BacktraceDebugDataHolder::class, $holder);
         $holder->reset();
 
         $sessions = $this->history->recentSessions($user, $exercise, 10);
@@ -478,7 +476,7 @@ final class PerformanceHistoryTest extends KernelTestCase
 
         $logged = (new LoggedExercise())
             ->setExercise($exercise)
-            ->setExerciseName($exercise->getName())
+            ->setExerciseName((string) $exercise->getName())
             ->setPosition(1)
             ->setSkipped($skipped);
 

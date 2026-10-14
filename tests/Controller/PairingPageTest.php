@@ -133,7 +133,7 @@ final class PairingPageTest extends WebTestCase
             'exp' => $pairing->getExpiresAt()->format(\DateTimeInterface::ATOM),
         ]);
 
-        self::assertStringContainsString($expected, $this->client->getResponse()->getContent());
+        self::assertStringContainsString($expected, (string) $this->client->getResponse()->getContent());
     }
 
     /**
@@ -160,7 +160,7 @@ final class PairingPageTest extends WebTestCase
 
         $this->issue([TurboBundle::STREAM_MEDIA_TYPE]);
 
-        $content = $this->client->getResponse()->getContent();
+        $content = (string) $this->client->getResponse()->getContent();
         self::assertStringContainsString('<turbo-stream action="replace" target="pairing-panel">', $content);
         self::assertStringNotContainsString('<form method="post" action="/login"', $content);
     }
@@ -179,21 +179,21 @@ final class PairingPageTest extends WebTestCase
         $this->client->request('GET', '/pairing/'.$pairing->getId().'/status');
         self::assertSame(
             ['used' => false, 'device' => null, 'expired' => false],
-            json_decode($this->client->getResponse()->getContent(), true),
+            json_decode((string) $this->client->getResponse()->getContent(), true),
         );
 
         $this->client->request(
             'POST',
             '/api/auth/pair',
             server: ['CONTENT_TYPE' => 'application/json'],
-            content: json_encode(['code' => $code, 'deviceName' => 'Pixel 8']),
+            content: json_encode(['code' => $code, 'deviceName' => 'Pixel 8'], \JSON_THROW_ON_ERROR),
         );
         self::assertResponseStatusCodeSame(201);
 
         $this->client->request('GET', '/pairing/'.$pairing->getId().'/status');
         self::assertSame(
             ['used' => true, 'device' => 'Pixel 8', 'expired' => false],
-            json_decode($this->client->getResponse()->getContent(), true),
+            json_decode((string) $this->client->getResponse()->getContent(), true),
         );
     }
 

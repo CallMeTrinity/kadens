@@ -1,0 +1,33 @@
+parameters:
+    level: 8
+    paths:
+        - bin/
+        - config/
+        - public/
+        - src/
+        - tests/
+    excludePaths:
+        - config/bundles.php
+        - config/reference.php
+
+    # Le conteneur compilé (env dev) donne à PHPStan les services réels :
+    # $container->get(), paramètres, types de retour des services.
+    # Il se régénère par `php bin/console cache:warmup --env=dev`.
+    symfony:
+        containerXmlPath: var/cache/dev/App_KernelDevDebugContainer.xml
+        consoleApplicationLoader: tests/console-application.php
+
+    doctrine:
+        objectManagerLoader: tests/object-manager.php
+        # Entités au format maker : une colonne obligatoire porte une propriété
+        # nullable tant que l'entité n'est pas remplie (formulaire, new). C'est
+        # voulu, pas une dérive du mapping.
+        allowNullablePropertyForRequiredField: true
+
+    ignoreErrors:
+        # Un test vérifie à l'exécution ce que les types promettent : qu'une
+        # assertion soit « déjà vraie » pour l'analyse est précisément son rôle
+        # (un PHPDoc ne garantit rien au runtime). Borné à tests/.
+        -
+            identifier: staticMethod.alreadyNarrowedType
+            path: tests/*

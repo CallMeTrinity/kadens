@@ -75,7 +75,7 @@ final class DeviceRevocationTest extends WebTestCase
         self::assertResponseIsSuccessful();
         self::assertCount(1, $crawler->filter('.kd-device'));
         self::assertStringContainsString('Pixel 8', $crawler->filter('.kd-device__name')->text());
-        self::assertStringNotContainsString('Galaxy S24', $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('Galaxy S24', (string) $this->client->getResponse()->getContent());
     }
 
     /**
@@ -162,7 +162,7 @@ final class DeviceRevocationTest extends WebTestCase
             server: ['HTTP_ACCEPT' => TurboBundle::STREAM_MEDIA_TYPE],
         );
 
-        $content = $this->client->getResponse()->getContent();
+        $content = (string) $this->client->getResponse()->getContent();
         self::assertStringContainsString('<turbo-stream action="replace" target="devices-panel">', $content);
         self::assertStringNotContainsString('pairing-panel', $content);
     }

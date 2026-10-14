@@ -306,7 +306,7 @@ final class ApiExerciseHistoryTest extends WebTestCase
 
         $logged = (new LoggedExercise())
             ->setExercise($exercise)
-            ->setExerciseName($exercise->getName())
+            ->setExerciseName((string) $exercise->getName())
             ->setPosition(0);
 
         foreach ($sets as $position => [$type, $reps, $weightKg]) {

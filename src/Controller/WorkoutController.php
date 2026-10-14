@@ -24,7 +24,6 @@ use App\Service\PlanFlattener;
 use App\Service\SetSynchronizer;
 use App\Service\SlugGenerator;
 use App\Service\SupersetGrouper;
-use App\Service\UnitFormatter;
 use App\Service\VolumePanel;
 use App\Service\WorkoutCloner;
 use App\Service\WorkoutEstimator;
@@ -68,7 +67,6 @@ final class WorkoutController extends AbstractController
         private readonly SetSynchronizer $setSynchronizer,
         private readonly SupersetGrouper $supersets,
         private readonly VolumePanel $volumePanel,
-        private readonly UnitFormatter $units,
     ) {
     }
 
@@ -147,8 +145,10 @@ final class WorkoutController extends AbstractController
 
         $title = trim($request->getPayload()->getString('title')) ?: self::DRAFT_WORKOUT_TITLE;
 
+        /** @var User $user */
+        $user = $this->getUser();
         $workout = (new Workout())
-            ->setOwner($this->getUser())
+            ->setOwner($user)
             ->setTitle($title)
             ->setSlug($slugGenerator->generate($title, Workout::class));
 
@@ -287,6 +287,7 @@ final class WorkoutController extends AbstractController
         // obtient une variante DANS la bibliothèque de cet athlète. Chez le coach,
         // elle serait inerte — il ne pourrait ni la poser sur le calendrier de
         // l'athlète ni dans son plan, qui n'acceptent que du contenu de l'athlète.
+        /** @var User $owner */
         $owner = $workout->getOwner() ?? $this->getUser();
         $copy = $cloner->cloneWorkout($workout, $owner, $workout->getTitle().' (copie)', false);
         $this->entityManager->flush();
@@ -468,7 +469,7 @@ final class WorkoutController extends AbstractController
             return $this->render('workout/stream/prescribed_row.stream.html.twig', [
                 'workout' => $workout,
                 'prescribed' => $prescribed,
-                'summary' => $this->prescribedSummaries($workout)[$prescribed->getId()] ?? '',
+                'summary' => $this->prescribedSummaries($workout)[(int) $prescribed->getId()] ?? '',
                 // La ligne re-rendue seule doit garder son rang de superset et sa
                 // bascule de liaison : sans ça, un enregistrement de paramètre les
                 // ferait disparaître jusqu'au rechargement.
@@ -556,8 +557,7 @@ final class WorkoutController extends AbstractController
     public function editSet(Request $request, Workout $workout, int $setId): Response
     {
         $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
-        $set = $this->findSet($workout, $setId);
-        $prescribed = $set->getPrescribedExercise();
+        [$set, $prescribed] = $this->findSet($workout, $setId);
         $countBefore = $prescribed->getWorkingSetCount();
 
         $form = $this->createSetForm($set);
@@ -579,7 +579,7 @@ final class WorkoutController extends AbstractController
             return $this->render('workout/stream/prescribed_row.stream.html.twig', [
                 'workout' => $workout,
                 'prescribed' => $prescribed,
-                'summary' => $this->prescribedSummaries($workout)[$prescribed->getId()] ?? '',
+                'summary' => $this->prescribedSummaries($workout)[(int) $prescribed->getId()] ?? '',
                 // La ligne re-rendue seule doit garder son rang de superset et sa
                 // bascule de liaison : sans ça, un enregistrement de paramètre les
                 // ferait disparaître jusqu'au rechargement.
@@ -593,8 +593,7 @@ final class WorkoutController extends AbstractController
     public function deleteSet(Request $request, Workout $workout, int $setId): Response
     {
         $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
-        $set = $this->findSet($workout, $setId);
-        $prescribed = $set->getPrescribedExercise();
+        [$set, $prescribed] = $this->findSet($workout, $setId);
 
         if ($this->isCsrfTokenValid('set_delete'.$setId, $request->getPayload()->getString('_token'))) {
             $prescribed->removeDetailedSet($set);
@@ -611,8 +610,7 @@ final class WorkoutController extends AbstractController
     public function moveSet(Request $request, Workout $workout, int $setId, string $direction): Response
     {
         $this->denyAccessUnlessGranted(WorkoutVoter::EDIT, $workout);
-        $set = $this->findSet($workout, $setId);
-        $prescribed = $set->getPrescribedExercise();
+        [$set, $prescribed] = $this->findSet($workout, $setId);
 
         if ($this->isCsrfTokenValid('set_move'.$setId, $request->getPayload()->getString('_token'))) {
             $this->swapPosition($prescribed->getDetailedSets()->toArray(), $set, $direction);
@@ -728,7 +726,7 @@ final class WorkoutController extends AbstractController
         $prescribed = $this->findPrescribed($workout, $prescribedId);
 
         if ($this->isCsrfTokenValid('prescribed_delete'.$prescribedId, $request->getPayload()->getString('_token'))) {
-            $block = $prescribed->getBlock();
+            $block = $prescribed->getBlock() ?? throw $this->createNotFoundException();
             $block->removePrescribedExercise($prescribed);
             // Retirer un membre peut laisser un groupe à un seul exercice : le
             // grouper le dissout (un superset compte au moins deux exercices).
@@ -746,7 +744,8 @@ final class WorkoutController extends AbstractController
         $prescribed = $this->findPrescribed($workout, $prescribedId);
 
         if ($this->isCsrfTokenValid('prescribed_move'.$prescribedId, $request->getPayload()->getString('_token'))) {
-            $this->swapPosition($prescribed->getBlock()->getPrescribedExercises()->toArray(), $prescribed, $direction);
+            $block = $prescribed->getBlock() ?? throw $this->createNotFoundException();
+            $this->swapPosition($block->getPrescribedExercises()->toArray(), $prescribed, $direction);
             $this->supersets->settleAfterMove($prescribed);
             $this->entityManager->flush();
         }
@@ -810,13 +809,19 @@ final class WorkoutController extends AbstractController
         throw $this->createNotFoundException('Exercice prescrit introuvable dans cette séance.');
     }
 
-    private function findSet(Workout $workout, int $setId): PrescribedSet
+    /**
+     * La série et son exercice parent, lus sur le chemin du parcours : le parent
+     * est donc garanti, sans repasser par le getter nullable de la série.
+     *
+     * @return array{PrescribedSet, PrescribedExercise}
+     */
+    private function findSet(Workout $workout, int $setId): array
     {
         foreach ($workout->getBlocks() as $block) {
             foreach ($block->getPrescribedExercises() as $prescribed) {
                 foreach ($prescribed->getDetailedSets() as $set) {
                     if ($set->getId() === $setId) {
-                        return $set;
+                        return [$set, $prescribed];
                     }
                 }
             }
@@ -941,13 +946,13 @@ final class WorkoutController extends AbstractController
      * Position suivante = max des positions existantes + 1 (évite les collisions
      * après suppression, contrairement à un simple count()).
      *
-     * @param array<object> $items entités exposant getPosition()
+     * @param array<int, Block|PrescribedExercise|PrescribedSet> $items
      */
     private function nextPosition(array $items): int
     {
         $max = -1;
         foreach ($items as $item) {
-            $max = max($max, $item->getPosition());
+            $max = max($max, (int) $item->getPosition());
         }
 
         return $max + 1;
@@ -956,9 +961,9 @@ final class WorkoutController extends AbstractController
     /**
      * Échange la position d'un élément avec son voisin dans la liste ordonnée.
      *
-     * @param array<object> $ordered liste triée par position croissante
+     * @param array<int, Block|PrescribedExercise|PrescribedSet> $ordered liste triée par position croissante
      */
-    private function swapPosition(array $ordered, object $entity, string $direction): void
+    private function swapPosition(array $ordered, Block|PrescribedExercise|PrescribedSet $entity, string $direction): void
     {
         $index = array_search($entity, $ordered, true);
         if (false === $index) {
@@ -971,8 +976,8 @@ final class WorkoutController extends AbstractController
         }
 
         $neighbour = $ordered[$target];
-        $position = $entity->getPosition();
-        $entity->setPosition($neighbour->getPosition());
+        $position = (int) $entity->getPosition();
+        $entity->setPosition((int) $neighbour->getPosition());
         $neighbour->setPosition($position);
     }
 
@@ -982,7 +987,11 @@ final class WorkoutController extends AbstractController
      */
     private function clearIrrelevantFields(PrescribedExercise $prescribed): void
     {
-        $relevant = $prescribed->getPrescriptionType()->fields();
+        $type = $prescribed->getPrescriptionType();
+        if (null === $type) {
+            return;
+        }
+        $relevant = $type->fields();
 
         foreach (array_diff(self::VALUE_FIELDS, $relevant) as $field) {
             $prescribed->{'set'.ucfirst($field)}(null);
@@ -997,6 +1006,7 @@ final class WorkoutController extends AbstractController
      * traitement du POST pour que handleRequest lise les bonnes données.
      */
 
+    /** @return FormInterface<Block> */
     private function createAddBlockForm(Workout $workout, Block $block): FormInterface
     {
         return $this->formFactory->createNamed('add_block', BlockType::class, $block, [
@@ -1004,16 +1014,18 @@ final class WorkoutController extends AbstractController
         ]);
     }
 
+    /** @return FormInterface<Block> */
     private function createBlockForm(Block $block): FormInterface
     {
         return $this->formFactory->createNamed('block_'.$block->getId(), BlockType::class, $block, [
             'action' => $this->generateUrl('app_workout_block_edit', [
-                'id' => $block->getWorkout()->getId(),
+                'id' => $block->getWorkout()?->getId(),
                 'blockId' => $block->getId(),
             ]),
         ]);
     }
 
+    /** @return FormInterface<PrescribedExercise> */
     private function createPrescribedForm(PrescribedExercise $prescribed, string $route = 'app_workout_prescribed_edit'): FormInterface
     {
         return $this->formFactory->createNamed('prescribed_'.$prescribed->getId(), PrescribedExerciseType::class, $prescribed, [
@@ -1023,20 +1035,21 @@ final class WorkoutController extends AbstractController
             // seul le compteur `sets` reste (cf. PrescribedExerciseType).
             'detailed' => $prescribed->hasDetailedSets(),
             'action' => $this->generateUrl($route, [
-                'id' => $prescribed->getBlock()->getWorkout()->getId(),
+                'id' => $prescribed->getBlock()?->getWorkout()?->getId(),
                 'prescribedId' => $prescribed->getId(),
             ]),
         ]);
     }
 
+    /** @return FormInterface<PrescribedSet> */
     private function createSetForm(PrescribedSet $set): FormInterface
     {
         $prescribed = $set->getPrescribedExercise();
 
         return $this->formFactory->createNamed('set_'.$set->getId(), PrescribedSetType::class, $set, [
-            'parent_type' => $prescribed->getPrescriptionType() ?? PrescriptionType::SETS_REPS,
+            'parent_type' => $prescribed?->getPrescriptionType() ?? PrescriptionType::SETS_REPS,
             'action' => $this->generateUrl('app_workout_set_edit', [
-                'id' => $prescribed->getBlock()->getWorkout()->getId(),
+                'id' => $prescribed?->getBlock()?->getWorkout()?->getId(),
                 'setId' => $set->getId(),
             ]),
         ]);
@@ -1051,7 +1064,7 @@ final class WorkoutController extends AbstractController
     {
         $forms = [];
         foreach ($prescribed->getDetailedSets() as $set) {
-            $forms[$set->getId()] = $this->createSetForm($set)->createView();
+            $forms[(int) $set->getId()] = $this->createSetForm($set)->createView();
         }
 
         return $forms;
@@ -1067,7 +1080,7 @@ final class WorkoutController extends AbstractController
         return [
             'workout' => $workout,
             'prescribed' => $prescribed,
-            'summary' => $this->prescribedSummaries($workout)[$prescribed->getId()] ?? '',
+            'summary' => $this->prescribedSummaries($workout)[(int) $prescribed->getId()] ?? '',
             // Vue du formulaire prescrit : le stream re-rend TOUT le panneau de
             // paramètres (form + séries), pour que la visibilité des champs scalaires
             // suive le passage simple <-> détaillé.
@@ -1109,7 +1122,7 @@ final class WorkoutController extends AbstractController
         $prescribedForms = [];
         foreach ($workout->getBlocks() as $block) {
             foreach ($block->getPrescribedExercises() as $prescribed) {
-                $prescribedForms[$prescribed->getId()] = $this
+                $prescribedForms[(int) $prescribed->getId()] = $this
                     ->createPrescribedForm($prescribed, 'app_workout_prescribed_quick_edit')
                     ->createView();
             }
@@ -1121,7 +1134,7 @@ final class WorkoutController extends AbstractController
         foreach ($this->planFlattener->flattenWorkout($workout)['blocks'] as $flatBlock) {
             foreach ($flatBlock['exercises'] as $flat) {
                 if (null !== $flat['groupLabel']) {
-                    $supersetLabels[$flat['prescribed']->getId()] = $flat['groupLabel'];
+                    $supersetLabels[(int) $flat['prescribed']->getId()] = $flat['groupLabel'];
                 }
             }
         }
@@ -1150,18 +1163,18 @@ final class WorkoutController extends AbstractController
         $exerciseIds = [];
 
         foreach ($workout->getBlocks() as $block) {
-            $blockForms[$block->getId()] = $this->createBlockForm($block)->createView();
+            $blockForms[(int) $block->getId()] = $this->createBlockForm($block)->createView();
             // Le compositeur rend les exercices segment par segment (isolé ou
             // groupe lié) : le DOM reste plat pour le glisser-déposer, seules les
             // classes et l'étiquette A1/A2 changent.
-            $segments[$block->getId()] = $this->supersets->segments($block);
+            $segments[(int) $block->getId()] = $this->supersets->segments($block);
 
             foreach ($block->getPrescribedExercises() as $prescribed) {
-                $prescribedForms[$prescribed->getId()] = $this->createPrescribedForm($prescribed)->createView();
+                $prescribedForms[(int) $prescribed->getId()] = $this->createPrescribedForm($prescribed)->createView();
                 $exerciseIds[] = $prescribed->getExercise()?->getId();
 
                 foreach ($prescribed->getDetailedSets() as $set) {
-                    $setForms[$set->getId()] = $this->createSetForm($set)->createView();
+                    $setForms[(int) $set->getId()] = $this->createSetForm($set)->createView();
                 }
             }
         }
@@ -1266,7 +1279,7 @@ final class WorkoutController extends AbstractController
                     $rest = 'repos '.$flat['rest'].' s';
                     $summary = '' !== $summary ? $summary.' · '.$rest : $rest;
                 }
-                $summaries[$flat['prescribed']->getId()] = $summary;
+                $summaries[(int) $flat['prescribed']->getId()] = $summary;
             }
         }
 
@@ -1303,7 +1316,7 @@ final class WorkoutController extends AbstractController
         $usage = $owner instanceof User ? $this->loggedExerciseRepository->usageForOwner($owner) : [];
 
         usort($exercises, static function (Exercise $a, Exercise $b) use ($usage): int {
-            $byUsage = ($usage[$b->getId()]['count'] ?? 0) <=> ($usage[$a->getId()]['count'] ?? 0);
+            $byUsage = ($usage[(int) $b->getId()]['count'] ?? 0) <=> ($usage[(int) $a->getId()]['count'] ?? 0);
 
             // Le repli alphabétique n'est pas cosmétique : sans lui, l'ordre des
             // exercices jamais faits — l'écrasante majorité — dépendrait de la
@@ -1315,7 +1328,10 @@ final class WorkoutController extends AbstractController
 
         $countsByActivity = [];
         foreach ($exercises as $exercise) {
-            $key = $exercise->getActivity()->value;
+            $key = $exercise->getActivity()?->value;
+            if (null === $key) {
+                continue;
+            }
             $countsByActivity[$key] = ($countsByActivity[$key] ?? 0) + 1;
         }
 

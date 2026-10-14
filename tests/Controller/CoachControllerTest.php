@@ -16,6 +16,7 @@ use App\Enum\ActivityType;
 use App\Enum\CoachingStatus;
 use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
+use App\Tests\FindsEntities;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -28,6 +29,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  */
 final class CoachControllerTest extends WebTestCase
 {
+    use FindsEntities;
+
     private KernelBrowser $client;
     private EntityManagerInterface $em;
 
@@ -171,7 +174,7 @@ final class CoachControllerTest extends WebTestCase
 
         $workout = $this->em->getRepository(Workout::class)->findOneBy(['title' => 'Sortie longue Z2']);
         self::assertNotNull($workout);
-        self::assertSame($athlete->getId(), $workout->getOwner()->getId());
+        self::assertSame($athlete->getId(), $workout->getOwner()?->getId());
         // Redirection vers le compositeur normal : pas d'éditeur dédié au coach.
         self::assertResponseRedirects('/workout/'.$workout->getId().'/edit');
     }
@@ -191,7 +194,7 @@ final class CoachControllerTest extends WebTestCase
 
         $plan = $this->em->getRepository(PlanTemplate::class)->findOneBy(['title' => 'Prépa semi']);
         self::assertNotNull($plan);
-        self::assertSame($athlete->getId(), $plan->getOwner()->getId());
+        self::assertSame($athlete->getId(), $plan->getOwner()?->getId());
         self::assertSame(6, $plan->getDurationWeeks());
     }
 
@@ -214,7 +217,7 @@ final class CoachControllerTest extends WebTestCase
         $scheduled = $this->em->getRepository(ScheduledWorkout::class)->findAll();
         self::assertCount(1, $scheduled);
         // La séance datée appartient à l'athlète : elle apparaît sur SON calendrier.
-        self::assertSame($athlete->getId(), $scheduled[0]->getOwner()->getId());
+        self::assertSame($athlete->getId(), $scheduled[0]->getOwner()?->getId());
         self::assertSame($date, $scheduled[0]->getScheduledDate()->format('Y-m-d'));
     }
 
@@ -262,7 +265,7 @@ final class CoachControllerTest extends WebTestCase
 
         $scheduled = $this->em->getRepository(ScheduledWorkout::class)->findAll();
         self::assertCount(1, $scheduled);
-        self::assertSame($athlete->getId(), $scheduled[0]->getOwner()->getId());
+        self::assertSame($athlete->getId(), $scheduled[0]->getOwner()?->getId());
         self::assertSame($monday->format('Y-m-d'), $scheduled[0]->getScheduledDate()->format('Y-m-d'));
     }
 
@@ -377,11 +380,15 @@ final class CoachControllerTest extends WebTestCase
 
         $this->em->clear();
         $reloaded = $this->em->getRepository(PlanTemplate::class)->find($plan->getId());
+        self::assertNotNull($reloaded);
         self::assertCount(1, $reloaded->getPlanItems());
 
-        $fork = $reloaded->getPlanItems()->first()->getWorkout();
+        $item = $reloaded->getPlanItems()->first();
+        self::assertNotFalse($item);
+        $fork = $item->getWorkout();
+        self::assertNotNull($fork);
         self::assertTrue($fork->isPlanLocal());
-        self::assertSame($athlete->getId(), $fork->getOwner()->getId());
+        self::assertSame($athlete->getId(), $fork->getOwner()?->getId());
     }
 
     /** La relation est dirigée : l'athlète n'hérite pas des droits sur son coach. */
@@ -618,8 +625,8 @@ final class CoachControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(403);
 
         $this->em->clear();
-        self::assertNull($this->em->getRepository(Workout::class)->find($workout->getId())->getNotes());
-        self::assertNull($this->em->getRepository(PlanTemplate::class)->find($template->getId())->getNotes());
+        self::assertNull($this->mustFind(Workout::class, $workout->getId())->getNotes());
+        self::assertNull($this->mustFind(PlanTemplate::class, $template->getId())->getNotes());
     }
 
     /** Le propriétaire écrit ses notes par le même endpoint, sur les deux entités. */
@@ -650,11 +657,11 @@ final class CoachControllerTest extends WebTestCase
         $this->em->clear();
         self::assertSame(
             "Semaine 1 : en vrac\nSemaine 2 : à voir",
-            $this->em->getRepository(Workout::class)->find($workout->getId())->getNotes()
+            $this->mustFind(Workout::class, $workout->getId())->getNotes()
         );
         self::assertSame(
             'Déroulé provisoire',
-            $this->em->getRepository(PlanTemplate::class)->find($template->getId())->getNotes()
+            $this->mustFind(PlanTemplate::class, $template->getId())->getNotes()
         );
     }
 
@@ -762,7 +769,7 @@ final class CoachControllerTest extends WebTestCase
 
         self::assertResponseIsSuccessful();
         self::assertStringNotContainsString('athlete@example.com', $crawler->filter('body')->text());
-        self::assertSame(0, $crawler->filter('a[href="/coach/athlete/'.$athlete->getId().'"]')->count());
+        self::assertCount(0, $crawler->filter('a[href="/coach/athlete/'.$athlete->getId().'"]'));
     }
 
     /** Sans relation acceptée, le journal d'un autre reste fermé. */
@@ -935,6 +942,7 @@ final class CoachControllerTest extends WebTestCase
         return $scheduled;
     }
 
+    /** @param list<string> $roles */
     private function createUser(string $email, array $roles = []): User
     {
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);

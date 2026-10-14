@@ -18,6 +18,7 @@ use App\Enum\CoachingStatus;
 use App\Enum\PrescriptionType;
 use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
+use App\Tests\FindsEntities;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -38,6 +39,8 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  */
 final class ScheduledWorkoutLogTest extends WebTestCase
 {
+    use FindsEntities;
+
     private KernelBrowser $client;
     private EntityManagerInterface $em;
 
@@ -309,7 +312,7 @@ final class ScheduledWorkoutLogTest extends WebTestCase
         self::assertResponseStatusCodeSame(403);
 
         $this->em->clear();
-        self::assertTrue($this->em->getRepository(ScheduledWorkout::class)->find($id)->hasLog());
+        self::assertTrue($this->mustFind(ScheduledWorkout::class, $id)->hasLog());
     }
 
     // ----------------------------------- Ce qui NE fuite pas (PlanFlattener)
@@ -328,35 +331,36 @@ final class ScheduledWorkoutLogTest extends WebTestCase
         // 123,5 kg n'est prescrit nulle part : la valeur ne peut venir que du
         // réalisé. Un tonnage agrégé ne suffirait pas — il pourrait coïncider.
         [$scheduled, $prescribed] = $this->createLoggedSession($user, [[SetType::NORMAL, 3, 123.5]]);
-        $workout = $prescribed->getBlock()->getWorkout();
+        $workout = $prescribed->getBlock()?->getWorkout();
+        self::assertNotNull($workout);
 
         $this->client->loginUser($user);
 
         // 1. La page de la séance datée : le réalisé y est, c'est le seul endroit.
         $this->client->request('GET', '/schedule/'.$scheduled->getId());
-        self::assertStringContainsString('123,5', $this->client->getResponse()->getContent());
+        self::assertStringContainsString('123,5', (string) $this->client->getResponse()->getContent());
 
         // 2. La séance en bibliothèque : la recette, sans date, utilisée dans N plans.
         $this->client->request('GET', '/workout/'.$workout->getId());
         self::assertResponseIsSuccessful();
-        self::assertStringNotContainsString('123,5', $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('123,5', (string) $this->client->getResponse()->getContent());
         self::assertSelectorNotExists('.kd-settable--compared');
 
         // 3. La page de partage public.
         $this->client->request('GET', '/s/'.$workout->getSlug());
         self::assertResponseIsSuccessful();
-        self::assertStringNotContainsString('123,5', $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('123,5', (string) $this->client->getResponse()->getContent());
         self::assertSelectorNotExists('.kd-settable--compared');
 
         // 4. L'export Excel du mois.
         $this->client->request('GET', '/export/schedule/2026/7');
         self::assertResponseIsSuccessful();
-        self::assertStringNotContainsString('123,5', $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('123,5', (string) $this->client->getResponse()->getContent());
 
         // 5. Le flux ICS.
         $this->client->request('GET', '/feed/'.$user->getCalendarFeedToken().'.ics');
         self::assertResponseIsSuccessful();
-        self::assertStringNotContainsString('123,5', $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('123,5', (string) $this->client->getResponse()->getContent());
     }
 
     // --------------------------------------------------------- Fixtures

@@ -28,6 +28,8 @@ use Symfony\Component\Validator\Context\ExecutionContextInterface;
  * libre sous 4,5:1 avec le blanc est refusée avec son contraste mesuré, pour
  * que l'utilisateur sache de combien il doit assombrir. Les pastilles
  * (`ActivityPalette::SWATCHES`) passent toutes.
+ *
+ * @extends AbstractType<array<string, string>>
  */
 final class ActivityColorsType extends AbstractType
 {

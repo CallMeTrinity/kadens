@@ -186,6 +186,7 @@ final class TrainingHistoryImporter
                 continue;
             }
 
+            $notes = trim((string) ($entry['notes'] ?? ''));
             $logged = (new LoggedExercise())
                 ->setExercise($exercise)
                 // Le snapshot porte le nom **Kadens**, pas le libellé Blast :
@@ -195,7 +196,7 @@ final class TrainingHistoryImporter
                 ->setPosition($exercises)
                 // Le texte que la source portait et que le modèle ne sait pas
                 // ranger ailleurs (cf. l'en-tête de classe). Absent chez Blast.
-                ->setNotes(('' === trim((string) ($entry['notes'] ?? ''))) ? null : trim((string) $entry['notes']));
+                ->setNotes('' === $notes ? null : $notes);
 
             foreach ($entry['sets'] as $index => $set) {
                 $logged->addLoggedSet(

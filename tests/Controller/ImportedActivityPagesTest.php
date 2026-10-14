@@ -61,8 +61,8 @@ final class ImportedActivityPagesTest extends WebTestCase
 
         self::assertStringContainsString('Coureur Grenoblois', $crawler->filter('#intervals-panel')->text());
         self::assertCount(1, $crawler->filter('#intervals-panel form[action="/profile/intervals/sync"]'));
-        self::assertStringNotContainsString($connection->getSealedApiKey(), $this->client->getResponse()->getContent());
-        self::assertStringNotContainsString('cle-secrete', $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString($connection->getSealedApiKey(), (string) $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString('cle-secrete', (string) $this->client->getResponse()->getContent());
     }
 
     public function testConnectingWithoutACsrfTokenIsRefused(): void
@@ -107,13 +107,14 @@ final class ImportedActivityPagesTest extends WebTestCase
         $form = $crawler->filter('form[action="/schedule/'.$scheduled->getId().'/activity/'.$activity->getId().'/attach"]');
         self::assertCount(1, $form);
 
-        $this->client->request('POST', $form->attr('action'), ['_token' => $form->filter('input[name="_token"]')->attr('value')]);
+        $this->client->request('POST', (string) $form->attr('action'), ['_token' => $form->filter('input[name="_token"]')->attr('value')]);
         self::assertResponseRedirects('/schedule/'.$scheduled->getId());
 
         $this->em->clear();
         $reloaded = $this->em->find(ImportedActivity::class, $activity->getId());
+        self::assertNotNull($reloaded);
         self::assertSame($scheduled->getId(), $reloaded->getScheduledWorkout()?->getId());
-        self::assertSame(ScheduledStatus::DONE, $reloaded->getScheduledWorkout()->getStatus());
+        self::assertSame(ScheduledStatus::DONE, $reloaded->getScheduledWorkout()?->getStatus());
 
         $crawler = $this->client->request('GET', '/schedule/'.$scheduled->getId());
         self::assertStringContainsString('10 km', $crawler->filter('.kd-actimport')->text());
@@ -171,7 +172,7 @@ final class ImportedActivityPagesTest extends WebTestCase
         $crawler = $this->client->request('GET', '/schedule/'.$freeId);
         $form = $crawler->filter('form[action="/schedule/'.$freeId.'/activity/'.$activity->getId().'/detach"]');
 
-        $this->client->request('POST', $form->attr('action'), ['_token' => $form->filter('input[name="_token"]')->attr('value')]);
+        $this->client->request('POST', (string) $form->attr('action'), ['_token' => $form->filter('input[name="_token"]')->attr('value')]);
 
         self::assertResponseRedirects('/calendar/week/2026-09-12');
         $this->em->clear();
@@ -190,7 +191,7 @@ final class ImportedActivityPagesTest extends WebTestCase
         $crawler = $this->client->request('GET', '/schedule/'.$scheduled->getId());
         $form = $crawler->filter('form[action="/schedule/'.$scheduled->getId().'/activity/'.$activity->getId().'/detach"]');
 
-        $this->client->request('POST', $form->attr('action'), ['_token' => $form->filter('input[name="_token"]')->attr('value')]);
+        $this->client->request('POST', (string) $form->attr('action'), ['_token' => $form->filter('input[name="_token"]')->attr('value')]);
 
         self::assertResponseRedirects('/schedule/'.$scheduled->getId());
         $this->em->clear();
@@ -210,6 +211,7 @@ final class ImportedActivityPagesTest extends WebTestCase
         self::assertResponseStatusCodeSame(404);
     }
 
+    /** @param list<string> $roles */
     private function createUser(string $email, array $roles = []): User
     {
         $user = (new User())->setEmail($email)->setRoles($roles)->setPassword('x');

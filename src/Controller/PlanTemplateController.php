@@ -25,7 +25,6 @@ use App\Service\WorkoutCloner;
 use App\Service\WorkoutMetrics;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -49,7 +48,6 @@ final class PlanTemplateController extends AbstractController
 
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
-        private readonly FormFactoryInterface $formFactory,
         private readonly PlanFlattener $planFlattener,
         private readonly WorkoutRepository $workoutRepository,
         private readonly WorkoutMetrics $workoutMetrics,
@@ -126,8 +124,10 @@ final class PlanTemplateController extends AbstractController
 
         $title = trim($request->getPayload()->getString('title')) ?: self::DRAFT_PLAN_TITLE;
 
+        /** @var \App\Entity\User $user */
+        $user = $this->getUser();
         $template = (new PlanTemplate())
-            ->setOwner($this->getUser())
+            ->setOwner($user)
             ->setTitle($title)
             ->setDurationWeeks(self::DRAFT_PLAN_WEEKS)
             ->setSlug($slugGenerator->generate($title, PlanTemplate::class));
@@ -166,7 +166,7 @@ final class PlanTemplateController extends AbstractController
 
         // Précharge tout le contenu en une requête : la mise à plat ET les agrégats
         // de progression parcourent chaque case (anti-N+1). Même instance managée.
-        $loaded = $planTemplateRepository->findWithContent($template->getId()) ?? $template;
+        $loaded = $planTemplateRepository->findWithContent((int) $template->getId()) ?? $template;
 
         $owner = $template->getOwner();
         $anchors = null !== $owner ? $scheduledWorkoutRepository->findPlanAnchorsForOwner($template, $owner) : [];
@@ -394,19 +394,23 @@ final class PlanTemplateController extends AbstractController
             ->setOwner($owner)
             ->setTitle($template->getTitle().' (copie)')
             ->setDescription($template->getDescription())
-            ->setDurationWeeks($template->getDurationWeeks())
+            ->setDurationWeeks((int) $template->getDurationWeeks())
             ->setSlug($slugGenerator->generate($template->getTitle().' copie', PlanTemplate::class));
 
         // Chaque case porte sa PROPRE copie de séance (progression indépendante) :
         // on clone donc la copie locale, pas seulement le placement. Sans ça, les
         // deux plans partageraient les mêmes séances et s'éditeraient mutuellement.
         foreach ($template->getPlanItems() as $item) {
-            $workoutCopy = $cloner->cloneWorkout($item->getWorkout(), $owner, $item->getWorkout()->getTitle(), true);
+            $source = $item->getWorkout();
+            if (null === $source) {
+                continue;
+            }
+            $workoutCopy = $cloner->cloneWorkout($source, $owner, $source->getTitle(), true);
             $copy->addPlanItem(
                 (new PlanItem())
                     ->setWorkout($workoutCopy)
-                    ->setWeekNumber($item->getWeekNumber())
-                    ->setDayOfWeek($item->getDayOfWeek())
+                    ->setWeekNumber((int) $item->getWeekNumber())
+                    ->setDayOfWeek((int) $item->getDayOfWeek())
                     ->setNotes($item->getNotes())
             );
         }
@@ -635,10 +639,14 @@ final class PlanTemplateController extends AbstractController
 
             // 2) Cloner les cases de la source vers la cible.
             foreach ($sources as $item) {
-                $copy = $cloner->cloneWorkout($item->getWorkout(), $this->ownerOf($template), $item->getWorkout()->getTitle(), true);
+                $source = $item->getWorkout();
+                if (null === $source) {
+                    continue;
+                }
+                $copy = $cloner->cloneWorkout($source, $this->ownerOf($template), $source->getTitle(), true);
                 $newItem = (new PlanItem())
                     ->setWeekNumber($target)
-                    ->setDayOfWeek($item->getDayOfWeek())
+                    ->setDayOfWeek((int) $item->getDayOfWeek())
                     ->setNotes($item->getNotes())
                     ->setWorkout($copy);
                 $template->addPlanItem($newItem);
@@ -777,16 +785,6 @@ final class PlanTemplateController extends AbstractController
         }
 
         throw $this->createNotFoundException('Case introuvable dans ce plan.');
-    }
-
-    /**
-     * Vérifie qu'une case (semaine/jour) appartient bien à la trame déclarée.
-     */
-    private function assertCell(PlanTemplate $template, int $week, int $day): void
-    {
-        if ($week < 1 || $week > (int) $template->getDurationWeeks() || $day < 1 || $day > 7) {
-            throw $this->createNotFoundException('Cette case est hors de la trame du plan.');
-        }
     }
 
     /**

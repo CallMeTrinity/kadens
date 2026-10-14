@@ -40,7 +40,7 @@ final class WorkoutCloner
      */
     public function cloneWorkout(Workout $source, User $owner, ?string $title, bool $planLocal): Workout
     {
-        $title ??= $source->getTitle();
+        $title ??= (string) $source->getTitle();
 
         $copy = (new Workout())
             ->setOwner($owner)
@@ -53,9 +53,9 @@ final class WorkoutCloner
         // maintiennent les deux côtés (indispensable pour un re-rendu immédiat).
         foreach ($source->getBlocks() as $block) {
             $blockCopy = (new Block())
-                ->setRole($block->getRole())
-                ->setRounds($block->getRounds() ?? 1)
-                ->setPosition($block->getPosition())
+                ->setRole($block->getRole() ?? throw new \LogicException('Bloc source sans rôle.'))
+                ->setRounds($block->getRounds())
+                ->setPosition((int) $block->getPosition())
                 ->setLabel($block->getLabel());
 
             foreach ($block->getPrescribedExercises() as $prescribed) {
@@ -81,8 +81,8 @@ final class WorkoutCloner
     {
         $copy = (new PrescribedExercise())
             ->setExercise($source->getExercise())
-            ->setPrescriptionType($source->getPrescriptionType())
-            ->setPosition($source->getPosition())
+            ->setPrescriptionType($source->getPrescriptionType() ?? throw new \LogicException('Exercice prescrit source sans type.'))
+            ->setPosition((int) $source->getPosition())
             // Les liaisons de superset sont internes au bloc : le numéro reste
             // valable tel quel dans la copie.
             ->setSupersetGroup($source->getSupersetGroup())

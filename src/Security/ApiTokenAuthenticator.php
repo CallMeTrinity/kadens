@@ -54,7 +54,7 @@ final class ApiTokenAuthenticator extends AbstractAuthenticator implements Authe
      * poursuit en anonyme et `access_control` la refuse, ce qui appelle
      * `start()`. C'est ce qui laisse `^/api/auth` public sans exception ici.
      */
-    public function supports(Request $request): ?bool
+    public function supports(Request $request): bool
     {
         return str_starts_with($request->headers->get('Authorization', ''), self::SCHEME);
     }
@@ -98,7 +98,7 @@ final class ApiTokenAuthenticator extends AbstractAuthenticator implements Authe
         return null;
     }
 
-    public function onAuthenticationFailure(Request $request, AuthenticationException $exception): ?Response
+    public function onAuthenticationFailure(Request $request, AuthenticationException $exception): Response
     {
         return $this->unauthorized('Jeton absent ou invalide.');
     }

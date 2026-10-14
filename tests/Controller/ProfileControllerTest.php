@@ -15,6 +15,7 @@ use App\Enum\ActivityType;
 use App\Enum\ExerciseLanguage;
 use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
+use App\Tests\FindsEntities;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -27,6 +28,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
  */
 final class ProfileControllerTest extends WebTestCase
 {
+    use FindsEntities;
+
     private const CURRENT_PASSWORD = 'password';
 
     private KernelBrowser $client;
@@ -81,6 +84,7 @@ final class ProfileControllerTest extends WebTestCase
 
         $this->em->clear();
         $updated = $this->em->getRepository(User::class)->find($user->getId());
+        self::assertNotNull($updated);
         self::assertNotSame($oldHash, $updated->getPassword());
 
         $hasher = static::getContainer()->get(UserPasswordHasherInterface::class);
@@ -105,7 +109,7 @@ final class ProfileControllerTest extends WebTestCase
         self::assertStringContainsString('ne correspond pas à ton mot de passe actuel', $crawler->html());
 
         $this->em->clear();
-        self::assertSame($oldHash, $this->em->getRepository(User::class)->find($user->getId())->getPassword());
+        self::assertSame($oldHash, $this->mustFind(User::class, $user->getId())->getPassword());
     }
 
     public function testChangePasswordRejectsMismatchedRepeat(): void
@@ -121,7 +125,7 @@ final class ProfileControllerTest extends WebTestCase
         self::assertStringContainsString('ne correspondent pas', $crawler->html());
 
         $this->em->clear();
-        self::assertSame($oldHash, $this->em->getRepository(User::class)->find($user->getId())->getPassword());
+        self::assertSame($oldHash, $this->mustFind(User::class, $user->getId())->getPassword());
     }
 
     public function testChangePasswordRejectsTooShortPassword(): void
@@ -139,7 +143,7 @@ final class ProfileControllerTest extends WebTestCase
         self::assertGreaterThan(0, $crawler->filter('.kd-errors')->count());
 
         $this->em->clear();
-        self::assertSame($oldHash, $this->em->getRepository(User::class)->find($user->getId())->getPassword());
+        self::assertSame($oldHash, $this->mustFind(User::class, $user->getId())->getPassword());
     }
 
     public function testChangePasswordRejectsSamePassword(): void
@@ -350,9 +354,9 @@ final class ProfileControllerTest extends WebTestCase
         self::assertStringContainsString('150 kg', $sheet);
         self::assertStringContainsString('1 rep · 12/08/26', $sheet);
         self::assertStringNotContainsString('140 kg', $sheet, 'Le record déclaré est un plancher : battu, il ne s\'affiche plus.');
-        self::assertSame(
+        self::assertCount(
             1,
-            $crawler->filter('.kd-deflist--profile a[href="/exercise/'.$squat->getId().'"]')->count(),
+            $crawler->filter('.kd-deflist--profile a[href="/exercise/'.$squat->getId().'"]'),
             'La valeur mesurée ouvre l\'exercice qui l\'a produite.',
         );
     }
