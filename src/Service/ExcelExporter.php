@@ -124,7 +124,7 @@ final class ExcelExporter
             }
 
             $meta = ucfirst($item->getScheduledDate()->format('d/m/Y'))
-                .' · '.($item->getStatus()?->getLabel() ?? '');
+                .' · '.$item->getStatus()->getLabel();
             if (null !== $item->getCompletionNotes() && '' !== $item->getCompletionNotes()) {
                 $meta .= ' · '.$item->getCompletionNotes();
             }
@@ -174,7 +174,7 @@ final class ExcelExporter
 
         // En-tête de bloc : rôle, tours si >1, label éventuel.
         $heading = $block->getRole()?->getLabel() ?? '';
-        if (($block->getRounds() ?? 1) > 1) {
+        if ($block->getRounds() > 1) {
             $heading .= ' · '.$block->getRounds().' tours';
         }
         if (null !== $block->getLabel() && '' !== $block->getLabel()) {

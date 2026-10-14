@@ -48,12 +48,14 @@ final class SetSynchronizerTest extends TestCase
         $prescribed = $this->prescribed(4);
         $this->detail($prescribed, [SetType::WARMUP, SetType::NORMAL, SetType::NORMAL, SetType::NORMAL, SetType::NORMAL]);
         // Dernière série de travail : 8 reps @ 100 kg.
-        $prescribed->getDetailedSets()->last()->setReps(8)->setWeightKg(100.0);
+        $last = $prescribed->getDetailedSets()->last();
+        self::assertNotFalse($last);
+        $last->setReps(8)->setWeightKg(100.0);
 
         $created = $this->sync->applyScalarToDetailed($prescribed, 6);
 
         self::assertCount(2, $created);
-        self::assertSame(7, $prescribed->getDetailedSets()->count());
+        self::assertCount(7, $prescribed->getDetailedSets());
         self::assertSame(6, $prescribed->getWorkingSetCount());
         foreach ($created as $set) {
             self::assertSame(SetType::NORMAL, $set->getSetType());
@@ -70,8 +72,10 @@ final class SetSynchronizerTest extends TestCase
         $this->sync->applyScalarToDetailed($prescribed, 2);
 
         self::assertSame(2, $prescribed->getWorkingSetCount());
-        self::assertSame(3, $prescribed->getDetailedSets()->count());
-        self::assertSame(SetType::WARMUP, $prescribed->getDetailedSets()->first()->getSetType());
+        self::assertCount(3, $prescribed->getDetailedSets());
+        $first = $prescribed->getDetailedSets()->first();
+        self::assertNotFalse($first);
+        self::assertSame(SetType::WARMUP, $first->getSetType());
     }
 
     public function testLoweringToZeroKeepsOnlyTheWarmup(): void
@@ -82,7 +86,7 @@ final class SetSynchronizerTest extends TestCase
         $this->sync->applyScalarToDetailed($prescribed, 0);
 
         self::assertSame(0, $prescribed->getWorkingSetCount());
-        self::assertSame(1, $prescribed->getDetailedSets()->count());
+        self::assertCount(1, $prescribed->getDetailedSets());
     }
 
     public function testPositionsStayDenseAfterMutation(): void

@@ -9,6 +9,7 @@ use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ScheduledStatus;
+use App\Tests\FindsEntities;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -16,6 +17,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class CalendarControllerTest extends WebTestCase
 {
+    use FindsEntities;
+
     private KernelBrowser $client;
     private EntityManagerInterface $em;
 
@@ -88,7 +91,7 @@ final class CalendarControllerTest extends WebTestCase
         self::assertNotNull($scheduled);
         self::assertSame('2026-03-10', $scheduled->getScheduledDate()->format('Y-m-d'));
         self::assertSame(ScheduledStatus::PLANNED, $scheduled->getStatus());
-        self::assertSame($workout->getId(), $scheduled->getWorkout()->getId());
+        self::assertSame($workout->getId(), $scheduled->getWorkout()?->getId());
         self::assertResponseRedirects('/calendar/2026/3');
     }
 
@@ -138,6 +141,7 @@ final class CalendarControllerTest extends WebTestCase
 
         $this->em->clear();
         $moved = $this->em->getRepository(ScheduledWorkout::class)->find($scheduled->getId());
+        self::assertNotNull($moved);
         self::assertSame('2026-03-20', $moved->getScheduledDate()->format('Y-m-d'));
         self::assertResponseRedirects('/calendar/2026/3');
     }
@@ -205,14 +209,14 @@ final class CalendarControllerTest extends WebTestCase
         self::assertResponseRedirects('/schedule/'.$id);
 
         $this->em->clear();
-        self::assertSame(ScheduledStatus::DONE, $this->em->getRepository(ScheduledWorkout::class)->find($id)->getStatus());
+        self::assertSame(ScheduledStatus::DONE, $this->mustFind(ScheduledWorkout::class, $id)->getStatus());
 
         // Et la bascule fonctionne dans l'autre sens.
         $crawler = $this->client->request('GET', '/schedule/'.$id);
         $this->client->submit($crawler->filter('.kd-done__form')->form());
 
         $this->em->clear();
-        self::assertSame(ScheduledStatus::PLANNED, $this->em->getRepository(ScheduledWorkout::class)->find($id)->getStatus());
+        self::assertSame(ScheduledStatus::PLANNED, $this->mustFind(ScheduledWorkout::class, $id)->getStatus());
     }
 
     /**
@@ -239,7 +243,7 @@ final class CalendarControllerTest extends WebTestCase
         ], [], ['HTTP_ACCEPT' => 'text/vnd.turbo-stream.html, text/html']);
 
         self::assertResponseIsSuccessful();
-        $html = $this->client->getResponse()->getContent();
+        $html = (string) $this->client->getResponse()->getContent();
 
         self::assertStringContainsString('target="schedule-badge"', $html);
         self::assertStringContainsString('target="schedule-done"', $html);

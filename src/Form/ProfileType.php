@@ -23,6 +23,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  * ils portent ce qui a été fait avant l'app ou hors séance loguée, et le réalisé
  * les dépasse dès qu'il les bat (`AthleteRecords`). C'est pourquoi ils restent
  * éditables alors que la fiche se met à jour toute seule.
+ *
+ * @extends AbstractType<User>
  */
 class ProfileType extends AbstractType
 {

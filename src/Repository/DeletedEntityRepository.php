@@ -56,10 +56,10 @@ class DeletedEntityRepository extends ServiceEntityRepository
             ;
         }
 
-        return array_map(
+        return array_values(array_map(
             static fn (array $row): int => (int) $row['entityKey'],
             $qb->getQuery()->getScalarResult(),
-        );
+        ));
     }
 
     /**
@@ -84,7 +84,7 @@ class DeletedEntityRepository extends ServiceEntityRepository
             ->getScalarResult()
         ;
 
-        return array_map(static fn (array $row): string => (string) $row['entityKey'], $rows);
+        return array_values(array_map(static fn (array $row): string => (string) $row['entityKey'], $rows));
     }
 
     /**

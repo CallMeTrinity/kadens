@@ -517,7 +517,10 @@ final class LogComparator
         ];
 
         foreach ($axes as $one) {
-            foreach (['tonnageKg', 'reps', 'durationSeconds'] as $axis) {
+            if (null !== $one['tonnageKg']) {
+                $total['tonnageKg'] = ($total['tonnageKg'] ?? 0.0) + $one['tonnageKg'];
+            }
+            foreach (['reps', 'durationSeconds'] as $axis) {
                 if (null !== $one[$axis]) {
                     $total[$axis] = ($total[$axis] ?? 0) + $one[$axis];
                 }

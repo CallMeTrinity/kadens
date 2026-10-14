@@ -22,6 +22,8 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
  *
  * Un éventuel partage public en lecture (slug) passera par une route dédiée,
  * pas par ce voter.
+ *
+ * @extends Voter<string, PlanTemplate>
  */
 final class PlanTemplateVoter extends Voter
 {

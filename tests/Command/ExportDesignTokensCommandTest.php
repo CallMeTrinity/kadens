@@ -31,7 +31,7 @@ final class ExportDesignTokensCommandTest extends TestCase
         return (string) file_get_contents(self::projectDir().'/'.ExportDesignTokensCommand::SOURCE);
     }
 
-    /** @return array{primitives: array<string, string>, semantic: array<string, string>} */
+    /** @return array{primitives: array<string, string>, semantic: array<string, string>, themes: array{light: array<string, string>, dark: array<string, string>}} */
     private static function exported(): array
     {
         return json_decode(ExportDesignTokensCommand::render(self::css()), true);

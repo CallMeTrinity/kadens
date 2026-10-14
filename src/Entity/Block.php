@@ -23,7 +23,7 @@ class Block
     private ?BlockRole $role = null;
 
     #[ORM\Column(options: ['default' => 1])]
-    private ?int $rounds = 1;
+    private int $rounds = 1;
 
     #[ORM\Column]
     private ?int $position = null;
@@ -72,7 +72,7 @@ class Block
         return $this;
     }
 
-    public function getRounds(): ?int
+    public function getRounds(): int
     {
         return $this->rounds;
     }

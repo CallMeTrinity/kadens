@@ -47,7 +47,7 @@ final class WorkoutEstimator
             $seconds += $this->prescribedSeconds($prescribed);
         }
 
-        return $seconds * max(1, $block->getRounds() ?? 1);
+        return $seconds * max(1, $block->getRounds());
     }
 
     /**

@@ -86,14 +86,14 @@ final class CoachedLibrary
         $facets = [[
             'value' => (string) $user->getId(),
             'label' => 'Moi',
-            'count' => $countsByOwnerId[$user->getId()] ?? 0,
+            'count' => $countsByOwnerId[(int) $user->getId()] ?? 0,
         ]];
 
         foreach ($athletes as $athlete) {
             $facets[] = [
                 'value' => (string) $athlete->getId(),
                 'label' => $athlete->getUserIdentifier(),
-                'count' => $countsByOwnerId[$athlete->getId()] ?? 0,
+                'count' => $countsByOwnerId[(int) $athlete->getId()] ?? 0,
             ];
         }
 

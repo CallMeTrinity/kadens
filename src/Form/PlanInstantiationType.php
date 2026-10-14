@@ -17,6 +17,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  *
  * Les plans sont préchargés une fois par le contrôleur et passés via l'option
  * `planTemplates`.
+ *
+ * @extends AbstractType<array<string, mixed>>
  */
 class PlanInstantiationType extends AbstractType
 {

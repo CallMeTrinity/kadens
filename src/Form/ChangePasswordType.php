@@ -16,6 +16,8 @@ use Symfony\Component\Validator\Constraints\NotBlank;
  * mappé sur `User` : le hachage se fait dans le contrôleur (le formulaire ne
  * manipule que du clair). `UserPassword` vérifie l'ancien mot de passe contre
  * l'utilisateur connecté — le formulaire n'a donc de sens que dans le firewall.
+ *
+ * @extends AbstractType<array<string, mixed>>
  */
 class ChangePasswordType extends AbstractType
 {

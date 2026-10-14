@@ -60,6 +60,22 @@ use App\Enum\SetType;
  *
  * Le jour, lui, reste le jour **local** : une séance du 2 janvier au soir est du
  * 2 janvier au calendrier, quelle que soit sa traduction en UTC.
+ *
+ * @phpstan-type ParsedSession array{
+ *     sourceKey: string,
+ *     title: string,
+ *     startedAt: \DateTimeImmutable,
+ *     endedAt: \DateTimeImmutable|null,
+ *     loggedAt: \DateTimeImmutable,
+ *     date: \DateTimeImmutable,
+ *     entries: list<array{
+ *         key: string,
+ *         name: string,
+ *         equipment: string,
+ *         execution: string,
+ *         sets: list<array{setType: SetType, reps: int|null, weightKg: float|null, durationSeconds: int|null}>
+ *     }>
+ * }
  */
 final class BlastCsvParser
 {
@@ -90,27 +106,14 @@ final class BlastCsvParser
     /**
      * Les séances d'un export, dans l'ordre chronologique.
      *
-     * @return list<array{
-     *     sourceKey: string,
-     *     title: string,
-     *     startedAt: \DateTimeImmutable,
-     *     endedAt: \DateTimeImmutable|null,
-     *     loggedAt: \DateTimeImmutable,
-     *     date: \DateTimeImmutable,
-     *     entries: list<array{
-     *         key: string,
-     *         name: string,
-     *         equipment: string,
-     *         execution: string,
-     *         sets: list<array{setType: SetType, reps: int|null, weightKg: float|null, durationSeconds: int|null}>
-     *     }>
-     * }>
+     * @return list<ParsedSession>
      *
      * @throws \RuntimeException si le fichier est illisible ou mal formé
      */
     public function parse(string $file, string $timezone = self::DEFAULT_TIMEZONE): array
     {
         $tz = new \DateTimeZone($timezone);
+        /** @var array<string, ParsedSession> $sessions */
         $sessions = [];
 
         foreach ($this->rows($file) as $row) {
@@ -210,7 +213,7 @@ final class BlastCsvParser
 
             while (false !== ($cells = fgetcsv($handle, 0, $delimiter, '"', ''))) {
                 // Ligne vide en fin de fichier : `fgetcsv` rend `[null]`.
-                if ([null] === $cells || [] === $cells) {
+                if ([null] === $cells) {
                     continue;
                 }
 

@@ -5,6 +5,7 @@ namespace App\Tests\Command;
 use App\Entity\Exercise;
 use App\Entity\User;
 use App\Enum\ActivityType;
+use App\Tests\FindsEntities;
 use App\Tests\PurgesDatabase;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -23,6 +24,7 @@ use Symfony\Component\Console\Tester\CommandTester;
 final class GlobalizeAdminExercisesCommandTest extends KernelTestCase
 {
     use PurgesDatabase;
+    use FindsEntities;
 
     private EntityManagerInterface $em;
 
@@ -59,7 +61,7 @@ final class GlobalizeAdminExercisesCommandTest extends KernelTestCase
         self::assertStringContainsString('Simulation', $tester->getDisplay());
 
         $this->em->clear();
-        self::assertNotNull($this->em->find(Exercise::class, $exercise->getId())->getOwner());
+        self::assertNotNull($this->mustFind(Exercise::class, $exercise->getId())->getOwner());
     }
 
     public function testAnOrdinaryUserExerciseIsNeverTouched(): void
@@ -73,7 +75,7 @@ final class GlobalizeAdminExercisesCommandTest extends KernelTestCase
         self::assertStringContainsString('Aucun exercice perso', $tester->getDisplay());
 
         $this->em->clear();
-        self::assertNotNull($this->em->find(Exercise::class, $mine->getId())->getOwner());
+        self::assertNotNull($this->mustFind(Exercise::class, $mine->getId())->getOwner());
     }
 
     public function testANameAlreadyHeldByTheGlobalLibraryIsSkipped(): void
@@ -91,8 +93,8 @@ final class GlobalizeAdminExercisesCommandTest extends KernelTestCase
 
         $this->em->clear();
         // Le doublon reste perso — et surtout, il existe toujours.
-        self::assertNotNull($this->em->find(Exercise::class, $duplicate->getId())->getOwner());
-        self::assertNull($this->em->find(Exercise::class, $fresh->getId())->getOwner());
+        self::assertNotNull($this->mustFind(Exercise::class, $duplicate->getId())->getOwner());
+        self::assertNull($this->mustFind(Exercise::class, $fresh->getId())->getOwner());
     }
 
     /**
@@ -110,8 +112,8 @@ final class GlobalizeAdminExercisesCommandTest extends KernelTestCase
         $this->launch(['--force' => true]);
 
         $this->em->clear();
-        self::assertNull($this->em->find(Exercise::class, $published->getId())->getOwner());
-        self::assertNotNull($this->em->find(Exercise::class, $rejected->getId())->getOwner());
+        self::assertNull($this->mustFind(Exercise::class, $published->getId())->getOwner());
+        self::assertNotNull($this->mustFind(Exercise::class, $rejected->getId())->getOwner());
     }
 
     public function testTheUserFilterScopesTheRun(): void
@@ -124,8 +126,8 @@ final class GlobalizeAdminExercisesCommandTest extends KernelTestCase
         $this->launch(['--force' => true, '--user' => 'admin1@example.com']);
 
         $this->em->clear();
-        self::assertNull($this->em->find(Exercise::class, $mine->getId())->getOwner());
-        self::assertNotNull($this->em->find(Exercise::class, $theirs->getId())->getOwner());
+        self::assertNull($this->mustFind(Exercise::class, $mine->getId())->getOwner());
+        self::assertNotNull($this->mustFind(Exercise::class, $theirs->getId())->getOwner());
     }
 
     public function testANonAdminTargetIsRefused(): void
@@ -153,6 +155,7 @@ final class GlobalizeAdminExercisesCommandTest extends KernelTestCase
      */
     private function launch(array $arguments): CommandTester
     {
+        self::assertNotNull(self::$kernel);
         $tester = new CommandTester((new Application(self::$kernel))->find('app:exercise:globalize'));
         $tester->execute($arguments);
 

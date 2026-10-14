@@ -67,8 +67,8 @@ final class ScheduledWorkoutPayload
             // internes des séances qu'il a créées hors réseau, et c'est ce qui
             // rend `PUT /api/schedule/{uuid}` idempotent.
             'uuid' => (string) $scheduled->getUuid(),
-            'date' => $scheduled->getScheduledDate()?->format('Y-m-d'),
-            'status' => $scheduled->getStatus()?->value,
+            'date' => $scheduled->getScheduledDate()->format('Y-m-d'),
+            'status' => $scheduled->getStatus()->value,
             // Titre vivant → snapshot → « Séance libre » : jamais `workout.title`,
             // qui peut être null depuis que la FK est en SET NULL.
             'title' => $scheduled->getDisplayTitle(),

@@ -283,7 +283,7 @@ final class ExportDesignTokensCommand extends Command
             preg_match_all('/(--[a-zA-Z0-9_-]+)\s*:\s*([^;]+);/', $block, $matches, \PREG_SET_ORDER);
 
             foreach ($matches as $match) {
-                $declarations[$match[1]] = trim(preg_replace('/\s+/', ' ', $match[2]));
+                $declarations[$match[1]] = trim((string) preg_replace('/\s+/', ' ', $match[2]));
             }
         }
 

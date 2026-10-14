@@ -115,9 +115,9 @@ final class CoachingControllerTest extends WebTestCase
         $relation = $this->em->getRepository(Coaching::class)->findOneBy([]);
         self::assertNotNull($relation);
         self::assertSame(CoachingStatus::PENDING, $this->reload($relation)->getStatus());
-        self::assertSame('coach@example.com', $relation->getCoach()->getEmail());
-        self::assertSame('athlete@example.com', $relation->getAthlete()->getEmail());
-        self::assertSame($athlete->getId(), $this->reload($relation)->getRequestedBy()->getId());
+        self::assertSame('coach@example.com', $relation->getCoach()?->getEmail());
+        self::assertSame('athlete@example.com', $relation->getAthlete()?->getEmail());
+        self::assertSame($athlete->getId(), $this->reload($relation)->getRequestedBy()?->getId());
     }
 
     public function testRequestTowardsNonCoachIsRejected(): void
@@ -157,8 +157,8 @@ final class CoachingControllerTest extends WebTestCase
 
         $relation = $this->em->getRepository(Coaching::class)->findOneBy([]);
         self::assertNotNull($relation);
-        self::assertSame($coach->getId(), $relation->getCoach()->getId());
-        self::assertSame($coach->getId(), $relation->getRequestedBy()->getId());
+        self::assertSame($coach->getId(), $relation->getCoach()?->getId());
+        self::assertSame($coach->getId(), $relation->getRequestedBy()?->getId());
     }
 
     public function testRecipientCanAcceptRequest(): void
@@ -246,7 +246,7 @@ final class CoachingControllerTest extends WebTestCase
 
         self::assertCount(1, $this->em->getRepository(Coaching::class)->findAll());
         self::assertSame(CoachingStatus::PENDING, $this->reload($relation)->getStatus());
-        self::assertSame($athlete->getId(), $this->reload($relation)->getRequestedBy()->getId());
+        self::assertSame($athlete->getId(), $this->reload($relation)->getRequestedBy()?->getId());
     }
 
     public function testDuplicatePendingRequestIsRejected(): void
@@ -294,7 +294,10 @@ final class CoachingControllerTest extends WebTestCase
      */
     private function reload(Coaching $relation): Coaching
     {
-        return $this->em->getRepository(Coaching::class)->find($relation->getId());
+        $reloaded = $this->em->getRepository(Coaching::class)->find($relation->getId());
+        self::assertNotNull($reloaded);
+
+        return $reloaded;
     }
 
     /** Jeton d'une action portée par une carte de relation, lu depuis /coaching. */
@@ -302,7 +305,7 @@ final class CoachingControllerTest extends WebTestCase
     {
         $crawler = $this->client->request('GET', '/coaching');
 
-        return $crawler
+        return (string) $crawler
             ->filter(sprintf('form[action$="/coaching/%d/%s"] input[name="_token"]', $relation->getId(), $action))
             ->first()
             ->attr('value');

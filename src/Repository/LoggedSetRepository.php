@@ -273,7 +273,7 @@ class LoggedSetRepository extends ServiceEntityRepository
                 ->setParameter('windowEnd', $end, \Doctrine\DBAL\Types\Types::DATE_IMMUTABLE);
         }
 
-        return array_map(static function (array $row): array {
+        return array_values(array_map(static function (array $row): array {
             $date = $row['date'];
 
             return [
@@ -284,7 +284,7 @@ class LoggedSetRepository extends ServiceEntityRepository
                 'unloadedReps' => (int) $row['unloadedReps'],
                 'duration' => (int) $row['duration'],
             ];
-        }, $qb->getQuery()->getArrayResult());
+        }, $qb->getQuery()->getArrayResult()));
     }
 
     /**
@@ -325,7 +325,7 @@ class LoggedSetRepository extends ServiceEntityRepository
             ->groupBy('s.scheduledDate')
             ->orderBy('s.scheduledDate', 'ASC');
 
-        return array_map(static fn (array $row): array => [
+        return array_values(array_map(static fn (array $row): array => [
             'date' => $row['date'] instanceof \DateTimeImmutable
                 ? $row['date']
                 : new \DateTimeImmutable((string) $row['date']),
@@ -335,7 +335,7 @@ class LoggedSetRepository extends ServiceEntityRepository
             'seconds' => (int) $row['seconds'],
             'rpeSum' => (int) $row['rpeSum'],
             'rpeCount' => (int) $row['rpeCount'],
-        ], $qb->getQuery()->getArrayResult());
+        ], $qb->getQuery()->getArrayResult()));
     }
 
     /**
@@ -376,14 +376,14 @@ class LoggedSetRepository extends ServiceEntityRepository
             ->addGroupBy('orphanName')
             ->orderBy('workingSets', 'DESC');
 
-        return array_map(static fn (array $row): array => [
+        return array_values(array_map(static fn (array $row): array => [
             'exerciseId' => null !== $row['exerciseId'] ? (int) $row['exerciseId'] : null,
             'name' => (string) $row['name'],
             'workingSets' => (int) $row['workingSets'],
             'tonnageKg' => (float) $row['tonnage'],
             'topWeightKg' => null !== $row['topWeight'] ? (float) $row['topWeight'] : null,
             'sessions' => (int) $row['sessions'],
-        ], $qb->getQuery()->getArrayResult());
+        ], $qb->getQuery()->getArrayResult()));
     }
 
     /**
@@ -477,11 +477,11 @@ class LoggedSetRepository extends ServiceEntityRepository
             ->addGroupBy('exerciseId')
             ->orderBy('s.id', 'ASC');
 
-        return array_map(static fn (array $row): array => [
+        return array_values(array_map(static fn (array $row): array => [
             'scheduledId' => (int) $row['scheduledId'],
             'exerciseId' => null !== $row['exerciseId'] ? (int) $row['exerciseId'] : null,
             'workingSets' => (int) $row['workingSets'],
-        ], $qb->getQuery()->getArrayResult());
+        ], $qb->getQuery()->getArrayResult()));
     }
 
     /**
@@ -673,13 +673,13 @@ class LoggedSetRepository extends ServiceEntityRepository
      * `enumType` et une colonne date reviennent déjà convertis ou sous leur
      * forme brute. On ne laisse pas ce doute remonter jusqu'au service.
      *
-     * @param list<array<string, mixed>> $rows
+     * @param array<array<string, mixed>> $rows
      *
      * @return list<PerfRow>
      */
     private function hydrateRows(array $rows): array
     {
-        return array_map(static function (array $row): array {
+        return array_values(array_map(static function (array $row): array {
             $date = $row['date'];
             $type = $row['setType'];
 
@@ -695,6 +695,6 @@ class LoggedSetRepository extends ServiceEntityRepository
                 'durationSeconds' => null !== $row['durationSeconds'] ? (int) $row['durationSeconds'] : null,
                 'rpe' => null !== $row['rpe'] ? (int) $row['rpe'] : null,
             ];
-        }, $rows);
+        }, $rows));
     }
 }

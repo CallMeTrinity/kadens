@@ -300,7 +300,7 @@ final class ApiPairingTest extends WebTestCase
             'POST',
             '/api/auth/pair',
             server: ['CONTENT_TYPE' => 'application/json'],
-            content: json_encode($body),
+            content: json_encode($body, \JSON_THROW_ON_ERROR),
         );
 
         self::assertResponseStatusCodeSame(400);
@@ -410,7 +410,7 @@ final class ApiPairingTest extends WebTestCase
             'POST',
             '/api/auth/pair',
             server: ['CONTENT_TYPE' => 'application/json'],
-            content: json_encode($extra + ['code' => $code, 'deviceName' => $deviceName]),
+            content: json_encode($extra + ['code' => $code, 'deviceName' => $deviceName], \JSON_THROW_ON_ERROR),
         );
     }
 
@@ -419,7 +419,7 @@ final class ApiPairingTest extends WebTestCase
      */
     private function json(): array
     {
-        return json_decode($this->client->getResponse()->getContent(), true);
+        return json_decode((string) $this->client->getResponse()->getContent(), true);
     }
 
     private function createUser(string $email): User

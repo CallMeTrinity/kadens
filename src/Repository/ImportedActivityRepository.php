@@ -47,7 +47,7 @@ class ImportedActivityRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleColumnResult();
 
-        return array_map('strval', $rows);
+        return array_values(array_map('strval', $rows));
     }
 
     /**
@@ -109,7 +109,7 @@ class ImportedActivityRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleColumnResult();
 
-        return array_map('intval', $rows);
+        return array_values(array_map('intval', $rows));
     }
 
     /**
@@ -137,13 +137,13 @@ class ImportedActivityRepository extends ServiceEntityRepository
             ->getQuery()
             ->getArrayResult();
 
-        return array_map(static fn (array $row): array => [
+        return array_values(array_map(static fn (array $row): array => [
             'scheduledId' => (int) $row['sid'],
             'activity' => $row['activity'] instanceof ActivityType
                 ? $row['activity']
                 : ActivityType::from((string) $row['activity']),
             'activities' => (int) $row['activities'],
-        ], $rows);
+        ], $rows));
     }
 
     /**
@@ -208,7 +208,7 @@ class ImportedActivityRepository extends ServiceEntityRepository
     }
 
     /**
-     * @param list<array<string, mixed>> $rows
+     * @param array<array<string, mixed>> $rows
      *
      * @return array<int, array<string, array{meters: int, seconds: int}>>
      */

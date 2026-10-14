@@ -109,7 +109,7 @@ class ExerciseRepository extends ServiceEntityRepository
             ->getScalarResult()
         ;
 
-        return array_map(static fn (array $row): int => (int) $row['id'], $rows);
+        return array_values(array_map(static fn (array $row): int => (int) $row['id'], $rows));
     }
 
     /**

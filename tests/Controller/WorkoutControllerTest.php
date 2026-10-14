@@ -20,6 +20,7 @@ use App\Enum\PrescriptionType;
 use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
 use App\Enum\TargetArea;
+use App\Tests\FindsEntities;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -27,6 +28,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class WorkoutControllerTest extends WebTestCase
 {
+    use FindsEntities;
+
     private KernelBrowser $client;
     private EntityManagerInterface $em;
 
@@ -99,15 +102,16 @@ final class WorkoutControllerTest extends WebTestCase
         $created = $this->em->getRepository(Workout::class)->findOneBy(['title' => 'Nouvelle séance']);
         self::assertNotNull($created);
         $id = $created->getId();
+        self::assertNotNull($id);
 
         $this->renameWorkout($id, 'Séance jambes');
         $this->em->clear();
-        self::assertSame('seance-jambes', $this->em->getRepository(Workout::class)->find($id)->getSlug());
+        self::assertSame('seance-jambes', $this->mustFind(Workout::class, $id)->getSlug());
 
         // Second renommage : le slug ne bouge plus.
         $this->renameWorkout($id, 'Séance jambes lourdes');
         $this->em->clear();
-        self::assertSame('seance-jambes', $this->em->getRepository(Workout::class)->find($id)->getSlug());
+        self::assertSame('seance-jambes', $this->mustFind(Workout::class, $id)->getSlug());
     }
 
     private function renameWorkout(int $id, string $title): void
@@ -136,8 +140,11 @@ final class WorkoutControllerTest extends WebTestCase
 
         $this->em->clear();
         $workout = $this->em->getRepository(Workout::class)->find($workout->getId());
+        self::assertNotNull($workout);
         self::assertCount(1, $workout->getBlocks());
-        $blockId = $workout->getBlocks()->first()->getId();
+        $block = $workout->getBlocks()->first();
+        self::assertNotFalse($block);
+        $blockId = $block->getId();
 
         // Ajout express depuis la bibliothèque (type SETS_REPS par défaut) : le
         // « + »/glisser-déposer poste le formulaire caché quick-add.
@@ -208,7 +215,7 @@ final class WorkoutControllerTest extends WebTestCase
         $prescribed = $this->em->getRepository(PrescribedExercise::class)->findOneBy([]);
         self::assertNotNull($prescribed);
         self::assertSame(PrescriptionType::SETS_REPS, $prescribed->getPrescriptionType());
-        self::assertSame($blockId, $prescribed->getBlock()->getId());
+        self::assertSame($blockId, $prescribed->getBlock()?->getId());
         self::assertNull($prescribed->getSets(), 'Ajout express : aucune valeur posée, à affiner ensuite.');
     }
 
@@ -279,8 +286,10 @@ final class WorkoutControllerTest extends WebTestCase
 
         $this->em->clear();
         $moved = $this->em->getRepository(PrescribedExercise::class)->find($movedId);
+        self::assertNotNull($moved);
         $anchor = $this->em->getRepository(PrescribedExercise::class)->find($anchorId);
-        self::assertSame($blockBId, $moved->getBlock()->getId(), 'Doit changer de bloc.');
+        self::assertNotNull($anchor);
+        self::assertSame($blockBId, $moved->getBlock()?->getId(), 'Doit changer de bloc.');
         // Positions denses 0..n : anchor (0) puis moved (1).
         self::assertSame(0, $anchor->getPosition());
         self::assertSame(1, $moved->getPosition());
@@ -317,7 +326,7 @@ final class WorkoutControllerTest extends WebTestCase
         );
 
         self::assertResponseIsSuccessful();
-        $content = $this->client->getResponse()->getContent();
+        $content = (string) $this->client->getResponse()->getContent();
         self::assertStringContainsString('<turbo-stream action="update" target="workout-blocks">', $content);
         self::assertStringContainsString('Fentes', $content);
     }
@@ -783,6 +792,7 @@ final class WorkoutControllerTest extends WebTestCase
         $this->client->request('POST', $addUrl, ['_token' => $addToken]);
         $this->em->clear();
         $reloaded = $this->em->getRepository(PrescribedExercise::class)->find($prescribedId);
+        self::assertNotNull($reloaded);
         self::assertCount(4, $reloaded->getDetailedSets());
         self::assertSame(4, $reloaded->getSets());
 
@@ -791,6 +801,7 @@ final class WorkoutControllerTest extends WebTestCase
         $this->client->request('POST', $addUrl, ['_token' => $addToken]);
         $this->em->clear();
         $reloaded = $this->em->getRepository(PrescribedExercise::class)->find($prescribedId);
+        self::assertNotNull($reloaded);
         self::assertSame(6, $reloaded->getSets());
 
         // Retour au mode simple : on repart de 6, pas de 4.
@@ -801,6 +812,7 @@ final class WorkoutControllerTest extends WebTestCase
 
         $this->em->clear();
         $reloaded = $this->em->getRepository(PrescribedExercise::class)->find($prescribedId);
+        self::assertNotNull($reloaded);
         self::assertCount(0, $reloaded->getDetailedSets());
         self::assertSame(6, $reloaded->getSets());
     }

@@ -17,6 +17,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  *
  * Pour les unités « m:ss », un nombre simple est aussi accepté et interprété en
  * minutes (« 5 » -> 5:00, « 5,5 » -> 5:30).
+ *
+ * @extends AbstractType<int|null>
  */
 final class PaceType extends AbstractType
 {

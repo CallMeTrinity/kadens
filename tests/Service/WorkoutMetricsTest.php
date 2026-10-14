@@ -247,11 +247,11 @@ final class WorkoutMetricsTest extends TestCase
         // Une moyenne simple donnerait 7,5 ; pondérée par les séries : 8.
         $squat = $this->prescribed(ActivityType::GYM, PrescriptionType::SETS_REPS, [TargetArea::QUADRICEPS]);
         $squat->setSets(4)->setReps(5)->setWeightKg(120.0)->setRpe(9);
-        $squat->getExercise()->setName('Squat');
+        $squat->getExercise()?->setName('Squat');
 
         $curl = $this->prescribed(ActivityType::GYM, PrescriptionType::SETS_REPS, [TargetArea::BICEPS]);
         $curl->setSets(2)->setReps(12)->setWeightKg(20.0)->setRpe(6);
-        $curl->getExercise()->setName('Curl');
+        $curl->getExercise()?->setName('Curl');
 
         $workout = $this->workout([$this->block(BlockRole::MAIN, 1, [$squat, $curl])]);
         $summary = $this->metrics->summary($workout);

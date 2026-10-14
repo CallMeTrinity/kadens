@@ -152,7 +152,7 @@ final class ApiAuthEndpointsTest extends WebTestCase
 
         $this->client->request('GET', '/api/me', server: ['HTTP_AUTHORIZATION' => 'Bearer '.$secret]);
         self::assertResponseIsSuccessful();
-        self::assertStringNotContainsString($secret, $this->client->getResponse()->getContent());
+        self::assertStringNotContainsString($secret, (string) $this->client->getResponse()->getContent());
     }
 
     /**
@@ -232,7 +232,7 @@ final class ApiAuthEndpointsTest extends WebTestCase
                 'email' => 'athlete@example.com',
                 'password' => 'password',
                 'deviceName' => 'Pixel 8',
-            ]),
+            ], \JSON_THROW_ON_ERROR),
         );
 
         self::assertResponseStatusCodeSame(401);
@@ -405,7 +405,7 @@ final class ApiAuthEndpointsTest extends WebTestCase
             'POST',
             $uri,
             server: ['CONTENT_TYPE' => 'application/json'],
-            content: json_encode($body),
+            content: json_encode($body, \JSON_THROW_ON_ERROR),
         );
     }
 
@@ -414,7 +414,7 @@ final class ApiAuthEndpointsTest extends WebTestCase
      */
     private function json(): array
     {
-        return json_decode($this->client->getResponse()->getContent(), true);
+        return json_decode((string) $this->client->getResponse()->getContent(), true);
     }
 
     private function issueToken(User $owner, string $deviceName = 'Pixel de test'): string

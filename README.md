@@ -54,6 +54,17 @@ Un service Mailpit est disponible en dev (`compose.override.yaml`) pour intercep
 vendor/bin/phpunit
 ```
 
+## Analyse statique
+
+PHPStan au niveau 8, avec les extensions Symfony, Doctrine et PHPUnit
+(configuration : [`phpstan.dist.neon`](./phpstan.dist.neon)). Il lit le
+conteneur compilé de l'env `dev` : le régénérer après un changement de services.
+
+```bash
+php bin/console cache:warmup --env=dev
+composer phpstan
+```
+
 ## Déploiement
 
 Le déploiement est automatisé via [`.github/workflows/deploy.yml`](./.github/workflows/deploy.yml) : à chaque push sur `main`, le build et les tests tournent, puis un déploiement vers l'hébergement mutualisé Infomaniak attend une validation manuelle dans l'onglet Actions avant d'être exécuté (rsync + migrations + cache warmup côté serveur).

@@ -29,6 +29,8 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
  * En Phase 6 (page publique en lecture seule), la règle VIEW évoluera encore
  * (lecture publique si l'exercice est publié). La séparation des attributs est
  * là pour ça.
+ *
+ * @extends Voter<string, Exercise>
  */
 final class ExerciseVoter extends Voter
 {

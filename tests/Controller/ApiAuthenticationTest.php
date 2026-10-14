@@ -41,8 +41,8 @@ final class ApiAuthenticationTest extends WebTestCase
         $this->request($secret);
 
         self::assertResponseIsSuccessful();
-        self::assertJson($this->client->getResponse()->getContent());
-        self::assertSame('athlete@example.com', json_decode($this->client->getResponse()->getContent(), true)['user']);
+        self::assertJson((string) $this->client->getResponse()->getContent());
+        self::assertSame('athlete@example.com', json_decode((string) $this->client->getResponse()->getContent(), true)['user']);
     }
 
     /**
@@ -120,6 +120,7 @@ final class ApiAuthenticationTest extends WebTestCase
         $secret = $this->issueToken($user, new \DateTimeImmutable('-30 days'));
 
         $before = $this->em->getRepository(ApiToken::class)->findOneByPlainToken($secret);
+        self::assertNotNull($before);
         self::assertNull($before->getLastUsedAt());
         $initialExpiry = $before->getExpiresAt();
 
@@ -128,6 +129,7 @@ final class ApiAuthenticationTest extends WebTestCase
 
         $this->em->clear();
         $after = $this->em->getRepository(ApiToken::class)->findOneByPlainToken($secret);
+        self::assertNotNull($after);
 
         self::assertNotNull($after->getLastUsedAt());
         self::assertGreaterThan($initialExpiry, $after->getExpiresAt());

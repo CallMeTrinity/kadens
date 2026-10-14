@@ -14,6 +14,9 @@ use App\Service\LogMetrics;
 use App\Service\RegionBreakdown;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @phpstan-import-type LogSummary from LogMetrics
+ */
 final class LogMetricsTest extends TestCase
 {
     private LogMetrics $metrics;
@@ -192,7 +195,7 @@ final class LogMetricsTest extends TestCase
             [SetType::NORMAL, 12, 20.0],
         ]);
 
-        $regions = $this->metrics->summary($this->scheduled([$squat, $curl]))['regions'];
+        $regions = $this->summaryOf($this->scheduled([$squat, $curl]))['regions'];
 
         self::assertCount(2, $regions);
         self::assertSame(TargetRegion::LOWER_BODY, $regions[0]['region']);
@@ -209,15 +212,15 @@ final class LogMetricsTest extends TestCase
 
         // Séance commencée, pas encore finie : une durée « jusqu'à maintenant »
         // bougerait à chaque rafraîchissement.
-        self::assertNull($this->metrics->summary($scheduled)['durationSeconds']);
+        self::assertNull($this->summaryOf($scheduled)['durationSeconds']);
 
         $scheduled->setEndedAt(new \DateTimeImmutable('2026-07-30 19:20:00'));
-        self::assertSame(4500, $this->metrics->summary($scheduled)['durationSeconds']);
+        self::assertSame(4500, $this->summaryOf($scheduled)['durationSeconds']);
 
         // Horloge du téléphone rattrapée entre les deux écritures : on plafonne
         // à 0 plutôt que d'afficher une durée négative.
         $scheduled->setEndedAt(new \DateTimeImmutable('2026-07-30 18:04:00'));
-        self::assertSame(0, $this->metrics->summary($scheduled)['durationSeconds']);
+        self::assertSame(0, $this->summaryOf($scheduled)['durationSeconds']);
     }
 
     public function testLoggedAtFallsBackOnTheLastCompletedSet(): void
@@ -226,22 +229,22 @@ final class LogMetricsTest extends TestCase
             [SetType::NORMAL, 5, 100.0],
             [SetType::NORMAL, 5, 100.0],
         ]);
-        $sets = $logged->getLoggedSets();
-        $sets[0]->setCompletedAt(new \DateTimeImmutable('2026-07-30 18:10:00'));
-        $sets[1]->setCompletedAt(new \DateTimeImmutable('2026-07-30 18:14:00'));
+        [$first, $second] = $logged->getLoggedSets()->getValues();
+        $first->setCompletedAt(new \DateTimeImmutable('2026-07-30 18:10:00'));
+        $second->setCompletedAt(new \DateTimeImmutable('2026-07-30 18:14:00'));
 
         // Saisie a posteriori : pas de bornes, les séries portent seules la date.
         $scheduled = $this->scheduled([$logged]);
         self::assertEquals(
             new \DateTimeImmutable('2026-07-30 18:14:00'),
-            $this->metrics->summary($scheduled)['loggedAt'],
+            $this->summaryOf($scheduled)['loggedAt'],
         );
 
         // La fin d'exécution, quand elle existe, prime.
         $scheduled->setEndedAt(new \DateTimeImmutable('2026-07-30 18:30:00'));
         self::assertEquals(
             new \DateTimeImmutable('2026-07-30 18:30:00'),
-            $this->metrics->summary($scheduled)['loggedAt'],
+            $this->summaryOf($scheduled)['loggedAt'],
         );
     }
 
@@ -249,7 +252,7 @@ final class LogMetricsTest extends TestCase
     {
         // C'est ce qui permet au bandeau de KPI de `_workout_read` de se rendre
         // tel quel sur du réalisé : les clés du prescrit doivent toutes exister.
-        $summary = $this->metrics->summary($this->scheduled([
+        $summary = $this->summaryOf($this->scheduled([
             $this->logged('Squat', [TargetArea::QUADRICEPS], [[SetType::NORMAL, 5, 100.0]]),
         ]));
 
@@ -281,8 +284,21 @@ final class LogMetricsTest extends TestCase
     }
 
     /**
+     * Le résumé d'une séance qui a du réalisé : null serait ici un échec.
+     *
+     * @return LogSummary
+     */
+    private function summaryOf(ScheduledWorkout $scheduled): array
+    {
+        $summary = $this->metrics->summary($scheduled);
+        self::assertNotNull($summary);
+
+        return $summary;
+    }
+
+    /**
      * @param list<TargetArea>                                              $areas
-     * @param list<array{SetType, int|null, float|null, 3?: int, 4?: int}> $sets type, reps, charge, RPE, durée
+     * @param list<array{SetType, int|null, float|null, 3?: int|null, 4?: int}> $sets type, reps, charge, RPE, durée
      */
     private function logged(string $name, array $areas, array $sets): LoggedExercise
     {

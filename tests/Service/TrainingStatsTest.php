@@ -218,6 +218,7 @@ final class TrainingStatsTest extends KernelTestCase
     {
         $bench = $this->em->getRepository(Exercise::class)->findOneBy(['name' => 'Développé couché']);
         $outing = $this->em->getRepository(ScheduledWorkout::class)->findOneBy(['scheduledDate' => new \DateTimeImmutable('2026-07-20')]);
+        self::assertNotNull($outing);
 
         $free = (new ScheduledWorkout())
             ->setOwner($this->user)
@@ -339,6 +340,7 @@ final class TrainingStatsTest extends KernelTestCase
     public function testRenamingAnExerciseDoesNotSplitItsRecordLine(): void
     {
         $bench = $this->em->getRepository(Exercise::class)->findOneBy(['name' => 'Développé couché']);
+        self::assertNotNull($bench);
 
         $this->schedule(
             $this->gymWorkout($bench, 'Haut du corps (après renommage)'),
@@ -563,7 +565,7 @@ final class TrainingStatsTest extends KernelTestCase
         $workout = (new Workout())
             ->setOwner($this->user)
             ->setTitle($title)
-            ->setSlug(strtolower(preg_replace('/[^a-z]+/i', '-', $title)).'-'.bin2hex(random_bytes(4)));
+            ->setSlug(strtolower((string) preg_replace('/[^a-z]+/i', '-', $title)).'-'.bin2hex(random_bytes(4)));
 
         $block = (new Block())->setRole(BlockRole::MAIN)->setRounds(1)->setPosition(0);
         $block->addPrescribedExercise(
@@ -597,13 +599,18 @@ final class TrainingStatsTest extends KernelTestCase
         }
 
         if ([] !== $sets) {
-            $exercise = $workout->getBlocks()->first()->getPrescribedExercises()->first()->getExercise();
+            $block = $workout->getBlocks()->first();
+            self::assertNotFalse($block);
+            $prescribed = $block->getPrescribedExercises()->first();
+            self::assertNotFalse($prescribed);
+            $exercise = $prescribed->getExercise();
+            self::assertNotNull($exercise);
 
             // Le nom figé se surcharge : c'est ce qui permet de rejouer un
             // renommage, où deux séances du même exercice ne portent pas le
             // même instantané.
             $logged = (new LoggedExercise())
-                ->setExerciseName($loggedName ?? $exercise->getName())
+                ->setExerciseName($loggedName ?? (string) $exercise->getName())
                 ->setExercise($exercise)
                 ->setPosition(0);
 

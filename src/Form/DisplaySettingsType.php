@@ -23,6 +23,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  * Pas de `placeholder` : les deux champs sont NOT NULL sur `User`. Un affichage
  * n'a pas de « non renseigné », contrairement au reste de la fiche athlète — et
  * c'est ce qui distingue `bodySilhouette` de `sex`, qui vit dans cette fiche.
+ *
+ * @extends AbstractType<User>
  */
 final class DisplaySettingsType extends AbstractType
 {

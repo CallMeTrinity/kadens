@@ -73,6 +73,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     // défaut, y compris s'il change un jour. Réglage du LECTEUR, comme la
     // silhouette : il colore tout ce que l'on regarde, son contenu ou celui d'un
     // autre.
+    /** @var array<string, string>|null */
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $activityColors = null;
 
@@ -274,7 +275,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
      */
     public function getUserIdentifier(): string
     {
-        return (string) $this->email;
+        // Le contrat Symfony exige un identifiant non vide ; un compte se crée
+        // toujours en console avec son email (cf. app:user:create).
+        if (null === $this->email || '' === $this->email) {
+            throw new \LogicException('Utilisateur sans email : identifiant indisponible.');
+        }
+
+        return $this->email;
     }
 
     /**
@@ -320,7 +327,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function __serialize(): array
     {
         $data = (array) $this;
-        $data["\0".self::class."\0password"] = hash('crc32c', $this->password);
+        $data["\0".self::class."\0password"] = hash('crc32c', (string) $this->password);
 
         return $data;
     }

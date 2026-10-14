@@ -58,6 +58,8 @@ final class AthleteRecords
      * sinon la fiche afficherait un total que ses propres lignes contredisent.
      *
      * @return array{rows: list<RecordRow>, sbdTotalKg: float|null}
+     *
+     * @phpstan-impure lit le réalisé en base : deux appels peuvent différer
      */
     public function strengthFor(User $user): array
     {

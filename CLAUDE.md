@@ -41,6 +41,12 @@ Intervals.icu ; celui de la muscu, lui, se logue série par série — cf. §3.
 - **Docker** en dev uniquement. Prod = **hébergement mutualisé Infomaniak**
   (`kadens.antoninpamart.fr`), pas de conteneurs, pas de root.
 - CI/CD GitHub Actions, déploiement manuel validé (rsync + migrations + cache).
+- **PHPStan niveau 8** (extensions Symfony, Doctrine, PHPUnit), job CI bloquant
+  pour le déploiement. Entités au format maker assumé
+  (`allowNullablePropertyForRequiredField`) : un getter nullable sur colonne
+  obligatoire se traite chez l'appelant, sauf s'il ne peut jamais rendre `null`
+  (défaut ou constructeur), auquel cas on resserre le getter. En test, relire une
+  entité passe par `FindsEntities::mustFind()`. Pas de baseline : rester à 0.
 - **Intervals.icu** : la seule API tierce appelée en prod (import du réalisé
   cardio, clé d'API par utilisateur, chiffrée par `SecretBox` avec
   `APP_SECRET_BOX_KEY`). À ne pas confondre avec la règle « aucune IA ».

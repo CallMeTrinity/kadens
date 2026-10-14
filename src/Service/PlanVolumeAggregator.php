@@ -59,11 +59,11 @@ final class PlanVolumeAggregator
         }
 
         foreach ($template->getPlanItems() as $item) {
-            $week = $item->getWeekNumber();
-            if (!isset($raw[$week])) {
+            $week = (int) $item->getWeekNumber();
+            $workout = $item->getWorkout();
+            if (!isset($raw[$week]) || null === $workout) {
                 continue;
             }
-            $workout = $item->getWorkout();
             $vol = $this->metrics->volume($workout);
 
             ++$raw[$week]['sessions'];

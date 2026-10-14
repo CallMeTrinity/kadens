@@ -130,7 +130,7 @@ final class BackfillLogsCommand extends Command
             }
 
             $rows[] = [
-                $scheduled->getScheduledDate()?->format('d/m/Y') ?? '—',
+                $scheduled->getScheduledDate()->format('d/m/Y'),
                 $this->titleOf($scheduled),
                 $scheduled->getOwner()?->getEmail() ?? '—',
                 \count($logged),

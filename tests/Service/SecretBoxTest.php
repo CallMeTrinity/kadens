@@ -34,6 +34,7 @@ final class SecretBoxTest extends TestCase
     {
         $box = new SecretBox(self::KEY);
         $raw = base64_decode($box->seal('clé'), true);
+        self::assertNotFalse($raw);
         $raw[\strlen($raw) - 1] = \chr(\ord($raw[\strlen($raw) - 1]) ^ 1);
 
         $this->expectException(\RuntimeException::class);

@@ -36,7 +36,7 @@ class ScheduledWorkout
      * créées par le web reçoivent le leur au prePersist.
      */
     #[ORM\Column(type: 'uuid', unique: true)]
-    private ?Uuid $uuid = null;
+    private Uuid $uuid;
 
     #[ORM\ManyToOne(inversedBy: 'scheduledWorkouts')]
     #[ORM\JoinColumn(onDelete: 'CASCADE')]
@@ -80,7 +80,7 @@ class ScheduledWorkout
     private ?\DateTimeImmutable $scheduledDate = null;
 
     #[ORM\Column(enumType: ScheduledStatus::class, options: ['default' => ScheduledStatus::PLANNED->value])]
-    private ?ScheduledStatus $status = ScheduledStatus::PLANNED;
+    private ScheduledStatus $status = ScheduledStatus::PLANNED;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $completionNotes = null;
@@ -139,7 +139,7 @@ class ScheduledWorkout
         return $this->id;
     }
 
-    public function getUuid(): ?Uuid
+    public function getUuid(): Uuid
     {
         return $this->uuid;
     }
@@ -234,9 +234,13 @@ class ScheduledWorkout
         return $this;
     }
 
-    public function getScheduledDate(): ?\DateTimeImmutable
+    /**
+     * Colonne NOT NULL, posée à la création par tous les chemins (calendrier,
+     * plan, API, import) : la lire avant serait un bug, pas un état à gérer.
+     */
+    public function getScheduledDate(): \DateTimeImmutable
     {
-        return $this->scheduledDate;
+        return $this->scheduledDate ?? throw new \LogicException('Séance datée sans date : setScheduledDate() doit précéder toute lecture.');
     }
 
     public function setScheduledDate(\DateTimeImmutable $scheduledDate): static
@@ -246,7 +250,7 @@ class ScheduledWorkout
         return $this;
     }
 
-    public function getStatus(): ?ScheduledStatus
+    public function getStatus(): ScheduledStatus
     {
         return $this->status;
     }

@@ -25,6 +25,9 @@ use App\Service\WorkoutEstimator;
 use App\Service\WorkoutMetrics;
 use PHPUnit\Framework\TestCase;
 
+/**
+ * @phpstan-import-type VolumeSeries from ProgressionAggregator
+ */
 final class ProgressionAggregatorTest extends TestCase
 {
     private ProgressionAggregator $aggregator;
@@ -158,6 +161,7 @@ final class ProgressionAggregatorTest extends TestCase
                 [SetType::NORMAL, 5, 110.0],
             ]),
         ]);
+        self::assertNotNull($realized);
 
         self::assertNotNull($realized);
         // L'échauffement ne compte ni en tonnage ni en séries, ici comme ailleurs.
@@ -183,12 +187,14 @@ final class ProgressionAggregatorTest extends TestCase
     {
         $template = $this->gymPlan();
 
-        $adherence = $this->aggregator->realizedRun($template, [
+        $realized = $this->aggregator->realizedRun($template, [
             $this->scheduled($template, 1, '2026-03-04', ScheduledStatus::DONE, [[SetType::NORMAL, 5, 100.0]]),
             $this->scheduled($template, 1, '2026-03-06', ScheduledStatus::MISSED, []),
             $this->scheduled($template, 2, '2026-03-11', ScheduledStatus::PLANNED, []),
             $this->scheduled($template, 2, '2026-03-13', ScheduledStatus::DONE, []),
-        ])['adherence'];
+        ]);
+        self::assertNotNull($realized);
+        $adherence = $realized['adherence'];
 
         self::assertSame(4, $adherence['total']);
         self::assertSame(2, $adherence['done']);
@@ -211,6 +217,7 @@ final class ProgressionAggregatorTest extends TestCase
         $realized = $this->aggregator->realizedRun($template, [
             $this->scheduled($template, 1, '2026-03-12', ScheduledStatus::DONE, [[SetType::NORMAL, 5, 100.0]]),
         ]);
+        self::assertNotNull($realized);
 
         self::assertSame(1, $realized['weeks'][1]['sets']);
         self::assertSame(0, $realized['weeks'][2]['sets']);
@@ -232,6 +239,7 @@ final class ProgressionAggregatorTest extends TestCase
         $realized = $this->aggregator->realizedRun($template, [
             $this->scheduled($template, 1, '2026-03-04', ScheduledStatus::DONE, []),
         ]);
+        self::assertNotNull($realized);
 
         $running = $this->seriesByKey($this->aggregator->weeklyVolume($template, $realized['weeks']), 'running');
 
@@ -259,6 +267,7 @@ final class ProgressionAggregatorTest extends TestCase
         (new \ReflectionProperty(ScheduledWorkout::class, 'id'))->setValue($session, 42);
 
         $realized = $this->aggregator->realizedRun($template, [$session], [42 => ['running' => ['meters' => 8400, 'seconds' => 2520]]]);
+        self::assertNotNull($realized);
 
         self::assertSame(1, $realized['adherence']['imported']);
         self::assertSame(42, $realized['weeks'][1]['minutes']);
@@ -333,6 +342,7 @@ final class ProgressionAggregatorTest extends TestCase
                 [SetType::NORMAL, 5, 107.5],
             ], $squat),
         ]);
+        self::assertNotNull($realized);
 
         $traj = $this->aggregator->exerciseTrajectories($template, $realized['exercises'])[0];
 
@@ -352,6 +362,7 @@ final class ProgressionAggregatorTest extends TestCase
                 [SetType::NORMAL, 5, 100.0],
             ], $squat, skipped: true),
         ]);
+        self::assertNotNull($realized);
 
         self::assertSame(0, $realized['weeks'][1]['sets']);
         self::assertSame([], $realized['exercises']);
@@ -427,9 +438,9 @@ final class ProgressionAggregatorTest extends TestCase
     }
 
     /**
-     * @param list<array{key: string, points: list<array<string, mixed>>, hasRealized: bool, max: float, label: string, modifier: string}> $series
+     * @param list<VolumeSeries> $series
      *
-     * @return array{key: string, points: list<array<string, mixed>>, hasRealized: bool, max: float, label: string, modifier: string}
+     * @return VolumeSeries
      */
     private function seriesByKey(array $series, string $key): array
     {

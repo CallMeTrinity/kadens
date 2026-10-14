@@ -35,7 +35,7 @@ class LoggedSet
      * Les séries créées côté serveur reçoivent le leur au prePersist.
      */
     #[ORM\Column(type: 'uuid', unique: true)]
-    private ?Uuid $uuid = null;
+    private Uuid $uuid;
 
     #[ORM\ManyToOne(inversedBy: 'loggedSets')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
@@ -74,7 +74,7 @@ class LoggedSet
         return $this->id;
     }
 
-    public function getUuid(): ?Uuid
+    public function getUuid(): Uuid
     {
         return $this->uuid;
     }

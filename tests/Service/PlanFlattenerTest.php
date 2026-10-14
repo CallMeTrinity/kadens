@@ -106,6 +106,7 @@ final class PlanFlattenerTest extends TestCase
         self::assertNull($flat['sets']);
         self::assertSame('3 × 15 @ 130 kg', $flat['summary']);
 
+        self::assertNotNull($flat['setLines']);
         self::assertCount(3, $flat['setLines']);
         self::assertSame([1, 2, 3], array_column($flat['setLines'], 'index'));
         foreach ($flat['setLines'] as $line) {
@@ -138,6 +139,8 @@ final class PlanFlattenerTest extends TestCase
         $flat = $this->flattener->flattenWorkout($workout)['blocks'][0]['exercises'][0];
 
         // Deux groupes condensés, mais trois lignes déroulées.
+        self::assertNotNull($flat['sets']);
+        self::assertNotNull($flat['setLines']);
         self::assertCount(2, $flat['sets']);
         self::assertCount(3, $flat['setLines']);
         self::assertSame([SetType::WARMUP, SetType::NORMAL, SetType::NORMAL], array_column($flat['setLines'], 'type'));
@@ -232,6 +235,7 @@ final class PlanFlattenerTest extends TestCase
         $flat = $this->flattener->flattenWorkout($workout)['blocks'][0]['exercises'][0];
         $groups = $flat['sets'];
 
+        self::assertNotNull($groups);
         self::assertCount(3, $groups);
         // Groupe isolé : rang unique.
         self::assertSame(1, $groups[0]['firstIndex']);
@@ -311,6 +315,7 @@ final class PlanFlattenerTest extends TestCase
         self::assertSame([], $flat['weeks'][1]['days'][2]['items']);
     }
 
+    /** @return iterable<string, array{PrescribedExercise, string}> */
     public static function summaryCases(): iterable
     {
         yield 'sets_reps avec charge' => [

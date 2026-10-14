@@ -81,7 +81,7 @@ final class LogBackfiller
         $logged = [];
 
         foreach ($workout->getBlocks() as $block) {
-            $rounds = max(1, $block->getRounds() ?? 1);
+            $rounds = max(1, $block->getRounds());
 
             foreach ($block->getPrescribedExercises() as $prescribed) {
                 $exercise = $prescribed->getExercise();

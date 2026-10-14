@@ -92,7 +92,7 @@ final class ImportedActivityController extends AbstractController
 
                 $this->addFlash('success', 'Activité détachée. Sa séance libre, vide sans elle, a été retirée du calendrier.');
 
-                return $this->redirectToRoute('app_calendar_week', ['date' => $date?->format('Y-m-d')]);
+                return $this->redirectToRoute('app_calendar_week', ['date' => $date->format('Y-m-d')]);
             }
 
             $this->entityManager->flush();

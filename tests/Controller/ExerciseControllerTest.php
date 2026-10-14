@@ -15,7 +15,6 @@ use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
 use App\Enum\TargetArea;
 use App\Repository\LoggedExerciseRepository;
-use Doctrine\Bundle\DoctrineBundle\Middleware\BacktraceDebugDataHolder;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -399,7 +398,6 @@ final class ExerciseControllerTest extends WebTestCase
         }
 
         $holder = static::getContainer()->get('doctrine.debug_data_holder');
-        self::assertInstanceOf(BacktraceDebugDataHolder::class, $holder);
         $holder->reset();
 
         $usage = static::getContainer()->get(LoggedExerciseRepository::class)->usageForOwner($user);

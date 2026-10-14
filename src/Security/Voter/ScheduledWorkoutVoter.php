@@ -32,6 +32,8 @@ use Symfony\Component\Security\Core\Authorization\Voter\Voter;
  * Conséquence à ne pas casser : tout point d'écriture du réalisé, web comme API,
  * teste LOG. Tester EDIT y suffirait syntaxiquement et donnerait la main au
  * coach — c'est exactement la confusion que cet attribut existe pour empêcher.
+ *
+ * @extends Voter<string, ScheduledWorkout>
  */
 final class ScheduledWorkoutVoter extends Voter
 {

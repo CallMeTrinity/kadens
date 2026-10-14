@@ -81,7 +81,6 @@ final class ScheduledWorkoutSourcelessTest extends WebTestCase
         $scheduled = $this->createScheduled($user, $workout, new \DateTimeImmutable('2026-03-15'));
 
         self::assertSame('Fractionné', $scheduled->getTitle());
-        self::assertNotNull($scheduled->getUuid());
     }
 
     /** L'uuid sert de clé d'idempotence à l'API mobile : il doit être retrouvable. */
@@ -178,7 +177,7 @@ final class ScheduledWorkoutSourcelessTest extends WebTestCase
         );
 
         self::assertResponseIsSuccessful();
-        self::assertStringContainsString('kd-freeform', $this->client->getResponse()->getContent());
+        self::assertStringContainsString('kd-freeform', (string) $this->client->getResponse()->getContent());
     }
 
     /** La page datée se rend : date, statut, titre — mais pas de programme. */
@@ -220,7 +219,7 @@ final class ScheduledWorkoutSourcelessTest extends WebTestCase
         $this->client->request('GET', '/feed/'.$user->getCalendarFeedToken().'.ics');
 
         self::assertResponseIsSuccessful();
-        self::assertStringContainsString('Séance improvisée', $this->client->getResponse()->getContent());
+        self::assertStringContainsString('Séance improvisée', (string) $this->client->getResponse()->getContent());
     }
 
     private function createUser(string $email): User

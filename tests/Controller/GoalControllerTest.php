@@ -12,6 +12,7 @@ use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\CoachingStatus;
 use App\Enum\GoalPriority;
+use App\Tests\FindsEntities;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -19,6 +20,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 final class GoalControllerTest extends WebTestCase
 {
+    use FindsEntities;
+
     private KernelBrowser $client;
     private EntityManagerInterface $em;
 
@@ -90,7 +93,7 @@ final class GoalControllerTest extends WebTestCase
         self::assertResponseRedirects();
         $goal = $this->em->getRepository(Goal::class)->findOneBy(['title' => 'Marathon de Lyon']);
         self::assertNotNull($goal);
-        self::assertSame($user->getId(), $goal->getOwner()->getId());
+        self::assertSame($user->getId(), $goal->getOwner()?->getId());
     }
 
     public function testShowIsForbiddenForNonOwner(): void
@@ -177,7 +180,7 @@ final class GoalControllerTest extends WebTestCase
 
         $scheduled = $this->em->getRepository(ScheduledWorkout::class)->findAll();
         self::assertCount(1, $scheduled);
-        self::assertSame($athlete->getId(), $scheduled[0]->getOwner()->getId());
+        self::assertSame($athlete->getId(), $scheduled[0]->getOwner()?->getId());
     }
 
     /** Un plan d'un autre propriétaire ne s'ancre pas, même par URL forgée. */
@@ -253,15 +256,18 @@ final class GoalControllerTest extends WebTestCase
             ]);
         }
         $this->em->clear();
-        self::assertCount(2, $this->em->getRepository(Goal::class)->find($goalId)->getPlanTemplates());
+        self::assertCount(2, $this->mustFind(Goal::class, $goalId)->getPlanTemplates());
 
         $this->client->request('POST', $url, [
             '_token' => $token, 'action' => 'detach', 'planTemplate' => $spe->getId(),
         ]);
         $this->em->clear();
         $reloaded = $this->em->getRepository(Goal::class)->find($goalId);
+        self::assertNotNull($reloaded);
         self::assertCount(1, $reloaded->getPlanTemplates());
-        self::assertSame('Bloc base', $reloaded->getPlanTemplates()->first()->getTitle());
+        $plan = $reloaded->getPlanTemplates()->first();
+        self::assertNotFalse($plan);
+        self::assertSame('Bloc base', $plan->getTitle());
     }
 
     /**
@@ -288,7 +294,7 @@ final class GoalControllerTest extends WebTestCase
         ]);
 
         $this->em->clear();
-        self::assertCount(0, $this->em->getRepository(Goal::class)->find($goalId)->getPlanTemplates());
+        self::assertCount(0, $this->mustFind(Goal::class, $goalId)->getPlanTemplates());
     }
 
     /**
@@ -311,7 +317,7 @@ final class GoalControllerTest extends WebTestCase
         self::assertResponseRedirects('/plan-template/'.$created->getId().'/edit?rename=1');
 
         $this->em->clear();
-        self::assertCount(1, $this->em->getRepository(Goal::class)->find($goalId)->getPlanTemplates());
+        self::assertCount(1, $this->mustFind(Goal::class, $goalId)->getPlanTemplates());
     }
 
     /**
@@ -339,7 +345,7 @@ final class GoalControllerTest extends WebTestCase
         self::assertResponseRedirects('/goal/'.$goalId);
 
         $this->em->clear();
-        self::assertCount(1, $this->em->getRepository(Goal::class)->find($goalId)->getPlanTemplates());
+        self::assertCount(1, $this->mustFind(Goal::class, $goalId)->getPlanTemplates());
     }
 
     private function createGoal(User $owner, string $title, \DateTimeImmutable $date): Goal

@@ -98,6 +98,7 @@ final class ProfileHistoryPageTest extends WebTestCase
         self::assertGreaterThan(0, $links->count());
 
         foreach ($links as $link) {
+            self::assertInstanceOf(\DOMElement::class, $link);
             self::assertMatchesRegularExpression(
                 '#^/schedule/\d+$#',
                 $link->getAttribute('href'),

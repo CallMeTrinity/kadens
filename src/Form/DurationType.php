@@ -16,6 +16,8 @@ use Symfony\Component\OptionsResolver\OptionsResolver;
  * UnitFormatter::duration (source unique du formatage mm:ss / h:mm:ss).
  *
  * Sert aux records de course (5K/10K/semi/marathon) et au temps 100m natation.
+ *
+ * @extends AbstractType<int|null>
  */
 final class DurationType extends AbstractType
 {

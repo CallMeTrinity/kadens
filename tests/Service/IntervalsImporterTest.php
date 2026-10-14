@@ -26,6 +26,7 @@ use App\Service\IntervalsAuthException;
 use App\Service\IntervalsClient;
 use App\Service\IntervalsImporter;
 use App\Service\SecretBox;
+use App\Tests\FindsEntities;
 use App\Tests\PurgesDatabase;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -43,6 +44,7 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 final class IntervalsImporterTest extends KernelTestCase
 {
     use PurgesDatabase;
+    use FindsEntities;
 
     private EntityManagerInterface $em;
     private User $user;
@@ -94,16 +96,22 @@ final class IntervalsImporterTest extends KernelTestCase
         $activities = $this->em->getRepository(ImportedActivity::class);
 
         $morningRun = $activities->findOneBy(['externalId' => 'i1']);
+        self::assertNotNull($morningRun);
         self::assertNotNull($morningRun->getScheduledWorkout());
         self::assertSame(ScheduledStatus::DONE, $morningRun->getScheduledWorkout()->getStatus(), 'Rattacher prouve que la séance a eu lieu.');
         self::assertSame([0, 10, 0, 10, 0], $morningRun->getHrZoneSeconds());
 
-        self::assertNull($activities->findOneBy(['externalId' => 'i2'])->getScheduledWorkout(), 'Deux candidates : on ne devine pas.');
-        self::assertNull($activities->findOneBy(['externalId' => 'i4'])->getScheduledWorkout(), 'Un type non reconnu ne se rattache jamais seul.');
+        $ambiguous = $activities->findOneBy(['externalId' => 'i2']);
+        self::assertNotNull($ambiguous);
+        self::assertNull($ambiguous->getScheduledWorkout(), 'Deux candidates : on ne devine pas.');
+        $unknownType = $activities->findOneBy(['externalId' => 'i4']);
+        self::assertNotNull($unknownType);
+        self::assertNull($unknownType->getScheduledWorkout(), 'Un type non reconnu ne se rattache jamais seul.');
         self::assertNull($activities->findOneBy(['externalId' => 'i3']), 'Coquille Strava : rien à importer.');
 
-        $connection = static::getContainer()->get(IntervalsConnectionRepository::class)->findForOwner($this->em->find(User::class, $this->user->getId()));
-        self::assertSame('2026-09-14', $connection->getSyncedThrough()->format('Y-m-d'));
+        $connection = static::getContainer()->get(IntervalsConnectionRepository::class)->findForOwner($this->mustFind(User::class, $this->user->getId()));
+        self::assertNotNull($connection);
+        self::assertSame('2026-09-14', $connection->getSyncedThrough()?->format('Y-m-d'));
     }
 
     public function testSyncingAgainImportsNothingAndFetchesNoStream(): void
@@ -112,11 +120,11 @@ final class IntervalsImporterTest extends KernelTestCase
         $streamsBefore = \count(array_filter($this->requested, static fn (string $url): bool => str_contains($url, 'streams')));
 
         $this->em->clear();
-        $user = $this->em->find(User::class, $this->user->getId());
+        $user = $this->mustFind(User::class, $this->user->getId());
         $report = $this->importer()->sync($user, new \DateTimeImmutable('2026-09-14'));
 
         self::assertSame(0, $report->imported);
-        self::assertSame($streamsBefore, \count(array_filter($this->requested, static fn (string $url): bool => str_contains($url, 'streams'))));
+        self::assertCount($streamsBefore, array_filter($this->requested, static fn (string $url): bool => str_contains($url, 'streams')));
         self::assertCount(3, $this->em->getRepository(ImportedActivity::class)->findAll());
 
         // Fenêtre glissante : la seconde synchro relit depuis syncedThrough − 7 jours.
@@ -142,6 +150,7 @@ final class IntervalsImporterTest extends KernelTestCase
 
         $this->em->clear();
         $ride = $this->em->getRepository(ImportedActivity::class)->findOneBy(['externalId' => 'i0']);
+        self::assertNotNull($ride);
         $free = $ride->getScheduledWorkout();
 
         self::assertNotNull($free);
@@ -162,7 +171,7 @@ final class IntervalsImporterTest extends KernelTestCase
         self::assertSame(3, $report->imported);
         self::assertSame([], array_filter($this->requested, static fn (string $url): bool => str_contains($url, 'streams')));
         self::assertSame([], $this->em->getRepository(ImportedActivity::class)->findAll());
-        self::assertSame(ScheduledStatus::PLANNED, $this->em->getRepository(ScheduledWorkout::class)->findOneBy(['scheduledDate' => new \DateTimeImmutable('2026-09-12')])->getStatus());
+        self::assertSame(ScheduledStatus::PLANNED, $this->em->getRepository(ScheduledWorkout::class)->findOneBy(['scheduledDate' => new \DateTimeImmutable('2026-09-12')])?->getStatus());
     }
 
     /**
@@ -172,14 +181,16 @@ final class IntervalsImporterTest extends KernelTestCase
     public function testHistoryNeverMovesTheWebWindowBackwards(): void
     {
         $connection = static::getContainer()->get(IntervalsConnectionRepository::class)->findForOwner($this->user);
+        self::assertNotNull($connection);
         $connection->setSyncedThrough(new \DateTimeImmutable('2026-09-01'));
         $this->em->flush();
 
         $this->importer()->importHistory($this->user, new \DateTimeImmutable('2025-01-01'), new \DateTimeImmutable('2025-12-31'), freeSessions: true, dryRun: false);
 
         $this->em->clear();
-        $connection = static::getContainer()->get(IntervalsConnectionRepository::class)->findForOwner($this->em->find(User::class, $this->user->getId()));
-        self::assertSame('2026-09-01', $connection->getSyncedThrough()->format('Y-m-d'));
+        $connection = static::getContainer()->get(IntervalsConnectionRepository::class)->findForOwner($this->mustFind(User::class, $this->user->getId()));
+        self::assertNotNull($connection);
+        self::assertSame('2026-09-01', $connection->getSyncedThrough()?->format('Y-m-d'));
     }
 
     public function testARefusedKeySurfacesAsAnAuthError(): void
@@ -207,7 +218,7 @@ final class IntervalsImporterTest extends KernelTestCase
                 return new MockResponse(json_encode([
                     ['type' => 'time', 'data' => range(0, 20)],
                     ['type' => 'heartrate', 'data' => array_merge([140], array_fill(0, 10, 140), array_fill(0, 10, 170))],
-                ]));
+                ], \JSON_THROW_ON_ERROR));
             }
 
             // Du plus récent au plus ancien, comme l'API.
@@ -216,7 +227,7 @@ final class IntervalsImporterTest extends KernelTestCase
                 ['id' => 'i3', 'source' => 'STRAVA', 'type' => 'Run', 'start_date_local' => '2026-09-13T12:00:00'],
                 ['id' => 'i2', 'source' => 'GARMIN_CONNECT', 'type' => 'Run', 'start_date_local' => '2026-09-13T08:00:00', 'distance' => 8000, 'moving_time' => 2700],
                 ['id' => 'i1', 'source' => 'GARMIN_CONNECT', 'type' => 'Run', 'start_date_local' => '2026-09-12T07:00:00', 'start_date' => '2026-09-12T05:00:00Z', 'distance' => 10000, 'moving_time' => 3000, 'average_heartrate' => 150],
-            ], ...$this->extra]));
+            ], ...$this->extra], \JSON_THROW_ON_ERROR));
         }, 'https://intervals.icu/api/v1/');
 
         return new IntervalsImporter(

@@ -93,7 +93,7 @@ final class CalendarController extends AbstractController
                 foreach ($cell['scheduled'] as $scheduled) {
                     $workout = $scheduled->getWorkout();
                     if (null !== $workout) {
-                        $flattened[$workout->getId()] ??= $planFlattener->flattenWorkout($workout);
+                        $flattened[(int) $workout->getId()] ??= $planFlattener->flattenWorkout($workout);
                     }
                 }
             }
@@ -196,7 +196,7 @@ final class CalendarController extends AbstractController
             $byDate[$scheduled->getScheduledDate()->format('Y-m-d')][] = $scheduled;
             $workout = $scheduled->getWorkout();
             if (null !== $workout) {
-                $flattened[$workout->getId()] ??= $planFlattener->flattenWorkout($workout);
+                $flattened[(int) $workout->getId()] ??= $planFlattener->flattenWorkout($workout);
             }
         }
 
@@ -326,7 +326,9 @@ final class CalendarController extends AbstractController
      */
     private function buildPickerCards(WorkoutRepository $workoutRepository, array $plans): array
     {
-        $workouts = $workoutRepository->findLibraryForOwnerWithContent($this->getUser());
+        /** @var \App\Entity\User $user */
+        $user = $this->getUser();
+        $workouts = $workoutRepository->findLibraryForOwnerWithContent($user);
 
         $cards = [];
         $countsByActivity = [];
@@ -386,7 +388,10 @@ final class CalendarController extends AbstractController
     {
         $byDate = [];
         foreach ($goals as $goal) {
-            $byDate[$goal->getTargetDate()->format('Y-m-d')][] = $goal;
+            $date = $goal->getTargetDate();
+            if (null !== $date) {
+                $byDate[$date->format('Y-m-d')][] = $goal;
+            }
         }
 
         return $byDate;
