@@ -54,6 +54,10 @@ Un service Mailpit est disponible en dev (`compose.override.yaml`) pour intercep
 vendor/bin/phpunit
 ```
 
+La base de test (`<db>_test`) n'a pas besoin des migrations : au lancement,
+`tests/bootstrap.php` compare son schéma aux entités et la reconstruit s'il
+diffère.
+
 ## Analyse statique
 
 PHPStan au niveau 8, avec les extensions Symfony, Doctrine et PHPUnit

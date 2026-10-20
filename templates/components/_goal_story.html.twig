@@ -1,0 +1,101 @@
+{# ============================== LE RÉCIT ===============================
+   Rendu en lecture du récit d'un objectif (#42). Source unique pour la fiche
+   objectif et la page publique : ce que voit un lecteur du lien est exactement
+   ce que voit le propriétaire, aux liens près.
+
+   Attendus :
+     goal    Goal (requis)
+     story   list de GoalStory::present (requis, peut être vide)
+     public  bool — page publique : photos servies par la route publique, aucun
+             lien vers l'intérieur de l'app (séance datée, activité)
+     preview bool — aperçu d'un bloc dans l'éditeur : sans légende ni
+             commentaire, déjà dans le champ juste en dessous
+
+   Un bloc de référence dont la source a disparu (SET NULL) ne rend que son
+   commentaire, s'il en a un : le texte de l'auteur survit à la sortie supprimée.
+   Auto-suffisant : aucun AJAX, les photos sont de simples <img>. #}
+{% import 'components/_activity.html.twig' as act %}
+{% set public = public ?? false %}
+{% set preview = preview ?? false %}
+
+<div class="kd-story">
+    {% for item in story %}
+        {% set block = item.block %}
+
+        {% if item.type == 'text' %}
+            <div class="kd-story__text">
+                {% for para in block.body|replace({"\r\n": "\n"})|split("\n\n") %}
+                    {% if para|trim is not empty %}<p>{{ para|trim|nl2br }}</p>{% endif %}
+                {% endfor %}
+            </div>
+
+        {% elseif item.type == 'photo' and not item.orphan %}
+            <figure class="kd-story__photo">
+                <img src="{{ public
+                        ? path('app_public_share_goal_photo', {slug: goal.slug, blockId: block.id})
+                        : path('app_goal_photo', {id: goal.id, blockId: block.id}) }}"
+                     alt="{{ block.body ?? '' }}"
+                     {% if block.photoWidth and block.photoHeight %}width="{{ block.photoWidth }}" height="{{ block.photoHeight }}"{% endif %}
+                     loading="lazy" decoding="async">
+                {% if block.body and not preview %}<figcaption class="kd-story__caption">{{ block.body }}</figcaption>{% endif %}
+            </figure>
+
+        {% elseif item.activity %}
+            {% set a = item.activity %}
+            <figure class="kd-story__ref">
+                <article class="kd-story__card">
+                    <header class="kd-story__cardhead">
+                        {% if a.entity.activity %}{{ act.badge(a.entity.activity, false) }}{% endif %}
+                        <div>
+                            {# Nom saisi dans la montre : contenu, casse normale. #}
+                            <p class="kd-story__cardtitle">{{ a.title }}</p>
+                            <p class="kd-story__cardmeta">{{ a.startedAt|date('d/m/Y') }} · {{ a.sport }}</p>
+                        </div>
+                    </header>
+                    <dl class="kd-story__stats">
+                        {% if a.distance %}<div><dt>Distance</dt><dd>{{ a.distance }}</dd></div>{% endif %}
+                        {% if a.duration %}<div><dt>Durée</dt><dd>{{ a.duration }}</dd></div>{% endif %}
+                        {% if a.pace %}<div><dt>Allure</dt><dd>{{ a.pace }}</dd></div>{% endif %}
+                        {% if a.elevationGain %}<div><dt>D+</dt><dd>{{ a.elevationGain }} m</dd></div>{% endif %}
+                        {% if a.averageHeartRate %}<div><dt>FC moy.</dt><dd>{{ a.averageHeartRate }} bpm</dd></div>{% endif %}
+                    </dl>
+                </article>
+                {% if block.body and not preview %}<figcaption class="kd-story__caption">{{ block.body|nl2br }}</figcaption>{% endif %}
+            </figure>
+
+        {% elseif item.session %}
+            {% set s = item.session %}
+            <figure class="kd-story__ref">
+                <article class="kd-story__card">
+                    <header class="kd-story__cardhead">
+                        {% if s.activities is not empty %}{{ act.badge(s.activities|first, false) }}{% endif %}
+                        <div>
+                            <p class="kd-story__cardtitle">
+                                {% if public %}
+                                    {{ s.title }}
+                                {% else %}
+                                    <a href="{{ path('app_scheduled_workout_show', {id: s.entity.id}) }}">{{ s.title }}</a>
+                                {% endif %}
+                            </p>
+                            <p class="kd-story__cardmeta">{{ s.date|date('d/m/Y') }} · Séance faite</p>
+                        </div>
+                    </header>
+                    {% if s.tonnage or s.distance or s.duration %}
+                        <dl class="kd-story__stats">
+                            {% if s.distance %}<div><dt>Distance</dt><dd>{{ s.distance }}</dd></div>{% endif %}
+                            {% if s.duration %}<div><dt>Durée</dt><dd>{{ s.duration }}</dd></div>{% endif %}
+                            {% if s.tonnage %}<div><dt>Tonnage</dt><dd>{{ s.tonnage }}</dd></div>{% endif %}
+                            {% if s.workingSets %}<div><dt>Séries</dt><dd>{{ s.workingSets }}</dd></div>{% endif %}
+                            {% if s.topLift %}<div><dt>Top charge</dt><dd>{{ s.topLift.weightKg|round|number_format(0, ',', ' ') }} kg</dd></div>{% endif %}
+                        </dl>
+                    {% endif %}
+                </article>
+                {% if block.body and not preview %}<figcaption class="kd-story__caption">{{ block.body|nl2br }}</figcaption>{% endif %}
+            </figure>
+
+        {% elseif block.body %}
+            {# Référence orpheline : il ne reste que ce que l'auteur avait écrit. #}
+            <div class="kd-story__text"><p>{{ block.body|nl2br }}</p></div>
+        {% endif %}
+    {% endfor %}
+</div>

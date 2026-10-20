@@ -1,0 +1,21 @@
+{# Temps passé dans chaque zone cardio, une barre par zone.
+
+   Partagé par la page d'une séance (une sortie) et l'onglet Endurance des
+   statistiques (une fenêtre) : les deux lisent ZoneBreakdown::shares(), la
+   barre ne peut donc pas se dessiner de deux façons.
+
+   Attendus :
+     zones  list de ZoneBreakdown::shares (non vide) #}
+<ul class="kd-zonebars">
+    {% for zone in zones %}
+        <li class="kd-zonebar">
+            <span class="kd-zonebar__label">{{ zone.zone.shortLabel }}</span>
+            <span class="kd-zonebar__track" aria-hidden="true">
+                {# Largeur = donnée, pas décor : c'est la seule
+                   valeur de style posée en ligne. #}
+                <span class="kd-zonebar__fill kd-zonebar__fill--{{ zone.zone.value }}" style="width: {{ zone.percent }}%"></span>
+            </span>
+            <span class="kd-zonebar__value">{{ zone.duration }} · {{ zone.percent }} %</span>
+        </li>
+    {% endfor %}
+</ul>

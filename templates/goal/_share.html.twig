@@ -1,0 +1,49 @@
+{# Bandeau de publication du récit, rendu pour le propriétaire seul.
+
+   Le lien public n'existe qu'une fois publié. Avant, le bandeau dit
+   exactement ce qui sortira : un objectif est privé par défaut, publier est un
+   choix qu'on fait en sachant ce qu'on montre.
+
+   Attendus : goal (Goal). #}
+<div class="kd-goalshare"
+     {% if goal.published %}data-controller="clipboard" data-clipboard-url-value="{{ url('app_public_share_goal', {slug: goal.slug}) }}"{% endif %}>
+    {% if goal.published %}
+        <p class="kd-goalshare__state">
+            {{ ux_icon('lucide:globe') }}
+            <span>Récit public depuis le {{ goal.publishedAt|date('d/m/Y') }}.</span>
+        </p>
+        <div class="kd-goalshare__actions">
+            <button type="button" class="kd-btn kd-btn--secondary kd-btn--sm" data-action="clipboard#copy">
+                {{ ux_icon('lucide:link-2') }} Copier le lien
+            </button>
+            <a href="{{ path('app_public_share_goal', {slug: goal.slug}) }}" target="_blank" rel="noopener" class="kd-btn kd-btn--ghost kd-btn--sm">
+                {{ ux_icon('lucide:external-link') }} Ouvrir la page publique
+            </a>
+            <form method="post" action="{{ path('app_goal_publish', {id: goal.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('goal_publish' ~ goal.id) }}">
+                <input type="hidden" name="action" value="unpublish">
+                <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm">
+                    {{ ux_icon('lucide:lock') }} Dépublier
+                </button>
+            </form>
+            <span class="kd-goalshare__feedback" data-clipboard-target="feedback" role="status" aria-live="polite"></span>
+        </div>
+    {% else %}
+        <p class="kd-goalshare__state">
+            {{ ux_icon('lucide:lock') }}
+            <span>Récit privé : seuls toi et ton éventuel coach le voyez.</span>
+        </p>
+        <p class="kd-goalshare__hint">
+            Publier crée un lien lisible sans compte : intitulé, échéance, cible,
+            présentation, récit (photos comprises) et résultat. Jamais tes plans ni
+            tes séances à venir.
+        </p>
+        <form method="post" action="{{ path('app_goal_publish', {id: goal.id}) }}" class="kd-goalshare__actions">
+            <input type="hidden" name="_token" value="{{ csrf_token('goal_publish' ~ goal.id) }}">
+            <input type="hidden" name="action" value="publish">
+            <button type="submit" class="kd-btn kd-btn--secondary kd-btn--sm">
+                {{ ux_icon('lucide:globe') }} Publier le récit
+            </button>
+        </form>
+    {% endif %}
+</div>

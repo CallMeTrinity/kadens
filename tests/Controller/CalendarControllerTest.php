@@ -315,6 +315,35 @@ final class CalendarControllerTest extends WebTestCase
         self::assertCount(1, $crawler->filter('a.kd-wk__back[href="/calendar"]'));
     }
 
+    /**
+     * L'historique s'ouvre depuis les deux vues du calendrier, et son retour
+     * repart à la vue quittée — pas au profil, où il est rangé. Sans jeton, ou
+     * avec un jeton illisible, il retombe sur le profil.
+     */
+    public function testTheHistoryIsReachableFromTheCalendarAndLeadsBackToIt(): void
+    {
+        $this->client->loginUser($this->createUser('owner@example.com'));
+
+        $crawler = $this->client->request('GET', '/calendar/2026/3');
+        self::assertCount(1, $crawler->filter('a[href="/profile/history?from=cal-month-2026-03"]'));
+
+        $crawler = $this->client->request('GET', '/calendar/week/2026-03-18');
+        self::assertCount(1, $crawler->filter('a[href="/profile/history?from=cal-week-2026-03-16"]'));
+
+        $crawler = $this->client->request('GET', '/profile/history?from=cal-month-2026-03');
+        self::assertResponseIsSuccessful();
+        self::assertCount(1, $crawler->filter('a.kd-btn[href="/calendar/2026/3"]'));
+
+        $crawler = $this->client->request('GET', '/profile/history?from=cal-week-2026-03-16');
+        self::assertCount(1, $crawler->filter('a.kd-btn[href="/calendar/week/2026-03-16"]'));
+
+        foreach (['', '?from=cal-month-2026-13'] as $query) {
+            $crawler = $this->client->request('GET', '/profile/history'.$query);
+            self::assertResponseIsSuccessful();
+            self::assertCount(1, $crawler->filter('a.kd-btn[href="/"]'), 'Sans contexte lisible, retour au profil.');
+        }
+    }
+
     public function testMoveDeniedToNonOwner(): void
     {
         $owner = $this->createUser('owner@example.com');

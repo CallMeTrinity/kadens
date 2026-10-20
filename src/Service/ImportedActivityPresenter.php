@@ -7,7 +7,6 @@ namespace App\Service;
 use App\Entity\ImportedActivity;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
-use App\Enum\IntensityZone;
 use App\Enum\PaceUnit;
 
 /**
@@ -24,6 +23,7 @@ final class ImportedActivityPresenter
     public function __construct(
         private readonly UnitFormatter $units,
         private readonly WorkoutMetrics $metrics,
+        private readonly ZoneBreakdown $zones,
     ) {
     }
 
@@ -48,7 +48,7 @@ final class ImportedActivityPresenter
             'elevationGain' => $activity->getElevationGainMeters(),
             'cadence' => $activity->getAverageCadence(),
             'watts' => $activity->getAverageWatts(),
-            'zones' => $this->zones($activity->getHrZoneSeconds()),
+            'zones' => $this->zones->shares($activity->getHrZoneSeconds()),
             'splits' => $this->splits($activity->getSplits(), $paceUnit),
         ];
     }
@@ -94,32 +94,6 @@ final class ImportedActivityPresenter
         }
 
         return $rows;
-    }
-
-    /**
-     * @param list<int>|null $seconds
-     *
-     * @return list<array{zone: IntensityZone, duration: string, percent: int}>
-     */
-    private function zones(?array $seconds): array
-    {
-        if (null === $seconds || 0 === array_sum($seconds)) {
-            return [];
-        }
-
-        $total = array_sum($seconds);
-        $zones = [];
-
-        foreach (IntensityZone::cases() as $index => $zone) {
-            $value = (int) ($seconds[$index] ?? 0);
-            $zones[] = [
-                'zone' => $zone,
-                'duration' => $this->units->duration($value),
-                'percent' => (int) round($value * 100 / $total),
-            ];
-        }
-
-        return $zones;
     }
 
     /**

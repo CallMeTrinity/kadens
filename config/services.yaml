@@ -44,6 +44,13 @@ parameters:
     app.mobile.store_url: "https://store.antoninpamart.fr"
     app.mobile.store_fingerprint: "b59214699a2ae99286473398e7e43b8f50922ba82b07b23a199264e6ed725b74"
 
+    # #42 — les photos du récit d'un objectif. Sous `var/`, et c'est voulu : hors
+    # de `public/` (elles ne se servent que par un contrôleur qui vérifie le droit
+    # de lecture) et hors du rsync de déploiement (exclu, donc jamais effacé).
+    # **À inclure dans les sauvegardes du serveur** : ce sont les seules données
+    # de l'app qui ne sont pas en base.
+    app.goal_photos_dir: "%kernel.project_dir%/var/uploads/goal-photos"
+
 services:
     # default configuration for services in *this* file
     _defaults:
@@ -68,3 +75,12 @@ services:
             $repository: "%app.mobile.repository%"
             $storeUrl: "%app.mobile.store_url%"
             $storeFingerprint: "%app.mobile.store_fingerprint%"
+
+    App\Service\GoalPhotoStorage:
+        arguments:
+            $directory: "%app.goal_photos_dir%"
+
+# Les tests écrivent de vraies photos : jamais dans le dossier de dev.
+when@test:
+    parameters:
+        app.goal_photos_dir: "%kernel.project_dir%/var/test-uploads/goal-photos"

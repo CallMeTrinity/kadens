@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Enum\ActivityType;
+use App\Enum\GoalBlockType;
 use App\Enum\GoalOutcome;
 use App\Enum\GoalPriority;
 use App\Repository\GoalRepository;
@@ -19,6 +20,12 @@ use Doctrine\ORM\Mapping as ORM;
  *
  * Événement journée entière (pas d'heure, pas de fuseau), comme ScheduledWorkout :
  * le calendrier et le flux ICS s'y branchent sans VTIMEZONE.
+ *
+ * Un objectif porte aussi un **récit** (#42) : une suite ordonnée de `GoalBlock`
+ * (texte, photo, activité importée, séance faite) qui raconte la préparation et
+ * le jour J. Privé par défaut ; `publishedAt` non nul le sert en lecture publique
+ * sous `/s/goal/{slug}`. Le slug est posé à la première publication et ne bouge
+ * plus ensuite, même après dépublication : republier redonne le même lien.
  */
 #[ORM\Entity(repositoryClass: GoalRepository::class)]
 #[ORM\HasLifecycleCallbacks]
@@ -79,9 +86,29 @@ class Goal
     #[ORM\OrderBy(['title' => 'ASC'])]
     private Collection $planTemplates;
 
+    /**
+     * Le récit. `orphanRemoval` + `remove` en cascade : c'est l'ORM, et non la
+     * clé étrangère, qui supprime les blocs avec l'objectif — sans quoi aucun
+     * événement Doctrine ne partirait et les photos resteraient sur le disque
+     * (GoalPhotoCleanupListener).
+     *
+     * @var Collection<int, GoalBlock>
+     */
+    #[ORM\OneToMany(targetEntity: GoalBlock::class, mappedBy: 'goal', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[ORM\OrderBy(['position' => 'ASC'])]
+    private Collection $blocks;
+
+    #[ORM\Column(length: 255, unique: true, nullable: true)]
+    private ?string $slug = null;
+
+    // Null = privé. Seul le propriétaire publie (GoalController::publish).
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $publishedAt = null;
+
     public function __construct()
     {
         $this->planTemplates = new ArrayCollection();
+        $this->blocks = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -248,5 +275,134 @@ class Goal
         $days = $this->getDaysUntil();
 
         return null !== $days && $days < 0;
+    }
+
+    /**
+     * @return Collection<int, GoalBlock>
+     */
+    public function getBlocks(): Collection
+    {
+        return $this->blocks;
+    }
+
+    /**
+     * Les blocs dans l'ordre du récit. La collection est triée au chargement
+     * (`OrderBy`), mais pas après un ajout ou un déplacement dans la même
+     * requête : on retrie sur `position`, qui fait foi.
+     *
+     * @return list<GoalBlock>
+     */
+    public function getOrderedBlocks(): array
+    {
+        $blocks = $this->blocks->toArray();
+        usort($blocks, static fn (GoalBlock $a, GoalBlock $b): int => $a->getPosition() <=> $b->getPosition());
+
+        return $blocks;
+    }
+
+    /** Ajoute un bloc en fin de récit. */
+    public function appendBlock(GoalBlock $block): static
+    {
+        if (!$this->blocks->contains($block)) {
+            $block->setGoal($this)->setPosition(\count($this->blocks));
+            $this->blocks->add($block);
+        }
+
+        return $this;
+    }
+
+    public function removeBlock(GoalBlock $block): static
+    {
+        if ($this->blocks->removeElement($block)) {
+            $this->renumberBlocks();
+        }
+
+        return $this;
+    }
+
+    /**
+     * Échange un bloc avec son voisin (`-1` vers le haut, `+1` vers le bas). Sans
+     * effet en bout de récit. Les positions restent contiguës 0..n-1.
+     */
+    public function moveBlock(GoalBlock $block, int $direction): static
+    {
+        $ordered = $this->getOrderedBlocks();
+        $index = array_search($block, $ordered, true);
+        if (false === $index) {
+            return $this;
+        }
+
+        $target = $index + ($direction < 0 ? -1 : 1);
+        if ($target < 0 || $target >= \count($ordered)) {
+            return $this;
+        }
+
+        [$ordered[$index], $ordered[$target]] = [$ordered[$target], $ordered[$index]];
+        foreach ($ordered as $position => $item) {
+            $item->setPosition($position);
+        }
+
+        return $this;
+    }
+
+    /** Le récit contient-il déjà cette référence ? (on ne pose pas deux fois la même sortie) */
+    public function hasReferenceTo(ImportedActivity|ScheduledWorkout $source): bool
+    {
+        foreach ($this->blocks as $block) {
+            $current = $source instanceof ImportedActivity ? $block->getImportedActivity() : $block->getScheduledWorkout();
+            if ($current === $source) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Première photo du récit : l'aperçu de la page publique (og:image). */
+    public function getCoverBlock(): ?GoalBlock
+    {
+        foreach ($this->getOrderedBlocks() as $block) {
+            if (GoalBlockType::PHOTO === $block->getType() && null !== $block->getPhotoFile()) {
+                return $block;
+            }
+        }
+
+        return null;
+    }
+
+    private function renumberBlocks(): void
+    {
+        foreach ($this->getOrderedBlocks() as $position => $block) {
+            $block->setPosition($position);
+        }
+    }
+
+    public function getSlug(): ?string
+    {
+        return $this->slug;
+    }
+
+    public function setSlug(?string $slug): static
+    {
+        $this->slug = $slug;
+
+        return $this;
+    }
+
+    public function getPublishedAt(): ?\DateTimeImmutable
+    {
+        return $this->publishedAt;
+    }
+
+    public function setPublishedAt(?\DateTimeImmutable $publishedAt): static
+    {
+        $this->publishedAt = $publishedAt;
+
+        return $this;
+    }
+
+    public function isPublished(): bool
+    {
+        return null !== $this->publishedAt && null !== $this->slug;
     }
 }

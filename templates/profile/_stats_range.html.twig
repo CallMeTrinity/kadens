@@ -17,15 +17,21 @@
      statistiques). Le journal partage la même fenêtre et le même sélecteur ;
      sans ce paramètre, choisir « 6 mois » depuis le journal renverrait aux
      statistiques — un sélecteur ne change pas de page en même temps que de
-     fenêtre. Il reçoit `{id}` quand `subject` est posé, comme les stats. #}
+     fenêtre. Il reçoit `{id}` quand `subject` est posé, comme les stats.
+   - tab     : StatsTab ouvert sur la page des statistiques (défaut : aucun).
+     Reconduit par chaque lien et par le formulaire mois, sinon changer de
+     fenêtre ramènerait sur la vue d'ensemble. Le journal ne le passe pas.
+     Omis pour la vue d'ensemble, qui est l'onglet par défaut. #}
 {% set subject = subject|default(null) %}
 {% set statsRoute = route|default(subject ? 'app_coach_athlete_stats' : 'app_profile_stats') %}
 {% set statsParams = subject ? {id: subject.id} : {} %}
+{% set tab = tab|default(null) %}
+{% set tabParams = tab and tab.value != 'overview' ? {tab: tab.value} : {} %}
 
 <div class="kd-rangepick">
     <div class="kd-rangepick__tabs" role="group" aria-label="Fenêtre de temps">
         {% for range in ranges %}
-            <a href="{{ path(statsRoute, statsParams|merge({range: range.value})) }}"
+            <a href="{{ path(statsRoute, statsParams|merge(tabParams)|merge({range: range.value})) }}"
                class="kd-rangetab{{ period.queryValue == range.value ? ' is-active' }}"
                {{ period.queryValue == range.value ? 'aria-current="page"' : '' }}>
                 {{ range.shortLabel }}
@@ -35,6 +41,7 @@
 
     {% if months|length > 1 %}
         <form method="get" action="{{ path(statsRoute, statsParams) }}" class="kd-rangepick__month">
+            {% if tabParams is not empty %}<input type="hidden" name="tab" value="{{ tabParams.tab }}">{% endif %}
             <label class="kd-rangepick__label" for="stats-month">Un mois</label>
             <select class="kd-rangepick__select" id="stats-month" name="range">
                 {% for month in months %}

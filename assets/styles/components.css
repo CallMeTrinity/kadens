@@ -9268,6 +9268,28 @@ textarea.kd-inlineedit__input {
     background-image: repeating-linear-gradient(135deg, transparent 0 4px, var(--color-surface-raised) 4px 6px);
 }
 
+/* Rampe d'endurance : une colonne empilée par sport, le plus ancien sport en
+   bas. La hauteur de la pile est la donnée (posée en ligne, calculée en PHP),
+   la part de chaque segment aussi (`flex`). Les couleurs ne passent que par
+   --act, donc par la palette du lecteur. */
+.kd-prog__stack {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column-reverse;
+    min-height: 3px;
+    overflow: hidden;
+    border-radius: var(--kd-radius-sm);
+}
+
+.kd-prog__seg {
+    display: block;
+    min-height: 1px;
+    background: var(--act);
+}
+
 .kd-prog__col.is-empty .kd-prog__track {
     opacity: .5;
 }
@@ -10367,6 +10389,50 @@ a.kd-coachitem__name:hover {
    Des liens, pas des boutons : chaque fenêtre est une URL. Le formulaire du
    mois est à part parce qu'il porte une valeur, pas un choix binaire.
    ---------------------------------------------------------------------------- */
+/* Rubriques des statistiques (`?tab=`). Même dessin que les onglets d'une
+   séance (`.kd-wk__tab`) : filet bas sous l'actif. Distinct du sélecteur de
+   fenêtre juste dessous, dont l'aplat encre dit un état de filtre ; ici on
+   change de rubrique, pas de période. */
+.kd-stattabs {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-10);
+    margin-bottom: var(--kd-space-9);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.kd-stattab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    padding: var(--kd-space-6) 0;
+    margin-bottom: -1px;
+    border-bottom: 3px solid transparent;
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-action);
+    text-transform: uppercase;
+    text-decoration: none;
+    white-space: nowrap;
+    color: var(--color-text-faint);
+}
+
+.kd-stattab svg {
+    width: 15px;
+    height: 15px;
+}
+
+.kd-stattab:hover {
+    color: var(--color-text);
+}
+
+.kd-stattab.is-active {
+    color: var(--color-text);
+    font-weight: var(--kd-weight-bold);
+    border-bottom-color: var(--color-text);
+}
+
 .kd-rangepick {
     display: flex;
     align-items: center;
@@ -10575,6 +10641,22 @@ a.kd-coachitem__name:hover {
 /* Doit rester APRÈS les règles de base ci-dessus : une @media n'ajoute aucune
    spécificité (cf. docs/design-system.md §5). */
 @media (max-width: 560px) {
+    /* Trois rubriques en capitales débordent d'un téléphone étroit : la barre
+       défile dans son propre conteneur, jamais le `body` (§5). */
+    .kd-stattabs {
+        gap: var(--kd-space-8);
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    /* Un conteneur qui défile rogne à sa boîte de remplissage : le filet ne
+       peut plus chevaucher la bordure, il se pose juste au-dessus. */
+    .kd-stattab {
+        font-size: 15px;
+        padding: var(--kd-space-5) 0;
+        margin-bottom: 0;
+    }
+
     .kd-rangepick {
         align-items: stretch;
     }
@@ -11160,5 +11242,384 @@ a.kd-coachitem__name:hover {
 
     .kd-actimport__head {
         flex-direction: column;
+    }
+}
+
+/* ============================ ONGLET ENDURANCE ============================ */
+
+/* Couverture : la provenance de toute la page, dite avant le premier chiffre. */
+.kd-endu__coverage {
+    margin: 0 0 var(--kd-space-6);
+}
+
+/* Allure et D+ sous la tuile de volume : du réel seul, en second plan. */
+.kd-endu__real {
+    margin-top: var(--kd-space-2);
+}
+
+.kd-endu__sport {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-3);
+    margin: var(--kd-space-7) 0 var(--kd-space-3);
+    font-size: inherit;
+    font-weight: normal;
+}
+
+.kd-endu__sport:first-of-type {
+    margin-top: 0;
+}
+
+/* ============================================================================
+   RÉCIT D'OBJECTIF (#42)
+   Lecture (fiche objectif, page publique), éditeur de blocs, bandeau de
+   publication. Le récit se lit comme un article : colonne de lecture bornée,
+   photos pleine colonne, références (activité, séance) en cartes au filet.
+   ========================================================================== */
+
+.kd-goalstory__body {
+    padding: var(--kd-space-10) var(--kd-space-10) var(--kd-space-6);
+}
+
+.kd-goalprep {
+    margin-top: var(--kd-space-13);
+    padding-top: var(--kd-space-10);
+    border-top: 1px solid var(--color-divider);
+}
+
+/* --- Le récit lui-même --- */
+.kd-story {
+    max-width: 68ch;
+    display: grid;
+    gap: var(--kd-space-10);
+}
+
+.kd-story__text p {
+    margin: 0 0 var(--kd-space-5);
+    font-size: 16px;
+    line-height: 1.65;
+    color: var(--color-text);
+}
+
+.kd-story__text p:last-child {
+    margin-bottom: 0;
+}
+
+.kd-story__photo,
+.kd-story__ref {
+    margin: 0;
+}
+
+.kd-story__photo img {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+}
+
+.kd-story__caption {
+    margin-top: var(--kd-space-3);
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--color-text-secondary);
+}
+
+.kd-story__card {
+    border: 1px solid var(--color-border);
+    border-left: 3px solid var(--color-border-strong);
+    background: var(--color-surface-raised);
+    padding: var(--kd-space-7) var(--kd-space-8);
+}
+
+.kd-story__cardhead {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-5);
+}
+
+.kd-story__cardtitle {
+    margin: 0;
+    font-weight: var(--kd-weight-semibold);
+    color: var(--color-text-strong);
+}
+
+.kd-story__cardtitle a {
+    color: inherit;
+}
+
+.kd-story__cardmeta {
+    margin: var(--kd-space-1) 0 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-secondary);
+}
+
+.kd-story__stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--kd-space-5) var(--kd-space-10);
+    margin: var(--kd-space-6) 0 0;
+}
+
+.kd-story__stats dt {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-eyebrow-xl);
+    text-transform: uppercase;
+    color: var(--color-text-faint);
+}
+
+.kd-story__stats dd {
+    margin: var(--kd-space-1) 0 0;
+    font-family: var(--font-display);
+    font-weight: var(--kd-weight-bold);
+    font-size: 22px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text);
+}
+
+/* --- Bandeau de publication --- */
+.kd-goalshare {
+    margin-top: var(--kd-space-7);
+    padding: var(--kd-space-6) var(--kd-space-7);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-subtle);
+}
+
+.kd-goalshare__state {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-3);
+    margin: 0;
+    font-weight: var(--kd-weight-semibold);
+    color: var(--color-text-strong);
+}
+
+.kd-goalshare__state svg {
+    width: 16px;
+    height: 16px;
+}
+
+.kd-goalshare__hint {
+    margin: var(--kd-space-3) 0 0;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.kd-goalshare__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--kd-space-3);
+    margin-top: var(--kd-space-5);
+}
+
+.kd-goalshare__feedback {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-secondary);
+}
+
+/* --- Éditeur de blocs --- */
+.kd-storyedit {
+    list-style: none;
+    margin: 0 0 var(--kd-space-13);
+    padding: 0;
+    display: grid;
+    gap: var(--kd-space-7);
+}
+
+.kd-storyedit__item {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-raised);
+    padding: var(--kd-space-6) var(--kd-space-7);
+    scroll-margin-top: var(--kd-space-13);
+}
+
+.kd-storyedit__item:target {
+    border-left: 3px solid var(--color-primary);
+}
+
+.kd-storyedit__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--kd-space-5);
+    margin-bottom: var(--kd-space-5);
+}
+
+.kd-storyedit__type {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-text-faint);
+}
+
+.kd-storyedit__type svg {
+    width: 14px;
+    height: 14px;
+}
+
+.kd-storyedit__tools {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-1);
+}
+
+.kd-storyedit__preview {
+    margin-bottom: var(--kd-space-5);
+}
+
+/* L'aperçu d'une photo reste une vignette : on édite, on ne lit pas. */
+.kd-storyedit__preview .kd-story__photo img {
+    width: auto;
+    max-width: 100%;
+    max-height: 220px;
+}
+
+.kd-storyedit__orphan {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    margin: 0 0 var(--kd-space-5);
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.kd-storyedit__orphan svg {
+    width: 14px;
+    height: 14px;
+}
+
+.kd-storyedit__form {
+    display: grid;
+    gap: var(--kd-space-3);
+    justify-items: start;
+}
+
+.kd-storyedit__form textarea {
+    width: 100%;
+}
+
+/* --- Ajouter un bloc --- */
+.kd-storyadd {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--kd-space-7);
+}
+
+.kd-storyadd__card {
+    display: grid;
+    gap: var(--kd-space-3);
+    align-content: start;
+    justify-items: start;
+}
+
+.kd-storyadd__card .kd-input {
+    width: 100%;
+}
+
+.kd-storyadd__title {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    margin: 0 0 var(--kd-space-2);
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: var(--kd-weight-bold);
+    letter-spacing: var(--kd-tracking-action);
+    text-transform: uppercase;
+    color: var(--color-text-strong);
+}
+
+.kd-storyadd__title svg {
+    width: 16px;
+    height: 16px;
+}
+
+.kd-storyadd__hint {
+    margin: 0;
+    font-size: 12.5px;
+    color: var(--color-text-secondary);
+}
+
+@media (max-width: 900px) {
+    .kd-storyadd {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+/* --- Page publique : l'article --- */
+.kd-goalpost {
+    max-width: 720px;
+    margin: 0 auto;
+}
+
+.kd-goalpost__head {
+    margin-bottom: var(--kd-space-13);
+    padding-bottom: var(--kd-space-10);
+    border-bottom: 1px solid var(--color-divider);
+}
+
+.kd-goalpost__title {
+    margin: var(--kd-space-3) 0 0;
+}
+
+.kd-goalpost__target {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    margin: var(--kd-space-5) 0 0;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--color-text-secondary);
+}
+
+.kd-goalpost__target svg {
+    width: 14px;
+    height: 14px;
+}
+
+.kd-goalpost__lead {
+    margin: var(--kd-space-7) 0 0;
+    font-size: 18px;
+    line-height: 1.55;
+    color: var(--color-text-strong);
+}
+
+.kd-goalpost__result {
+    margin-top: var(--kd-space-13);
+    padding-top: var(--kd-space-10);
+    border-top: 1px solid var(--color-divider);
+}
+
+.kd-goalpost__note {
+    margin: var(--kd-space-5) 0 0;
+    line-height: 1.6;
+    color: var(--color-text);
+}
+
+.kd-goalpost__colophon {
+    margin-top: var(--kd-space-13);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-faint);
+}
+
+@media (max-width: 560px) {
+    .kd-goalstory__body {
+        padding: var(--kd-space-7);
+    }
+
+    .kd-goalpost__lead {
+        font-size: 16px;
     }
 }

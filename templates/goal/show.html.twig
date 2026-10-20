@@ -64,6 +64,67 @@
         </section>
     {% endif %}
 
+    {# -------------------------------- RÉCIT -------------------------------- #}
+    {# #42 — l'objectif se lit comme un article : présentation, récit, résultat,
+       puis la préparation en dessous. Le récit s'écrit sur sa propre page
+       (`app_goal_story`) ; ici, il se lit tel que le verra un lecteur du lien. #}
+    <section class="kd-section kd-goalstory" id="recit">
+        <div class="kd-pagehead kd-pagehead--sub">
+            <div>
+                <p class="kd-eyebrow kd-eyebrow--accent">Récit</p>
+                <h2 class="kd-title kd-title--sm">L'histoire de cet objectif</h2>
+            </div>
+            <a href="{{ path('app_goal_story', {id: goal.id}) }}" class="kd-btn kd-btn--secondary kd-btn--sm">
+                {{ ux_icon('lucide:square-pen') }} {{ story is empty ? 'Écrire le récit' : 'Éditer le récit' }}
+            </a>
+        </div>
+
+        {% if story is empty %}
+            <div class="kd-card">
+                <div class="kd-empty">
+                    {{ ux_icon('lucide:pilcrow') }}
+                    <div>Pas encore de récit. Raconte la prépa et le jour J : du texte, des photos, tes sorties et tes séances faites.</div>
+                </div>
+            </div>
+        {% else %}
+            <article class="kd-card kd-goalstory__body">
+                {{ include('components/_goal_story.html.twig', {goal: goal, story: story, public: false}, with_context = false) }}
+            </article>
+        {% endif %}
+
+        {# Publier est un geste de propriétaire (GoalStoryController::publish) :
+           le coach ne voit pas ce bandeau. #}
+        {% if mine %}
+            {{ include('goal/_share.html.twig', {goal: goal}, with_context = false) }}
+        {% endif %}
+    </section>
+
+    {# ------------------------------ RÉSULTAT ------------------------------- #}
+    {% if goal.outcome %}
+        <section class="kd-card kd-section__block">
+            <h2 class="kd-card__title kd-profile__grouphead">{{ ux_icon(goal.outcome.icon) }} Résultat</h2>
+            <p><span class="kd-badge kd-badge--{{ goal.outcome.modifier }}">{{ goal.outcome.label }}</span></p>
+            {% if goal.resultNote %}<p class="kd-profile__bio">{{ goal.resultNote|nl2br }}</p>{% endif %}
+        </section>
+    {% elseif goal.isPast %}
+        <section class="kd-card kd-section__block">
+            <div class="kd-empty">
+                {{ ux_icon('lucide:flag') }}
+                <div>L'échéance est passée. <a href="{{ path('app_goal_edit', {id: goal.id}) }}">Renseigne le résultat</a> pour boucler.</div>
+            </div>
+        </section>
+    {% endif %}
+
+    {# --------------------------- LA PRÉPARATION ---------------------------- #}
+    {# Les outils sous l'article : ce qui ne se raconte pas, et qui n'apparaît
+       jamais sur la page publique. #}
+    <div class="kd-pagehead kd-pagehead--sub kd-goalprep">
+        <div>
+            <p class="kd-eyebrow kd-eyebrow--accent">Préparation</p>
+            <h2 class="kd-title kd-title--sm">Plans et séances</h2>
+        </div>
+    </div>
+
     {# ------------------------ PLANS DE PRÉPARATION ------------------------- #}
     {# Le pendant du bandeau d'objectifs de l'éditeur de plan : le lien se pose et
        se défait des deux côtés. Rattacher documente l'intention (« ces plans
@@ -167,7 +228,7 @@
     <section class="kd-section">
         <div class="kd-pagehead kd-pagehead--sub">
             <div>
-                <p class="kd-eyebrow kd-eyebrow--accent">Préparation</p>
+                <p class="kd-eyebrow kd-eyebrow--accent">Calendrier</p>
                 <h2 class="kd-title kd-title--sm">Séances menant à l'échéance</h2>
             </div>
         </div>
@@ -183,7 +244,11 @@
                 {% for s in leadUp %}
                     <li class="kd-goallead__row">
                         <span class="kd-goallead__date">{{ s.scheduledDate|date('d/m') }}</span>
-                        <a href="{{ path('app_workout_show', {id: s.workout.id}) }}" class="kd-goallead__title">{{ s.workout.title }}</a>
+                        {# La liste montre des séances DATÉES : le lien ouvre la séance
+                           datée (statut, réalisé), jamais la séance de bibliothèque. Ça
+                           vaut aussi pour une séance libre, qui n'a pas de source. #}
+                        <a href="{{ path('app_scheduled_workout_show', {id: s.id}) }}"
+                           class="kd-goallead__title">{{ s.displayTitle }}</a>
                         <span class="kd-badge kd-badge--{{ s.status.value }}">{{ s.status.label }}</span>
                     </li>
                 {% endfor %}
@@ -191,19 +256,4 @@
         {% endif %}
     </section>
 
-    {# ------------------------------ RÉSULTAT ------------------------------- #}
-    {% if goal.outcome %}
-        <section class="kd-card kd-section__block">
-            <h2 class="kd-card__title kd-profile__grouphead">{{ ux_icon(goal.outcome.icon) }} Résultat</h2>
-            <p><span class="kd-badge kd-badge--{{ goal.outcome.modifier }}">{{ goal.outcome.label }}</span></p>
-            {% if goal.resultNote %}<p class="kd-profile__bio">{{ goal.resultNote|nl2br }}</p>{% endif %}
-        </section>
-    {% elseif goal.isPast %}
-        <section class="kd-card kd-section__block">
-            <div class="kd-empty">
-                {{ ux_icon('lucide:flag') }}
-                <div>L'échéance est passée. <a href="{{ path('app_goal_edit', {id: goal.id}) }}">Renseigne le résultat</a> pour boucler.</div>
-            </div>
-        </section>
-    {% endif %}
 {% endblock %}

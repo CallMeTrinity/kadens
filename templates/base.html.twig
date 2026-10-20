@@ -8,6 +8,8 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
         <title>{% block title %}Kadens{% endblock %}</title>
         <meta name="description" content="{% block meta_description %}Kadens — bibliothèque d'exercices, séances, plans multi-semaines et calendrier d'entraînement.{% endblock %}">
+        {# Métadonnées propres à une page (aperçu Open Graph d'un récit publié). #}
+        {% block head_meta %}{% endblock %}
 
         {{ include('components/_pwa_head.html.twig') }}
 

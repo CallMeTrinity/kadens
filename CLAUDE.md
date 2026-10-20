@@ -150,7 +150,8 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   séance cochée faite sans réalisé compte en assiduité et ne porte aucun
   tonnage ; le combler avec le prescrit ferait passer une intention pour un
   fait. Contrainte de coût qui va avec : hors de cette unique passe hydratante
-  d'endurance (bornée, le réel importé s'y greffe par un agrégat), tout passe par des agrégats scalaires — sans quoi
+  d'endurance (bornée, le réel importé s'y greffe par une lecture scalaire, une
+  ligne par sortie), tout passe par des agrégats scalaires — sans quoi
   « depuis le début » remonterait l'historique entier à chaque affichage.
   **Parcourir n'est pas agréger** : `TrainingLog` (journal, `/profile/log` et son
   jumeau coach) liste les séances consignées une à une, en trois requêtes
@@ -246,6 +247,14 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   lien ne se perde plus). Se pose et se défait des deux côtés : bandeau `#plan-goals`
   dans l'éditeur de plan, section « Plans de préparation » sur la fiche objectif.
   Jamais affiché sur la page publique d'un plan (les objectifs sont privés).
+- **Récit d'objectif : privé par défaut, publication opt-in (#42).** Un objectif
+  porte un récit en blocs (`GoalBlock` : texte, photo, activité importée, séance
+  faite). Les blocs de référence ne recopient aucun chiffre (`GoalStory`). Seul le
+  **propriétaire** publie (`/s/goal/{slug}`, le coach co-écrit mais prend un 403) ;
+  la page publique ne montre jamais les plans. Premier stockage de fichiers de
+  l'app : photos sous `var/uploads/` (hors `public/`, hors rsync, **à sauvegarder**),
+  servies par contrôleur, réduites et purgées de leur EXIF côté navigateur, sans
+  GD côté serveur. Invariants : [`docs/feature-goal-story.md`](./docs/feature-goal-story.md).
 - **Création sans écran intermédiaire.** « Nouvelle séance » / « Nouveau plan » sont
   des **POST** qui créent un brouillon titré par défaut (plan : 4 semaines) et
   redirigent vers l'éditeur avec `rename=1`, qui ouvre le titre en édition en ligne.

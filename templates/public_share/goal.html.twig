@@ -1,0 +1,55 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ goal.title }}{% endblock %}
+
+{# Pas de twig/string-extra dans le projet : `slice` suffit pour un aperçu. #}
+{% set summary = (goal.description ?? goal.title)|replace({"\r\n": ' ', "\n": ' '}) %}
+{% set summary = summary|length > 200 ? summary|slice(0, 199) ~ '…' : summary %}
+
+{% block meta_description %}{{ summary }}{% endblock %}
+
+{# L'aperçu d'un lien collé dans une messagerie : titre, chapeau, première photo.
+   L'image passe par la route publique, qui revérifie la publication. #}
+{% block head_meta %}
+    {% set cover = goal.coverBlock %}
+    <meta property="og:type" content="article">
+    <meta property="og:title" content="{{ goal.title }}">
+    <meta property="og:description" content="{{ summary }}">
+    <meta property="og:url" content="{{ url('app_public_share_goal', {slug: goal.slug}) }}">
+    {% if cover %}
+        <meta property="og:image" content="{{ url('app_public_share_goal_photo', {slug: goal.slug, blockId: cover.id}) }}">
+    {% endif %}
+{% endblock %}
+
+{% block body %}
+    {# Récit publié d'un objectif (#42), en lecture seule et sans compte. Ce qui
+       se raconte, et rien d'autre : ni plans, ni séances à venir, ni action. Le
+       récit passe par le même composant que la fiche privée (`public: true` :
+       photos par la route publique, aucun lien vers l'intérieur de l'app). #}
+    <article class="kd-goalpost">
+        <header class="kd-goalpost__head">
+            <p class="kd-eyebrow kd-eyebrow--accent">
+                {{ goal.activity ? goal.activity.label : 'Objectif' }} · {{ goal.targetDate|date('d/m/Y') }}
+            </p>
+            <h1 class="kd-title kd-goalpost__title">{{ goal.title }}</h1>
+            {% if goal.targetValue %}
+                <p class="kd-goalpost__target">{{ ux_icon('lucide:target') }} {{ goal.targetValue }}</p>
+            {% endif %}
+            {% if goal.description %}
+                <p class="kd-goalpost__lead">{{ goal.description|nl2br }}</p>
+            {% endif %}
+        </header>
+
+        {{ include('components/_goal_story.html.twig', {goal: goal, story: story, public: true}, with_context = false) }}
+
+        {% if goal.outcome %}
+            <footer class="kd-goalpost__result">
+                <p class="kd-eyebrow">Résultat</p>
+                <p><span class="kd-badge kd-badge--{{ goal.outcome.modifier }}">{{ ux_icon(goal.outcome.icon) }} {{ goal.outcome.label }}</span></p>
+                {% if goal.resultNote %}<p class="kd-goalpost__note">{{ goal.resultNote|nl2br }}</p>{% endif %}
+            </footer>
+        {% endif %}
+
+        <p class="kd-goalpost__colophon">Publié avec Kadens le {{ goal.publishedAt|date('d/m/Y') }}.</p>
+    </article>
+{% endblock %}

@@ -2,8 +2,12 @@
 
 namespace App\Controller;
 
+use App\Entity\Goal;
+use App\Entity\GoalBlock;
 use App\Entity\PlanTemplate;
 use App\Entity\Workout;
+use App\Service\GoalPhotoStorage;
+use App\Service\GoalStory;
 use App\Service\PlanFlattener;
 use App\Service\WorkoutMetrics;
 use Symfony\Bridge\Doctrine\Attribute\MapEntity;
@@ -18,6 +22,11 @@ use Symfony\Component\Routing\Attribute\Route;
  * L'accès n'est pas régi par les voters : le lien slug vaut autorisation de
  * lecture. L'édition reste réservée au propriétaire par ailleurs. Tout reste sous
  * le préfixe `/s` (hors access_control), donc anonyme-accessible.
+ *
+ * **Le récit d'objectif est l'exception opt-in** (#42) : un objectif est privé,
+ * son slug n'existe qu'après une première publication, et il ne vaut lecture que
+ * tant que `publishedAt` est posé. Dépublié, la page et ses photos rendent 404 —
+ * le même code qu'un slug inconnu, pour ne rien confirmer.
  */
 final class PublicShareController extends AbstractController
 {
@@ -73,5 +82,46 @@ final class PublicShareController extends AbstractController
             'flat' => $planFlattener->flattenPlanTemplate($template),
             'weeks' => range($from, $to),
         ]);
+    }
+
+    /**
+     * Le récit publié d'un objectif. N'affiche que ce qui se raconte : intitulé,
+     * échéance, cible, présentation, récit, résultat. Jamais les plans rattachés
+     * ni les séances à venir — c'est la préparation, pas l'histoire.
+     */
+    #[Route('/s/goal/{slug}', name: 'app_public_share_goal', methods: ['GET'])]
+    public function goal(
+        #[MapEntity(mapping: ['slug' => 'slug'])] Goal $goal,
+        GoalStory $story,
+    ): Response {
+        if (!$goal->isPublished()) {
+            throw $this->createNotFoundException();
+        }
+
+        return $this->render('public_share/goal.html.twig', [
+            'goal' => $goal,
+            'story' => $story->present($goal),
+        ]);
+    }
+
+    /** Cache public, mais court : dépublier doit finir par se voir chez un intermédiaire. */
+    #[Route('/s/goal/{slug}/photo/{blockId}', name: 'app_public_share_goal_photo', methods: ['GET'], requirements: ['blockId' => '\d+'])]
+    public function goalPhoto(
+        #[MapEntity(mapping: ['slug' => 'slug'])] Goal $goal,
+        #[MapEntity(id: 'blockId')] GoalBlock $block,
+        GoalPhotoStorage $photos,
+    ): Response {
+        if (!$goal->isPublished() || $block->getGoal()?->getId() !== $goal->getId()) {
+            throw $this->createNotFoundException();
+        }
+
+        $response = $photos->response($block);
+        if (null === $response) {
+            throw $this->createNotFoundException();
+        }
+        $response->setPublic();
+        $response->setMaxAge(3600);
+
+        return $response;
     }
 }

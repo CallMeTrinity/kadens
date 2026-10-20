@@ -53,8 +53,11 @@ class GoalType extends AbstractType
                 'attr' => ['placeholder' => 'ex. sub 4h · 180 kg · Top 10'],
             ])
             ->add('description', TextareaType::class, [
-                'label' => 'Notes',
+                // « Présentation » et non plus « Notes » : c'est le chapeau du récit,
+                // lisible sur la page publique quand l'objectif est publié (#42).
+                'label' => 'Présentation',
                 'required' => false,
+                'help' => 'Le chapeau du récit : visible sur la page publique si tu le publies.',
                 'attr' => ['rows' => 3, 'placeholder' => 'Contexte, stratégie, parcours…'],
             ])
             ->add('outcome', EnumType::class, [

@@ -9,6 +9,7 @@ use App\Form\ChangePasswordType;
 use App\Form\DisplaySettingsType;
 use App\Enum\MuscleGroup;
 use App\Enum\StatsRange;
+use App\Enum\StatsTab;
 use App\Form\ProfileType;
 use App\Repository\ApiTokenRepository;
 use App\Repository\CoachingRepository;
@@ -93,6 +94,10 @@ final class ProfileController extends AbstractController
      * La valeur brute n'est jamais validée ici : StatsPeriod la lit et retombe
      * sur la fenêtre par défaut si elle ne veut rien dire. Un lien périmé doit
      * afficher des statistiques, pas une 404.
+     *
+     * La rubrique (`?tab=`, cf. StatsTab) suit la même règle : un lien par
+     * onglet, pas de bascule côté client, pour que changer de fenêtre garde
+     * l'onglet ouvert et inversement.
      */
     #[Route('/profile/stats', name: 'app_profile_stats', methods: ['GET'])]
     public function stats(Request $request, TrainingStats $training): Response
@@ -107,6 +112,8 @@ final class ProfileController extends AbstractController
             'period' => $period,
             'ranges' => StatsRange::pickable(),
             'months' => $training->availableMonths($user),
+            'tab' => StatsTab::resolve($request->query->getString('tab')),
+            'tabs' => StatsTab::cases(),
         ]);
     }
 
@@ -150,7 +157,9 @@ final class ProfileController extends AbstractController
      * toujours d'une fenêtre choisie ; ici la réponse EST l'étendue complète.
      * Accepter un `?range=` obligerait à choisir ce qu'on cherche justement à
      * embrasser d'un seul regard — un `?range=` traînant dans un lien est donc
-     * simplement ignoré, pas rejeté.
+     * simplement ignoré, pas rejeté. Seul `?from=` est lu, par le lien de
+     * retour du template (ouverture depuis le calendrier) : il ne change rien
+     * au contenu.
      *
      * La page se rend entièrement côté serveur, sans fragment ni chargement
      * différé : elle reste auto-suffisante (condition du cache offline) et

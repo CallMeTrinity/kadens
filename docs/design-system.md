@@ -531,6 +531,15 @@ de mise à l'échelle). Elle réutilise tel quel `.kd-stack`, `.kd-legend`,
 — une barre inventée pour l'occasion aurait fini par diverger de celle qui
 affiche déjà la même donnée ailleurs.
 
+- **Rubriques** (`.kd-stattabs`, `.kd-stattab`, `profile/_stats_tabs.html.twig`) :
+  vue d'ensemble / salle / endurance, en **liens** `?tab=` et non par le
+  contrôleur `tabs`. La fenêtre recharge déjà la page : des onglets côté client
+  retomberaient sur le premier à chaque changement de fenêtre. Chaque onglet
+  reconduit la fenêtre, le sélecteur de fenêtre reconduit l'onglet (paramètre
+  `tab` de `_stats_range`, absent pour le journal). Dessin des onglets de séance
+  (filet bas sous l'actif), pas de l'aplat encre du sélecteur : on change de
+  rubrique, pas de période. Une rubrique ne filtre aucun chiffre, elle choisit
+  les blocs rendus d'un même agrégat.
 - **Sélecteur de fenêtre** (`.kd-rangepick`, `.kd-rangetab`) : trois **liens**
   (4 semaines / 6 mois / tout) plus un `<select>` de mois dans un formulaire
   **GET**. Jamais de fragment rechargé — la page reste auto-suffisante, donc
@@ -541,6 +550,14 @@ affiche déjà la même donnée ailleurs.
   la flèche d'un record battu — de l'intensité, pas une catégorie.
 - **Observance par plan** (`.kd-planbar`) : reprend `.kd-obar`, la même barre
   faite/manquée/prévue que la synthèse générale, simplement ventilée.
+- **Rampe d'endurance** (`.kd-prog__stack`, `.kd-prog__seg`) : la colonne de
+  `.kd-prog__bars`, empilée par sport. Hauteur de la pile et part de chaque
+  segment (`flex`) sont des données calculées en PHP ; la couleur ne vient que
+  de `--act` (`kd-act--*`), donc de la palette du lecteur. Légende en
+  `.kd-legend__key--act`, comme au calendrier.
+- **Temps en zones** (`components/_zonebars.html.twig`) : une seule barre de
+  zones, partagée par la page d'une séance et l'onglet Endurance
+  (`ZoneBreakdown::shares()`). Le rouge n'y touche que Z4-Z5 : de l'intensité.
 - **Rampe de volume** (`.kd-statbars`) : le graphique **déborde** dans son
   propre conteneur `overflow-x` plutôt que de se comprimer — vingt-quatre barres
   de trois pixels ne se lisent pas, et le `body` ne défile jamais
@@ -551,6 +568,12 @@ affiche déjà la même donnée ailleurs.
 Tous les mois d'un coup, du plus récent au plus ancien, en cases compactes —
 là où `/profile/stats` répond toujours d'une **fenêtre** choisie, celle-ci
 répond de l'étendue complète et n'a donc aucun paramètre d'URL.
+
+- **Points d'entrée** : le profil, les statistiques et l'en-tête du calendrier
+  (mois et semaine). Depuis le calendrier, le lien porte `?from=cal-month-…` /
+  `cal-week-…` et le retour de la page repart à la vue quittée
+  (`_backlink`, repli sur le profil). Seul paramètre lu, et il ne change pas le
+  contenu : c'est pour ça que `from` sort de la clé de cache du service worker.
 
 - **Grille de mois** (`.kd-histmonths`) : trois de front, deux sous 1200, un
   sous 900. La grille de sept colonnes est **conservée à toutes les largeurs**,
