@@ -9,6 +9,7 @@ use App\Entity\User;
 use App\Repository\CoachingRepository;
 use App\Repository\DeletedEntityRepository;
 use App\Repository\ExerciseRepository;
+use App\Repository\ExerciseSetupRepository;
 use App\Repository\ScheduledWorkoutRepository;
 
 /**
@@ -41,6 +42,12 @@ use App\Repository\ScheduledWorkoutRepository;
  * console, surtout — et elle, elle a un horodatage fiable. C'est donc elle, et
  * elle seule, que le delta allège.
  *
+ * Les **réglages de machine** (`setups`) partent entiers eux aussi, et pour une
+ * raison de plus : un réglage effacé supprime sa ligne, et un delta n'aurait
+ * aucune pierre tombale pour le dire. La liste est courte par nature — une
+ * entrée par machine qu'on a pris la peine de noter — et c'est son intégralité
+ * qui permet au client de remplacer la sienne.
+ *
  * ## Ce que la fenêtre ne contient pas
  *
  * Les séances qui ne se consignent pas — celles sans le moindre exercice de
@@ -60,9 +67,10 @@ use App\Repository\ScheduledWorkoutRepository;
  *
  * @phpstan-import-type ApiScheduledWorkout from ScheduledWorkoutPayload
  * @phpstan-import-type ApiHistoryEntry from PerformanceHistoryPayload
+ * @phpstan-import-type ApiExerciseSetup from ExerciseSetupPayload
  *
  * @phpstan-type ApiExercise array{id: int|null, name: string|null, nameEn: string|null, description: string|null, activity: string|null, targetAreas: list<string>, mediaUrl: string|null, global: bool, updatedAt: string|null}
- * @phpstan-type ApiBootstrap array{serverTime: string, since: string|null, exerciseLanguage: string, window: array{from: string, to: string}, exercises: list<ApiExercise>, schedule: list<ApiScheduledWorkout>, history: list<ApiHistoryEntry>, deleted: array{exercises: list<int>, schedule: list<string>}}
+ * @phpstan-type ApiBootstrap array{serverTime: string, since: string|null, exerciseLanguage: string, window: array{from: string, to: string}, exercises: list<ApiExercise>, schedule: list<ApiScheduledWorkout>, history: list<ApiHistoryEntry>, setups: list<ApiExerciseSetup>, deleted: array{exercises: list<int>, schedule: list<string>}}
  */
 final class BootstrapPayload
 {
@@ -76,6 +84,7 @@ final class BootstrapPayload
         private readonly DeletedEntityRepository $deletedEntities,
         private readonly CoachingRepository $coachings,
         private readonly PerformanceHistory $history,
+        private readonly ExerciseSetupRepository $setups,
         private readonly ScheduledWorkoutPayload $scheduledWorkouts,
         private readonly TrackableSchedule $trackable,
     ) {
@@ -87,6 +96,9 @@ final class BootstrapPayload
     public function build(User $user, ?\DateTimeImmutable $since, \DateTimeImmutable $now): array
     {
         $owners = $this->libraryOwners($user);
+        // Lue une fois : l'historique et les réglages se bornent tous deux à ce
+        // que le téléphone peut afficher.
+        $libraryIds = $this->exercises->libraryIdsForUsers($owners);
 
         $today = $now->setTime(0, 0);
         $from = $today->sub(new \DateInterval(self::WINDOW_PAST));
@@ -126,7 +138,8 @@ final class BootstrapPayload
             'window' => ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')],
             'exercises' => $this->exercisePayloads($owners, $since),
             'schedule' => $schedule,
-            'history' => $this->historyPayloads($user, $owners),
+            'history' => $this->historyPayloads($user, $libraryIds),
+            'setups' => $this->setupPayloads($user, $libraryIds),
             'deleted' => $this->deletedPayloads($user, $owners, $since),
         ];
     }
@@ -228,16 +241,39 @@ final class BootstrapPayload
      * (KL-17), qui sert aussi `GET /api/exercises/{id}/history` : le client n'a
      * qu'un désérialiseur de performance, parce qu'il n'y a qu'un producteur.
      *
-     * @param list<User> $owners
+     * @param list<int> $libraryIds
      *
      * @return list<ApiHistoryEntry>
      */
-    private function historyPayloads(User $user, array $owners): array
+    private function historyPayloads(User $user, array $libraryIds): array
     {
         $entries = [];
 
-        foreach ($this->history->bulkForIds($user, $this->exercises->libraryIdsForUsers($owners)) as $exerciseId => $entry) {
+        foreach ($this->history->bulkForIds($user, $libraryIds) as $exerciseId => $entry) {
             $entries[] = PerformanceHistoryPayload::entry($exerciseId, $entry['last'], $entry['best']);
+        }
+
+        return $entries;
+    }
+
+    /**
+     * Les réglages de machine du porteur du jeton, et **de lui seul** : un coach
+     * qui pull ne reçoit pas les crans de poulie de ses athlètes, il n'est pas
+     * assis sur leurs machines.
+     *
+     * Bornés à la bibliothèque visible, comme l'historique : un réglage sur un
+     * exercice que le téléphone n'a pas n'aurait rien à quoi s'accrocher.
+     *
+     * @param list<int> $libraryIds
+     *
+     * @return list<ApiExerciseSetup>
+     */
+    private function setupPayloads(User $user, array $libraryIds): array
+    {
+        $entries = [];
+
+        foreach ($this->setups->listFor($user, $libraryIds) as $row) {
+            $entries[] = ExerciseSetupPayload::entry($row['exerciseId'], $row['text'], $row['updatedAt']);
         }
 
         return $entries;

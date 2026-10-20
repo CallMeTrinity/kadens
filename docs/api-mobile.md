@@ -1,7 +1,7 @@
 # API mobile de Kadens
 
 Le contrat entre le serveur Symfony et l'app Android « Kadens Live » (KL-21 et
-suivants). Onze endpoints, un seul mécanisme d'authentification, un seul format
+suivants). Douze endpoints, un seul mécanisme d'authentification, un seul format
 d'erreur.
 
 Ce document est la **référence d'implémentation du client**. Le *pourquoi* de
@@ -115,6 +115,7 @@ provoque.
 | 6.4 | `GET` | `/api/ping` | oui | KL-10 |
 | 6.5 | `GET` | `/api/bootstrap` | oui | KL-14 |
 | 6.6 | `GET` | `/api/exercises/{id}/history` | oui | KL-17 |
+| 6.11 | `PUT` | `/api/exercises/{id}/setup` | oui | #8 mobile |
 | 6.7 | `GET` | `/api/schedule/{uuid}` | oui | KL-15 |
 | 6.8 | `PUT` | `/api/schedule/{uuid}` | oui | KL-16 |
 | 6.9 | `DELETE` | `/api/schedule/{uuid}` | oui | KL-16 |
@@ -348,6 +349,8 @@ deux `422`, aucune séance fantôme n'apparaît en base.
 
 3. À la clôture, et à chaque reconnexion, pour chaque séance modifiée :
    PUT /api/schedule/{uuid}   (document complet, rejouable)
+   et pour chaque réglage de machine modifié :
+   PUT /api/exercises/{id}/setup   (texte complet, rejouable)
 
 4. Écran de progression, en ligne uniquement :
    GET /api/exercises/{id}/history
@@ -519,6 +522,7 @@ qu'il a descendu.
 | `exercises` | La bibliothèque visible : la sienne, la globale, celle de ses coachs et de ses athlètes acceptés. |
 | `schedule` | Les séances datées de la fenêtre **qui se consignent**, structure du §6.7. Voir juste en dessous. |
 | `history` | Dernière performance et record par exercice. **Toujours une liste**, jamais un objet indexé par identifiant. |
+| `setups` | Les réglages de machine **du porteur du jeton**, sur la bibliothèque visible (§6.11). Toujours entiers, comme `history`. |
 | `deleted` | `{exercises: [id], schedule: [uuid]}` — ce que la base locale doit oublier. |
 
 **La fenêtre n'est pas tout le calendrier.** Le réalisé se logue en muscu, jamais
@@ -565,9 +569,13 @@ $ curl -sk "https://127.0.0.1:8000/api/bootstrap" -H "Authorization: Bearer $TOK
   ],
   "schedule": [],
   "history": [],
+  "setups": [],
   "deleted": { "exercises": [], "schedule": [] }
 }
 ```
+
+*(`setups` est arrivé après cette capture ; il est ajouté ici pour que
+l'exemple ait la forme actuelle.)*
 
 Delta d'une heure, sur le même compte — 241 exercices deviennent 0, la fenêtre
 reste entière :
@@ -621,6 +629,13 @@ donc tout seul et le prochain `?since` les remonte.
 **Erreurs** : `400` si `since` n'est pas une date ISO 8601 (`?since=hier` est
 refusé — le constructeur PHP l'accepterait comme « hier », ce qui produirait une
 donnée plausible et fausse), `401` sans jeton.
+
+**`setups`** ne suit pas `?since` : un réglage effacé supprime sa ligne, et
+aucune pierre tombale ne le dirait à un delta. La liste part donc entière à
+chaque appel, et elle **remplace** celle du client — sauf, côté client, les
+réglages qu'il n'a pas encore réussi à pousser. Un client qui ne connaît pas la
+clé l'ignore ; un client qui la connaît doit tolérer son absence (serveur pas
+encore à jour) en ne touchant à rien.
 
 **Budget** : la réponse est tenue sous **1 Mo** et son coût en requêtes SQL ne
 dépend pas du volume de données. Mesuré ci-dessus : 74,6 ko pour 241 exercices.
@@ -937,6 +952,49 @@ Les deux nombres sont **déclarés** côté serveur (`config/services.yaml`), pa
 chez GitHub à chaque appel : cet endpoint doit répondre même quand le tiers qui
 héberge les binaires ne répond pas.
 
+### 6.11 `PUT /api/exercises/{id}/setup`
+
+Les **réglages de machine** du porteur du jeton sur un exercice : un bloc de
+texte libre (« dossier : 5, jambe : 1 »), une note par pratiquant et par
+exercice, qui se relit d'une séance à l'autre. Ce n'est ni `log[].notes` (ce qui
+s'est passé **une** séance) ni la consigne du programme (`blocks[].exercises[].notes`).
+
+**Corps**
+
+| Champ | Type | Requis | Contrainte |
+|---|---|---|---|
+| `text` | string | non | ≤ 2 000 caractères. Le texte **entier**, qui remplace le précédent. Les espaces de bord sont retirés. `null`, vide ou blanc : le réglage est **supprimé**. |
+
+**Réponse `200`**, toujours, avec l'état persisté — même forme qu'une entrée de
+`setups` dans le bootstrap :
+
+```json
+{ "exerciseId": 106, "text": "dossier : 5\njambe : 1", "updatedAt": "2026-10-20T18:02:11+00:00" }
+```
+
+Après un effacement, `text` et `updatedAt` valent `null` :
+
+```json
+{ "exerciseId": 106, "text": null, "updatedAt": null }
+```
+
+*(Formes reprises de `tests/Controller/ApiExerciseSetupTest.php`, pas d'un
+`curl` contre le serveur de développement.)*
+
+- **Rejouable.** Le même texte envoyé deux fois rend le même état, horodatage
+  compris ; effacer ce qui n'existe pas rend `200`. Une file de mutations peut
+  donc le rejouer après une réponse perdue.
+- **La dernière écriture arrivée gagne.** Il n'y a qu'un auteur par ligne, il
+  n'y a pas de fusion.
+- **La garde est `VIEW`**, pas `EDIT` : on écrit sa propre ligne à côté de
+  l'exercice, on ne modifie pas l'exercice. Un athlète règle la machine d'un
+  exercice global ou de l'exercice maison de son coach.
+- **Privé à son auteur**, coach compris : le bootstrap d'un coach ne contient
+  pas les réglages de ses athlètes.
+
+**Erreurs** : `401`, `404` pour un exercice **inconnu comme invisible** (même
+règle et même raison qu'au §6.6), `422` + `violations` sur un texte trop long.
+
 ---
 
 ## 7. Limites connues
@@ -973,6 +1031,7 @@ Les gardes décrites ici sont tenues par des tests, pas par la bonne volonté :
 | `tests/Controller/ApiBootstrapTest.php` | Le delta, la fenêtre, les pierres tombales, le budget de 1 Mo. |
 | `tests/Controller/ApiScheduleTest.php` | La lecture, l'upsert, l'idempotence à trois envois, le partage d'autorité. |
 | `tests/Controller/ApiExerciseHistoryTest.php` | L'historique : périmètre, bornage, portée. |
+| `tests/Controller/ApiExerciseSetupTest.php` | Les réglages de machine : aller-retour avec le bootstrap, effacement, rejeu, portée privée, 404 sur un exercice invisible. |
 | `tests/Controller/ApiErrorResponseTest.php` | La forme RFC 9457 et l'absence de fuite interne. |
 | `tests/Controller/ApiAppVersionTest.php` | `GET /api/app-version` : répond sans jeton (l'inverse de la matrice, d'où un fichier à part), refuse quand même un `Bearer` inconnu, ne pose aucun cookie. |
 

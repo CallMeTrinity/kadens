@@ -116,6 +116,7 @@ final class ApiEndpointMatrixTest extends WebTestCase
         yield 'GET /api/me' => ['GET', '/api/me', null, 200, true];
         yield 'GET /api/bootstrap' => ['GET', '/api/bootstrap', null, 200, true];
         yield 'GET /api/exercises/{id}/history' => ['GET', '/api/exercises/{exercise}/history', null, 200, true];
+        yield 'PUT /api/exercises/{id}/setup' => ['PUT', '/api/exercises/{exercise}/setup', ['text' => 'dossier : 5'], 200, true];
         yield 'GET /api/schedule/{uuid}' => ['GET', '/api/schedule/{scheduled}', null, 200, true];
         yield 'PUT /api/schedule/{uuid}' => ['PUT', '/api/schedule/{scheduled}', self::DOCUMENT, 200, true];
         yield 'DELETE /api/schedule/{uuid}' => ['DELETE', '/api/schedule/{freeform}', null, 204, true];
@@ -324,6 +325,9 @@ final class ApiEndpointMatrixTest extends WebTestCase
         self::assertResponseStatusCodeSame(403);
 
         $this->call('GET', '/api/exercises/{exercise}/history', null, $secret);
+        self::assertResponseStatusCodeSame(404);
+
+        $this->call('PUT', '/api/exercises/{exercise}/setup', ['text' => 'dossier : 5'], $secret);
         self::assertResponseStatusCodeSame(404);
     }
 
