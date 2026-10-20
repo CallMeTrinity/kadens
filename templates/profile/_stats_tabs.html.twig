@@ -1,0 +1,28 @@
+{# Rubriques des statistiques : vue d'ensemble, salle, endurance.
+
+   Des liens, pas le contrôleur `tabs` : la fenêtre (`?range=`) recharge déjà
+   la page, et des onglets côté client retomberaient sur le premier à chaque
+   changement de fenêtre. Ici chaque onglet porte la fenêtre courante, et le
+   sélecteur de fenêtre porte l'onglet courant (`_stats_range`, paramètre
+   `tab`) : les deux se conservent mutuellement, sans une ligne de JS.
+
+   Paramètres :
+   - tab     : StatsTab courant
+   - tabs    : list de StatsTab (StatsTab::cases())
+   - period  : StatsPeriod courant, dont la fenêtre est reconduite
+   - subject : l'athlète regardé, ou null pour soi — il décide de la route,
+     comme pour le sélecteur de fenêtre #}
+{% set subject = subject|default(null) %}
+{% set statsRoute = subject ? 'app_coach_athlete_stats' : 'app_profile_stats' %}
+{% set statsParams = (subject ? {id: subject.id} : {})|merge({range: period.queryValue}) %}
+
+<nav class="kd-stattabs" aria-label="Rubriques des statistiques">
+    {% for t in tabs %}
+        {# La vue d'ensemble est l'onglet par défaut : son URL n'a pas de `tab`. #}
+        <a href="{{ path(statsRoute, t.value == 'overview' ? statsParams : statsParams|merge({tab: t.value})) }}"
+           class="kd-stattab{{ t == tab ? ' is-active' }}"
+           {{ t == tab ? 'aria-current="page"' : '' }}>
+            {{ ux_icon(t.icon) }} {{ t.label }}
+        </a>
+    {% endfor %}
+</nav>

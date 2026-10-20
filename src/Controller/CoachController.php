@@ -10,6 +10,7 @@ use App\Entity\Workout;
 use App\Enum\MuscleGroup;
 use App\Enum\ScheduledStatus;
 use App\Enum\StatsRange;
+use App\Enum\StatsTab;
 use App\Repository\GoalRepository;
 use App\Repository\PlanTemplateRepository;
 use App\Repository\ScheduledWorkoutRepository;
@@ -176,6 +177,8 @@ final class CoachController extends AbstractController
             'period' => $period,
             'ranges' => StatsRange::pickable(),
             'months' => $training->availableMonths($athlete),
+            'tab' => StatsTab::resolve($request->query->getString('tab')),
+            'tabs' => StatsTab::cases(),
             'subject' => $athlete,
         ]);
     }

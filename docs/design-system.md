@@ -531,6 +531,15 @@ de mise à l'échelle). Elle réutilise tel quel `.kd-stack`, `.kd-legend`,
 — une barre inventée pour l'occasion aurait fini par diverger de celle qui
 affiche déjà la même donnée ailleurs.
 
+- **Rubriques** (`.kd-stattabs`, `.kd-stattab`, `profile/_stats_tabs.html.twig`) :
+  vue d'ensemble / salle / endurance, en **liens** `?tab=` et non par le
+  contrôleur `tabs`. La fenêtre recharge déjà la page : des onglets côté client
+  retomberaient sur le premier à chaque changement de fenêtre. Chaque onglet
+  reconduit la fenêtre, le sélecteur de fenêtre reconduit l'onglet (paramètre
+  `tab` de `_stats_range`, absent pour le journal). Dessin des onglets de séance
+  (filet bas sous l'actif), pas de l'aplat encre du sélecteur : on change de
+  rubrique, pas de période. Une rubrique ne filtre aucun chiffre, elle choisit
+  les blocs rendus d'un même agrégat.
 - **Sélecteur de fenêtre** (`.kd-rangepick`, `.kd-rangetab`) : trois **liens**
   (4 semaines / 6 mois / tout) plus un `<select>` de mois dans un formulaire
   **GET**. Jamais de fragment rechargé — la page reste auto-suffisante, donc
@@ -551,6 +560,12 @@ affiche déjà la même donnée ailleurs.
 Tous les mois d'un coup, du plus récent au plus ancien, en cases compactes —
 là où `/profile/stats` répond toujours d'une **fenêtre** choisie, celle-ci
 répond de l'étendue complète et n'a donc aucun paramètre d'URL.
+
+- **Points d'entrée** : le profil, les statistiques et l'en-tête du calendrier
+  (mois et semaine). Depuis le calendrier, le lien porte `?from=cal-month-…` /
+  `cal-week-…` et le retour de la page repart à la vue quittée
+  (`_backlink`, repli sur le profil). Seul paramètre lu, et il ne change pas le
+  contenu : c'est pour ça que `from` sort de la clé de cache du service worker.
 
 - **Grille de mois** (`.kd-histmonths`) : trois de front, deux sous 1200, un
   sous 900. La grille de sept colonnes est **conservée à toutes les largeurs**,

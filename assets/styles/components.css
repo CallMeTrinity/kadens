@@ -10367,6 +10367,50 @@ a.kd-coachitem__name:hover {
    Des liens, pas des boutons : chaque fenêtre est une URL. Le formulaire du
    mois est à part parce qu'il porte une valeur, pas un choix binaire.
    ---------------------------------------------------------------------------- */
+/* Rubriques des statistiques (`?tab=`). Même dessin que les onglets d'une
+   séance (`.kd-wk__tab`) : filet bas sous l'actif. Distinct du sélecteur de
+   fenêtre juste dessous, dont l'aplat encre dit un état de filtre ; ici on
+   change de rubrique, pas de période. */
+.kd-stattabs {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-10);
+    margin-bottom: var(--kd-space-9);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.kd-stattab {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    padding: var(--kd-space-6) 0;
+    margin-bottom: -1px;
+    border-bottom: 3px solid transparent;
+    font-family: var(--font-display);
+    font-size: 17px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-action);
+    text-transform: uppercase;
+    text-decoration: none;
+    white-space: nowrap;
+    color: var(--color-text-faint);
+}
+
+.kd-stattab svg {
+    width: 15px;
+    height: 15px;
+}
+
+.kd-stattab:hover {
+    color: var(--color-text);
+}
+
+.kd-stattab.is-active {
+    color: var(--color-text);
+    font-weight: var(--kd-weight-bold);
+    border-bottom-color: var(--color-text);
+}
+
 .kd-rangepick {
     display: flex;
     align-items: center;
@@ -10575,6 +10619,22 @@ a.kd-coachitem__name:hover {
 /* Doit rester APRÈS les règles de base ci-dessus : une @media n'ajoute aucune
    spécificité (cf. docs/design-system.md §5). */
 @media (max-width: 560px) {
+    /* Trois rubriques en capitales débordent d'un téléphone étroit : la barre
+       défile dans son propre conteneur, jamais le `body` (§5). */
+    .kd-stattabs {
+        gap: var(--kd-space-8);
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    /* Un conteneur qui défile rogne à sa boîte de remplissage : le filet ne
+       peut plus chevaucher la bordure, il se pose juste au-dessus. */
+    .kd-stattab {
+        font-size: 15px;
+        padding: var(--kd-space-5) 0;
+        margin-bottom: 0;
+    }
+
     .kd-rangepick {
         align-items: stretch;
     }

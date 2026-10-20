@@ -49,6 +49,11 @@
                 <a class="kd-btn kd-btn--secondary kd-btn--sm" href="{{ path('app_calendar_month', {year: next.year, month: next.month}) }}" aria-label="Mois suivant">
                     {{ ux_icon('lucide:arrow-right') }}
                 </a>
+                {# L'historique (calendrier annuel du fait) est rangé sous le profil ;
+                   le jeton `from` y ramène à la vue quittée au lieu du profil. #}
+                <a class="kd-btn kd-btn--secondary kd-btn--sm" href="{{ path('app_profile_history', back_to('cal-month', '%04d-%02d'|format(year, month))) }}">
+                    {{ ux_icon('lucide:history') }} Historique
+                </a>
                 <a class="kd-btn kd-btn--secondary kd-btn--sm" href="{{ path('app_export_schedule', {year: year, month: month}) }}">
                     {{ ux_icon('lucide:file-down') }} Exporter
                 </a>

@@ -64,9 +64,20 @@
             <a href="{{ statsPath }}" class="kd-btn kd-btn--ghost">
                 {{ ux_icon('lucide:chart-column') }} Statistiques
             </a>
-            <a href="{{ backPath }}" class="kd-btn kd-btn--ghost">
-                {{ ux_icon('lucide:arrow-left') }} {{ subject ? 'Retour à sa fiche' : 'Retour au profil' }}
-            </a>
+            {# Pour soi, la page s'ouvre aussi depuis le calendrier (`?from=cal-…`) :
+               le retour repart alors à la vue quittée, sinon au profil. Le coach
+               n'y arrive que par la fiche athlète, son retour reste figé. #}
+            {% if subject %}
+                <a href="{{ backPath }}" class="kd-btn kd-btn--ghost">
+                    {{ ux_icon('lucide:arrow-left') }} Retour à sa fiche
+                </a>
+            {% else %}
+                {{ include('components/_backlink.html.twig', {
+                    fallback: 'app_profile',
+                    kicker: 'Retour au profil',
+                    class: 'kd-btn kd-btn--ghost',
+                }) }}
+            {% endif %}
         </div>
     </div>
 

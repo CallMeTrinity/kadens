@@ -127,6 +127,67 @@ final class ProfileStatsPageTest extends WebTestCase
     }
 
     /**
+     * Chaque rubrique est une URL, se marque active, et ne rend que ses blocs.
+     * La vue d'ensemble est l'onglet par défaut : son lien n'a pas de `tab`.
+     */
+    public function testEachTabRendersItsOwnBlocks(): void
+    {
+        $this->client->loginUser($this->seedUser());
+
+        $cases = [
+            '' => ['Vue d\'ensemble', 'Tenu, manqué, à venir', 'Où part le volume'],
+            '?tab=gym' => ['Salle', 'Où part le volume', 'Tenu, manqué, à venir'],
+            '?tab=endurance' => ['Endurance', 'Ce qui a été parcouru', 'Où part le volume'],
+        ];
+
+        foreach ($cases as $query => [$label, $shown, $hidden]) {
+            $crawler = $this->client->request('GET', '/profile/stats'.$query);
+
+            self::assertResponseIsSuccessful();
+            $active = $crawler->filter('.kd-stattab[aria-current="page"]');
+            self::assertCount(1, $active, 'Un seul onglet de rubrique actif à la fois.');
+            self::assertSame($label, trim($active->text()));
+            self::assertStringContainsString($shown, $crawler->filter('body')->text());
+            self::assertStringNotContainsString($hidden, $crawler->filter('body')->text());
+        }
+
+        self::assertCount(3, $crawler->filter('.kd-stattab'));
+        self::assertCount(1, $crawler->filter('a.kd-stattab[href="/profile/stats?range=4w"]'));
+    }
+
+    /** Un `?tab=` inconnu retombe sur la vue d'ensemble, comme une fenêtre inconnue. */
+    public function testAnUnknownTabFallsBackToTheOverview(): void
+    {
+        $this->client->loginUser($this->seedUser());
+        $crawler = $this->client->request('GET', '/profile/stats?tab=n-importe-quoi');
+
+        self::assertResponseIsSuccessful();
+        self::assertSame('Vue d\'ensemble', trim($crawler->filter('.kd-stattab[aria-current="page"]')->text()));
+    }
+
+    /**
+     * La fenêtre et la rubrique se conservent mutuellement : changer l'une ne
+     * réinitialise jamais l'autre. C'est la raison d'être d'onglets en liens.
+     */
+    public function testTheTabAndTheWindowCarryEachOther(): void
+    {
+        $this->client->loginUser($this->seedUser());
+        $crawler = $this->client->request('GET', '/profile/stats?range=6m&tab=gym');
+
+        // Les onglets de rubrique gardent la fenêtre.
+        self::assertCount(1, $crawler->filter('a.kd-stattab[href="/profile/stats?range=6m&tab=endurance"]'));
+        // Les onglets de fenêtre gardent la rubrique.
+        self::assertCount(1, $crawler->filter('a.kd-rangetab[href="/profile/stats?tab=gym&range=4w"]'));
+        // Le formulaire mois aussi.
+        self::assertSame('gym', $crawler->filter('.kd-rangepick__month input[name="tab"]')->attr('value'));
+
+        // Sur la vue d'ensemble, rien à porter : les URLs restent propres.
+        $crawler = $this->client->request('GET', '/profile/stats?range=6m');
+        self::assertCount(1, $crawler->filter('a.kd-rangetab[href="/profile/stats?range=4w"]'));
+        self::assertCount(0, $crawler->filter('.kd-rangepick__month input[name="tab"]'));
+    }
+
+    /**
      * Le lien vers la page détaillée n'est offert que sur SON profil : il mène à
      * `/profile/stats`, qui se scope sur l'utilisateur connecté. Sur la fiche
      * d'un athlète suivi, il afficherait les statistiques du coach.

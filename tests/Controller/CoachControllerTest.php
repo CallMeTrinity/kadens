@@ -894,6 +894,12 @@ final class CoachControllerTest extends WebTestCase
         // Le sélecteur de fenêtre reste sur l'athlète.
         self::assertSelectorExists('a[href^="/coach/athlete/'.$athlete->getId().'/stats?range="]');
         self::assertSelectorNotExists('a[href^="/profile/stats"]');
+        // Les rubriques aussi : un onglet ne change pas de sujet en silence.
+        self::assertSelectorExists('a.kd-stattab[href="/coach/athlete/'.$athlete->getId().'/stats?range=4w&tab=gym"]');
+
+        $this->client->request('GET', '/coach/athlete/'.$athlete->getId().'/stats?tab=gym');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorExists('a.kd-rangetab[href="/coach/athlete/'.$athlete->getId().'/stats?tab=gym&range=6m"]');
 
         $this->client->request('GET', '/coach/athlete/'.$athlete->getId().'/history');
         self::assertResponseIsSuccessful();
