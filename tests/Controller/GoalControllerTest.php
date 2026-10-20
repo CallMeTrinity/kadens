@@ -108,6 +108,41 @@ final class GoalControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(403);
     }
 
+    /**
+     * Les séances menant à l'échéance sont des séances DATÉES : chaque ligne
+     * ouvre la séance datée, qu'elle ait une source ou non. Une séance libre
+     * (reprise d'historique, ou source supprimée en SET NULL) n'a pas de séance de
+     * bibliothèque ; la liste la lisait par `s.workout.id` et faisait tomber toute
+     * la fiche en 500.
+     */
+    public function testShowLinksEveryLeadUpSessionToTheDatedSession(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $goal = $this->createGoal($user, 'Course cible', new \DateTimeImmutable('+10 days'));
+        $fromLibrary = (new ScheduledWorkout())
+            ->setOwner($user)
+            ->setWorkout($this->createWorkout($user, 'Sortie longue'))
+            ->setScheduledDate(new \DateTimeImmutable('+1 day'));
+        $free = (new ScheduledWorkout())
+            ->setOwner($user)
+            ->setTitle('Footing importé')
+            ->setScheduledDate(new \DateTimeImmutable('+2 days'));
+        $this->em->persist($fromLibrary);
+        $this->em->persist($free);
+        $this->em->flush();
+
+        $this->client->loginUser($user);
+        $crawler = $this->client->request('GET', '/goal/'.$goal->getId());
+
+        self::assertResponseIsSuccessful();
+        $links = $crawler->filter('.kd-goallead__title');
+        self::assertSame(['Sortie longue', 'Footing importé'], $links->each(static fn ($link) => trim($link->text())));
+        self::assertSame(
+            ['/schedule/'.$fromLibrary->getId(), '/schedule/'.$free->getId()],
+            $links->each(static fn ($link) => $link->attr('href')),
+        );
+    }
+
     public function testDeleteRemovesGoal(): void
     {
         $user = $this->createUser('owner@example.com');

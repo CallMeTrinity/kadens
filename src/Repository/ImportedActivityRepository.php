@@ -82,6 +82,25 @@ class ImportedActivityRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Les activités d'un utilisateur entre deux jours inclus, la plus récente en
+     * tête : ce qu'on propose d'insérer dans le récit d'un objectif.
+     *
+     * @return list<ImportedActivity>
+     */
+    public function findForOwnerBetween(User $owner, \DateTimeImmutable $start, \DateTimeImmutable $end): array
+    {
+        return $this->createQueryBuilder('a')
+            ->andWhere('a.owner = :owner')
+            ->andWhere('a.localDate BETWEEN :start AND :end')
+            ->setParameter('owner', $owner)
+            ->setParameter('start', $start, Types::DATE_IMMUTABLE)
+            ->setParameter('end', $end, Types::DATE_IMMUTABLE)
+            ->orderBy('a.startedAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
     public function countUnattachedForOwner(User $owner): int
     {
         return (int) $this->createQueryBuilder('a')

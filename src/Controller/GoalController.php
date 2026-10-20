@@ -11,6 +11,7 @@ use App\Repository\PlanTemplateRepository;
 use App\Repository\ScheduledWorkoutRepository;
 use App\Security\Voter\GoalVoter;
 use App\Security\Voter\PlanTemplateVoter;
+use App\Service\GoalStory;
 use App\Service\PlanScheduler;
 use App\Service\SlugGenerator;
 use Doctrine\ORM\EntityManagerInterface;
@@ -67,6 +68,7 @@ final class GoalController extends AbstractController
         Goal $goal,
         PlanTemplateRepository $planTemplateRepository,
         ScheduledWorkoutRepository $scheduledWorkoutRepository,
+        GoalStory $story,
     ): Response {
         $this->denyAccessUnlessGranted(GoalVoter::VIEW, $goal);
 
@@ -94,6 +96,7 @@ final class GoalController extends AbstractController
                 static fn ($plan) => !$goal->getPlanTemplates()->contains($plan),
             )),
             'leadUp' => $leadUp,
+            'story' => $story->present($goal),
         ]);
     }
 

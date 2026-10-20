@@ -247,6 +247,14 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   lien ne se perde plus). Se pose et se défait des deux côtés : bandeau `#plan-goals`
   dans l'éditeur de plan, section « Plans de préparation » sur la fiche objectif.
   Jamais affiché sur la page publique d'un plan (les objectifs sont privés).
+- **Récit d'objectif : privé par défaut, publication opt-in (#42).** Un objectif
+  porte un récit en blocs (`GoalBlock` : texte, photo, activité importée, séance
+  faite). Les blocs de référence ne recopient aucun chiffre (`GoalStory`). Seul le
+  **propriétaire** publie (`/s/goal/{slug}`, le coach co-écrit mais prend un 403) ;
+  la page publique ne montre jamais les plans. Premier stockage de fichiers de
+  l'app : photos sous `var/uploads/` (hors `public/`, hors rsync, **à sauvegarder**),
+  servies par contrôleur, réduites et purgées de leur EXIF côté navigateur, sans
+  GD côté serveur. Invariants : [`docs/feature-goal-story.md`](./docs/feature-goal-story.md).
 - **Création sans écran intermédiaire.** « Nouvelle séance » / « Nouveau plan » sont
   des **POST** qui créent un brouillon titré par défaut (plan : 4 semaines) et
   redirigent vers l'éditeur avec `rename=1`, qui ouvre le titre en édition en ligne.
