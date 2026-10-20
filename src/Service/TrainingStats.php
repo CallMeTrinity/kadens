@@ -42,11 +42,16 @@ use App\Repository\ScheduledWorkoutRepository;
  * **Coût.** Cinq requêtes agrégées sans hydratation (statuts, dates faites,
  * volume salle par jour, volume salle par exercice, records antérieurs) plus
  * UNE seule passe hydratante, celle du prescrit d'endurance, bornée par la
- * fenêtre. Le réel importé s'y greffe par un sixième agrégat, sans hydrater
- * une seule activité. C'est ce qui rend « depuis le début » aussi tenable que « quatre
- * semaines » ; l'ancienne page remontait deux fois tout l'historique.
+ * fenêtre. Le réel importé s'y greffe par une lecture scalaire, une ligne par
+ * sortie et sans hydrater une seule activité : ses zones et ses splits sont du
+ * JSON, que DQL ne sait pas sommer. Elle est bornée par le nombre de sorties,
+ * pas par l'historique de séries, et nourrit aussi l'onglet Endurance
+ * (`EnduranceStats`). C'est ce qui rend « depuis le début » aussi tenable que
+ * « quatre semaines » ; l'ancienne page remontait deux fois tout l'historique.
  *
  * @phpstan-import-type RegionShare from RegionBreakdown
+ * @phpstan-import-type EnduranceRow from ImportedActivityRepository
+ * @phpstan-import-type EndurancePair from EnduranceStats
  *
  * @phpstan-type Adherence array{done: int, missed: int, planned: int, total: int, adherence: float|null}
  * @phpstan-type EnduranceVolume array{meters: int, seconds: int, sessions: int, derivedMeters: int, derivedSeconds: int, distanceLabel: string|null, durationLabel: string|null}
@@ -54,6 +59,8 @@ use App\Repository\ScheduledWorkoutRepository;
  * @phpstan-type Bucket array{label: string, short: string, tonnageKg: float, sessions: int, workingSets: int, tonnageLabel: string, tonnageHeightPct: int, sessionsHeightPct: int}
  * @phpstan-type TopLift array{name: string, weightKg: float, weightLabel: string, workingSets: int, sessions: int}
  * @phpstan-type NewRecord array{name: string, weightKg: float, weightLabel: string, previousKg: float, previousLabel: string, gainKg: float, gainLabel: string}
+ * @phpstan-type EnduranceSegment array{activity: ActivityType, seconds: int, meters: int, durationLabel: string, distanceLabel: string|null}
+ * @phpstan-type EnduranceBucket array{label: string, short: string, seconds: int, durationLabel: string, heightPct: int, segments: list<EnduranceSegment>}
  * @phpstan-type PlanAdherence array{planId: int|null, planTitle: string, done: int, missed: int, planned: int, total: int, adherence: float|null}
  */
 final class TrainingStats
@@ -77,6 +84,7 @@ final class TrainingStats
         private readonly UnitFormatter $units,
         private readonly ExerciseNaming $naming,
         private readonly ImportedActivityRepository $importedActivities,
+        private readonly EnduranceStats $enduranceStats,
     ) {
     }
 
@@ -122,6 +130,11 @@ final class TrainingStats
             'progression' => $this->progression($gymByDate, $period),
             'plans' => $this->planAdherence($user, $period),
             'activityCounts' => $prescribed['activities'],
+            'endurance' => $this->enduranceStats->over(
+                $prescribed['rows'],
+                $prescribed['pairs'],
+                $prescribed['coverage'] + ['unattached' => $this->importedActivities->countUnattachedEnduranceForOwnerIn($user, $period->start, $period->end)],
+            ) + ['progression' => $this->enduranceProgression($prescribed['byDate'], $period)],
             'bounds' => $bounds,
         ];
     }
@@ -413,7 +426,14 @@ final class TrainingStats
      * être dite estimée. Sans allure, elle reste à zéro : on n'invente pas une
      * allure. Le réel importé, lui, porte toujours les deux et ne déduit rien.
      *
-     * @return array{endurance: array<string, EnduranceRaw>, activities: list<array{activity: ActivityType, sessions: int}>}
+     * Le même parcours sert aussi l'onglet Endurance, sans une requête de plus :
+     * les lignes du réel importé (`rows`, d'où `EnduranceStats` tire allure, D+,
+     * zones et records), les couples prévu/réel par séance et par sport
+     * (`pairs`), le volume daté par sport pour la rampe (`byDate`) et la
+     * couverture (combien de séances d'endurance faites, combien lues sur la
+     * montre).
+     *
+     * @return array{endurance: array<string, EnduranceRaw>, activities: list<array{activity: ActivityType, sessions: int}>, rows: list<EnduranceRow>, pairs: list<EndurancePair>, byDate: list<array{date: \DateTimeImmutable, activity: ActivityType, meters: int, seconds: int}>, coverage: array{sessions: int, withActivity: int}}
      */
     private function prescribedPass(User $user, StatsPeriod $period): array
     {
@@ -421,8 +441,20 @@ final class TrainingStats
         $endurance = ['running' => $empty, 'cycling' => $empty, 'swimming' => $empty];
         $activityCounts = [];
 
-        // Le réel importé, par séance puis par activité : un seul agrégat SQL.
-        $imported = $this->importedActivities->enduranceTotalsByScheduledWorkout($user, $period->start, $period->end);
+        // Le réel importé : une seule lecture scalaire, repliée ici par séance
+        // puis par activité. Les mêmes lignes nourrissent EnduranceStats.
+        $rows = $this->importedActivities->enduranceRowsForOwner($user, $period->start, $period->end);
+        $imported = [];
+        foreach ($rows as $row) {
+            $cell = $imported[$row['scheduledId']][$row['activity']->value] ?? ['meters' => 0, 'seconds' => 0];
+            $cell['meters'] += $row['meters'] ?? 0;
+            $cell['seconds'] += $row['seconds'] ?? 0;
+            $imported[$row['scheduledId']][$row['activity']->value] = $cell;
+        }
+
+        $pairs = [];
+        $byDate = [];
+        $coverage = ['sessions' => 0, 'withActivity' => 0];
 
         // Les activités du réalisé logué, par séance : un second agrégat. Elles ne
         // servent qu'aux séances sans prescrit — tout l'historique importé
@@ -463,11 +495,24 @@ final class TrainingStats
             }
 
             $volume = null === $workout ? null : $this->metrics->volume($workout);
+            $isEndurance = false;
             foreach ($endurance as $key => $_) {
                 // Par activité, le réel remplace le prescrit en bloc (distance ET
                 // durée) : mélanger la distance courue et la durée prévue ne
                 // décrirait aucune séance.
                 if (isset($actual[$key])) {
+                    if (null !== $volume) {
+                        $pairs[] = [
+                            'activity' => ActivityType::from($key),
+                            'planned' => [
+                                'meters' => $volume[$key]['meters'],
+                                'seconds' => $volume[$key]['seconds'],
+                                'derivedMeters' => $volume[$key]['derivedMeters'],
+                                'derivedSeconds' => $volume[$key]['derivedSeconds'],
+                            ],
+                            'actual' => $actual[$key],
+                        ];
+                    }
                     $meters = $actual[$key]['meters'];
                     $seconds = $actual[$key]['seconds'];
                     $derivedMeters = 0;
@@ -481,11 +526,20 @@ final class TrainingStats
 
                 if ($meters > 0 || $seconds > 0) {
                     ++$endurance[$key]['sessions'];
+                    $isEndurance = true;
+                    $byDate[] = ['date' => $sw->getScheduledDate(), 'activity' => ActivityType::from($key), 'meters' => $meters, 'seconds' => $seconds];
                 }
                 $endurance[$key]['meters'] += $meters;
                 $endurance[$key]['seconds'] += $seconds;
                 $endurance[$key]['derivedMeters'] += $derivedMeters;
                 $endurance[$key]['derivedSeconds'] += $derivedSeconds;
+            }
+
+            if ($isEndurance || [] !== $actual) {
+                ++$coverage['sessions'];
+                if ([] !== $actual) {
+                    ++$coverage['withActivity'];
+                }
             }
         }
 
@@ -495,7 +549,14 @@ final class TrainingStats
             $activities[] = ['activity' => ActivityType::from((string) $value), 'sessions' => $sessions];
         }
 
-        return ['endurance' => $endurance, 'activities' => $activities];
+        return [
+            'endurance' => $endurance,
+            'activities' => $activities,
+            'rows' => $rows,
+            'pairs' => $pairs,
+            'byDate' => $byDate,
+            'coverage' => $coverage,
+        ];
     }
 
     /**
@@ -677,7 +738,7 @@ final class TrainingStats
             $totals[$key]['workingSets'] += $row['workingSets'];
         }
 
-        $keys = $this->bucketKeys($byDate, $period, $weekly);
+        $keys = $this->bucketKeys($byDate[0]['date'] ?? null, $period, $weekly);
         $truncated = \count($keys) > self::MAX_BUCKETS;
         if ($truncated) {
             $keys = \array_slice($keys, -self::MAX_BUCKETS);
@@ -717,21 +778,18 @@ final class TrainingStats
      * Les clés de bucket à tracer, trous compris.
      *
      * La fenêtre bornée donne ses propres bornes ; « depuis le début » les
-     * emprunte aux données, faute de borne basse. Sans données du tout, il n'y
-     * a pas de graphique à tracer.
-     *
-     * @param list<array{date: \DateTimeImmutable, sessions: int, workingSets: int, tonnageKg: float, seconds: int, rpeSum: int, rpeCount: int}> $byDate
+     * emprunte aux données (`$first`, la plus ancienne date de la série), faute
+     * de borne basse. Sans données du tout, il n'y a pas de graphique à tracer.
+     * Partagée par la rampe de salle et celle d'endurance : mêmes colonnes,
+     * mêmes trous.
      *
      * @return list<string>
      */
-    private function bucketKeys(array $byDate, StatsPeriod $period, bool $weekly): array
+    private function bucketKeys(?\DateTimeImmutable $first, StatsPeriod $period, bool $weekly): array
     {
-        $start = $period->start;
+        $start = $period->start ?? $first;
         if (null === $start) {
-            if ([] === $byDate) {
-                return [];
-            }
-            $start = $byDate[0]['date'];
+            return [];
         }
 
         $cursor = $weekly
@@ -747,6 +805,92 @@ final class TrainingStats
         }
 
         return $keys;
+    }
+
+    /**
+     * La rampe d'endurance : le temps par semaine (ou par mois), empilé par
+     * sport. **En durée, pas en distance** : en kilomètres, une sortie vélo
+     * écraserait toute la natation de la fenêtre et la barre ne dirait plus que
+     * « vélo ». Les kilomètres restent dans le détail de chaque segment.
+     *
+     * Même découpage que la rampe de salle (`bucketKeys`, `MAX_BUCKETS`) et même
+     * provenance que le volume : réel importé quand il existe, prescrit sinon. Une
+     * sortie prescrite en distance sans allure n'a pas de durée : elle compte au
+     * volume, pas ici.
+     *
+     * @param list<array{date: \DateTimeImmutable, activity: ActivityType, meters: int, seconds: int}> $byDate
+     *
+     * @return array{points: list<EnduranceBucket>, granularity: string, truncated: bool, hasVolume: bool, sports: list<ActivityType>}
+     */
+    private function enduranceProgression(array $byDate, StatsPeriod $period): array
+    {
+        $weekly = \in_array($period->range, [StatsRange::FOUR_WEEKS, StatsRange::MONTH], true);
+
+        $first = null;
+        $totals = [];
+        foreach ($byDate as $row) {
+            $first = null === $first ? $row['date'] : min($first, $row['date']);
+            $key = $weekly ? $row['date']->format('o-\WW') : $row['date']->format('Y-m');
+            $sport = $row['activity']->value;
+            $totals[$key][$sport] ??= ['meters' => 0, 'seconds' => 0];
+            $totals[$key][$sport]['meters'] += $row['meters'];
+            $totals[$key][$sport]['seconds'] += $row['seconds'];
+        }
+
+        $keys = $this->bucketKeys($first, $period, $weekly);
+        $truncated = \count($keys) > self::MAX_BUCKETS;
+        if ($truncated) {
+            $keys = \array_slice($keys, -self::MAX_BUCKETS);
+        }
+
+        $maxSeconds = 0;
+        foreach ($keys as $key) {
+            $maxSeconds = max($maxSeconds, array_sum(array_column($totals[$key] ?? [], 'seconds')));
+        }
+
+        $points = [];
+        $present = [];
+        foreach ($keys as $key) {
+            $segments = [];
+            $seconds = 0;
+            foreach (EnduranceStats::SPORTS as $sport) {
+                $cell = $totals[$key][$sport->value] ?? null;
+                if (null === $cell || ($cell['seconds'] <= 0 && $cell['meters'] <= 0)) {
+                    continue;
+                }
+
+                $seconds += $cell['seconds'];
+                if ($cell['seconds'] > 0) {
+                    $present[$sport->value] = true;
+                }
+                $segments[] = [
+                    'activity' => $sport,
+                    'seconds' => $cell['seconds'],
+                    'meters' => $cell['meters'],
+                    'durationLabel' => $this->units->duration($cell['seconds']),
+                    'distanceLabel' => $cell['meters'] > 0 ? $this->units->distance($cell['meters']) : null,
+                ];
+            }
+
+            $points[] = [
+                'label' => $weekly ? $this->weekLabel($key) : StatsPeriod::monthLabel(new \DateTimeImmutable($key.'-01')),
+                'short' => $weekly ? 'S'.substr($key, 6) : substr($key, 5, 2).'/'.substr($key, 2, 2),
+                'seconds' => $seconds,
+                'durationLabel' => $seconds > 0 ? $this->units->duration($seconds) : '—',
+                'heightPct' => $maxSeconds > 0 ? (int) round($seconds / $maxSeconds * 100) : 0,
+                'segments' => $segments,
+            ];
+        }
+
+        return [
+            'points' => $points,
+            'granularity' => $weekly ? 'week' : 'month',
+            'truncated' => $truncated,
+            'hasVolume' => $maxSeconds > 0,
+            // La légende : les sports qui ont au moins un segment tracé, dans
+            // l'ordre d'affichage.
+            'sports' => array_values(array_filter(EnduranceStats::SPORTS, static fn (ActivityType $sport): bool => isset($present[$sport->value]))),
+        ];
     }
 
     /**

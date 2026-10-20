@@ -150,7 +150,8 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   séance cochée faite sans réalisé compte en assiduité et ne porte aucun
   tonnage ; le combler avec le prescrit ferait passer une intention pour un
   fait. Contrainte de coût qui va avec : hors de cette unique passe hydratante
-  d'endurance (bornée, le réel importé s'y greffe par un agrégat), tout passe par des agrégats scalaires — sans quoi
+  d'endurance (bornée, le réel importé s'y greffe par une lecture scalaire, une
+  ligne par sortie), tout passe par des agrégats scalaires — sans quoi
   « depuis le début » remonterait l'historique entier à chaque affichage.
   **Parcourir n'est pas agréger** : `TrainingLog` (journal, `/profile/log` et son
   jumeau coach) liste les séances consignées une à une, en trois requêtes

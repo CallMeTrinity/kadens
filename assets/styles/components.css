@@ -9268,6 +9268,28 @@ textarea.kd-inlineedit__input {
     background-image: repeating-linear-gradient(135deg, transparent 0 4px, var(--color-surface-raised) 4px 6px);
 }
 
+/* Rampe d'endurance : une colonne empilée par sport, le plus ancien sport en
+   bas. La hauteur de la pile est la donnée (posée en ligne, calculée en PHP),
+   la part de chaque segment aussi (`flex`). Les couleurs ne passent que par
+   --act, donc par la palette du lecteur. */
+.kd-prog__stack {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    flex-direction: column-reverse;
+    min-height: 3px;
+    overflow: hidden;
+    border-radius: var(--kd-radius-sm);
+}
+
+.kd-prog__seg {
+    display: block;
+    min-height: 1px;
+    background: var(--act);
+}
+
 .kd-prog__col.is-empty .kd-prog__track {
     opacity: .5;
 }
@@ -11221,4 +11243,29 @@ a.kd-coachitem__name:hover {
     .kd-actimport__head {
         flex-direction: column;
     }
+}
+
+/* ============================ ONGLET ENDURANCE ============================ */
+
+/* Couverture : la provenance de toute la page, dite avant le premier chiffre. */
+.kd-endu__coverage {
+    margin: 0 0 var(--kd-space-6);
+}
+
+/* Allure et D+ sous la tuile de volume : du réel seul, en second plan. */
+.kd-endu__real {
+    margin-top: var(--kd-space-2);
+}
+
+.kd-endu__sport {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-3);
+    margin: var(--kd-space-7) 0 var(--kd-space-3);
+    font-size: inherit;
+    font-weight: normal;
+}
+
+.kd-endu__sport:first-of-type {
+    margin-top: 0;
 }

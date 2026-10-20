@@ -14,10 +14,15 @@ use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
+ * @phpstan-type EnduranceRow array{id: int, scheduledId: int, date: \DateTimeImmutable, activity: ActivityType, meters: ?int, seconds: ?int, elevation: ?int, splits: ?list<mixed>, zones: ?list<mixed>}
+ *
  * @extends ServiceEntityRepository<ImportedActivity>
  */
 class ImportedActivityRepository extends ServiceEntityRepository
 {
+    /** Les activités dont le réel entre dans les statistiques d'endurance. */
+    private const ENDURANCE = [ActivityType::RUNNING->value, ActivityType::CYCLING->value, ActivityType::SWIMMING->value];
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, ImportedActivity::class);
@@ -147,34 +152,87 @@ class ImportedActivityRepository extends ServiceEntityRepository
     }
 
     /**
-     * Le volume d'endurance **réel** des séances faites d'une fenêtre, par séance
-     * et par activité, en un seul agrégat SQL. C'est ce que `TrainingStats` substitue
-     * au prescrit quand il existe, sans hydrater une seule activité.
+     * Les sorties d'endurance **réelles** des séances faites d'une fenêtre, une
+     * ligne par activité, en une seule lecture scalaire : aucune entité n'est
+     * hydratée. C'est tout ce que `TrainingStats` sait du réel importé — le
+     * volume par séance s'en replie, et `EnduranceStats` en tire allure, D+,
+     * zones, records et comparaison.
      *
-     * @return array<int, array<string, array{meters: int, seconds: int}>> id de séance => activité => volume
+     * Pas un agrégat SQL, parce que les zones et les splits sont du JSON, que
+     * DQL ne sait pas sommer. La lecture reste bornée par le nombre de sorties
+     * de la fenêtre, jamais par l'historique de séries.
+     *
+     * Les JSON sont rendus tels quels (`list<mixed>`) : leur forme se vérifie
+     * chez qui les lit, une ligne mal formée ne doit pas casser la page.
+     *
+     * @return list<EnduranceRow>
      */
-    public function enduranceTotalsByScheduledWorkout(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
+    public function enduranceRowsForOwner(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
     {
-        $qb = $this->enduranceTotalsQuery()
+        $qb = $this->createQueryBuilder('a')
+            ->select(
+                'a.id AS id',
+                's.id AS sid',
+                's.scheduledDate AS date',
+                'a.activity AS activity',
+                'a.distanceMeters AS meters',
+                'a.movingSeconds AS seconds',
+                'a.elevationGainMeters AS elevation',
+                'a.splits AS splits',
+                'a.hrZoneSeconds AS zones',
+            )
             ->join('a.scheduledWorkout', 's')
             ->andWhere('s.owner = :owner')
             ->andWhere('s.status = :done')
+            ->andWhere('a.activity IN (:endurance)')
             ->setParameter('owner', $owner)
-            ->setParameter('done', ScheduledStatus::DONE);
+            ->setParameter('done', ScheduledStatus::DONE)
+            ->setParameter('endurance', self::ENDURANCE)
+            ->orderBy('s.scheduledDate', 'ASC')
+            ->addOrderBy('a.id', 'ASC');
 
-        if (null !== $start) {
-            $qb->andWhere('s.scheduledDate >= :windowStart')->setParameter('windowStart', $start, Types::DATE_IMMUTABLE);
-        }
+        $this->window($qb, 's.scheduledDate', $start, $end);
 
-        if (null !== $end) {
-            $qb->andWhere('s.scheduledDate <= :windowEnd')->setParameter('windowEnd', $end, Types::DATE_IMMUTABLE);
-        }
-
-        return $this->foldEnduranceTotals($qb->getQuery()->getArrayResult());
+        return array_values(array_map(static fn (array $row): array => [
+            'id' => (int) $row['id'],
+            'scheduledId' => (int) $row['sid'],
+            'date' => $row['date'] instanceof \DateTimeImmutable ? $row['date'] : new \DateTimeImmutable((string) $row['date']),
+            'activity' => $row['activity'] instanceof ActivityType
+                ? $row['activity']
+                : ActivityType::from((string) $row['activity']),
+            'meters' => null !== $row['meters'] ? (int) $row['meters'] : null,
+            'seconds' => null !== $row['seconds'] ? (int) $row['seconds'] : null,
+            'elevation' => null !== $row['elevation'] ? (int) $row['elevation'] : null,
+            'splits' => self::json($row['splits']),
+            'zones' => self::json($row['zones']),
+        ], $qb->getQuery()->getArrayResult()));
     }
 
     /**
-     * Le même agrégat, borné à des séances désignées : celles d'une instanciation
+     * Les sorties d'endurance importées d'une fenêtre qui attendent encore une
+     * séance. Elles ne comptent nulle part dans les statistiques ; ce compteur
+     * sert seulement à le dire, pour qu'un total plus bas que prévu s'explique.
+     * La fenêtre se lit sur le jour local de la sortie : sans séance, c'est la
+     * seule date qu'elle ait.
+     */
+    public function countUnattachedEnduranceForOwnerIn(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): int
+    {
+        $qb = $this->createQueryBuilder('a')
+            ->select('COUNT(a.id)')
+            ->andWhere('a.owner = :owner')
+            ->andWhere('a.scheduledWorkout IS NULL')
+            ->andWhere('a.activity IN (:endurance)')
+            ->setParameter('owner', $owner)
+            ->setParameter('endurance', self::ENDURANCE);
+
+        $this->window($qb, 'a.localDate', $start, $end);
+
+        return (int) $qb->getQuery()->getSingleScalarResult();
+    }
+
+    /**
+     * Le volume d'endurance **réel**, par séance et par activité, borné à des
+     * séances désignées : celles d'une instanciation
      * de plan, que `ProgressionAggregator::realizedRun()` replie sur ses semaines.
      * Le rattachement suffit (pas de filtre de statut) : une activité posée sur
      * une séance dit qu'elle a eu lieu, et le rattachement la passe déjà en DONE.
@@ -203,7 +261,7 @@ class ImportedActivityRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('a')
             ->select('IDENTITY(a.scheduledWorkout) AS sid', 'a.activity AS activity', 'COALESCE(SUM(a.distanceMeters), 0) AS meters', 'COALESCE(SUM(a.movingSeconds), 0) AS seconds')
             ->andWhere('a.activity IN (:endurance)')
-            ->setParameter('endurance', [ActivityType::RUNNING->value, ActivityType::CYCLING->value, ActivityType::SWIMMING->value])
+            ->setParameter('endurance', self::ENDURANCE)
             ->groupBy('sid', 'a.activity');
     }
 
@@ -224,6 +282,32 @@ class ImportedActivityRepository extends ServiceEntityRepository
         }
 
         return $totals;
+    }
+
+    /**
+     * Une colonne JSON lue en scalaire arrive déjà décodée par son type ; le
+     * repli sur la chaîne brute ne coûte rien et ne dépend pas de l'hydrateur.
+     *
+     * @return ?list<mixed>
+     */
+    private static function json(mixed $value): ?array
+    {
+        if (\is_string($value)) {
+            $value = json_decode($value, true);
+        }
+
+        return \is_array($value) ? array_values($value) : null;
+    }
+
+    private function window(QueryBuilder $qb, string $field, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): void
+    {
+        if (null !== $start) {
+            $qb->andWhere($field.' >= :windowStart')->setParameter('windowStart', $start, Types::DATE_IMMUTABLE);
+        }
+
+        if (null !== $end) {
+            $qb->andWhere($field.' <= :windowEnd')->setParameter('windowEnd', $end, Types::DATE_IMMUTABLE);
+        }
     }
 
     public function deleteForOwner(User $owner, ActivitySource $source): int

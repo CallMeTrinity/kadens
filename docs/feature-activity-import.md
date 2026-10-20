@@ -105,7 +105,24 @@ php bin/console app:intervals:import athlete@example.com --since=2025-01-01 --fo
   traitée ; le clic suivant reprend.
 - **Stats** (`TrainingStats`) : par séance faite et par activité, le réel importé
   remplace le prescrit, distance et durée ensemble. Une activité non rattachée ne
-  compte nulle part. Le réel arrive par un agrégat SQL, jamais hydraté.
+  compte nulle part : l'onglet Endurance la **signale** (couverture), sans la
+  verser au volume. Le réel arrive par une **lecture scalaire** bornée
+  (`ImportedActivityRepository::enduranceRowsForOwner`, une ligne par sortie,
+  aucune entité hydratée) : les zones et les splits sont du JSON, que DQL ne
+  somme pas. Les mêmes lignes nourrissent `EnduranceStats` (allure réelle, D+,
+  zones, records, prévu contre réel).
+- **Onglet Endurance : tout sauf le volume se lit sur le seul réel.** Le volume
+  (tuiles, rampe) garde le repli sur le prescrit ; allure, D+, zones et records
+  n'existent que sur les sorties importées et rattachées, et chaque bloc dit sur
+  combien il repose. Définitions à ne pas « simplifier » : l'allure moyenne est
+  Σtemps ÷ Σdistance (jamais la moyenne des allures) ; le record d'allure exige
+  une distance minimale (5 km course, 20 km vélo, 1 km natation) ; le meilleur
+  kilomètre ne retient que les splits d'au moins 1000 m (pauses comprises, donc
+  prudent) ; à égalité, la sortie la plus ancienne garde le record ; prévu contre
+  réel ne compare une grandeur que là où elle était prescrite (pas la part
+  déduite de l'allure), mais l'allure se compare déduction comprise. La rampe se
+  trace en **durée** empilée par sport : en distance, le vélo écraserait la
+  natation.
 - **Allure dérivée**, jamais stockée (`ImportedActivity::getPaceSecondsPerKm`),
   sur le temps en mouvement.
 

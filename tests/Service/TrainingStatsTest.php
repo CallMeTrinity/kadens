@@ -411,6 +411,102 @@ final class TrainingStatsTest extends KernelTestCase
         self::assertCount(1, $withVolume, 'Une seule semaine porte du volume ; les autres restent tracées à zéro.');
     }
 
+    /**
+     * La rampe d'endurance garde les semaines vides, comme celle de la salle, et
+     * se trace en DURÉE : la sortie du 20/07 pèse ses 25 minutes, dans la
+     * semaine 30 seulement.
+     */
+    public function testEnduranceRampKeepsEmptyBucketsAndStacksDurationBySport(): void
+    {
+        $prog = $this->stats->over($this->user, StatsPeriod::month(2026, 7))['endurance']['progression'];
+
+        self::assertSame('week', $prog['granularity']);
+        self::assertCount(5, $prog['points']);
+        self::assertTrue($prog['hasVolume']);
+        self::assertSame([ActivityType::RUNNING], $prog['sports']);
+
+        $withVolume = array_values(array_filter($prog['points'], static fn (array $p): bool => $p['heightPct'] > 0));
+        self::assertCount(1, $withVolume);
+        self::assertSame('S30', $withVolume[0]['short']);
+        self::assertSame(1500, $withVolume[0]['seconds']);
+        self::assertSame(ActivityType::RUNNING, $withVolume[0]['segments'][0]['activity']);
+        self::assertSame(5000, $withVolume[0]['segments'][0]['meters']);
+    }
+
+    /**
+     * L'onglet Endurance lit le réel rattaché, et seulement lui : allure, D+ et
+     * zones viennent de la sortie importée du 20/07. Celle du 21/07, sans séance,
+     * ne compte nulle part — mais la couverture la signale, sinon le total plus
+     * bas que prévu ne s'expliquerait pas.
+     */
+    public function testTheEnduranceTabReadsOnlyTheAttachedReal(): void
+    {
+        $outing = $this->em->getRepository(ScheduledWorkout::class)->findOneBy(['scheduledDate' => new \DateTimeImmutable('2026-07-20')]);
+
+        $this->em->persist((new ImportedActivity($this->user, ActivitySource::INTERVALS, 'i2001', 'Run', new \DateTimeImmutable('2026-07-20 07:00'), new \DateTimeImmutable('2026-07-20')))
+            ->setActivity(ActivityType::RUNNING)
+            ->setDistanceMeters(6000)
+            ->setMovingSeconds(1800)
+            ->setElevationGainMeters(85)
+            ->setHrZoneSeconds([300, 1200, 300, 0, 0])
+            ->setScheduledWorkout($outing));
+        $this->em->persist((new ImportedActivity($this->user, ActivitySource::INTERVALS, 'i2002', 'Run', new \DateTimeImmutable('2026-07-21 07:00'), new \DateTimeImmutable('2026-07-21')))
+            ->setActivity(ActivityType::RUNNING)
+            ->setDistanceMeters(21100)
+            ->setMovingSeconds(7200)
+            ->setElevationGainMeters(400));
+        $this->em->flush();
+
+        $endurance = $this->stats->over($this->user, StatsPeriod::month(2026, 7))['endurance'];
+
+        self::assertSame(['sessions' => 1, 'withActivity' => 1, 'unattached' => 1], $endurance['coverage']);
+        self::assertSame(1, $endurance['summary']['running']['outings']);
+        self::assertSame('5:00/km', $endurance['summary']['running']['paceLabel']);
+        self::assertSame('85 m', $endurance['summary']['running']['elevationLabel']);
+        self::assertNotNull($endurance['zones']);
+        self::assertSame(1, $endurance['zones']['outings']);
+        self::assertSame(83, $endurance['zones']['easyPercent']);
+        // Le semi non rattaché n'est pas le record de la période.
+        self::assertSame('6 km', $endurance['records'][0]['value']);
+    }
+
+    /**
+     * Prévu contre réel : 5 km en 25 min prescrits, 6 km en 30 min courus. Les
+     * deux grandeurs étaient prescrites, les deux se comparent.
+     */
+    public function testEnduranceComparisonPairsThePrescriptionWithTheReal(): void
+    {
+        $outing = $this->em->getRepository(ScheduledWorkout::class)->findOneBy(['scheduledDate' => new \DateTimeImmutable('2026-07-20')]);
+
+        $this->em->persist((new ImportedActivity($this->user, ActivitySource::INTERVALS, 'i2003', 'Run', new \DateTimeImmutable('2026-07-20 07:00'), new \DateTimeImmutable('2026-07-20')))
+            ->setActivity(ActivityType::RUNNING)
+            ->setDistanceMeters(6000)
+            ->setMovingSeconds(1800)
+            ->setScheduledWorkout($outing));
+        $this->em->flush();
+
+        $comparison = $this->stats->over($this->user, StatsPeriod::month(2026, 7))['endurance']['comparison'];
+
+        self::assertCount(1, $comparison);
+        self::assertSame(ActivityType::RUNNING, $comparison[0]['activity']);
+        self::assertNotNull($comparison[0]['distance']);
+        self::assertSame('+1 km', $comparison[0]['distance']['delta']);
+        self::assertSame(20, $comparison[0]['distance']['percent']);
+        self::assertNotNull($comparison[0]['duration']);
+        self::assertSame('+5:00', $comparison[0]['duration']['delta']);
+    }
+
+    /** Sans import, la sortie compte sur son prescrit, et la couverture le dit. */
+    public function testCoverageCountsOutingsReadOnThePrescription(): void
+    {
+        $endurance = $this->stats->over($this->user, StatsPeriod::month(2026, 7))['endurance'];
+
+        self::assertSame(['sessions' => 1, 'withActivity' => 0, 'unattached' => 0], $endurance['coverage']);
+        self::assertSame([], $endurance['summary']);
+        self::assertNull($endurance['zones']);
+        self::assertSame([], $endurance['comparison']);
+    }
+
     /** Les mois du sélecteur couvrent tout l'historique, mois vides compris. */
     /**
      * Régression : les semaines se comparent par leur VALEUR, jamais par

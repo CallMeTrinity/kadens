@@ -7,10 +7,11 @@ namespace App\Enum;
 /**
  * Rubrique affichée par `/profile/stats` (`?tab=`).
  *
- * Trois rubriques et pas une par sport : la salle a de quoi remplir une page
- * (tonnage, régions, rampe, records), l'endurance pas encore — course, vélo et
- * natation tiennent côte à côte en une tuile chacun. Les découper aujourd'hui
- * donnerait trois onglets presque vides.
+ * Trois rubriques et pas une par sport : la salle a sa page (tonnage, régions,
+ * rampe, records), l'endurance aussi (volume, rampe, zones, records, prévu
+ * contre réel), et course, vélo et natation y tiennent ensemble, distingués par
+ * leur couleur. Un onglet par sport découperait une question unique — « combien
+ * et à quelle intensité je m'entraîne » — en trois pages à moitié vides.
  *
  * Une rubrique ne filtre rien : `TrainingStats::over()` calcule la fenêtre
  * entière et l'onglet choisit seulement les blocs rendus. Les chiffres d'un

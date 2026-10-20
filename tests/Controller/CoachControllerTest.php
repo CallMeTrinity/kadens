@@ -5,6 +5,7 @@ namespace App\Tests\Controller;
 use App\Entity\Coaching;
 use App\Entity\Exercise;
 use App\Entity\Goal;
+use App\Entity\ImportedActivity;
 use App\Entity\LoggedExercise;
 use App\Entity\LoggedSet;
 use App\Entity\PlanItem;
@@ -12,6 +13,7 @@ use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
 use App\Entity\Workout;
+use App\Enum\ActivitySource;
 use App\Enum\ActivityType;
 use App\Enum\CoachingStatus;
 use App\Enum\ScheduledStatus;
@@ -910,6 +912,33 @@ final class CoachControllerTest extends WebTestCase
         $this->client->request('GET', '/coach/athlete/'.$athlete->getId());
         self::assertSelectorExists('a[href="/coach/athlete/'.$athlete->getId().'/stats"]');
         self::assertSelectorExists('a[href="/coach/athlete/'.$athlete->getId().'/history"]');
+    }
+
+    /**
+     * L'onglet Endurance vu par le coach : il apprend qu'une sortie de son
+     * athlète attend une séance, mais n'est pas invité à la rattacher —
+     * rattacher, c'est consigner (`LOG`), et ce droit reste au propriétaire.
+     */
+    public function testAthleteEnduranceTabTellsTheCoachWithoutAnInvitationToAttach(): void
+    {
+        $coach = $this->createUser('coach@example.com', ['ROLE_COACH']);
+        $athlete = $this->createUser('athlete@example.com');
+        $this->createCoaching($coach, $athlete, CoachingStatus::ACCEPTED);
+
+        $day = new \DateTimeImmutable('-2 days');
+        $this->em->persist((new ImportedActivity($athlete, ActivitySource::INTERVALS, 'c1', 'Run', $day->setTime(7, 0), $day))
+            ->setActivity(ActivityType::RUNNING)
+            ->setDistanceMeters(8000)
+            ->setMovingSeconds(2400));
+        $this->em->flush();
+
+        $this->client->loginUser($coach);
+        $crawler = $this->client->request('GET', '/coach/athlete/'.$athlete->getId().'/stats?tab=endurance');
+
+        self::assertResponseIsSuccessful();
+        $coverage = $crawler->filter('.kd-endu__coverage')->text();
+        self::assertStringContainsString('1 activité importée sans séance', $coverage);
+        self::assertStringNotContainsString('rattache', $coverage);
     }
 
     /**

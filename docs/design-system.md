@@ -550,6 +550,14 @@ affiche déjà la même donnée ailleurs.
   la flèche d'un record battu — de l'intensité, pas une catégorie.
 - **Observance par plan** (`.kd-planbar`) : reprend `.kd-obar`, la même barre
   faite/manquée/prévue que la synthèse générale, simplement ventilée.
+- **Rampe d'endurance** (`.kd-prog__stack`, `.kd-prog__seg`) : la colonne de
+  `.kd-prog__bars`, empilée par sport. Hauteur de la pile et part de chaque
+  segment (`flex`) sont des données calculées en PHP ; la couleur ne vient que
+  de `--act` (`kd-act--*`), donc de la palette du lecteur. Légende en
+  `.kd-legend__key--act`, comme au calendrier.
+- **Temps en zones** (`components/_zonebars.html.twig`) : une seule barre de
+  zones, partagée par la page d'une séance et l'onglet Endurance
+  (`ZoneBreakdown::shares()`). Le rouge n'y touche que Z4-Z5 : de l'intensité.
 - **Rampe de volume** (`.kd-statbars`) : le graphique **déborde** dans son
   propre conteneur `overflow-x` plutôt que de se comprimer — vingt-quatre barres
   de trois pixels ne se lisent pas, et le `body` ne défile jamais
