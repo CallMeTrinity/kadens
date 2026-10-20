@@ -7,8 +7,8 @@
 # `doctrine:database:create --env=test` échoue faute de droits.
 #
 # Exécuté par l'entrypoint MariaDB au PREMIER démarrage seulement (répertoire de
-# données vide). Sur un volume existant, il ne se relance pas. Le schéma reste à
-# poser ensuite : `APP_ENV=test php bin/console doctrine:schema:create`.
+# données vide). Sur un volume existant, il ne se relance pas. Le schéma, lui,
+# se pose et se resynchronise tout seul au lancement de PHPUnit (tests/bootstrap.php).
 #
 # Exécutable et autonome (client `mariadb` sur la socket du serveur temporaire,
 # root déjà sécurisé à ce stade) : l'entrypoint « source » un .sh non

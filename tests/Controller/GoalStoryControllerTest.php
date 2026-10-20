@@ -326,6 +326,10 @@ final class GoalStoryControllerTest extends WebTestCase
 
         $this->client->request('POST', '/goal/'.$goal->getId().'/publish', ['_token' => $token, 'action' => $action]);
         self::assertResponseRedirects('/goal/'.$goal->getId());
+
+        // La requête a écrit par le gestionnaire d'un noyau redémarré : celui du
+        // test garde sinon l'objectif d'avant (slug nul) dans sa carte d'identité.
+        $this->em->clear();
     }
 
     /** Le jeton se lit sur l'éditeur, comme le ferait un navigateur. */
