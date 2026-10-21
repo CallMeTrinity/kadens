@@ -254,7 +254,7 @@ final class GoalController extends AbstractController
             $this->addFlash('error', sprintf(
                 'Le plan « %s » est déjà posé sur %s. Vide-le d\'abord pour le ré-ancrer sur cette échéance.',
                 $plan->getTitle(),
-                $mine ? 'ton calendrier' : 'le calendrier de '.$owner->getUserIdentifier(),
+                $mine ? 'ton calendrier' : 'le calendrier de '.$owner->getDisplayName(),
             ));
 
             return $this->redirectToRoute('app_goal_show', ['id' => $goal->getId()]);
@@ -272,7 +272,7 @@ final class GoalController extends AbstractController
             $plan->getTitle(),
             \count($created),
             \count($created) > 1 ? 's' : '',
-            $mine ? 'ton échéance' : 'l\'échéance de '.$owner->getUserIdentifier(),
+            $mine ? 'ton échéance' : 'l\'échéance de '.$owner->getDisplayName(),
         ));
 
         return $this->redirectToRoute('app_goal_show', ['id' => $goal->getId()]);

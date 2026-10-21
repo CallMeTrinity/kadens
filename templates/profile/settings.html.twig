@@ -18,7 +18,7 @@
         <div>
             <p class="kd-eyebrow kd-eyebrow--accent">Profil</p>
             <h1 class="kd-title">Paramètres du compte</h1>
-            <p class="kd-lead">Tes identifiants et ta sécurité. Les mesures et records sont sur <a href="{{ path('app_profile_edit') }}">ta fiche athlète</a>.</p>
+            <p class="kd-lead">Ton pseudo, tes identifiants et ta sécurité. Les mesures et records sont sur <a href="{{ path('app_profile_edit') }}">ta fiche athlète</a>.</p>
         </div>
     </div>
 
@@ -29,7 +29,7 @@
                 <span class="kd-formsection__icon">{{ ux_icon('lucide:user') }}</span>
                 <div>
                     <h2 class="kd-formsection__title">Compte</h2>
-                    <p class="kd-formsection__hint">L'email sert d'identifiant de connexion. Il se change en console (<code>app:user:create</code> pour un nouveau compte).</p>
+                    <p class="kd-formsection__hint">L'email sert d'identifiant de connexion et d'adresse pour le coaching. Il se change en console (<code>app:user:create</code> pour un nouveau compte).</p>
                 </div>
             </header>
             <dl class="kd-deflist kd-deflist--profile">
@@ -40,6 +40,17 @@
                 <dt>Rôle</dt>
                 <dd>{{ u.isCoach ? 'Athlète et coach' : 'Athlète' }}</dd>
             </dl>
+
+            {# Son propre <form>, dans la carte du compte : c'est la seule donnée
+               d'identité modifiable depuis l'app. Vider le champ retire le pseudo. #}
+            {{ form_start(usernameForm) }}
+                <div class="kd-formgrid kd-formgrid--full">
+                    {{ form_row(usernameForm.username, {help: 'Affiché à la place de ton email, partout dans l\'app. Unique, modifiable à volonté ; laisse vide pour ne pas en avoir.'}) }}
+                </div>
+                <div class="kd-formactions">
+                    <button type="submit" class="kd-btn kd-btn--primary">Enregistrer le pseudo</button>
+                </div>
+            {{ form_end(usernameForm) }}
         </section>
 
         {# Son propre <form> : un <form> ne s'imbrique pas, et ce réglage n'a rien

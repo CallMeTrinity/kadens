@@ -16,15 +16,15 @@
 {% set workspace = iAmCoach and relation.isActive and (linkAthlete ?? false) %}
 
 <article class="kd-coachcard{{ relation.isActive ? '' : ' is-muted' }}">
-    <span class="kd-coachcard__avatar" aria-hidden="true">{{ other ? other.userIdentifier|first|upper : '?' }}</span>
+    <span class="kd-coachcard__avatar" aria-hidden="true">{{ other ? other.displayName|first|upper : '?' }}</span>
 
     <div class="kd-coachcard__body">
         <div class="kd-coachcard__top">
             <h3 class="kd-coachcard__name">
                 {% if workspace %}
-                    <a href="{{ path('app_coach_athlete', {id: other.id}) }}">{{ other.userIdentifier }}</a>
+                    <a href="{{ path('app_coach_athlete', {id: other.id}) }}">{{ other.displayName }}</a>
                 {% else %}
-                    {{ other ? other.userIdentifier : 'Utilisateur supprimé' }}
+                    {{ other ? other.displayName : 'Utilisateur supprimé' }}
                 {% endif %}
             </h3>
             <span class="kd-badge kd-badge--{{ relation.status.modifier }}">
@@ -33,6 +33,8 @@
         </div>
 
         <p class="kd-coachcard__role">
+            {# Le coaching se noue par email : sous un pseudo, on le rappelle. #}
+            {% if other and other.username %}{{ other.email }} · {% endif %}
             {{ iAmCoach ? 'Tu entraînes cette personne' : 'Cette personne t\'entraîne' }}
             {% if relation.status.value == 'pending' %}
                 · {{ relation.isRecipient(me) ? 'demande reçue' : 'demande envoyée' }}

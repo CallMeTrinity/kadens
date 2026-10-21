@@ -1,0 +1,47 @@
+{% extends 'base.html.twig' %}
+
+{# La page de l'invitation à choisir un pseudo, quand la modale ne suffit pas :
+   pseudo refusé (déjà pris, invalide), lien direct, ou navigateur sans JS.
+   Attend : form (UsernameType, requis), back (chemin local où revenir). #}
+
+{% block title %}Choisir un pseudo — Kadens{% endblock %}
+
+{% block body %}
+    <a href="{{ back }}" class="kd-backlink">
+        {{ ux_icon('lucide:arrow-left') }} Retour
+    </a>
+
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow kd-eyebrow--accent">Profil</p>
+            <h1 class="kd-title">Choisis un pseudo</h1>
+            <p class="kd-lead">Facultatif, modifiable à tout moment depuis <a href="{{ path('app_profile_settings') }}">tes paramètres</a>.</p>
+        </div>
+    </div>
+
+    <div class="kd-editform">
+        {{ form_start(form) }}
+            <section class="kd-card kd-formsection">
+                <input type="hidden" name="_back" value="{{ back }}">
+                <div class="kd-formgrid kd-formgrid--full">
+                    {{ form_row(form.username) }}
+                </div>
+                <div class="kd-formactions">
+                    <button type="submit" class="kd-btn kd-btn--primary">
+                        {{ ux_icon('lucide:check') }} Valider
+                    </button>
+                    {% if app.user.shouldPromptForUsername %}
+                        <button type="submit" form="username-dismiss" class="kd-btn kd-btn--ghost">Non merci</button>
+                    {% endif %}
+                </div>
+            </section>
+        {{ form_end(form) }}
+
+        {% if app.user.shouldPromptForUsername %}
+            <form id="username-dismiss" method="post" action="{{ path('app_profile_username_dismiss') }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('username_dismiss') }}">
+                <input type="hidden" name="_back" value="{{ back }}">
+            </form>
+        {% endif %}
+    </div>
+{% endblock %}

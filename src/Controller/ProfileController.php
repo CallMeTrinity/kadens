@@ -12,6 +12,7 @@ use App\Enum\ProfileTab;
 use App\Enum\StatsRange;
 use App\Enum\StatsTab;
 use App\Form\ProfileType;
+use App\Form\UsernameType;
 use App\Repository\ApiTokenRepository;
 use App\Repository\ImportedActivityRepository;
 use App\Repository\IntervalsConnectionRepository;
@@ -27,6 +28,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\Form\FormError;
+use Symfony\Component\Form\FormInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -209,15 +211,33 @@ final class ProfileController extends AbstractController
         /** @var User $user */
         $user = $this->getUser();
 
-        // Deux formulaires sur une même route : chacun ne lit la requête que si
-        // c'est LUI qui a été posté. Un `handleRequest()` inconditionnel sur les
-        // deux ferait valider le second à vide au premier envoi du premier —
-        // pour `display_settings`, mappé sur `User`, ça écraserait la préférence
-        // avec la valeur par défaut de l'enum.
+        // Trois formulaires sur une même route : chacun ne lit la requête que si
+        // c'est LUI qui a été posté. Un `handleRequest()` inconditionnel sur tous
+        // ferait valider les autres à vide au premier envoi de l'un — pour
+        // `display_settings`, mappé sur `User`, ça écraserait la préférence avec
+        // la valeur par défaut de l'enum ; pour `username`, ça effacerait le pseudo.
+        $usernameForm = $this->createForm(UsernameType::class, $user);
         $display = $this->createForm(DisplaySettingsType::class, $user);
         $form = $this->createForm(ChangePasswordType::class);
 
         $posted = $request->request->keys();
+
+        if (\in_array($usernameForm->getName(), $posted, true)) {
+            $usernameForm->handleRequest($request);
+
+            if ($usernameForm->isSubmitted() && $usernameForm->isValid()) {
+                // Passer par ici vaut réponse à l'invitation, même pour vider le
+                // champ : retirer son pseudo est un choix, pas un oubli à relancer.
+                $user->setUsernamePromptDismissedAt($user->getUsernamePromptDismissedAt() ?? new \DateTimeImmutable());
+                $entityManager->flush();
+
+                $this->addFlash('success', null === $user->getUsername() ? 'Pseudo retiré.' : 'Pseudo mis à jour.');
+
+                return $this->redirectToRoute('app_profile_settings');
+            }
+
+            $this->discardRejectedUsername($usernameForm, $entityManager, $user);
+        }
 
         if (\in_array($display->getName(), $posted, true)) {
             $display->handleRequest($request);
@@ -260,10 +280,68 @@ final class ProfileController extends AbstractController
         }
 
         return $this->render('profile/settings.html.twig', [
+            'usernameForm' => $usernameForm,
             'form' => $form,
             'display' => $display,
             'devices' => $this->apiTokens->findForOwner($user),
         ] + $this->intervalsContext($user));
+    }
+
+    /**
+     * Réponse à l'invitation à choisir un pseudo (`components/_username_prompt`),
+     * qui s'ouvre sur n'importe quelle page tant qu'il n'y en a pas. Retour à la
+     * page d'où l'on vient (`_back`), sinon l'invitation ferait perdre sa place.
+     *
+     * Le refus (pseudo pris, invalide) ne peut pas se rendre sur la page
+     * d'origine, que ce contrôleur ne sait pas construire : il se rend ici, sur
+     * une page qui ne porte que ce formulaire. C'est aussi le repli sans JS, et
+     * ce que sert le GET.
+     */
+    #[Route('/profile/username', name: 'app_profile_username', methods: ['GET', 'POST'])]
+    public function username(Request $request, EntityManagerInterface $entityManager): Response
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        $form = $this->createForm(UsernameType::class, $user, ['required' => true]);
+        $form->handleRequest($request);
+
+        $back = self::localPath($request->request->getString('_back', $request->query->getString('back')));
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $entityManager->flush();
+
+            $this->addFlash('success', sprintf('C\'est noté, tu t\'appelles maintenant %s.', $user->getDisplayName()));
+
+            return $this->redirect($back);
+        }
+
+        $this->discardRejectedUsername($form, $entityManager, $user);
+
+        return $this->render('profile/username.html.twig', [
+            'form' => $form,
+            'back' => $back,
+        ]);
+    }
+
+    /**
+     * « Non merci » : l'invitation ne revient plus, sur aucun appareil. Le pseudo
+     * reste ajoutable depuis les paramètres.
+     */
+    #[Route('/profile/username/dismiss', name: 'app_profile_username_dismiss', methods: ['POST'])]
+    public function dismissUsernamePrompt(Request $request, EntityManagerInterface $entityManager): Response
+    {
+        /** @var User $user */
+        $user = $this->getUser();
+
+        if (!$this->isCsrfTokenValid('username_dismiss', $request->getPayload()->getString('_token'))) {
+            throw $this->createAccessDeniedException('Jeton CSRF invalide.');
+        }
+
+        $user->setUsernamePromptDismissedAt($user->getUsernamePromptDismissedAt() ?? new \DateTimeImmutable());
+        $entityManager->flush();
+
+        return $this->redirect(self::localPath($request->getPayload()->getString('_back')));
     }
 
     /**
@@ -326,6 +404,7 @@ final class ProfileController extends AbstractController
         }
 
         return $this->render('profile/settings.html.twig', $context + [
+            'usernameForm' => $this->createForm(UsernameType::class, $user)->createView(),
             'form' => $this->createForm(ChangePasswordType::class)->createView(),
             'display' => $this->createForm(DisplaySettingsType::class, $user)->createView(),
             'devices' => $this->apiTokens->findForOwner($user),
@@ -418,6 +497,34 @@ final class ProfileController extends AbstractController
         $this->apiTokens->deleteForOwner($user);
 
         return $this->afterRevocation($request, $user, 'Tous les appareils ont été révoqués.');
+    }
+
+    /**
+     * Le formulaire du pseudo est mappé sur `User`, qui est aussi `app.user` : un
+     * pseudo refusé (déjà pris) resterait sinon dans l'entité le temps du rendu,
+     * et l'en-tête l'afficherait comme accepté. On relit le compte en base ; le
+     * champ, lui, garde la saisie et son erreur (un formulaire soumis se rend
+     * depuis ce qui a été envoyé, pas depuis l'entité).
+     *
+     * @param FormInterface<User> $form
+     */
+    private function discardRejectedUsername(FormInterface $form, EntityManagerInterface $entityManager, User $user): void
+    {
+        if ($form->isSubmitted() && !$form->isValid()) {
+            $entityManager->refresh($user);
+        }
+    }
+
+    /**
+     * La page où revenir après l'invitation, réduite à un chemin local. Le champ
+     * vient du client : sans ce filtre, ce serait une redirection ouverte. Refusés,
+     * tout ce qui ne commence pas par un seul `/` (`//hote` et `/\hote` partent
+     * ailleurs) et les caractères de contrôle — un navigateur retire tabulations
+     * et retours à la ligne d'une URL, `/<TAB>/hote` deviendrait `//hote`.
+     */
+    private static function localPath(string $path): string
+    {
+        return 1 === preg_match('#^/(?![/\\\\])[^\x00-\x20\x7F]*$#', $path) ? $path : '/';
     }
 
     /**

@@ -180,7 +180,7 @@ final class BackLink
         return [
             'url' => $this->urlGenerator->generate($route, ['id' => $athlete->getId()]),
             'kicker' => $kicker,
-            'name' => $athlete->getUserIdentifier(),
+            'name' => $athlete->getDisplayName(),
         ];
     }
 

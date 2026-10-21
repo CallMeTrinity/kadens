@@ -73,11 +73,11 @@
             <details class="kd-usermenu" data-controller="dismiss">
                 <summary class="kd-usermenu__trigger{{ activeMenuItem ? ' is-active' }}"
                          aria-label="Menu du compte">
-                    <span class="kd-usermenu__avatar" aria-hidden="true">{{ app.user.userIdentifier|first|upper }}</span>
+                    <span class="kd-usermenu__avatar" aria-hidden="true">{{ app.user.displayName|first|upper }}</span>
                     {{ ux_icon('lucide:chevron-down') }}
                 </summary>
                 <div class="kd-usermenu__panel">
-                    <p class="kd-usermenu__who">{{ app.user.userIdentifier }}</p>
+                    <p class="kd-usermenu__who">{{ app.user.displayName }}</p>
                     <nav class="kd-usermenu__list" aria-label="Menu du compte">
                         {% for item in menuItems %}
                             {% set active = activeMenuItem == item.label %}

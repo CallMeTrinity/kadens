@@ -1,0 +1,50 @@
+{#
+    Invitation à choisir un pseudo, posée sur toutes les pages par base.html.twig
+    tant que le compte n'en a pas et ne l'a pas déclinée (User::shouldPromptForUsername()).
+
+    Attend :
+      - `form` : FormView de UsernameType (fonction `username_prompt_form()`)
+
+    Trois sorties, trois portées :
+      - Valider : le pseudo est posé, l'invitation ne revient plus.
+      - « Non merci » : refus enregistré en base, l'invitation ne revient plus,
+        sur aucun appareil. Le pseudo reste ajoutable dans les paramètres.
+      - La croix ou Échap : « plus tard ». Rien côté serveur ; le contrôleur
+        `dialog` ne la rouvre qu'à la prochaine session du navigateur.
+
+    `_back` ramène à la page en cours : l'invitation ne doit pas faire perdre sa
+    place (filtré côté serveur, cf. ProfileController::localPath()).
+#}
+<div data-controller="dialog" data-dialog-open-once-value="kd-username-prompt-{{ app.user.id }}">
+    <dialog class="kd-modal" data-dialog-target="dialog" data-action="click->dialog#backdrop"
+            aria-labelledby="username-prompt-title">
+        <div class="kd-modal__card">
+            <div class="kd-modal__head">
+                <div>
+                    <h2 class="kd-modal__title" id="username-prompt-title">Choisis un pseudo</h2>
+                    <p class="kd-modal__sub">Facultatif, modifiable à tout moment</p>
+                </div>
+                <button type="button" class="kd-modal__close" data-action="dialog#close" aria-label="Plus tard">
+                    {{ ux_icon('lucide:x') }}
+                </button>
+            </div>
+
+            {{ form_start(form, {attr: {class: 'kd-modal__form'}}) }}
+                <input type="hidden" name="_back" value="{{ app.request.requestUri }}">
+                {{ form_row(form.username) }}
+                <div class="kd-formactions">
+                    <button type="submit" class="kd-btn kd-btn--primary">
+                        {{ ux_icon('lucide:check') }} Valider
+                    </button>
+                    {# Bouton d'un autre formulaire : un <form> ne s'imbrique pas. #}
+                    <button type="submit" form="username-prompt-dismiss" class="kd-btn kd-btn--ghost">Non merci</button>
+                </div>
+            {{ form_end(form) }}
+
+            <form id="username-prompt-dismiss" method="post" action="{{ path('app_profile_username_dismiss') }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('username_dismiss') }}">
+                <input type="hidden" name="_back" value="{{ app.request.requestUri }}">
+            </form>
+        </div>
+    </dialog>
+</div>

@@ -55,7 +55,7 @@
                     <article class="kd-libcard{{ item.activities ? ' kd-libcard--act ' ~ activity.surface(item.activities) }}"
                              data-filter-target="item"
                              data-filter-name="{{ workout.title }}"
-                             data-filter-text="{{ workout.title }} {% for a in item.activities %}{{ a.label }} {% endfor %}{{ workout.owner ? workout.owner.userIdentifier }}"
+                             data-filter-text="{{ workout.title }} {% for a in item.activities %}{{ a.label }} {% endfor %}{{ workout.owner ? workout.owner.displayName }}"
                              data-facet-activity="{% for a in item.activities %}{{ a.value }}{{ not loop.last ? ' ' }}{% endfor %}"
                              data-facet-owner="{{ workout.owner ? workout.owner.id }}"
                              data-sort-name="{{ workout.title|lower }}"

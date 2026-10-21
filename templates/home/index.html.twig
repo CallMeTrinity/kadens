@@ -19,7 +19,7 @@
 
     <div class="kd-home">
         <div class="kd-home__head">
-            <h1 class="kd-home__title">Salut {{ u.userIdentifier }}</h1>
+            <h1 class="kd-home__title">Salut {{ u.displayName }}</h1>
             <p class="kd-eyebrow">{{ dayNames[today|date('N')] }} {{ today|date('j') }} {{ monthName }} · S{{ today|date('W') }}</p>
         </div>
 
@@ -29,7 +29,7 @@
             <div class="kd-home__coach">
                 {{ ux_icon('lucide:users') }}
                 <p class="kd-home__coachtext">
-                    <strong>{{ other ? other.userIdentifier : 'Quelqu\'un' }}</strong>
+                    <strong>{{ other ? other.displayName : 'Quelqu\'un' }}</strong>
                     {{ relation.coach == u ? 'te demande de l\'entraîner' : 'propose de t\'entraîner' }}
                 </p>
                 <div class="kd-home__coachacts">

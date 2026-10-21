@@ -46,6 +46,15 @@
             {% block body %}{% endblock %}
         </main>
 
+        {# L'invitation à choisir un pseudo, sur la page où l'on arrive. Pas sur
+           les deux pages qui portent déjà le champ : elle y ferait doublon. #}
+        {% if app.request.attributes.get('_route') not in ['app_profile_settings', 'app_profile_username'] %}
+            {% set username_prompt = username_prompt_form(app.user, path('app_profile_username')) %}
+            {% if username_prompt %}
+                {{ include('components/_username_prompt.html.twig', {form: username_prompt}, with_context = false) }}
+            {% endif %}
+        {% endif %}
+
         {# Service worker : PROD SEULEMENT. En dev il n'apporte rien (rien à
            installer) et un SW qui traîne masque les modifications — c'est ce qui
            avait fait suspendre la Phase 9. Pour le tester en local : APP_ENV=prod.

@@ -28,7 +28,7 @@
    filtre aucun chiffre, elle choisit les blocs rendus : `stats` est le même
    agrégat quel que soit l'onglet. #}
 
-{% block title %}Statistiques{% if subject|default(null) %} — {{ subject.userIdentifier }}{% endif %} — Kadens{% endblock %}
+{% block title %}Statistiques{% if subject|default(null) %} — {{ subject.displayName }}{% endif %} — Kadens{% endblock %}
 
 {% block body %}
     {% set subject = subject|default(null) %}
@@ -46,7 +46,7 @@
                d'affichage (User.sex est nullable et sert au DOTS). #}
             <h1 class="kd-title">{{ subject ? 'Ce qui a été fait' : 'Ce que tu as fait' }}</h1>
             <p class="kd-pagehead__lead">
-                {%- if subject %}{{ subject.userIdentifier }} · {% endif -%}
+                {%- if subject %}{{ subject.displayName }} · {% endif -%}
                 {{ period.label }}
             </p>
         </div>

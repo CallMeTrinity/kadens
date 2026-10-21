@@ -1,6 +1,6 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}{{ athlete.userIdentifier }} — Espace coach — Kadens{% endblock %}
+{% block title %}{{ athlete.displayName }} — Espace coach — Kadens{% endblock %}
 
 {% block body %}
     {% for message in app.flashes('success') %}
@@ -12,10 +12,10 @@
 
     {# ============================== EN-TÊTE ATHLÈTE ========================= #}
     <header class="kd-phero">
-        <span class="kd-phero__avatar" aria-hidden="true">{{ athlete.userIdentifier|first|upper }}</span>
+        <span class="kd-phero__avatar" aria-hidden="true">{{ athlete.displayName|first|upper }}</span>
         <div class="kd-phero__main">
             <p class="kd-eyebrow kd-eyebrow--accent">Athlète suivi</p>
-            <h1 class="kd-phero__name">{{ athlete.userIdentifier }}</h1>
+            <h1 class="kd-phero__name">{{ athlete.displayName }}</h1>
             {% set vitals = [
                 athlete.age is not null ? athlete.age ~ ' ans',
                 athlete.sex ? athlete.sex.label,
@@ -68,7 +68,7 @@
         <div class="kd-pagehead kd-pagehead--sub">
             <div>
                 <p class="kd-eyebrow kd-eyebrow--accent">Créer</p>
-                <h2 class="kd-title kd-title--sm">Programmer pour {{ athlete.userIdentifier }}</h2>
+                <h2 class="kd-title kd-title--sm">Programmer pour {{ athlete.displayName }}</h2>
                 <p class="kd-lead">Ce que tu crées ici lui appartient : tu ouvres ensuite le compositeur habituel pour le composer.</p>
             </div>
         </div>

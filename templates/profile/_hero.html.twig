@@ -19,10 +19,10 @@
 
 <header class="kd-pfile__hero">
     <div class="kd-pfile__id">
-        <span class="kd-pfile__avatar" aria-hidden="true">{{ athlete.userIdentifier|first|upper }}</span>
+        <span class="kd-pfile__avatar" aria-hidden="true">{{ athlete.displayName|first|upper }}</span>
         <div class="kd-pfile__who">
             <p class="kd-eyebrow kd-pfile__eyebrow">Profil</p>
-            <h1 class="kd-pfile__name">{{ athlete.userIdentifier }}</h1>
+            <h1 class="kd-pfile__name">{{ athlete.displayName }}</h1>
             {% if vitals is not empty %}
                 <p class="kd-pfile__vitals">{{ vitals|join(' · ') }}</p>
             {% endif %}

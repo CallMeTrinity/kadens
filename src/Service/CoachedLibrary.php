@@ -47,7 +47,7 @@ final class CoachedLibrary
             }
         }
 
-        usort($athletes, static fn (User $a, User $b) => strcasecmp($a->getUserIdentifier(), $b->getUserIdentifier()));
+        usort($athletes, static fn (User $a, User $b) => strcasecmp($a->getDisplayName(), $b->getDisplayName()));
 
         return $athletes;
     }
@@ -92,7 +92,7 @@ final class CoachedLibrary
         foreach ($athletes as $athlete) {
             $facets[] = [
                 'value' => (string) $athlete->getId(),
-                'label' => $athlete->getUserIdentifier(),
+                'label' => $athlete->getDisplayName(),
                 'count' => $countsByOwnerId[(int) $athlete->getId()] ?? 0,
             ];
         }

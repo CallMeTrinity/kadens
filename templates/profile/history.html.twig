@@ -29,7 +29,7 @@
    n'importe quel `User` : même page, servie par
    `CoachController::athleteHistory`. #}
 
-{% block title %}Historique{% if subject|default(null) %} — {{ subject.userIdentifier }}{% endif %} — Kadens{% endblock %}
+{% block title %}Historique{% if subject|default(null) %} — {{ subject.displayName }}{% endif %} — Kadens{% endblock %}
 
 {% block body %}
     {% set subject = subject|default(null) %}
@@ -44,7 +44,7 @@
             <h1 class="kd-title">
                 {{- subject ? 'Son année, jour par jour' : 'Ton année, jour par jour' -}}
             </h1>
-            {% if subject %}<p class="kd-pagehead__lead">{{ subject.userIdentifier }}</p>{% endif %}
+            {% if subject %}<p class="kd-pagehead__lead">{{ subject.displayName }}</p>{% endif %}
             {% if years is not empty %}
                 {# Le libellé du premier mois d'historique est déjà calculé : les
                    années sont triées du plus récent au plus ancien, donc c'est le

@@ -268,8 +268,17 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
 - **Pas d'inscription publique.** Les comptes se créent en console
   (`app:user:create`, rôle ROLE_USER), comme les promotions (`app:user:promote`,
   `app:user:promote-coach`). L'app n'expose que ce que le titulaire du compte peut
-  changer lui-même : son mot de passe, dans `/profile/settings`. L'email reste un
-  identifiant fixe côté console.
+  changer lui-même : son mot de passe et son pseudo, dans `/profile/settings`.
+  L'email reste un identifiant fixe côté console.
+- **Le pseudo s'affiche, l'email identifie.** `User.username` est facultatif,
+  unique (collation `utf8mb4_general_ci` : insensible à la casse et aux accents),
+  sans `@`, modifiable à volonté. Connexion, coaching, API et console restent sur
+  l'email. **Un seul endroit décide du nom affiché** : `User::getDisplayName()`
+  (pseudo, sinon email), `displayName` en Twig ; écrire `userIdentifier` pour
+  nommer quelqu'un ignore son pseudo. Tant qu'il n'y en a pas, `base.html.twig`
+  pose une invitation (`components/_username_prompt`) ; « Non merci » est
+  mémorisé en base (`usernamePromptDismissedAt`), la croix ne vaut que pour la
+  session du navigateur.
 - **Dans le compositeur, l'historique suit le PROPRIÉTAIRE de la séance ; sur la
   fiche d'un exercice, il suit SOI.** Ce n'est pas une incohérence, ce sont deux
   questions. `/exercise/{id}` répond à « est-ce que **je** progresse » sur un
