@@ -8,12 +8,11 @@ use App\Entity\User;
 use App\Form\ChangePasswordType;
 use App\Form\DisplaySettingsType;
 use App\Enum\MuscleGroup;
+use App\Enum\ProfileTab;
 use App\Enum\StatsRange;
 use App\Enum\StatsTab;
 use App\Form\ProfileType;
 use App\Repository\ApiTokenRepository;
-use App\Repository\CoachingRepository;
-use App\Repository\GoalRepository;
 use App\Repository\ImportedActivityRepository;
 use App\Repository\IntervalsConnectionRepository;
 use App\Repository\PairingCodeRepository;
@@ -36,9 +35,10 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\UX\Turbo\TurboBundle;
 
 /**
- * Page profil : remplace l'ancienne page d'accueil ET la synthèse. Combine les
- * stats générales de l'athlète (ProfileStats) et sa fiche éditable (ProfileType).
- * Le profil est la page d'accueil (« / »).
+ * Page profil : l'identité de l'athlète en tête (vitals, records clés), puis
+ * trois onglets (cf. ProfileTab) — aperçu, fiche complète, stats depuis le
+ * début. Combine les stats générales (ProfileStats) et la fiche éditable
+ * (ProfileType). L'accueil (« / ») est à part, dans HomeController.
  */
 final class ProfileController extends AbstractController
 {
@@ -56,29 +56,23 @@ final class ProfileController extends AbstractController
     }
 
     /**
-     * Page d'accueil = profil. `/` n'est pas couvert par access_control : on garde
-     * manuellement (comme l'ancien HomeController).
+     * L'onglet est un paramètre d'URL (`?tab=`), la page se rend entièrement :
+     * même règle que `/profile/stats`, un lien par onglet et aucun fragment.
      */
-    #[Route('/', name: 'app_profile', methods: ['GET'])]
+    #[Route('/profile', name: 'app_profile', methods: ['GET'])]
     public function index(
+        Request $request,
         ProfileStats $profileStats,
         HeartRateZones $heartRateZones,
-        GoalRepository $goalRepository,
-        CoachingRepository $coachingRepository,
     ): Response {
+        /** @var User $user */
         $user = $this->getUser();
-        if (!$user instanceof User) {
-            return $this->redirectToRoute('app_login');
-        }
 
         return $this->render('profile/index.html.twig', [
             'stats' => $profileStats->for($user),
             'hrZones' => $heartRateZones->forUser($user),
-            'upcomingGoals' => $goalRepository->findUpcomingForOwner($user, 3),
-            // Découvrabilité : une demande de coaching reçue doit se voir depuis
-            // la page d'accueil, pas seulement dans /coaching.
-            'coachingReceived' => $coachingRepository->findPendingReceivedBy($user),
-            'coachingActive' => $coachingRepository->findAcceptedCoaches($user),
+            'tab' => ProfileTab::resolve($request->query->getString('tab')),
+            'tabs' => ProfileTab::cases(),
         ]);
     }
 
@@ -193,7 +187,7 @@ final class ProfileController extends AbstractController
             $entityManager->flush();
             $this->addFlash('success', 'Fiche athlète mise à jour.');
 
-            return $this->redirectToRoute('app_profile');
+            return $this->redirectToRoute('app_profile', ['tab' => ProfileTab::SHEET->value]);
         }
 
         return $this->render('profile/edit.html.twig', [

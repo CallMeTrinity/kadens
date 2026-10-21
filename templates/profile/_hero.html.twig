@@ -1,0 +1,47 @@
+{# En-tête du profil en aplat encre : monogramme, nom, vitals sur une ligne,
+   action, puis les records clés en bandeau (ProfileStats::keyRecords).
+
+   Aucun `app.user` ici : tout vient des paramètres, pour que la page athlète
+   du coach puisse le reprendre.
+
+   Paramètres :
+   - athlete : l'utilisateur dont c'est le profil
+   - stats   : sortie de ProfileStats::for($athlete) (on n'en lit que `keyRecords`)
+   - own     : true = mon profil (bouton « Modifier ») #}
+{% set own = own|default(false) %}
+{% set vitals = [
+    athlete.age is not null ? athlete.age ~ ' ans',
+    athlete.sex ? athlete.sex.label,
+    athlete.heightCm is not null ? athlete.heightCm ~ ' cm',
+    athlete.weightKg is not null ? (athlete.weightKg|number_format(athlete.weightKg == athlete.weightKg|round ? 0 : 1, ',', ' ')) ~ ' kg',
+    athlete.mainGoal ? 'Objectif ' ~ athlete.mainGoal.label|lower,
+]|filter(v => v) %}
+
+<header class="kd-pfile__hero">
+    <div class="kd-pfile__id">
+        <span class="kd-pfile__avatar" aria-hidden="true">{{ athlete.userIdentifier|first|upper }}</span>
+        <div class="kd-pfile__who">
+            <p class="kd-eyebrow kd-pfile__eyebrow">Profil</p>
+            <h1 class="kd-pfile__name">{{ athlete.userIdentifier }}</h1>
+            {% if vitals is not empty %}
+                <p class="kd-pfile__vitals">{{ vitals|join(' · ') }}</p>
+            {% endif %}
+        </div>
+        {% if own %}
+            <a href="{{ path('app_profile_edit') }}" class="kd-btn kd-btn--onink kd-pfile__action">
+                {{ ux_icon('lucide:square-pen') }} Modifier
+            </a>
+        {% endif %}
+    </div>
+
+    {% if stats.keyRecords is not empty %}
+        <dl class="kd-pfile__records">
+            {% for r in stats.keyRecords %}
+                <div class="kd-pfile__record">
+                    <dt>{{ r.label }}</dt>
+                    <dd class="{{ r.derived ? 'is-derived' }}">{{ r.value }}</dd>
+                </div>
+            {% endfor %}
+        </dl>
+    {% endif %}
+</header>

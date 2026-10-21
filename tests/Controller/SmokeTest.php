@@ -75,7 +75,7 @@ final class SmokeTest extends WebTestCase
             '/plan-template', '/plan-template/'.$template->getId(), '/plan-template/'.$template->getId().'/edit',
             '/calendar', '/calendar/week', '/schedule/'.$scheduled->getId(),
             '/goal', '/goal/new',
-            '/', '/profile/edit', '/profile/settings',
+            '/', '/profile', '/profile?tab=sheet', '/profile?tab=stats', '/profile/edit', '/profile/settings',
             '/coaching',
         ];
 

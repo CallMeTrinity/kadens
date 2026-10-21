@@ -1,0 +1,71 @@
+{# Onglet « Aperçu » du profil : ce qu'on vient chercher en l'ouvrant. Les
+   records renseignés (force, endurance), les zones cardio, la bio. Les lignes
+   vides n'y figurent pas : elles sont dans la fiche complète.
+
+   Paramètres :
+   - stats   : sortie de ProfileStats::for($user) (on n'en lit que `athlete`)
+   - hrZones : sortie de HeartRateZones::forUser($user)
+   - athlete : l'utilisateur dont c'est le profil (FC max et repos)
+   - own     : true = mon profil (liens d'édition, tutoiement)
+   - subject : l'athlète regardé, null = moi (liens vers un exercice) #}
+{% import 'profile/_rows.html.twig' as rows %}
+{% set own = own|default(false) %}
+{% set subject = subject|default(null) %}
+{% set card = stats.athlete %}
+
+{% set groups = [
+    { title: 'Force',     icon: 'lucide:dumbbell',   rows: card.strength|filter(r => not r.derived and r.value is not null) },
+    { title: 'Endurance', icon: 'lucide:footprints', rows: card.endurance|filter(r => r.value is not null) },
+]|filter(g => g.rows is not empty) %}
+{% set hasZones = (hrZones|first).max is not null %}
+
+<div class="kd-pfile__panel">
+    {% if groups is empty and not hasZones and not card.bio %}
+        <div class="kd-card">
+            <div class="kd-empty">
+                {{ ux_icon('lucide:user') }}
+                {% if own %}
+                    <div>Ta fiche est vide. <a href="{{ path('app_profile_edit') }}">Renseigne tes infos</a> (taille, poids, records…).</div>
+                {% else %}
+                    <div>Fiche vide : cet athlète n'a pas encore renseigné ses mesures ni ses records.</div>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+
+    {% if groups is not empty %}
+        <div class="kd-grid kd-grid--2 kd-pfile__groups">
+            {% for g in groups %}
+                <section class="kd-card">
+                    <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon(g.icon) }} {{ g.title }}</h3>
+                    {{ rows.list(g.rows, subject) }}
+                </section>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {# Zones cardio : n'ont de sens qu'avec une FC max renseignée (bornes BPM). #}
+    {% if hasZones %}
+        <section class="kd-card">
+            <div class="kd-pfile__zonehead">
+                <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:heart-pulse') }} Zones cardio</h3>
+                <span class="kd-pfile__zonemeta">
+                    FC max {{ athlete.maxHeartRate }}{% if athlete.restingHeartRate %} · repos {{ athlete.restingHeartRate }}{% endif %}
+                    {%- if own %} · <a href="{{ path('app_profile_edit') }}">Ajuster</a>{% endif %}
+                </span>
+            </div>
+            <ul class="kd-pfile__zones">
+                {% for band in hrZones %}
+                    <li class="kd-pfile__zone kd-pfile__zone--{{ band.zone.value }}">
+                        <span class="kd-pfile__zonetag">{{ band.zone.value|upper }} <span class="kd-pfile__zonename">{{ band.zone.label }}</span></span>
+                        <span class="kd-pfile__zonebpm">{{ band.min }}–{{ band.max }}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        </section>
+    {% endif %}
+
+    {% if card.bio %}
+        <p class="kd-pfile__bio">« {{ card.bio }} »</p>
+    {% endif %}
+</div>

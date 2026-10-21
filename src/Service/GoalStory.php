@@ -140,7 +140,7 @@ final class GoalStory
             'title' => $scheduled->getDisplayTitle(),
             'date' => $scheduled->getScheduledDate(),
             'activities' => null !== $workout ? $this->workoutMetrics->distinctActivities($workout) : [],
-            'tonnage' => null !== $log && $log['tonnageKg'] > 0 ? $this->units->weight($log['tonnageKg']) : null,
+            'tonnage' => null !== $log && $log['tonnageKg'] > 0 ? $this->units->tonnage($log['tonnageKg']) : null,
             'workingSets' => $log['workingSets'] ?? null,
             'topLift' => $log['topLift'] ?? null,
             'distance' => $meters > 0 ? $this->units->distance($meters) : null,

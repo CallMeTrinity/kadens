@@ -86,7 +86,7 @@
                     <p class="kd-loggroup__totals">
                         {{- group.sessions }} séance{{ group.sessions > 1 ? 's' }}
                         {%- if group.workingSets > 0 %} · {{ group.workingSets }} série{{ group.workingSets > 1 ? 's' }}{% endif -%}
-                        {%- if group.tonnageKg > 0 %} · {{ group.tonnageKg|round|number_format(0, ',', ' ') }} kg{% endif -%}
+                        {%- if group.tonnageKg > 0 %} · {{ group.tonnageKg|tonnage }}{% endif -%}
                     </p>
                 </div>
                 {# La carte enveloppe la liste, elle ne se confond pas avec elle :

@@ -43,7 +43,7 @@
 
                     <span class="kd-block__sum">
                         {%- if stat and stat.seconds > 0 %}≈ {{ (stat.seconds / 60)|round(0, 'ceil') }} min{% endif -%}
-                        {%- if stat and stat.tonnageKg > 0 %} · {{ stat.tonnageKg|round|number_format(0, ',', ' ') }} kg{% endif -%}
+                        {%- if stat and stat.tonnageKg > 0 %} · {{ stat.tonnageKg|tonnage }}{% endif -%}
                         {%- if entry.exercises|length %} · {{ entry.exercises|length }} exercice{{ entry.exercises|length > 1 ? 's' }}{% endif -%}
                     </span>
 

@@ -1,5 +1,8 @@
 {% extends 'base.html.twig' %}
-{% import 'components/_activity.html.twig' as activity %}
+
+{# Profil : une fiche courte. L'identité et les records clés en aplat encre,
+   puis trois onglets (ProfileTab) servis par des liens `?tab=` — chaque onglet
+   a son URL et la page se rend entière, sans JS. #}
 
 {% block title %}Profil — Kadens{% endblock %}
 
@@ -8,93 +11,25 @@
         <p class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }} {{ message }}</p>
     {% endfor %}
 
-    {# ============================== EN-TÊTE ATHLÈTE ========================= #}
     {% set u = app.user %}
-    <header class="kd-phero">
-        <span class="kd-phero__avatar" aria-hidden="true">{{ u.userIdentifier|first|upper }}</span>
-        <div class="kd-phero__main">
-            <p class="kd-eyebrow">Profil</p>
-            <h1 class="kd-phero__name">{{ u.userIdentifier }}</h1>
-            {% set vitals = [
-                u.age is not null ? u.age ~ ' ans',
-                u.sex ? u.sex.label,
-                u.weightKg is not null ? (u.weightKg|number_format(u.weightKg == u.weightKg|round ? 0 : 1, ',', ' ')) ~ ' kg',
-                u.mainGoal ? u.mainGoal.label,
-            ]|filter(v => v) %}
-            {% if vitals is not empty %}
-                <ul class="kd-vitals">
-                    {% for v in vitals %}<li class="kd-vitals__item">{{ v }}</li>{% endfor %}
-                </ul>
-            {% endif %}
-        </div>
-        <div class="kd-phero__actions">
-            {# La bibliothèque d'exercices a quitté la nav principale (3 entrées) :
-               elle a besoin d'un point d'entrée visible, le menu déroulant seul
-               est trop discret pour une page de travail. #}
-            <a href="{{ path('app_exercise_index') }}" class="kd-btn kd-btn--ghost">
-                {{ ux_icon('lucide:dumbbell') }} Mes exercices
-            </a>
-            <a href="{{ path('app_profile_settings') }}" class="kd-btn kd-btn--ghost">
-                {{ ux_icon('lucide:settings-2') }} Paramètres
-            </a>
-            <a href="{{ path('app_profile_edit') }}" class="kd-btn kd-btn--primary">
-                {{ ux_icon('lucide:square-pen') }} Modifier ma fiche
-            </a>
-        </div>
-    </header>
+    <div class="kd-pfile">
+        {{ include('profile/_hero.html.twig', {athlete: u, stats: stats, own: true}) }}
 
-    {# ============================ OBJECTIFS À VENIR ======================== #}
-    <section class="kd-section">
-        <div class="kd-pagehead kd-pagehead--sub">
-            <div>
-                <p class="kd-eyebrow kd-eyebrow--accent">Objectifs</p>
-                <h2 class="kd-title kd-title--sm">Vers quoi tu t'entraînes</h2>
-            </div>
-            <a href="{{ path('app_goal_index') }}" class="kd-btn kd-btn--ghost">
-                {{ ux_icon('lucide:target') }} Tous les objectifs
-            </a>
-        </div>
-        {% if upcomingGoals is empty %}
-            <div class="kd-card kd-section__block">
-                <div class="kd-empty">
-                    {{ ux_icon('lucide:target') }}
-                    <div>Aucune échéance en vue. <a href="{{ path('app_goal_new') }}">Fixe-toi un objectif</a> pour donner un cap à tes plans.</div>
-                </div>
-            </div>
+        <nav class="kd-pfile__tabs" aria-label="Rubriques du profil">
+            {% for t in tabs %}
+                {# L'aperçu est l'onglet par défaut : son URL n'a pas de `tab`. #}
+                <a href="{{ path('app_profile', t.value == 'overview' ? {} : {tab: t.value}) }}"
+                   class="kd-pfile__tab{{ t == tab ? ' is-active' }}"
+                   {{ t == tab ? 'aria-current="page"' : '' }}>{{ t.label }}</a>
+            {% endfor %}
+        </nav>
+
+        {% if tab.value == 'overview' %}
+            {{ include('profile/_overview.html.twig', {stats: stats, hrZones: hrZones, athlete: u, own: true}) }}
+        {% elseif tab.value == 'sheet' %}
+            {{ include('profile/_sheet.html.twig', {stats: stats, own: true}) }}
         {% else %}
-            <div class="kd-goallist kd-section__block">
-                {% for goal in upcomingGoals %}
-                    {{ include('goal/_card.html.twig', {goal: goal}) }}
-                {% endfor %}
-            </div>
+            {{ include('profile/_summary.html.twig', {stats: stats, own: true}) }}
         {% endif %}
-    </section>
-
-    {# =============================== COACHING =============================== #}
-    {% if coachingReceived is not empty or coachingActive is not empty %}
-        <section class="kd-section">
-            <div class="kd-pagehead kd-pagehead--sub">
-                <div>
-                    <p class="kd-eyebrow kd-eyebrow--accent">Coaching</p>
-                    <h2 class="kd-title kd-title--sm">
-                        {{ coachingReceived is not empty ? 'Une demande t\'attend' : 'Qui t\'entraîne' }}
-                    </h2>
-                </div>
-                <a href="{{ path('app_coaching_index') }}" class="kd-btn kd-btn--ghost">
-                    {{ ux_icon('lucide:users') }} Gérer mes relations
-                </a>
-            </div>
-            <div class="kd-coachlist kd-section__block">
-                {% for relation in coachingReceived|merge(coachingActive) %}
-                    {{ include('components/_coaching_card.html.twig', {relation: relation, me: u}) }}
-                {% endfor %}
-            </div>
-        </section>
-    {% endif %}
-
-    {# Statistiques et fiche athlète : fragments partagés avec la page athlète du
-       coach (mêmes données, ProfileStats/HeartRateZones prennent n'importe quel
-       User). `own: true` = mon profil, donc tutoiement et liens d'édition. #}
-    {{ include('profile/_stats.html.twig', {stats: stats, own: true}) }}
-    {{ include('profile/_athlete_sheet.html.twig', {stats: stats, hrZones: hrZones, own: true}) }}
+    </div>
 {% endblock %}

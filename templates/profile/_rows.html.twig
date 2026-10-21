@@ -1,0 +1,32 @@
+{# Une liste de lignes de fiche (label, valeur, note), en `kd-deflist--profile`.
+   Partagée par l'aperçu et la fiche complète du profil.
+
+   - rows    : lignes de ProfileStats (label, value, note, exerciseId, derived)
+   - subject : l'athlète regardé, null = moi. Un record mesuré renvoie à SA
+     trajectoire, jamais à la mienne (« un lien ne change jamais de sujet en
+     silence »).
+   - empty   : ce qu'affiche une valeur absente. Une chaîne (« — ») ou, sur son
+     propre profil, `{label, href}` : l'invitation à compléter la fiche. #}
+{%- macro list(rows, subject = null, empty = '—') -%}
+    <dl class="kd-deflist kd-deflist--profile">
+        {% for r in rows %}
+            <dt>{{ r.label }}</dt>
+            {# La note dit quand et sur quel effort un record a été mesuré — son
+               absence est ce qui signale une valeur déclarée à la main. #}
+            <dd class="{{ r.derived ? 'kd-deflist__derived' }}{{ r.value is null ? ' kd-deflist__empty' }}">
+                {% if r.value is not null and r.exerciseId is not null %}
+                    <a href="{{ subject
+                        ? path('app_coach_athlete_exercise', {id: subject.id, exerciseId: r.exerciseId})
+                        : path('app_exercise_show', {id: r.exerciseId}) }}">{{ r.value }}</a>
+                {% elseif r.value is not null %}
+                    {{ r.value }}
+                {% elseif empty is iterable %}
+                    <a href="{{ empty.href }}" class="kd-deflist__add">{{ empty.label }}</a>
+                {% else %}
+                    {{ empty }}
+                {% endif %}
+                {% if r.note %}<span class="kd-deflist__note">{{ r.note }}</span>{% endif %}
+            </dd>
+        {% endfor %}
+    </dl>
+{%- endmacro -%}

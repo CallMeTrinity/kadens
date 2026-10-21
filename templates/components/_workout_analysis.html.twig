@@ -67,7 +67,7 @@
                             {{ '%02d'|format(loop.index) }} {{ stat.block.label ?: stat.block.role.label }}
                         </span>
                         <span class="kd-bars__val">
-                            {{- stat.tonnageKg > 0 ? stat.tonnageKg|round|number_format(0, ',', ' ') ~ ' kg' : '—' -}}
+                            {{- stat.tonnageKg > 0 ? stat.tonnageKg|tonnage : '—' -}}
                         </span>
                         <span class="kd-bars__track">
                             <span class="kd-bars__fill" style="width: {{ (stat.tonnageKg / maxTonnage * 100)|round(1) }}%"></span>
