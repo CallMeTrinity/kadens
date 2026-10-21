@@ -1,0 +1,76 @@
+{# Onglet « Stats » du profil : le résumé depuis le début. Observance,
+   répartition par activité, compteurs de bibliothèque, volume réalisé. Le
+   détail par fenêtre est sur /profile/stats.
+
+   Paramètres :
+   - stats : sortie de ProfileStats::for($user)
+   - own   : true = mon profil. Le lien vers les statistiques détaillées n'est
+     rendu que là : /profile/stats se scope sur l'utilisateur connecté, il
+     mènerait le coach à ses propres chiffres. #}
+{% import 'components/_activity.html.twig' as activity %}
+{% set own = own|default(false) %}
+{% set acts = stats.activityCounts %}
+{% set vol = stats.volume %}
+
+<div class="kd-pfile__panel">
+    <div class="kd-grid kd-grid--2">
+        <section class="kd-card kd-pfile__statcard">
+            <p class="kd-eyebrow">Depuis le début · observance</p>
+            {{ include('components/_status_stats.html.twig', {stats: stats.allTime}) }}
+            <p class="kd-pfile__counts">
+                {{ stats.counts.workouts }} séance{{ stats.counts.workouts > 1 ? 's' }}
+                · {{ stats.counts.plans }} plan{{ stats.counts.plans > 1 ? 's' }}
+                · {{ stats.counts.exercises }} exercice{{ stats.counts.exercises > 1 ? 's' }} en bibliothèque
+            </p>
+        </section>
+
+        <section class="kd-card kd-pfile__statcard">
+            <p class="kd-eyebrow">Depuis le début · par activité</p>
+            {% if acts is empty %}
+                <p class="kd-observance__empty">{{ ux_icon('lucide:activity') }} Aucune séance faite pour l'instant.</p>
+            {% else %}
+                <div class="kd-pfile__actbar" role="img"
+                     aria-label="{{ acts|map(r => r.activity.label ~ ' ' ~ r.sessions)|join(', ') }}">
+                    {% for row in acts %}
+                        <span class="kd-act--{{ activity.modifier(row.activity) }}" style="flex:{{ row.sessions }}"></span>
+                    {% endfor %}
+                </div>
+                <ul class="kd-pfile__actlegend">
+                    {% for row in acts %}
+                        <li class="kd-act--{{ activity.modifier(row.activity) }}">
+                            <span class="kd-pfile__actdot"></span>{{ row.activity.label }} {{ row.sessions }}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </section>
+    </div>
+
+    <section class="kd-card">
+        <p class="kd-eyebrow kd-pfile__tileshead">Volume réalisé</p>
+        <div class="kd-pfile__tiles">
+            <div class="kd-pfile__tile">
+                <div class="kd-pfile__tilevalue">{{ vol.tonnageLabel }}</div>
+                <div class="kd-pfile__tilelabel">Tonnage · {{ vol.gymSets }} série{{ vol.gymSets > 1 ? 's' }}</div>
+            </div>
+            {% for e in [
+                { label: 'Course',   v: vol.running },
+                { label: 'Vélo',     v: vol.cycling },
+                { label: 'Natation', v: vol.swimming },
+            ] %}
+                {% if e.v.meters > 0 or e.v.seconds > 0 %}
+                    <div class="kd-pfile__tile">
+                        <div class="kd-pfile__tilevalue">{{ e.v.distanceLabel ?? e.v.durationLabel }}</div>
+                        <div class="kd-pfile__tilelabel">{{ e.label }}{{ e.v.distanceLabel and e.v.durationLabel ? ' · ' ~ e.v.durationLabel }}</div>
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </section>
+
+    {% if own %}
+        <a href="{{ path('app_profile_stats') }}" class="kd-pfile__more">
+            Toutes les statistiques {{ ux_icon('lucide:arrow-right') }}
+        </a>
+    {% endif %}
+</div>

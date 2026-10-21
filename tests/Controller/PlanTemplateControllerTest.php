@@ -6,6 +6,8 @@ use App\Entity\Block;
 use App\Entity\Exercise;
 use App\Entity\Goal;
 use App\Entity\ImportedActivity;
+use App\Entity\LoggedExercise;
+use App\Entity\LoggedSet;
 use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
 use App\Entity\PrescribedExercise;
@@ -17,6 +19,7 @@ use App\Enum\ActivityType;
 use App\Enum\BlockRole;
 use App\Enum\PrescriptionType;
 use App\Enum\ScheduledStatus;
+use App\Enum\SetType;
 use App\Tests\FindsEntities;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
@@ -181,6 +184,52 @@ final class PlanTemplateControllerTest extends WebTestCase
         self::assertNotSame($workout->getId(), $fork->getId());
         self::assertTrue($fork->isPlanLocal());
         self::assertSame('Sortie longue', $fork->getTitle());
+    }
+
+    /**
+     * Reposer une séance déjà faite part de son dernier réalisé, et la palette
+     * l'annonce. La copie reste rattachée à la séance de bibliothèque.
+     */
+    public function testPlaceItemStartsFromTheLastDoneSession(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $library = $this->createLiftWorkout($user, 'Upper A');
+        $prescribed = $library->getBlocks()->first() ?: throw new \LogicException();
+        $squat = $prescribed->getPrescribedExercises()->first() ?: throw new \LogicException();
+
+        $scheduled = (new ScheduledWorkout())->setOwner($user)->setWorkout($library)
+            ->setScheduledDate(new \DateTimeImmutable('2026-10-14'))->setStatus(ScheduledStatus::DONE);
+        $logged = (new LoggedExercise())->setExercise($squat->getExercise())->setExerciseName('Squat barre')
+            ->setSourcePrescribedExercise($squat)->setPosition(1);
+        foreach ([1, 2, 3, 4, 5] as $position) {
+            $logged->addLoggedSet((new LoggedSet())->setPosition($position)->setSetType(SetType::NORMAL)->setReps(5)->setWeightKg(105.0));
+        }
+        $scheduled->addLoggedExercise($logged);
+        $this->em->persist($scheduled);
+
+        $template = $this->createPlanTemplate($user, 'Plan force', 1);
+        $this->client->loginUser($user);
+
+        $crawler = $this->client->request('GET', '/plan-template/'.$template->getId().'/edit');
+        self::assertResponseIsSuccessful();
+        self::assertStringContainsString("d'après le 14/10", $crawler->filter('[data-workout-id="'.$library->getId().'"]')->text());
+        $token = $crawler->filter('[data-place-token]')->attr('data-place-token');
+
+        $this->client->request('POST', '/plan-template/'.$template->getId().'/place', [
+            '_token' => $token,
+            'workoutId' => $library->getId(),
+            'week' => 1,
+            'day' => 2,
+        ]);
+
+        $this->em->clear();
+        $fork = $this->em->getRepository(PlanItem::class)->findOneBy([])?->getWorkout();
+        self::assertNotNull($fork);
+        self::assertSame($library->getId(), $fork->getOrigin()?->getId());
+        $copied = $fork->getBlocks()->first() ?: throw new \LogicException();
+        $copiedSquat = $copied->getPrescribedExercises()->first() ?: throw new \LogicException();
+        self::assertSame(105.0, $copiedSquat->getWeightKg());
+        self::assertSame(5, $copiedSquat->getSets());
     }
 
     /**

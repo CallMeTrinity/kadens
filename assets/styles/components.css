@@ -11623,3 +11623,761 @@ a.kd-coachitem__name:hover {
         font-size: 16px;
     }
 }
+
+/* ============================================================================
+   ACCUEIL (`/`) et PROFIL (`/profile`) — refonte « aplats encre »
+   L'accueil répond à « où j'en suis » : objectif en aplat encre, mois en deux
+   cartes, raccourcis en index. Le profil est une fiche courte : identité et
+   records clés en aplat encre, puis trois onglets (`?tab=`).
+   ========================================================================== */
+
+/* ── Accueil ──────────────────────────────────────────────────────────────── */
+.kd-home {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-9);
+}
+
+.kd-home__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--kd-space-5);
+}
+
+.kd-home__title {
+    font-family: var(--font-display);
+    font-weight: var(--kd-weight-extrabold);
+    font-size: clamp(30px, 5vw, 40px);
+    line-height: .92;
+    letter-spacing: var(--kd-tracking-display);
+    text-transform: uppercase;
+    margin: 0;
+    word-break: break-word;
+}
+
+/* Demande de coaching reçue : un bandeau, pas une section. Elle appelle une
+   réponse, c'est la seule chose de la page qui attend l'athlète. */
+.kd-home__coach {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--kd-space-4) var(--kd-space-6);
+    padding: var(--kd-space-4) var(--kd-space-6);
+    background: var(--color-primary-tint);
+    border: 1px solid var(--color-primary-track);
+    color: var(--color-primary-on-tint);
+}
+
+.kd-home__coach > svg {
+    flex: none;
+    width: 16px;
+    height: 16px;
+}
+
+.kd-home__coachtext {
+    flex: 1 1 14rem;
+    margin: 0;
+    font-size: 14px;
+}
+
+.kd-home__coachtext strong {
+    font-weight: var(--kd-weight-semibold);
+}
+
+.kd-home__coachacts {
+    display: flex;
+    gap: var(--kd-space-3);
+}
+
+.kd-home__decline {
+    color: var(--color-primary-on-tint);
+}
+
+/* Prochain objectif en aplat encre. Le compte à rebours est le chiffre qu'on
+   vient lire : il prend toute la hauteur, en rouge lisible sur encre. */
+.kd-home__goal {
+    display: flex;
+    flex-direction: column;
+    background: var(--color-surface-ink);
+    color: var(--color-on-ink);
+    text-decoration: none;
+}
+
+.kd-home__goal:hover {
+    background: var(--color-surface-ink-hover);
+    color: var(--color-on-ink);
+}
+
+.kd-home__goalmain {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--kd-space-7) var(--kd-space-10);
+    padding: var(--kd-space-10) var(--kd-space-12);
+}
+
+.kd-home__goalbody {
+    flex: 1 1 16rem;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-5);
+}
+
+.kd-home__goaleyebrow,
+.kd-home__goalcount {
+    color: var(--color-primary-on-ink);
+}
+
+/* Intitulé saisi par l'athlète : Barlow en casse normale (règle 4). */
+.kd-home__goaltitle {
+    font-family: var(--font-body);
+    font-weight: var(--kd-weight-bold);
+    font-size: clamp(24px, 4vw, 34px);
+    line-height: 1.05;
+    margin: 0;
+    text-wrap: balance;
+}
+
+.kd-home__goalmeta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--kd-space-4);
+}
+
+.kd-home__goalprio {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-eyebrow-lg);
+    text-transform: uppercase;
+    padding: 3px var(--kd-space-3);
+    border: 1px solid var(--color-border-on-ink-strong);
+    color: var(--color-on-ink-muted);
+}
+
+.kd-home__goaltarget {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    font-size: 13px;
+    color: var(--color-on-ink-muted);
+}
+
+.kd-home__goaltarget svg {
+    width: 14px;
+    height: 14px;
+}
+
+.kd-home__goalcount {
+    font-family: var(--font-display);
+    font-weight: var(--kd-weight-extrabold);
+    font-size: clamp(72px, 12vw, 120px);
+    line-height: .8;
+    letter-spacing: -.02em;
+    font-variant-numeric: tabular-nums;
+}
+
+.kd-home__goalnext {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--kd-space-5);
+    padding: var(--kd-space-5) var(--kd-space-12);
+    border-top: 1px solid var(--color-border-on-ink);
+    font-size: 13px;
+}
+
+.kd-home__goalnextlabel {
+    font-size: 10px;
+    color: var(--color-on-ink-muted);
+}
+
+.kd-home__goalnexttitle {
+    flex: 1;
+    min-width: 0;
+}
+
+.kd-home__goalnextcount {
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+
+/* Les cartes du mois sont des liens (vers /profile/stats sur le mois) : elles
+   gardent l'encre au repos et ne prennent qu'un fond au survol. */
+.kd-home__card {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-6);
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border);
+    padding: var(--kd-space-8) var(--kd-space-9);
+    color: inherit;
+    text-decoration: none;
+}
+
+.kd-home__card:hover {
+    background: var(--color-surface-hover);
+    color: inherit;
+}
+
+.kd-home__acts {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-4);
+}
+
+.kd-home__act {
+    display: grid;
+    grid-template-columns: 110px minmax(0, 1fr) 24px;
+    align-items: center;
+    gap: var(--kd-space-4);
+}
+
+.kd-home__actname {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-3);
+    font-size: 14px;
+    color: var(--color-text);
+    min-width: 0;
+}
+
+/* L'icône porte la couleur de l'activité ; le libellé reste en encre. */
+.kd-home__actname svg {
+    flex: none;
+    width: 14px;
+    height: 14px;
+    color: var(--act);
+}
+
+.kd-home__acttrack {
+    height: 8px;
+    background: var(--color-track);
+    overflow: hidden;
+}
+
+.kd-home__actfill {
+    display: block;
+    height: 100%;
+    background: var(--act);
+}
+
+.kd-home__actcount {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    text-align: right;
+}
+
+/* Raccourcis : un index à filets (fond = couleur du filet, `gap: 1px`), pas
+   des cartes. Trois colonnes, deux sur téléphone. */
+.kd-home__index {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--color-border);
+    border: 1px solid var(--color-border);
+}
+
+.kd-home__link {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-4);
+    padding: var(--kd-space-6) var(--kd-space-7);
+    background: var(--color-surface-raised);
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+.kd-home__link:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+}
+
+.kd-home__link > svg {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    color: var(--color-text-secondary);
+}
+
+.kd-home__linklabel {
+    flex: 1;
+    min-width: 0;
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: var(--kd-weight-bold);
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+}
+
+.kd-home__linkarrow {
+    display: inline-flex;
+    color: var(--color-primary);
+}
+
+.kd-home__linkarrow svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* ── Profil ───────────────────────────────────────────────────────────────── */
+.kd-pfile {
+    display: flex;
+    flex-direction: column;
+}
+
+.kd-pfile__hero {
+    display: flex;
+    flex-direction: column;
+    background: var(--color-surface-ink);
+    color: var(--color-on-ink);
+}
+
+.kd-pfile__id {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: var(--kd-space-8);
+    padding: var(--kd-space-10) var(--kd-space-12);
+}
+
+.kd-pfile__avatar {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    background: var(--color-primary);
+    color: var(--color-on-primary);
+    font-family: var(--font-display);
+    font-weight: var(--kd-weight-bold);
+    font-size: 26px;
+    line-height: 1;
+}
+
+.kd-pfile__who {
+    flex: 1 1 12rem;
+    min-width: 0;
+}
+
+.kd-pfile__eyebrow {
+    color: var(--color-on-ink-muted);
+}
+
+.kd-pfile__name {
+    font-family: var(--font-display);
+    font-weight: var(--kd-weight-extrabold);
+    font-size: clamp(30px, 5vw, 38px);
+    line-height: .95;
+    letter-spacing: var(--kd-tracking-display);
+    text-transform: uppercase;
+    margin: var(--kd-space-1) 0 0;
+    word-break: break-word;
+}
+
+.kd-pfile__vitals {
+    margin: var(--kd-space-3) 0 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--color-on-ink-muted);
+}
+
+.kd-pfile__action {
+    flex: none;
+}
+
+/* Records clés : un bandeau à filets sous l'identité. Le score DOTS, dérivé,
+   prend l'accent — comme dans la fiche. */
+/* En flex et non en grille : il y en a de un à quatre, selon ce qui est
+   renseigné, et une grille fixe laisserait des colonnes vides. */
+.kd-pfile__records {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0;
+    border-top: 1px solid var(--color-border-on-ink);
+}
+
+.kd-pfile__record {
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-2);
+    padding: var(--kd-space-6) var(--kd-space-12);
+}
+
+.kd-pfile__record + .kd-pfile__record {
+    border-left: 1px solid var(--color-border-on-ink);
+}
+
+.kd-pfile__record dt {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-on-ink-muted);
+}
+
+.kd-pfile__record dd {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: var(--kd-weight-extrabold);
+    font-size: 32px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.kd-pfile__record dd.is-derived {
+    color: var(--color-primary-on-ink);
+}
+
+/* Onglets : un segmenté à filet encre, l'actif en aplat. Des liens (`?tab=`),
+   pas le contrôleur `tabs`. */
+.kd-pfile__tabs {
+    display: flex;
+    align-self: flex-start;
+    margin: var(--kd-space-7) 0 var(--kd-space-7);
+    border: 1px solid var(--color-text);
+    background: var(--color-surface-raised);
+}
+
+.kd-pfile__tab {
+    flex: 1;
+    padding: var(--kd-space-4) var(--kd-space-8);
+    font-family: var(--font-display);
+    font-size: 15px;
+    font-weight: var(--kd-weight-bold);
+    letter-spacing: var(--kd-tracking-action);
+    text-transform: uppercase;
+    text-align: center;
+    white-space: nowrap;
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+.kd-pfile__tab + .kd-pfile__tab {
+    border-left: 1px solid var(--color-text);
+}
+
+.kd-pfile__tab:hover {
+    background: var(--color-fill);
+    color: var(--color-text);
+}
+
+.kd-pfile__tab.is-active {
+    background: var(--color-text);
+    color: var(--color-surface-raised);
+}
+
+.kd-pfile__panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-6);
+}
+
+.kd-pfile__groups {
+    align-items: start;
+}
+
+.kd-pfile__zonehead {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--kd-space-4);
+    margin-bottom: var(--kd-space-5);
+}
+
+.kd-pfile__zonehead .kd-card__title {
+    margin: 0;
+}
+
+.kd-pfile__zonemeta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-secondary);
+}
+
+/* Cinq zones en rampe de gris, le rouge au maximum seulement (cf. les zones
+   de l'ancienne fiche, `.kd-hrzone--z*`). */
+.kd-pfile__zones {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 2px;
+}
+
+.kd-pfile__zone {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-2);
+    min-width: 0;
+    padding-top: var(--kd-space-3);
+    border-top: 8px solid var(--color-cat-4);
+}
+
+.kd-pfile__zone--z2 { border-top-color: var(--color-cat-3); }
+.kd-pfile__zone--z3 { border-top-color: var(--color-cat-2); }
+.kd-pfile__zone--z4 { border-top-color: var(--color-cat-1); }
+.kd-pfile__zone--z5 { border-top-color: var(--color-primary); }
+
+.kd-pfile__zonetag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: var(--kd-weight-bold);
+    color: var(--color-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.kd-pfile__zonename {
+    font-weight: var(--kd-weight-regular);
+    color: var(--color-text-secondary);
+}
+
+.kd-pfile__zonebpm {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
+.kd-pfile__bio {
+    margin: 0;
+    padding: 0 var(--kd-space-1);
+    font-size: 15px;
+    font-style: italic;
+    line-height: 1.6;
+    color: var(--color-text-strong);
+    white-space: pre-line;
+    text-wrap: pretty;
+}
+
+/* Fiche complète : trois colonnes à filets, comme l'index de l'accueil. */
+.kd-pfile__sheet {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1px;
+    background: var(--color-border);
+    border: 1px solid var(--color-border);
+}
+
+.kd-pfile__sheetgroup {
+    background: var(--color-surface-raised);
+    padding: var(--kd-space-8) var(--kd-space-8);
+}
+
+/* Un champ vide de SON profil : l'invitation à le remplir, en rouge d'action. */
+.kd-deflist--profile a.kd-deflist__add {
+    color: var(--color-primary);
+    text-decoration: none;
+}
+
+.kd-deflist--profile a.kd-deflist__add:hover {
+    color: var(--color-primary-hover);
+}
+
+.kd-pfile__statcard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--kd-space-6);
+}
+
+.kd-pfile__counts {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-secondary);
+}
+
+.kd-pfile__actbar {
+    display: flex;
+    gap: 2px;
+    height: 8px;
+    overflow: hidden;
+}
+
+.kd-pfile__actbar > span {
+    background: var(--act);
+}
+
+.kd-pfile__actlegend {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--kd-space-2) var(--kd-space-6);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text);
+}
+
+.kd-pfile__actlegend li {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+}
+
+.kd-pfile__actdot {
+    width: 8px;
+    height: 8px;
+    background: var(--act);
+}
+
+.kd-pfile__tileshead {
+    margin-bottom: var(--kd-space-5);
+}
+
+.kd-pfile__tiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1px;
+    background: var(--color-border);
+    border: 1px solid var(--color-border);
+}
+
+.kd-pfile__tile {
+    flex: 1 1 0;
+    min-width: 0;
+    background: var(--color-surface);
+    padding: var(--kd-space-6);
+}
+
+.kd-pfile__tilevalue {
+    font-family: var(--font-display);
+    font-weight: var(--kd-weight-extrabold);
+    font-size: 32px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
+
+.kd-pfile__tilelabel {
+    margin-top: var(--kd-space-2);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    color: var(--color-text-faint);
+}
+
+.kd-pfile__more {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: var(--kd-weight-semibold);
+    letter-spacing: var(--kd-tracking-eyebrow);
+    text-transform: uppercase;
+    text-decoration: none;
+}
+
+.kd-pfile__more svg {
+    width: 13px;
+    height: 13px;
+}
+
+/* Doit rester APRÈS les règles de base ci-dessus : une @media n'ajoute aucune
+   spécificité (cf. docs/design-system.md §5). */
+@media (max-width: 900px) {
+    .kd-pfile__sheet {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 560px) {
+    .kd-home {
+        gap: var(--kd-space-7);
+    }
+
+    .kd-home__goalmain,
+    .kd-pfile__id {
+        padding: var(--kd-space-8) var(--kd-space-7);
+    }
+
+    .kd-home__goalnext {
+        padding: var(--kd-space-5) var(--kd-space-7);
+    }
+
+    .kd-home__index {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .kd-pfile__id {
+        gap: var(--kd-space-5);
+    }
+
+    .kd-pfile__avatar {
+        width: 48px;
+        height: 48px;
+    }
+
+    .kd-pfile__action {
+        flex: 1 1 100%;
+    }
+
+    /* Deux par rangée, le dernier impair prend la largeur. Le filet gauche ne
+       vaut qu'en colonne de droite, le filet haut qu'à partir de la seconde
+       rangée. */
+    .kd-pfile__record,
+    .kd-pfile__tile {
+        flex-basis: 40%;
+    }
+
+    .kd-pfile__record {
+        padding: var(--kd-space-6) var(--kd-space-7);
+    }
+
+    .kd-pfile__record + .kd-pfile__record {
+        border-left: 0;
+    }
+
+    .kd-pfile__record:nth-child(2n) {
+        border-left: 1px solid var(--color-border-on-ink);
+    }
+
+    .kd-pfile__record:nth-child(n + 3) {
+        border-top: 1px solid var(--color-border-on-ink);
+    }
+
+    .kd-pfile__record dd {
+        font-size: 26px;
+    }
+
+    .kd-pfile__tabs {
+        align-self: stretch;
+    }
+
+    .kd-pfile__tab {
+        padding: var(--kd-space-4) var(--kd-space-3);
+    }
+
+    .kd-pfile__sheet {
+        grid-template-columns: 1fr;
+    }
+
+    .kd-pfile__zonename {
+        display: none;
+    }
+
+    .kd-pfile__zonebpm {
+        font-size: 10px;
+    }
+}

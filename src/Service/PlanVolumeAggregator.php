@@ -143,7 +143,7 @@ final class PlanVolumeAggregator
             'totalTime' => $this->humanMinutes($data['totalMinutes']),
             'chips' => $chips,
             'gymAreas' => $gymAreas,
-            'tonnage' => $data['tonnage'] > 0 ? $this->units->weight($data['tonnage']) : null,
+            'tonnage' => $data['tonnage'] > 0 ? $this->units->tonnage($data['tonnage']) : null,
         ];
     }
 

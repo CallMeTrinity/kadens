@@ -343,7 +343,7 @@ final class ProfileControllerTest extends WebTestCase
         $this->em->flush();
 
         $this->client->loginUser($user);
-        $crawler = $this->client->request('GET', '/');
+        $crawler = $this->client->request('GET', '/profile?tab=sheet');
 
         self::assertResponseIsSuccessful();
         // Trois listes dans la fiche (identité, force, endurance) : on les lit
@@ -359,6 +359,59 @@ final class ProfileControllerTest extends WebTestCase
             $crawler->filter('.kd-deflist--profile a[href="/exercise/'.$squat->getId().'"]'),
             'La valeur mesurée ouvre l\'exercice qui l\'a produite.',
         );
+    }
+
+    /**
+     * Le profil se lit en trois onglets servis par l'URL : chacun a son lien,
+     * un onglet inconnu retombe sur l'aperçu (un lien périmé n'est pas une 404).
+     */
+    public function testTheProfileTabsAreLinks(): void
+    {
+        $this->client->loginUser($this->createUser('tabs@example.com'));
+
+        $crawler = $this->client->request('GET', '/profile');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.kd-pfile__tab.is-active', 'Aperçu');
+        self::assertCount(1, $crawler->filter('.kd-pfile__tab[href="/profile?tab=sheet"]'));
+        self::assertCount(1, $crawler->filter('.kd-pfile__tab[href="/profile?tab=stats"]'));
+
+        $this->client->request('GET', '/profile?tab=stats');
+        self::assertSelectorTextContains('.kd-pfile__tab.is-active', 'Stats');
+
+        $this->client->request('GET', '/profile?tab=nope');
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('.kd-pfile__tab.is-active', 'Aperçu');
+    }
+
+    /**
+     * L'en-tête ne montre que les records renseignés ; la fiche complète, elle,
+     * montre tout, et un champ vide de SON profil invite à le remplir.
+     */
+    public function testTheHeroShowsFilledRecordsAndTheSheetInvitesToFillTheRest(): void
+    {
+        $user = $this->createUser('records@example.com')
+            ->setRun10kSeconds(47 * 60 + 30)
+            ->setCyclingFtpWatts(245);
+        $this->em->flush();
+        $this->client->loginUser($user);
+
+        $crawler = $this->client->request('GET', '/profile');
+        $records = $crawler->filter('.kd-pfile__record dt')->each(static fn (Crawler $dt): string => $dt->text());
+        self::assertSame(['10 km', 'FTP vélo'], $records, 'Ni total SBD ni DOTS sans valeur.');
+        self::assertSelectorTextContains('.kd-pfile__records', '47:30');
+
+        $crawler = $this->client->request('GET', '/profile?tab=sheet');
+        self::assertGreaterThan(0, $crawler->filter('.kd-deflist__add[href="/profile/edit"]')->count());
+    }
+
+    public function testSavingTheSheetReturnsToTheSheetTab(): void
+    {
+        $this->client->loginUser($this->createUser('edit@example.com'));
+
+        $crawler = $this->client->request('GET', '/profile/edit');
+        $this->client->submit($crawler->filter('form[name="profile"]')->form());
+
+        self::assertResponseRedirects('/profile?tab=sheet');
     }
 
     private function submitDisplayForm(ExerciseLanguage $language): Crawler

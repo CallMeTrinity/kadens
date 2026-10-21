@@ -16,6 +16,7 @@ use App\Form\PrescribedExerciseType;
 use App\Form\PrescribedSetType;
 use App\Repository\ExerciseRepository;
 use App\Repository\LoggedExerciseRepository;
+use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\WorkoutVoter;
 use App\Service\CoachedLibrary;
@@ -168,7 +169,7 @@ final class WorkoutController extends AbstractController
      * post-chargement, c'est la condition de son cache offline.
      */
     #[Route('/{id}', name: 'app_workout_show', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function show(Workout $workout, PlanFlattener $planFlattener, WorkoutMetrics $metrics): Response
+    public function show(Workout $workout, PlanFlattener $planFlattener, WorkoutMetrics $metrics, ScheduledWorkoutRepository $scheduledRepository): Response
     {
         $this->denyAccessUnlessGranted(WorkoutVoter::VIEW, $workout);
 
@@ -178,6 +179,9 @@ final class WorkoutController extends AbstractController
             'flat' => $planFlattener->flattenWorkout($workout),
             'summary' => $metrics->summary($workout),
             'blockStats' => $metrics->blockBreakdown($workout),
+            // Les réalisations se lisent sur la racine de la lignée : une copie
+            // locale de plan n'en a pas à elle (null = section absente).
+            'instances' => $workout->isPlanLocal() ? null : $scheduledRepository->findDoneInLineage($workout),
         ] + $this->volumePanel->for($workout, $user instanceof User ? $user : null));
     }
 

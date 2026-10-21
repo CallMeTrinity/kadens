@@ -1,0 +1,36 @@
+{# Onglet « Fiche complète » du profil : chaque mesure, renseignée ou non.
+   Sur son propre profil, un champ vide devient une invitation (« + Ajouter »,
+   vers l'édition) ; chez un athlète suivi, il reste un tiret : la fiche
+   appartient à l'athlète, le coach la lit.
+
+   Paramètres :
+   - stats   : sortie de ProfileStats::for($user) (on n'en lit que `athlete`)
+   - own     : true = mon profil
+   - subject : l'athlète regardé, null = moi (liens vers un exercice) #}
+{% import 'profile/_rows.html.twig' as rows %}
+{% set own = own|default(false) %}
+{% set subject = subject|default(null) %}
+{% set card = stats.athlete %}
+{% set empty = own ? {label: '+ Ajouter', href: path('app_profile_edit')} : '—' %}
+
+<div class="kd-pfile__panel">
+    <div class="kd-pfile__sheet">
+        {% for g in [
+            { title: 'Identité',  icon: 'lucide:user',       rows: card.identity },
+            { title: 'Force',     icon: 'lucide:dumbbell',   rows: card.strength },
+            { title: 'Endurance', icon: 'lucide:footprints', rows: card.endurance },
+        ] %}
+            <section class="kd-pfile__sheetgroup">
+                <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon(g.icon) }} {{ g.title }}</h3>
+                {{ rows.list(g.rows, subject, empty) }}
+            </section>
+        {% endfor %}
+    </div>
+
+    {% if card.bio %}
+        <section class="kd-card">
+            <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:quote') }} Bio</h3>
+            <p class="kd-profile__bio">{{ card.bio }}</p>
+        </section>
+    {% endif %}
+</div>

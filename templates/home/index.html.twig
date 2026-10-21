@@ -1,0 +1,136 @@
+{% extends 'base.html.twig' %}
+{% import 'components/_activity.html.twig' as activity %}
+
+{# Accueil : « où j'en suis ». Le prochain objectif en aplat encre, le mois en
+   deux cartes (observance, répartition), puis les raccourcis vers les pages de
+   lecture. La fiche de l'athlète est sur /profile. #}
+
+{% block title %}Accueil — Kadens{% endblock %}
+
+{% block body %}
+    {% set u = app.user %}
+    {% set dayNames = {1: 'Lundi', 2: 'Mardi', 3: 'Mercredi', 4: 'Jeudi', 5: 'Vendredi', 6: 'Samedi', 7: 'Dimanche'} %}
+    {% set monthNames = {1: 'janvier', 2: 'février', 3: 'mars', 4: 'avril', 5: 'mai', 6: 'juin', 7: 'juillet', 8: 'août', 9: 'septembre', 10: 'octobre', 11: 'novembre', 12: 'décembre'} %}
+    {% set monthName = monthNames[today|date('n')] %}
+
+    {% for message in app.flashes('success') %}
+        <p class="kd-flash" role="status">{{ ux_icon('lucide:circle-check') }} {{ message }}</p>
+    {% endfor %}
+
+    <div class="kd-home">
+        <div class="kd-home__head">
+            <h1 class="kd-home__title">Salut {{ u.displayName }}</h1>
+            <p class="kd-eyebrow">{{ dayNames[today|date('N')] }} {{ today|date('j') }} {{ monthName }} · S{{ today|date('W') }}</p>
+        </div>
+
+        {# ============================== COACHING ============================ #}
+        {% for relation in coachingReceived %}
+            {% set other = relation.otherParty(u) %}
+            <div class="kd-home__coach">
+                {{ ux_icon('lucide:users') }}
+                <p class="kd-home__coachtext">
+                    <strong>{{ other ? other.displayName : 'Quelqu\'un' }}</strong>
+                    {{ relation.coach == u ? 'te demande de l\'entraîner' : 'propose de t\'entraîner' }}
+                </p>
+                <div class="kd-home__coachacts">
+                    <form method="post" action="{{ path('app_coaching_respond', {id: relation.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('coaching_respond' ~ relation.id) }}">
+                        <input type="hidden" name="decision" value="accept">
+                        <button type="submit" class="kd-btn kd-btn--primary kd-btn--sm">Accepter</button>
+                    </form>
+                    <form method="post" action="{{ path('app_coaching_respond', {id: relation.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('coaching_respond' ~ relation.id) }}">
+                        <input type="hidden" name="decision" value="decline">
+                        <button type="submit" class="kd-btn kd-btn--ghost kd-btn--sm kd-home__decline">Refuser</button>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+
+        {# ========================== PROCHAIN OBJECTIF ======================= #}
+        {% set goal = goals|first %}
+        {% if goal %}
+            {% set days = goal.daysUntil %}
+            {% set next = goals|length > 1 ? goals[1] : null %}
+            <a href="{{ path('app_goal_show', {id: goal.id}) }}" class="kd-home__goal">
+                <div class="kd-home__goalmain">
+                    <div class="kd-home__goalbody">
+                        <p class="kd-eyebrow kd-home__goaleyebrow">Prochain objectif · {{ goal.targetDate|date('d/m/Y') }}</p>
+                        <h2 class="kd-home__goaltitle">{{ goal.title }}</h2>
+                        <div class="kd-home__goalmeta">
+                            {% if goal.activity %}{{ activity.badge(goal.activity) }}{% endif %}
+                            <span class="kd-home__goalprio" title="{{ goal.priority.label }}">Priorité {{ goal.priority.shortLabel }}</span>
+                            {% if goal.targetValue %}
+                                <span class="kd-home__goaltarget">{{ ux_icon('lucide:target') }} {{ goal.targetValue }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <span class="kd-home__goalcount">{{ days == 0 ? 'Jour J' : 'J-' ~ days }}</span>
+                </div>
+                {% if next %}
+                    <div class="kd-home__goalnext">
+                        <span class="kd-eyebrow kd-home__goalnextlabel">Ensuite</span>
+                        <span class="kd-home__goalnexttitle">{{ next.title }}</span>
+                        <span class="kd-home__goalnextcount">{{ next.daysUntil == 0 ? 'Jour J' : 'J-' ~ next.daysUntil }}</span>
+                    </div>
+                {% endif %}
+            </a>
+        {% else %}
+            <div class="kd-card">
+                <div class="kd-empty">
+                    {{ ux_icon('lucide:target') }}
+                    <div>Aucune échéance en vue. <a href="{{ path('app_goal_new') }}">Fixe-toi un objectif</a> pour donner un cap à tes plans.</div>
+                </div>
+            </div>
+        {% endif %}
+
+        {# =============================== LE MOIS ============================ #}
+        {# Les deux cartes ouvrent les statistiques sur le mois courant : ce sont
+           les mêmes chiffres (TrainingStats, même fenêtre). #}
+        {% set monthStats = path('app_profile_stats', {range: month.period.queryValue}) %}
+        {% set acts = month.activityCounts %}
+        {% set actTotal = acts|reduce((sum, r) => sum + r.sessions, 0) %}
+        {% set actMax = acts|reduce((m, r) => max(m, r.sessions), 0) %}
+        <div class="kd-grid kd-grid--2">
+            <a href="{{ monthStats }}" class="kd-home__card">
+                <p class="kd-eyebrow">{{ monthName|capitalize }} · observance</p>
+                {{ include('components/_status_stats.html.twig', {stats: month.adherence, hero: true}) }}
+            </a>
+            <a href="{{ monthStats }}" class="kd-home__card">
+                <p class="kd-eyebrow">{{ monthName|capitalize }} · par activité{{ actTotal > 0 ? ' · ' ~ actTotal ~ ' séance' ~ (actTotal > 1 ? 's') ~ ' faite' ~ (actTotal > 1 ? 's') }}</p>
+                {% if acts is empty %}
+                    <p class="kd-observance__empty">{{ ux_icon('lucide:activity') }} Aucune séance faite ce mois-ci.</p>
+                {% else %}
+                    <ul class="kd-home__acts">
+                        {% for row in acts %}
+                            <li class="kd-home__act kd-act--{{ activity.modifier(row.activity) }}">
+                                <span class="kd-home__actname">{{ ux_icon(activity.icon(row.activity)|trim) }} {{ row.activity.label }}</span>
+                                <span class="kd-home__acttrack"><span class="kd-home__actfill" style="width:{{ (row.sessions / actMax * 100)|round }}%"></span></span>
+                                <span class="kd-home__actcount">{{ row.sessions }}</span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </a>
+        </div>
+
+        {# ============================== RACCOURCIS ========================== #}
+        {% set shortcuts = [
+            { label: 'Mon profil',   icon: 'lucide:user',           path: 'app_profile' },
+            { label: 'Journal',      icon: 'lucide:clipboard-list', path: 'app_profile_log' },
+            { label: 'Historique',   icon: 'lucide:history',        path: 'app_profile_history' },
+            { label: 'Statistiques', icon: 'lucide:chart-column',   path: 'app_profile_stats' },
+            { label: 'Exercices',    icon: 'lucide:dumbbell',       path: 'app_exercise_index' },
+            { label: 'Objectifs',    icon: 'lucide:target',         path: 'app_goal_index' },
+        ] %}
+        <nav class="kd-home__index" aria-label="Raccourcis">
+            {% for s in shortcuts %}
+                <a href="{{ path(s.path) }}" class="kd-home__link">
+                    {{ ux_icon(s.icon) }}
+                    <span class="kd-home__linklabel">{{ s.label }}</span>
+                    <span class="kd-home__linkarrow">{{ ux_icon('lucide:arrow-right') }}</span>
+                </a>
+            {% endfor %}
+        </nav>
+    </div>
+{% endblock %}

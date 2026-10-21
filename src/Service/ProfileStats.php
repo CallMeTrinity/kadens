@@ -72,7 +72,54 @@ final class ProfileStats
             'volume' => $this->summaryVolume($allTime['volume']),
             'dots' => $dots,
             'athlete' => $this->athleteCard($user, $strength, $dots),
+            'keyRecords' => $this->keyRecords($user, $strength['sbdTotalKg'], $dots),
         ];
+    }
+
+    /**
+     * Les records de l'en-tête du profil : un chiffre par discipline, quatre au
+     * plus, seulement ceux qui existent. La course prend la distance la plus
+     * courte renseignée à partir du 10 km (le plus parlant), le 5 km en repli.
+     *
+     * Les valeurs sont celles de la fiche, formatées pareil : le total SBD est
+     * le total EFFECTIF d'`AthleteRecords`, pas la somme des valeurs saisies.
+     *
+     * @return list<array{label: string, value: string, derived: bool}>
+     */
+    private function keyRecords(User $user, ?float $sbdTotalKg, ?float $dots): array
+    {
+        $run = null;
+        foreach ([
+            '10 km' => $user->getRun10kSeconds(),
+            '5 km' => $user->getRun5kSeconds(),
+            'Semi-marathon' => $user->getHalfMarathonSeconds(),
+            'Marathon' => $user->getMarathonSeconds(),
+        ] as $label => $seconds) {
+            if (null !== $seconds) {
+                $run = [$label, $this->units->duration($seconds)];
+                break;
+            }
+        }
+
+        $ftp = $user->getCyclingFtpWatts();
+        $swim = $user->getSwim100mSeconds();
+
+        $candidates = [
+            ['Total SBD', null !== $sbdTotalKg ? $this->units->weight($sbdTotalKg) : null, false],
+            ['Score DOTS', null !== $dots ? str_replace('.', ',', (string) $dots) : null, true],
+            [$run[0] ?? '10 km', $run[1] ?? null, false],
+            ['FTP vélo', null !== $ftp ? $ftp.' W' : null, false],
+            ['100 m natation', null !== $swim ? $this->units->duration($swim) : null, false],
+        ];
+
+        $records = [];
+        foreach ($candidates as [$label, $value, $derived]) {
+            if (null !== $value) {
+                $records[] = ['label' => $label, 'value' => $value, 'derived' => $derived];
+            }
+        }
+
+        return \array_slice($records, 0, 4);
     }
 
     /**

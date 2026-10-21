@@ -259,7 +259,7 @@ final class CoachController extends AbstractController
         $this->entityManager->persist($workout);
         $this->entityManager->flush();
 
-        $this->addFlash('success', sprintf('Séance créée pour %s. Compose-la maintenant.', $athlete->getUserIdentifier()));
+        $this->addFlash('success', sprintf('Séance créée pour %s. Compose-la maintenant.', $athlete->getDisplayName()));
 
         return $this->redirectToRoute('app_workout_edit', ['id' => $workout->getId()]);
     }
@@ -289,7 +289,7 @@ final class CoachController extends AbstractController
         $this->entityManager->persist($template);
         $this->entityManager->flush();
 
-        $this->addFlash('success', sprintf('Plan créé pour %s. Compose sa trame maintenant.', $athlete->getUserIdentifier()));
+        $this->addFlash('success', sprintf('Plan créé pour %s. Compose sa trame maintenant.', $athlete->getDisplayName()));
 
         return $this->redirectToRoute('app_plan_template_edit', ['id' => $template->getId()]);
     }
@@ -333,7 +333,7 @@ final class CoachController extends AbstractController
         $this->entityManager->persist($scheduled);
         $this->entityManager->flush();
 
-        $this->addFlash('success', sprintf('Séance posée au %s sur le calendrier de %s.', $date->format('d/m/Y'), $athlete->getUserIdentifier()));
+        $this->addFlash('success', sprintf('Séance posée au %s sur le calendrier de %s.', $date->format('d/m/Y'), $athlete->getDisplayName()));
 
         return $redirect;
     }
@@ -370,7 +370,7 @@ final class CoachController extends AbstractController
 
         $this->addFlash('success', $alreadyOnCalendar
             ? sprintf('Plan « %s » resynchronisé : %d nouvelle(s) séance(s).', $template->getTitle(), \count($created))
-            : sprintf('Plan « %s » posé chez %s : %d séance(s).', $template->getTitle(), $athlete->getUserIdentifier(), \count($created)));
+            : sprintf('Plan « %s » posé chez %s : %d séance(s).', $template->getTitle(), $athlete->getDisplayName(), \count($created)));
 
         return $redirect;
     }

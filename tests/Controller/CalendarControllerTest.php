@@ -340,7 +340,7 @@ final class CalendarControllerTest extends WebTestCase
         foreach (['', '?from=cal-month-2026-13'] as $query) {
             $crawler = $this->client->request('GET', '/profile/history'.$query);
             self::assertResponseIsSuccessful();
-            self::assertCount(1, $crawler->filter('a.kd-btn[href="/"]'), 'Sans contexte lisible, retour au profil.');
+            self::assertCount(1, $crawler->filter('a.kd-btn[href="/profile"]'), 'Sans contexte lisible, retour au profil.');
         }
     }
 

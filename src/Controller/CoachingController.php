@@ -167,7 +167,7 @@ final class CoachingController extends AbstractController
 
         /** @var User $user */
         $user = $this->getUser();
-        $other = $coaching->otherParty($user)?->getEmail() ?? 'cet utilisateur';
+        $other = $coaching->otherParty($user)?->getDisplayName() ?? 'cet utilisateur';
 
         $this->addFlash('success', $accepted
             ? sprintf('Relation acceptée avec %s.', $other)
@@ -195,7 +195,7 @@ final class CoachingController extends AbstractController
 
         /** @var User $user */
         $user = $this->getUser();
-        $other = $coaching->otherParty($user)?->getEmail() ?? 'cet utilisateur';
+        $other = $coaching->otherParty($user)?->getDisplayName() ?? 'cet utilisateur';
 
         $this->addFlash('success', sprintf('Relation terminée avec %s. Le contenu déjà créé reste chez son propriétaire.', $other));
 

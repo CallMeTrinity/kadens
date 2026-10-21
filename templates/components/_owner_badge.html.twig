@@ -9,7 +9,7 @@
    ============================================================================ #}
 {% if owner is not null and app.user and owner.id != app.user.id %}
     <a class="kd-scope kd-scope--link" href="{{ path('app_coach_athlete', {id: owner.id}) }}"
-       title="Fiche de {{ owner.userIdentifier }}">
-        {{ ux_icon('lucide:user') }} {{ owner.userIdentifier }}
+       title="Fiche de {{ owner.displayName }}">
+        {{ ux_icon('lucide:user') }} {{ owner.displayName }}
     </a>
 {% endif %}

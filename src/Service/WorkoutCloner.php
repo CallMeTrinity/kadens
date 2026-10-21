@@ -21,6 +21,11 @@ use Doctrine\ORM\EntityManagerInterface;
  * Block::prescribedExercises) mais PAS flushée : l'appelant maîtrise la
  * transaction.
  *
+ * Une copie locale de plan hérite de la RACINE de lignée (`origin`) : la séance
+ * de bibliothèque d'origine, jamais la copie dont on la tire. Dupliquer une
+ * semaine ou un plan garde donc la parenté, et une duplication de bibliothèque
+ * (`planLocal = false`) n'en a pas : c'est une nouvelle séance.
+ *
  * Le bloc-notes privé (`notes`) n'est délibérément PAS copié : le fork à la pose
  * en dupliquerait un exemplaire dans chaque case de plan, alors que ce champ est un
  * brouillon attaché à un contexte précis. La description, elle, décrit bien la
@@ -36,9 +41,12 @@ final class WorkoutCloner
     }
 
     /**
-     * @param bool $planLocal true = copie privée à un plan (masquée de la biblio)
+     * @param bool                                                     $planLocal     true = copie privée à un plan (masquée de la biblio)
+     * @param \SplObjectStorage<PrescribedExercise, PrescribedExercise>|null $prescribedMap rempli, si fourni, de la correspondance
+     *                                                                                exercice prescrit source → copie (sert à
+     *                                                                                reporter le réalisé sur la copie, cf. LineageSeed)
      */
-    public function cloneWorkout(Workout $source, User $owner, ?string $title, bool $planLocal): Workout
+    public function cloneWorkout(Workout $source, User $owner, ?string $title, bool $planLocal, ?\SplObjectStorage $prescribedMap = null): Workout
     {
         $title ??= (string) $source->getTitle();
 
@@ -47,6 +55,7 @@ final class WorkoutCloner
             ->setTitle($title)
             ->setDescription($source->getDescription())
             ->setPlanLocal($planLocal)
+            ->setOrigin($planLocal ? ($source->getOrigin() ?? $source) : null)
             ->setSlug($this->slugGenerator->generate($title, Workout::class));
 
         // Copie profonde blocs -> exercices prescrits. addBlock / addPrescribedExercise
@@ -59,13 +68,16 @@ final class WorkoutCloner
                 ->setLabel($block->getLabel());
 
             foreach ($block->getPrescribedExercises() as $prescribed) {
-                $blockCopy->addPrescribedExercise($this->clonePrescribed($prescribed));
+                $prescribedCopy = $this->clonePrescribed($prescribed);
+                $blockCopy->addPrescribedExercise($prescribedCopy);
+                $prescribedMap?->offsetSet($prescribed, $prescribedCopy);
             }
 
             $copy->addBlock($blockCopy);
         }
 
         // La durée estimée dérive du contenu : on la (re)calcule sur la copie.
+        // Un appelant qui retouche le contenu ensuite (LineageSeed) la recalcule.
         $copy->setEstimatedDurationMinutes($this->estimator->estimateMinutes($copy));
 
         $this->entityManager->persist($copy);

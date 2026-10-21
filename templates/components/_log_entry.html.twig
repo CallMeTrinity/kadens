@@ -38,7 +38,7 @@
                 <span>{{ entry.workingSets }} série{{ entry.workingSets > 1 ? 's' }}</span>
             {% endif %}
             {% if entry.tonnageKg > 0 %}
-                <span class="kd-logline__tonnage">{{ entry.tonnageKg|round|number_format(0, ',', ' ') }} kg</span>
+                <span class="kd-logline__tonnage">{{ entry.tonnageKg|tonnage }}</span>
             {% endif %}
             {% if entry.durationSeconds >= 60 %}
                 <span>{{ (entry.durationSeconds / 60)|round }} min</span>

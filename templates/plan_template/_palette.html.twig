@@ -71,6 +71,13 @@
                         {% endif %}
                         <span>{{ card.exerciseCount }} exos</span>
                     </span>
+                    {# La pose part de la dernière réalisation (LineageSeed) : la
+                       carte le dit, sinon la case changerait de source en silence. #}
+                    {% if card.lastDone %}
+                        <span class="kd-palettecard__meta">
+                            <span>{{ ux_icon('lucide:history') }} d'après le {{ card.lastDone|date('d/m') }}</span>
+                        </span>
+                    {% endif %}
                     {% if card.activities %}
                         <span class="kd-cellbadges">
                             {% for a in card.activities %}{{ activity.badge(a, false) }}{% endfor %}

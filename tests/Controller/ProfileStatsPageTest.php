@@ -243,7 +243,7 @@ final class ProfileStatsPageTest extends WebTestCase
     public function testTheEntryPointIsOwnProfileOnly(): void
     {
         $this->client->loginUser($this->seedUser());
-        $crawler = $this->client->request('GET', '/');
+        $crawler = $this->client->request('GET', '/profile?tab=stats');
 
         self::assertResponseIsSuccessful();
         self::assertGreaterThan(0, $crawler->filter('a[href="/profile/stats"]')->count());

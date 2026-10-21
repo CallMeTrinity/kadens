@@ -10,14 +10,20 @@ use App\Repository\UserRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ORM\UniqueConstraint(name: 'UNIQ_IDENTIFIER_EMAIL', fields: ['email'])]
+#[ORM\UniqueConstraint(name: 'UNIQ_USERNAME', fields: ['username'])]
+#[UniqueEntity(fields: ['username'], message: 'Ce pseudo est déjà pris.')]
 #[ORM\HasLifecycleCallbacks]
 class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
+    public const USERNAME_MAX_LENGTH = 30;
+
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
@@ -25,6 +31,25 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 180)]
     private ?string $email = null;
+
+    // Le pseudo : un libellé d'AFFICHAGE, jamais un identifiant. La connexion
+    // et les demandes de coaching passent toujours par l'email ; le pseudo ne
+    // fait que le remplacer à l'écran (cf. getDisplayName()). Facultatif,
+    // modifiable à volonté, unique. L'unicité suit la collation de la table
+    // (utf8mb4_general_ci) : « Rémi » et « remi » sont le même pseudo, ce qui
+    // ferme la porte aux sosies. Pas de longueur minimale, voulu. Pas d'`@` :
+    // un pseudo qui ressemble à un email se ferait passer pour l'identifiant
+    // de quelqu'un d'autre, celui qu'on tape pour l'inviter en coaching.
+    #[ORM\Column(length: self::USERNAME_MAX_LENGTH, nullable: true)]
+    #[Assert\Length(max: self::USERNAME_MAX_LENGTH, maxMessage: 'Le pseudo ne peut pas dépasser {{ limit }} caractères.')]
+    #[Assert\Regex(pattern: '/^[^@\p{Cc}]*$/u', message: 'Le pseudo ne peut contenir ni « @ » ni caractère de contrôle.')]
+    private ?string $username = null;
+
+    // Le « non merci » à l'invitation à choisir un pseudo. Seule son existence
+    // compte (la date ne sert qu'au diagnostic) : posé, l'invitation ne revient
+    // plus, sur aucun appareil. Le pseudo reste ajoutable depuis les paramètres.
+    #[ORM\Column(nullable: true)]
+    private ?\DateTimeImmutable $usernamePromptDismissedAt = null;
 
     /**
      * @var list<string> The user roles
@@ -266,6 +291,55 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         $this->email = $email;
 
         return $this;
+    }
+
+    public function getUsername(): ?string
+    {
+        return $this->username;
+    }
+
+    /**
+     * Espaces de bord retirés, et vide = pas de pseudo : NULL plutôt que `''`,
+     * sans quoi deux comptes « sans pseudo » se heurteraient sur l'index unique.
+     */
+    public function setUsername(?string $username): static
+    {
+        $username = null === $username ? null : trim($username);
+        $this->username = '' === $username ? null : $username;
+
+        return $this;
+    }
+
+    public function getUsernamePromptDismissedAt(): ?\DateTimeImmutable
+    {
+        return $this->usernamePromptDismissedAt;
+    }
+
+    public function setUsernamePromptDismissedAt(?\DateTimeImmutable $usernamePromptDismissedAt): static
+    {
+        $this->usernamePromptDismissedAt = $usernamePromptDismissedAt;
+
+        return $this;
+    }
+
+    /**
+     * L'invitation à choisir un pseudo : tant qu'il n'y en a pas et qu'elle n'a
+     * pas été déclinée.
+     */
+    public function shouldPromptForUsername(): bool
+    {
+        return null === $this->username && null === $this->usernamePromptDismissedAt;
+    }
+
+    /**
+     * Le nom montré à l'écran : le pseudo s'il y en a un, l'email sinon. **Le
+     * seul endroit qui en décide** — un template qui écrit `userIdentifier` pour
+     * nommer quelqu'un ignore son pseudo. L'identifiant, lui, reste l'email
+     * (getUserIdentifier()), pour la connexion comme pour le coaching.
+     */
+    public function getDisplayName(): string
+    {
+        return $this->username ?? $this->getUserIdentifier();
     }
 
     /**

@@ -23,6 +23,30 @@ final class UnitFormatter
         return $formatted.' kg';
     }
 
+    /**
+     * Seuil de bascule du tonnage en tonnes. En dessous, le kilo reste lisible
+     * (« 32 626 kg ») ; au-dessus, un cumul de six chiffres ne se lit plus d'un
+     * coup d'œil (« 612 480 kg »), la tonne le ramène à trois.
+     */
+    public const TONNAGE_TONNES_FROM_KG = 100_000;
+
+    /**
+     * Un tonnage (cumul de charge × répétitions), arrondi au kilo, en tonnes
+     * au-delà de 100 000 kg avec une décimale au plus (« 123,5 t »). À ne pas
+     * confondre avec `weight()`, qui affiche une charge : 140 kg sur une barre
+     * ne devient jamais « 0,1 t ».
+     */
+    public function tonnage(float $kg): string
+    {
+        $kg = round($kg);
+
+        if ($kg < self::TONNAGE_TONNES_FROM_KG) {
+            return $this->weight($kg);
+        }
+
+        return rtrim(rtrim(number_format($kg / 1000, 1, ',', ' '), '0'), ',').' t';
+    }
+
     public function distance(?int $meters): string
     {
         if (null === $meters) {

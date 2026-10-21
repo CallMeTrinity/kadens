@@ -6,14 +6,14 @@
    composant, seul l'historique change de propriétaire. Tout ce qui en dépend est
    dans ce template, le reste de la page ne sait pas qui regarde. #}
 
-{% block title %}{{ exercise_name(exercise) }}{% if subject|default(null) %} — {{ subject.userIdentifier }}{% endif %}{% endblock %}
+{% block title %}{{ exercise_name(exercise) }}{% if subject|default(null) %} — {{ subject.displayName }}{% endif %}{% endblock %}
 
 {% block body %}
     {% set subject = subject|default(null) %}
 
     {% if subject %}
         <a href="{{ path('app_coach_athlete', {id: subject.id}) }}" class="kd-backlink">
-            {{ ux_icon('lucide:arrow-left') }} {{ subject.userIdentifier }}
+            {{ ux_icon('lucide:arrow-left') }} {{ subject.displayName }}
         </a>
     {% else %}
         <a href="{{ path('app_exercise_index') }}" class="kd-backlink">

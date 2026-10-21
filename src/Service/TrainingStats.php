@@ -372,7 +372,7 @@ final class TrainingStats
 
         return [
             'tonnageKg' => $tonnage,
-            'tonnageLabel' => $this->units->weight(round($tonnage)),
+            'tonnageLabel' => $this->units->tonnage($tonnage),
             'workingSets' => $sets,
             'sessions' => $sessions,
             'seconds' => $seconds,
@@ -381,7 +381,7 @@ final class TrainingStats
             // une série non notée n'est pas une série à zéro.
             'averageRpe' => $rpeCount > 0 ? round($rpeSum / $rpeCount, 1) : null,
             'perSessionSets' => $sessions > 0 ? round($sets / $sessions, 1) : null,
-            'perSessionTonnageLabel' => $sessions > 0 ? $this->units->weight(round($tonnage / $sessions)) : null,
+            'perSessionTonnageLabel' => $sessions > 0 ? $this->units->tonnage($tonnage / $sessions) : null,
         ];
     }
 
@@ -760,7 +760,7 @@ final class TrainingStats
                 'tonnageKg' => $bucket['tonnageKg'],
                 'sessions' => $bucket['sessions'],
                 'workingSets' => $bucket['workingSets'],
-                'tonnageLabel' => $bucket['tonnageKg'] > 0 ? $this->units->weight(round($bucket['tonnageKg'])) : '—',
+                'tonnageLabel' => $bucket['tonnageKg'] > 0 ? $this->units->tonnage($bucket['tonnageKg']) : '—',
                 'tonnageHeightPct' => $maxTonnage > 0 ? (int) round($bucket['tonnageKg'] / $maxTonnage * 100) : 0,
                 'sessionsHeightPct' => $maxSessions > 0 ? (int) round($bucket['sessions'] / $maxSessions * 100) : 0,
             ];

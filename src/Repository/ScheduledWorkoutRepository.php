@@ -6,6 +6,7 @@ use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
 use App\Entity\User;
+use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\ScheduledStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -886,6 +887,70 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
             ->setParameter('item', $item)
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Séances **faites** de la lignée d'une séance de bibliothèque, la plus
+     * récente d'abord : celles qui pointent une de ses copies de plan
+     * (`w.origin`) et celles qui la pointent directement (pose au calendrier,
+     * qui ne forke pas).
+     *
+     * Portée = le propriétaire de la séance, comme le compositeur : un coach qui
+     * ouvre la séance de son athlète lit les réalisations de l'athlète.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findDoneInLineage(Workout $origin, ?int $limit = null): array
+    {
+        $owner = $origin->getOwner();
+        if (null === $owner) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('s')
+            ->addSelect('w', 'pt')
+            ->join('s.workout', 'w')
+            ->leftJoin('s.sourcePlanTemplate', 'pt')
+            ->andWhere('s.owner = :owner')
+            ->andWhere('s.status = :done')
+            ->andWhere('w = :origin OR w.origin = :origin')
+            ->setParameter('owner', $owner)
+            ->setParameter('done', ScheduledStatus::DONE)
+            ->setParameter('origin', $origin)
+            ->orderBy('s.scheduledDate', 'DESC')
+            ->addOrderBy('s.id', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Date de la dernière séance faite, par racine de lignée, pour toute la
+     * bibliothèque d'un propriétaire. Une seule requête d'agrégat : la palette
+     * de l'éditeur de plan l'affiche sur chaque carte sans N+1.
+     *
+     * @return array<int, \DateTimeImmutable> id de la séance de bibliothèque → date
+     */
+    public function lastDoneDateByLineage(User $owner): array
+    {
+        /** @var list<array{root: int|string, last: string}> $rows */
+        $rows = $this->createQueryBuilder('s')
+            ->select('COALESCE(IDENTITY(w.origin), w.id) AS root', 'MAX(s.scheduledDate) AS last')
+            ->join('s.workout', 'w')
+            ->andWhere('s.owner = :owner')
+            ->andWhere('s.status = :done')
+            ->setParameter('owner', $owner)
+            ->setParameter('done', ScheduledStatus::DONE)
+            ->groupBy('root')
+            ->getQuery()
+            ->getArrayResult();
+
+        $dates = [];
+        foreach ($rows as $row) {
+            $dates[(int) $row['root']] = new \DateTimeImmutable($row['last']);
+        }
+
+        return $dates;
     }
 
     /**

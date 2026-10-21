@@ -179,6 +179,15 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   référence la **copie locale** (pas la séance biblio) : ses modifications se
   reflètent donc d'office au calendrier. Nuance qui remplace l'ancien « les items
   pointent la même séance partagée ».
+  **Lignée (`Workout.origin`)** : chaque copie `planLocal` pointe la **racine**,
+  la séance de bibliothèque d'origine (jamais une copie intermédiaire, SET NULL),
+  posée par `WorkoutCloner` ; c'est elle qui dit que « Upper A » S10 est « Upper A »,
+  même renommée. La fiche `/workout/{id}` liste les séances **faites** de la lignée
+  (`findDoneInLineage`, poses directes au calendrier comprises). **La pose depuis la
+  palette part du dernier réalisé** (`LineageSeed`) : structure de la dernière
+  séance faite, réalisé logué reporté en prescrit (force uniquement, séries
+  chiffrées, échauffement gardé), et la carte l'annonce. Duplication de semaine ou
+  de plan et pose calendrier gardent le clone simple.
 - **Plan vivant sur le calendrier.** L'instanciation est désormais **idempotente**
   (`PlanScheduler`, ex-`PlanInstantiator`) : la relancer resynchronise au lieu de
   dupliquer. `resync` est **add-only** — il ajoute au calendrier les cases posées
@@ -268,8 +277,17 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
 - **Pas d'inscription publique.** Les comptes se créent en console
   (`app:user:create`, rôle ROLE_USER), comme les promotions (`app:user:promote`,
   `app:user:promote-coach`). L'app n'expose que ce que le titulaire du compte peut
-  changer lui-même : son mot de passe, dans `/profile/settings`. L'email reste un
-  identifiant fixe côté console.
+  changer lui-même : son mot de passe et son pseudo, dans `/profile/settings`.
+  L'email reste un identifiant fixe côté console.
+- **Le pseudo s'affiche, l'email identifie.** `User.username` est facultatif,
+  unique (collation `utf8mb4_general_ci` : insensible à la casse et aux accents),
+  sans `@`, modifiable à volonté. Connexion, coaching, API et console restent sur
+  l'email. **Un seul endroit décide du nom affiché** : `User::getDisplayName()`
+  (pseudo, sinon email), `displayName` en Twig ; écrire `userIdentifier` pour
+  nommer quelqu'un ignore son pseudo. Tant qu'il n'y en a pas, `base.html.twig`
+  pose une invitation (`components/_username_prompt`) ; « Non merci » est
+  mémorisé en base (`usernamePromptDismissedAt`), la croix ne vaut que pour la
+  session du navigateur.
 - **Dans le compositeur, l'historique suit le PROPRIÉTAIRE de la séance ; sur la
   fiche d'un exercice, il suit SOI.** Ce n'est pas une incohérence, ce sont deux
   questions. `/exercise/{id}` répond à « est-ce que **je** progresse » sur un

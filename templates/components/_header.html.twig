@@ -3,20 +3,23 @@
     Rendu uniquement pour un utilisateur connecté (inclus sous `if app.user`
     dans base.html.twig). L'état actif est déduit du préfixe de la route courante.
 
-    La barre ne porte que le travail quotidien, en **3 entrées** : c'est le fil de
-    la planification (une séance → un plan → une date). Tout le reste — profil,
-    bibliothèque d'exercices, objectifs, coaching, athlètes, paramètres — vit dans
-    le menu de l'avatar : un `<details>` natif, donc utilisable au clavier ET sans
-    JS (condition du cache offline). Le contrôleur `dismiss` n'ajoute que le
-    confort (fermeture au clic extérieur et à Échap).
+    La barre ne porte que le travail quotidien, en **4 entrées** : l'accueil
+    (« où j'en suis »), puis le fil de la planification (une séance → un plan →
+    une date). Tout le reste — profil, bibliothèque d'exercices, objectifs,
+    coaching, athlètes, paramètres — vit dans le menu de l'avatar : un
+    `<details>` natif, donc utilisable au clavier ET sans JS (condition du cache
+    offline). Le contrôleur `dismiss` n'ajoute que le confort (fermeture au clic
+    extérieur et à Échap).
 
-    Pourquoi 3 et pas 4 : sous 560px cette barre devient la barre basse à portée
-    de pouce, où chaque entrée doit rester tapotable. Les exercices sont un
-    matériau qu'on consulte en composant une séance, pas une destination
-    quotidienne — ils descendent donc dans le menu de compte.
+    Pourquoi 4 et pas plus : sous 560px cette barre devient la barre basse à
+    portée de pouce, où chaque entrée doit rester tapotable. Les exercices sont
+    un matériau qu'on consulte en composant une séance, pas une destination
+    quotidienne — ils restent dans le menu de compte, et dans les raccourcis de
+    l'accueil.
 #}
 {% set route = app.request.attributes.get('_route') %}
 {% set items = [
+    { label: 'Accueil',     icon: 'lucide:calendar-check', path: 'app_home',                 match: 'app_home' },
     { label: 'Séances',     icon: 'lucide:clipboard-list', path: 'app_workout_index',        match: 'app_workout' },
     { label: 'Plans',       icon: 'lucide:layers',         path: 'app_plan_template_index',  match: 'app_plan_template' },
     { label: 'Calendrier',  icon: 'lucide:calendar-days',  path: 'app_calendar_index',       match: 'app_calendar' },
@@ -50,7 +53,7 @@
 
 <header class="kd-header">
     <div class="kd-header__inner">
-        <a href="{{ path('app_profile') }}" class="kd-brand">
+        <a href="{{ path('app_home') }}" class="kd-brand">
             <img src="{{ asset('icons/kadens.png') }}" alt="" width="32" height="32">
             Kadens
         </a>
@@ -70,11 +73,11 @@
             <details class="kd-usermenu" data-controller="dismiss">
                 <summary class="kd-usermenu__trigger{{ activeMenuItem ? ' is-active' }}"
                          aria-label="Menu du compte">
-                    <span class="kd-usermenu__avatar" aria-hidden="true">{{ app.user.userIdentifier|first|upper }}</span>
+                    <span class="kd-usermenu__avatar" aria-hidden="true">{{ app.user.displayName|first|upper }}</span>
                     {{ ux_icon('lucide:chevron-down') }}
                 </summary>
                 <div class="kd-usermenu__panel">
-                    <p class="kd-usermenu__who">{{ app.user.userIdentifier }}</p>
+                    <p class="kd-usermenu__who">{{ app.user.displayName }}</p>
                     <nav class="kd-usermenu__list" aria-label="Menu du compte">
                         {% for item in menuItems %}
                             {% set active = activeMenuItem == item.label %}

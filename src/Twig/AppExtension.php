@@ -5,11 +5,16 @@ namespace App\Twig;
 use App\Entity\Exercise;
 use App\Entity\User;
 use App\Enum\PrescriptionType;
+use App\Form\UsernameType;
 use App\Http\BackTarget;
 use App\Service\ActivityPalette;
 use App\Service\BackLink;
 use App\Service\ExerciseNaming;
+use App\Service\UnitFormatter;
+use Symfony\Component\Form\FormFactoryInterface;
+use Symfony\Component\Form\FormView;
 use Twig\Extension\AbstractExtension;
+use Twig\TwigFilter;
 use Twig\TwigFunction;
 
 /**
@@ -31,6 +36,13 @@ use Twig\TwigFunction;
  * - `activity_palette_css()` rend les couleurs d'activité choisies par le
  *   lecteur, en déclarations `:root` à poser dans `<head>` (`base.html.twig`).
  *   Valeurs déjà validées par `ActivityPalette` (hex strict), d'où le `raw`.
+ * - `|tonnage` formate un tonnage en kilos, ou en tonnes au-delà de 100 000 kg
+ *   (`UnitFormatter::tonnage()`). Un template qui écrirait encore
+ *   `|number_format ~ ' kg'` afficherait « 612 480 kg » là où le reste de l'app
+ *   dit « 612,5 t ».
+ * - `username_prompt_form()` fabrique le formulaire de l'invitation à choisir un
+ *   pseudo, que `base.html.twig` pose sur toutes les pages : aucun contrôleur
+ *   n'a à le passer. Null quand il n'y a rien à demander.
  */
 final class AppExtension extends AbstractExtension
 {
@@ -38,7 +50,16 @@ final class AppExtension extends AbstractExtension
         private readonly ExerciseNaming $naming,
         private readonly BackLink $backLink,
         private readonly ActivityPalette $activityPalette,
+        private readonly UnitFormatter $units,
+        private readonly FormFactoryInterface $forms,
     ) {
+    }
+
+    public function getFilters(): array
+    {
+        return [
+            new TwigFilter('tonnage', [$this->units, 'tonnage']),
+        ];
     }
 
     public function getFunctions(): array
@@ -56,7 +77,21 @@ final class AppExtension extends AbstractExtension
             // et le reconduit par champ caché à travers le flux Turbo.
             new TwigFunction('back_token', [BackTarget::class, 'token']),
             new TwigFunction('activity_palette_css', [$this, 'activityPaletteCss'], ['is_safe' => ['html']]),
+            new TwigFunction('username_prompt_form', [$this, 'usernamePromptForm']),
         ];
+    }
+
+    /**
+     * Même règle que la palette : tout ce qui n'est pas un `User` (anonyme
+     * compris) n'a rien à choisir.
+     */
+    public function usernamePromptForm(mixed $user, string $action): ?FormView
+    {
+        if (!$user instanceof User || !$user->shouldPromptForUsername()) {
+            return null;
+        }
+
+        return $this->forms->create(UsernameType::class, $user, ['required' => true, 'action' => $action])->createView();
     }
 
     /**

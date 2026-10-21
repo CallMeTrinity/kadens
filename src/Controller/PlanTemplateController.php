@@ -16,6 +16,7 @@ use App\Repository\ScheduledWorkoutRepository;
 use App\Repository\WorkoutRepository;
 use App\Security\Voter\PlanTemplateVoter;
 use App\Service\CoachedLibrary;
+use App\Service\LineageSeed;
 use App\Service\PlanFlattener;
 use App\Service\PlanScheduler;
 use App\Service\PlanVolumeAggregator;
@@ -53,6 +54,7 @@ final class PlanTemplateController extends AbstractController
         private readonly WorkoutMetrics $workoutMetrics,
         private readonly PlanVolumeAggregator $volumeAggregator,
         private readonly GoalRepository $goalRepository,
+        private readonly ScheduledWorkoutRepository $scheduledWorkoutRepository,
     ) {
     }
 
@@ -447,11 +449,12 @@ final class PlanTemplateController extends AbstractController
 
     /**
      * Pose une séance dans une case (palette : mode tampon / glisser-déposer).
-     * Corps : workoutId + week + day. Clone la séance choisie (fork à la pose) et
-     * la pose dans la case, puis resync si le plan est déjà au calendrier.
+     * Corps : workoutId + week + day. Forke la séance choisie en partant de sa
+     * dernière réalisation s'il y en a une (LineageSeed), la pose dans la case,
+     * puis resync si le plan est déjà au calendrier.
      */
     #[Route('/{id}/place', name: 'app_plan_template_item_place', methods: ['POST'], requirements: ['id' => '\d+'])]
-    public function placeItem(Request $request, PlanTemplate $template, WorkoutCloner $cloner, PlanScheduler $scheduler): Response
+    public function placeItem(Request $request, PlanTemplate $template, LineageSeed $seed, PlanScheduler $scheduler): Response
     {
         $this->denyAccessUnlessGranted(PlanTemplateVoter::EDIT, $template);
         $payload = $request->getPayload();
@@ -467,7 +470,7 @@ final class PlanTemplateController extends AbstractController
             // son athlète — c'est-à-dire tout ce que la palette lui propose.
             if ($week >= 1 && $week <= (int) $template->getDurationWeeks() && $day >= 1 && $day <= 7
                 && null !== $source && $source->getOwner()?->getId() === $this->ownerOf($template)->getId() && !$source->isPlanLocal()) {
-                $this->placeWorkoutInCell($template, $source, $week, $day, null, $cloner);
+                $this->placeWorkoutInCell($template, $source, $week, $day, null, $seed);
                 $this->entityManager->flush();
                 $scheduler->resync($template);
             }
@@ -730,14 +733,16 @@ final class PlanTemplateController extends AbstractController
     /**
      * Fork à la pose : la case reçoit sa PROPRE copie (planLocal) de la séance
      * source, éditable et progressable sans toucher la biblio ni les autres cases.
+     * La copie part de la dernière réalisation de la séance quand il y en a une
+     * (cf. LineageSeed), de la bibliothèque sinon.
      * La copie appartient au propriétaire du plan (le contenu appartient toujours
      * à l'athlète) : c'est elle que référencera la séance datée au calendrier.
      * Persiste l'item ; le flush et le resync calendrier restent à l'appelant
      * (pour grouper les poses multiples si besoin).
      */
-    private function placeWorkoutInCell(PlanTemplate $template, Workout $source, int $week, int $day, ?string $notes, WorkoutCloner $cloner): PlanItem
+    private function placeWorkoutInCell(PlanTemplate $template, Workout $source, int $week, int $day, ?string $notes, LineageSeed $seed): PlanItem
     {
-        $copy = $cloner->cloneWorkout($source, $this->ownerOf($template), $source->getTitle(), true);
+        $copy = $seed->seed($source, $this->ownerOf($template));
         $item = (new PlanItem())
             ->setWeekNumber($week)
             ->setDayOfWeek($day)
@@ -818,7 +823,11 @@ final class PlanTemplateController extends AbstractController
      */
     private function paletteContext(PlanTemplate $template): array
     {
-        $workouts = $this->workoutRepository->findLibraryForOwnerWithContent($this->ownerOf($template));
+        $owner = $this->ownerOf($template);
+        $workouts = $this->workoutRepository->findLibraryForOwnerWithContent($owner);
+        // La pose part de la dernière réalisation : la carte le dit, pour que
+        // les valeurs de la case ne changent pas de source en silence.
+        $lastDone = $this->scheduledWorkoutRepository->lastDoneDateByLineage($owner);
 
         $cards = [];
         $countsByActivity = [];
@@ -836,6 +845,7 @@ final class PlanTemplateController extends AbstractController
                 'activities' => $activities,
                 'exerciseCount' => $this->workoutMetrics->exerciseCount($workout),
                 'filterText' => $filterText,
+                'lastDone' => $lastDone[(int) $workout->getId()] ?? null,
             ];
         }
 

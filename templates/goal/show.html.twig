@@ -18,7 +18,7 @@
     {% set mine = app.user is not null and goal.owner is not null and goal.owner.id == app.user.id %}
 
     <a href="{{ mine ? path('app_goal_index') : path('app_coach_athlete', {id: goal.owner.id}) }}" class="kd-backlink">
-        {{ ux_icon('lucide:arrow-left') }} {{ mine ? 'Objectifs' : goal.owner.userIdentifier }}
+        {{ ux_icon('lucide:arrow-left') }} {{ mine ? 'Objectifs' : goal.owner.displayName }}
     </a>
 
     {% set days = goal.daysUntil %}
@@ -197,7 +197,7 @@
             <p class="kd-lead" style="margin-top:0;">
                 On raisonne à l'envers : Kadens cale la dernière semaine du plan sur
                 {{ mine ? 'ton échéance' : 'cette échéance' }} et calcule la date de départ.
-                {% if not mine %}Le plan se pose sur le calendrier de {{ goal.owner.userIdentifier }}.{% endif %}
+                {% if not mine %}Le plan se pose sur le calendrier de {{ goal.owner.displayName }}.{% endif %}
             </p>
             {% if plans is empty %}
                 <div class="kd-empty">

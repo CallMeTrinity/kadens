@@ -200,8 +200,9 @@ final class ProfileHistoryPageTest extends WebTestCase
     }
 
     /**
-     * L'entrée se fait depuis le **profil** — la page d'accueil — autant que
-     * depuis les statistiques, et les deux retours sont offerts. Un historique
+     * L'entrée se fait depuis l'**accueil** (ses raccourcis) autant que depuis
+     * les statistiques, et les deux retours sont offerts — le second vers le
+     * profil, que l'historique prolonge. Un historique
      * qu'il faut atteindre en deux sauts n'est pas consulté.
      */
     public function testItIsReachableFromTheProfileAndFromTheStatsPage(): void
@@ -216,7 +217,7 @@ final class ProfileHistoryPageTest extends WebTestCase
 
         $history = $this->client->request('GET', '/profile/history');
         self::assertGreaterThan(0, $history->filter('a[href="/profile/stats"]')->count());
-        self::assertGreaterThan(0, $history->filter('a[href="/"]')->count());
+        self::assertGreaterThan(0, $history->filter('a[href="/profile"]')->count());
     }
 
     // ---------------------------------------------------------------- helpers

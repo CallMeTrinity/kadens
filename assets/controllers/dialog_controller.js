@@ -13,9 +13,16 @@ import { Controller } from '@hotwired/stimulus';
  *       ... <button data-action="dialog#close">Fermer</button> ...
  *     </dialog>
  *   </div>
+ *
+ * Ouverture automatique : `data-dialog-open-once-value="<clé>"` ouvre la modale
+ * au chargement, **une fois par session de navigateur** (la clé est notée en
+ * `sessionStorage`). C'est ce qui sépare « fermer » de « refuser » : la croix
+ * ou Échap remettent à plus tard sans que la modale ressurgisse à chaque clic
+ * de navigation ; un refus définitif, lui, est une action serveur.
  */
 export default class extends Controller {
     static targets = ['dialog'];
+    static values = { openOnce: String };
 
     /*
      * Turbo met la page en cache **avant** de naviguer, et `showModal()` laisse un
@@ -31,6 +38,8 @@ export default class extends Controller {
     connect() {
         this.closeBeforeCache = () => this.close();
         document.addEventListener('turbo:before-cache', this.closeBeforeCache);
+
+        if (this.openOnceValue) this.openOnceThisSession(this.openOnceValue);
     }
 
     disconnect() {
@@ -39,6 +48,24 @@ export default class extends Controller {
 
     open() {
         this.dialogTarget.showModal();
+    }
+
+    /*
+     * Stockage illisible (navigation privée, données bloquées) : on n'ouvre pas.
+     * Sans mémoire, la modale reviendrait à chaque page ; mieux vaut ne pas
+     * l'imposer, la même chose s'atteint depuis la page qui la propose en dur.
+     * Turbo connecte aussi le contrôleur sur un aperçu tiré du cache : la clé
+     * déjà posée l'y empêche de s'ouvrir une seconde fois.
+     */
+    openOnceThisSession(key) {
+        try {
+            if (sessionStorage.getItem(key)) return;
+            sessionStorage.setItem(key, '1');
+        } catch {
+            return;
+        }
+
+        if (!this.dialogTarget.open) this.open();
     }
 
     /*

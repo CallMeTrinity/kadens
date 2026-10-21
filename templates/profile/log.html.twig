@@ -25,7 +25,7 @@
       sur chaque ligne) est calculé en tête de `body` — un lien interne oublié
       renverrait le coach sur ses propres données au clic suivant. #}
 
-{% block title %}Journal{% if subject|default(null) %} — {{ subject.userIdentifier }}{% endif %} — Kadens{% endblock %}
+{% block title %}Journal{% if subject|default(null) %} — {{ subject.displayName }}{% endif %} — Kadens{% endblock %}
 
 {% block body %}
     {% set subject = subject|default(null) %}
@@ -41,7 +41,7 @@
             <p class="kd-eyebrow kd-eyebrow--accent">Journal</p>
             <h1 class="kd-title">{{ subject ? 'Ce qui a été consigné' : 'Ce que tu as consigné' }}</h1>
             <p class="kd-pagehead__lead">
-                {%- if subject %}{{ subject.userIdentifier }} · {% endif -%}
+                {%- if subject %}{{ subject.displayName }} · {% endif -%}
                 {{ period.label }} ·
                 {{ sessions }} séance{{ sessions > 1 ? 's' }} consignée{{ sessions > 1 ? 's' }}
                 {%- if total > sessions %} · {{ total }} au total{% endif -%}
@@ -86,7 +86,7 @@
                     <p class="kd-loggroup__totals">
                         {{- group.sessions }} séance{{ group.sessions > 1 ? 's' }}
                         {%- if group.workingSets > 0 %} · {{ group.workingSets }} série{{ group.workingSets > 1 ? 's' }}{% endif -%}
-                        {%- if group.tonnageKg > 0 %} · {{ group.tonnageKg|round|number_format(0, ',', ' ') }} kg{% endif -%}
+                        {%- if group.tonnageKg > 0 %} · {{ group.tonnageKg|tonnage }}{% endif -%}
                     </p>
                 </div>
                 {# La carte enveloppe la liste, elle ne se confond pas avec elle :
