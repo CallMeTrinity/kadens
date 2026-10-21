@@ -57,6 +57,18 @@ class Workout
     #[ORM\Column(options: ['default' => false])]
     private bool $planLocal = false;
 
+    /**
+     * Séance de bibliothèque dont cette copie descend : c'est ce qui dit que
+     * « Upper A » semaine 10 est bien « Upper A », même renommée. Toujours la
+     * RACINE de la lignée, jamais une copie intermédiaire (`WorkoutCloner` la
+     * reconduit de copie en copie) : on ne remonte donc jamais de chaîne.
+     * Null pour une séance de bibliothèque. SET NULL : supprimer la séance
+     * d'origine laisse ses copies en place, elles en oublient juste la parenté.
+     */
+    #[ORM\ManyToOne(targetEntity: self::class)]
+    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    private ?Workout $origin = null;
+
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -186,6 +198,18 @@ class Workout
     public function setPlanLocal(bool $planLocal): static
     {
         $this->planLocal = $planLocal;
+
+        return $this;
+    }
+
+    public function getOrigin(): ?Workout
+    {
+        return $this->origin;
+    }
+
+    public function setOrigin(?Workout $origin): static
+    {
+        $this->origin = $origin;
 
         return $this;
     }

@@ -421,6 +421,41 @@ final class WorkoutControllerTest extends WebTestCase
         self::assertResponseStatusCodeSame(403);
     }
 
+    /**
+     * La fiche d'une séance de bibliothèque liste ce qui a été FAIT de sa
+     * lignée : ses copies de plan comme ses poses directes au calendrier. Une
+     * séance seulement prévue n'y figure pas, et une copie locale n'a pas la
+     * section (elle n'est pas la racine).
+     */
+    public function testShowListsTheDoneSessionsOfTheLineage(): void
+    {
+        $owner = $this->createUser('owner@example.com');
+        $library = $this->createWorkout($owner, 'Upper A');
+        $copy = (new Workout())->setOwner($owner)->setTitle('Upper A S10')->setSlug('upper-a-s10')
+            ->setPlanLocal(true)->setOrigin($library);
+        $this->em->persist($copy);
+
+        foreach ([[$copy, '2026-10-12', ScheduledStatus::DONE], [$library, '2026-10-05', ScheduledStatus::DONE], [$copy, '2026-10-19', ScheduledStatus::PLANNED]] as [$workout, $date, $status]) {
+            $this->em->persist((new ScheduledWorkout())->setOwner($owner)->setWorkout($workout)
+                ->setScheduledDate(new \DateTimeImmutable($date))->setStatus($status));
+        }
+        $this->em->flush();
+
+        $this->client->loginUser($owner);
+        $crawler = $this->client->request('GET', '/workout/'.$library->getId());
+        self::assertResponseIsSuccessful();
+
+        $rows = $crawler->filter('[aria-labelledby="wk-instances"] .kd-list__row');
+        self::assertCount(2, $rows);
+        // La plus récente d'abord, sous le titre qu'elle portait.
+        self::assertStringContainsString('Upper A S10', $rows->eq(0)->text());
+        self::assertStringContainsString('Posée au calendrier', $rows->eq(1)->text());
+
+        $this->client->request('GET', '/workout/'.$copy->getId());
+        self::assertResponseIsSuccessful();
+        self::assertSelectorNotExists('#wk-instances');
+    }
+
     // --- Palette du compositeur : ordre et recherche --------------------------
 
     /**

@@ -179,6 +179,15 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   référence la **copie locale** (pas la séance biblio) : ses modifications se
   reflètent donc d'office au calendrier. Nuance qui remplace l'ancien « les items
   pointent la même séance partagée ».
+  **Lignée (`Workout.origin`)** : chaque copie `planLocal` pointe la **racine**,
+  la séance de bibliothèque d'origine (jamais une copie intermédiaire, SET NULL),
+  posée par `WorkoutCloner` ; c'est elle qui dit que « Upper A » S10 est « Upper A »,
+  même renommée. La fiche `/workout/{id}` liste les séances **faites** de la lignée
+  (`findDoneInLineage`, poses directes au calendrier comprises). **La pose depuis la
+  palette part du dernier réalisé** (`LineageSeed`) : structure de la dernière
+  séance faite, réalisé logué reporté en prescrit (force uniquement, séries
+  chiffrées, échauffement gardé), et la carte l'annonce. Duplication de semaine ou
+  de plan et pose calendrier gardent le clone simple.
 - **Plan vivant sur le calendrier.** L'instanciation est désormais **idempotente**
   (`PlanScheduler`, ex-`PlanInstantiator`) : la relancer resynchronise au lieu de
   dupliquer. `resync` est **add-only** — il ajoute au calendrier les cases posées

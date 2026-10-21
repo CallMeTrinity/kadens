@@ -64,4 +64,39 @@
             </div>
         {% endblock %}
     {% endembed %}
+
+    {# Réalisations de la lignée (copies de plan + poses directes au calendrier).
+       Hors de `_workout_read` : ce composant sert aussi la page publique, et
+       l'historique d'un propriétaire n'a rien à y faire. Absent d'une copie
+       locale de plan, qui n'est pas la racine de sa lignée. #}
+    {% if instances is not null %}
+        <section class="kd-section" aria-labelledby="wk-instances">
+            <h2 class="kd-wk__paneltitle" id="wk-instances">Réalisations</h2>
+            {% if instances is empty %}
+                <div class="kd-card kd-empty">
+                    {{ ux_icon('lucide:history') }}
+                    <div>Pas encore faite. Ses prochaines poses partiront de la version ci-dessus.</div>
+                </div>
+            {% else %}
+                <ul class="kd-list">
+                    {% for scheduled in instances %}
+                        <li class="kd-list__row">
+                            <div class="kd-list__date">
+                                <div class="kd-list__date-day">{{ scheduled.scheduledDate|date('d') }}</div>
+                                <div class="kd-list__date-mon">{{ scheduled.scheduledDate|date('m/Y') }}</div>
+                            </div>
+                            <div class="kd-list__main">
+                                <a class="kd-list__title" href="{{ path('app_scheduled_workout_show', {id: scheduled.id}) }}">
+                                    {{ scheduled.displayTitle }}
+                                </a>
+                                <div class="kd-list__meta">
+                                    {{ scheduled.sourcePlanTemplate ? scheduled.sourcePlanTemplate.title : 'Posée au calendrier' }}
+                                </div>
+                            </div>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        </section>
+    {% endif %}
 {% endblock %}
