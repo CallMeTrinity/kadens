@@ -23,8 +23,9 @@
 
    Paramètres :
    - entry : une entrée de TrainingLog (id, date, title, status, workingSets,
-     tonnageKg, durationSeconds, averageRpe, exercises, skipped)
+     tonnageKg, durationSeconds, averageRpe, exercises, skipped, rating)
    - back  : jeton de contexte à poser sur le lien (`back_to(...)`), ou {} #}
+{% import 'components/_rating.html.twig' as ratings %}
 {% set back = back|default({}) %}
 
 <li class="kd-loglist__item">
@@ -45,6 +46,9 @@
             {% endif %}
             {% if entry.averageRpe is not null %}
                 <span>RPE {{ entry.averageRpe|number_format(1, ',', ' ') }}</span>
+            {% endif %}
+            {% if entry.rating %}
+                <span>{{ ratings.badge(entry.rating) }}</span>
             {% endif %}
             {% if entry.skipped > 0 %}
                 <span>{{ entry.skipped }} sauté{{ entry.skipped > 1 ? 's' }}</span>

@@ -339,6 +339,51 @@ final class ApiScheduleTest extends WebTestCase
      * **Le cinquième test du ticket** : les trois refus qu'il nomme, plus le
      * champ fautif — un 422 nu obligerait le client à deviner.
      */
+    /**
+     * Le ressenti suit la règle de la note : écrit s'il est là, jamais effacé par
+     * un document qui n'en porte pas — le téléphone rejoue souvent un document
+     * plus ancien que la correction faite sur le web.
+     */
+    public function testTheRatingIsWrittenAndNeverErasedBySilence(): void
+    {
+        $user = $this->createUser('athlete@example.com');
+        $secret = $this->issueToken($user);
+        $uuid = Uuid::v7();
+        $document = [
+            'date' => (new \DateTimeImmutable('today'))->format('Y-m-d'),
+            'title' => 'Séance notée',
+            'status' => 'done',
+        ];
+
+        $created = $this->put($uuid, $secret, $document + ['feeling' => 4, 'sessionRpe' => 7], expected: 201);
+        self::assertSame(4, $created['feeling']);
+        self::assertSame(7, $created['sessionRpe']);
+
+        $silent = $this->put($uuid, $secret, $document + ['feeling' => null], expected: 200);
+        self::assertSame(4, $silent['feeling']);
+        self::assertSame(7, $silent['sessionRpe']);
+
+        $corrected = $this->put($uuid, $secret, $document + ['sessionRpe' => 9], expected: 200);
+        self::assertSame(4, $corrected['feeling']);
+        self::assertSame(9, $corrected['sessionRpe']);
+    }
+
+    public function testARatingOutOfItsScaleIsRejected(): void
+    {
+        $user = $this->createUser('athlete@example.com');
+        $secret = $this->issueToken($user);
+        $date = (new \DateTimeImmutable('today'))->format('Y-m-d');
+
+        foreach (['forme à 6' => ['feeling' => 6], 'forme à 0' => ['feeling' => 0], 'difficulté à 11' => ['sessionRpe' => 11]] as $label => $rating) {
+            $problem = $this->putRaw(Uuid::v7(), $secret, ['date' => $date] + $rating);
+
+            self::assertResponseStatusCodeSame(422, sprintf('« %s » doit être refusé.', $label));
+            self::assertSame(array_key_first($rating), $problem['violations'][0]['field'] ?? null);
+        }
+
+        self::assertCount(0, $this->em->getRepository(ScheduledWorkout::class)->findAll());
+    }
+
     public function testInvalidValuesAreRejected(): void
     {
         $user = $this->createUser('athlete@example.com');

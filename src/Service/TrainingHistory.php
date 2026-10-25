@@ -50,7 +50,7 @@ use App\Repository\ScheduledWorkoutRepository;
  * Le nombre de requêtes est **constant**, il ne dépend pas du nombre de mois
  * affichés — un test le vérifie et fige le chiffre.
  *
- * @phpstan-type HistorySession array{id: int, title: string, activity: ActivityType|null, endurance: bool, groups: list<MuscleGroup>, workingSets: int}
+ * @phpstan-type HistorySession array{id: int, title: string, activity: ActivityType|null, endurance: bool, groups: list<MuscleGroup>, workingSets: int, rating: SessionRating}
  * @phpstan-type HistoryDay array{date: \DateTimeImmutable, inMonth: bool, isToday: bool, sessions: list<HistorySession>}
  * @phpstan-type HistoryMonth array{year: int, month: int, label: string, sessions: int, activeDays: int, weeks: list<list<HistoryDay>>}
  * @phpstan-type HistoryYear array{year: int, sessions: int, months: list<HistoryMonth>}
@@ -157,6 +157,7 @@ final class TrainingHistory
                 'endurance' => null !== $activity && \in_array($activity, self::ENDURANCE, true),
                 'groups' => $volume[$row['id']]['groups'] ?? [],
                 'workingSets' => $volume[$row['id']]['workingSets'] ?? 0,
+                'rating' => $row['rating'],
             ];
         }
 

@@ -183,7 +183,9 @@
                                                         ? ' — ' ~ session.groups|map(g => g.label)|join(', ')
                                                         : (session.endurance
                                                             ? ' — ' ~ session.activity.label
-                                                            : ' — sans réalisé')) %}
+                                                            : ' — sans réalisé'))
+                                                    ~ (session.rating.feeling ? ' — forme : ' ~ session.rating.feelingLabel|lower)
+                                                    ~ (session.rating.sessionRpe ? ' — difficulté ' ~ session.rating.sessionRpe ~ '/10') %}
 
                                                 <a class="kd-histsess{{ session.endurance ? ' kd-histsess--endurance' }}"
                                                    href="{{ path('app_scheduled_workout_show', {id: session.id}) }}"

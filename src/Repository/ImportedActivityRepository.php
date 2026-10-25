@@ -29,30 +29,37 @@ class ImportedActivityRepository extends ServiceEntityRepository
     }
 
     /**
-     * Parmi des identifiants externes, ceux qui sont déjà en base. Une requête
-     * par lot, pas une par activité : c'est ce qui rend la synchro rejouable à
-     * coût constant.
+     * Les activités déjà importées d'un propriétaire parmi des identifiants
+     * externes, indexées par identifiant. Sert à relire leur ressenti, qu'on
+     * note souvent sur la montre ou dans Intervals après la synchro.
      *
      * @param list<string> $externalIds
      *
-     * @return list<string>
+     * @return array<string, ImportedActivity>
      */
-    public function knownExternalIds(ActivitySource $source, array $externalIds): array
+    public function findKnownForOwner(User $owner, ActivitySource $source, array $externalIds): array
     {
         if ([] === $externalIds) {
             return [];
         }
 
-        $rows = $this->createQueryBuilder('a')
-            ->select('a.externalId')
+        /** @var list<ImportedActivity> $activities */
+        $activities = $this->createQueryBuilder('a')
+            ->andWhere('a.owner = :owner')
             ->andWhere('a.source = :source')
             ->andWhere('a.externalId IN (:ids)')
+            ->setParameter('owner', $owner)
             ->setParameter('source', $source)
             ->setParameter('ids', $externalIds)
             ->getQuery()
-            ->getSingleColumnResult();
+            ->getResult();
 
-        return array_values(array_map('strval', $rows));
+        $byId = [];
+        foreach ($activities as $activity) {
+            $byId[$activity->getExternalId()] = $activity;
+        }
+
+        return $byId;
     }
 
     /**

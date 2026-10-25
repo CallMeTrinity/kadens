@@ -34,6 +34,10 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  *
  * **Relançable.** Une panne ou un quota épuisé laisse en base ce qui a été
  * traité (écriture par lots) ; relancer la même commande reprend sans doublon.
+ *
+ * **Elle relit aussi le ressenti** des activités déjà importées (forme, RPE), sans
+ * stream ni quota : relancer sur toute la plage est la façon de remplir les
+ * notes d'un historique importé avant qu'on les lise.
  */
 #[AsCommand(
     name: 'app:intervals:import',
@@ -134,6 +138,7 @@ final class ImportIntervalsHistoryCommand extends Command
             ['À rattacher (plusieurs séances possibles)' => (string) $report->ambiguous],
             ['À rattacher (sans séance, ou type non reconnu)' => (string) ($report->imported - $report->attached - $report->freeSessions - $report->ambiguous)],
             ['Ignorées (arrivées via Strava)' => (string) $report->skipped],
+            ['Déjà connues, ressenti mis à jour' => (string) $report->rated],
         );
 
         if (!$force) {
@@ -142,7 +147,7 @@ final class ImportIntervalsHistoryCommand extends Command
             return Command::SUCCESS;
         }
 
-        $io->success(\sprintf('%d activités importées pour %s.', $report->imported, $email));
+        $io->success(\sprintf('%d activités importées, %d ressentis mis à jour pour %s.', $report->imported, $report->rated, $email));
 
         return Command::SUCCESS;
     }

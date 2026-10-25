@@ -233,6 +233,38 @@ final class PlanTemplateControllerTest extends WebTestCase
     }
 
     /**
+     * On compose la semaine suivante en sachant comment s'est passée la
+     * précédente : la carte de palette donne le dernier ressenti et la moyenne
+     * des dernières exécutions notées de la lignée, copies de plan comprises.
+     */
+    public function testThePaletteCardTellsHowTheLineageFelt(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $library = $this->createLiftWorkout($user, 'Upper A');
+        $copy = (new Workout())->setOwner($user)->setTitle('Upper A')->setSlug('upper-a-copie')->setPlanLocal(true)->setOrigin($library);
+        $this->em->persist($copy);
+
+        foreach ([['2026-10-07', $library, 2, 8], ['2026-10-14', $copy, 4, 6]] as [$date, $workout, $feeling, $rpe]) {
+            $this->em->persist((new ScheduledWorkout())->setOwner($user)->setWorkout($workout)
+                ->setScheduledDate(new \DateTimeImmutable($date))->setStatus(ScheduledStatus::DONE)
+                ->setFeeling($feeling)->setSessionRpe($rpe));
+        }
+
+        $template = $this->createPlanTemplate($user, 'Plan force', 1);
+        $this->client->loginUser($user);
+
+        $crawler = $this->client->request('GET', '/plan-template/'.$template->getId().'/edit');
+        self::assertResponseIsSuccessful();
+
+        $card = $crawler->filter('[data-workout-id="'.$library->getId().'"] .kd-palettecard__feel');
+        self::assertStringContainsString('En forme', $card->text(), 'La dernière exécution en tête.');
+        self::assertStringContainsString('Difficulté 6/10', $card->text());
+        self::assertStringContainsString('moy. 2 : normal, 7,0/10', $card->text());
+        // La liste datée, au survol, de la plus récente à la plus ancienne.
+        self::assertSame("14/10 : En forme, difficulté 6/10\n07/10 : Faible, difficulté 8/10", $card->attr('title'));
+    }
+
+    /**
      * Repli sans JS du glisser-déposer : le menu d'une case porte un vrai
      * formulaire « Déplacer vers » (selects semaine/jour). C'est le seul chemin de
      * déplacement au clavier, et le seul praticable au doigt quand la trame est

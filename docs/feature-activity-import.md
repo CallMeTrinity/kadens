@@ -51,6 +51,10 @@ php bin/console app:intervals:import athlete@example.com --since=2025-01-01 --fo
 - Écrit par lots de 40. Une panne ou un quota épuisé conserve ce qui précède ;
   relancer la même commande reprend sans doublon.
 - Ne recule jamais la fenêtre du bouton web (`syncedThrough`).
+- **Relit aussi le ressenti** des activités déjà connues (voir §5). Relancer la
+  commande sur toute la plage est la façon de noter un historique importé avant
+  que Kadens lise `feel` et `icu_rpe` : rien n'est réimporté, aucun stream n'est
+  demandé, la ligne « Déjà connues, ressenti mis à jour » dit combien ont changé.
 
 ## 4. Mise en route (serveur)
 
@@ -125,6 +129,21 @@ php bin/console app:intervals:import athlete@example.com --since=2025-01-01 --fo
   natation.
 - **Allure dérivée**, jamais stockée (`ImportedActivity::getPaceSecondsPerKm`),
   sur le temps en mouvement.
+- **Ressenti : `feel` et `icu_rpe`, ramenés à l'échelle Kadens au mapping**
+  (`ImportedActivityMapper::ratingsFromIntervals`). `icu_rpe` (1-10) passe tel
+  quel ; `feel` (1-5) est **à l'envers** chez Intervals (1 = « Strong ») et se
+  lit `6 − feel` (constante `FEEL_FLIP`, le seul endroit où le sens se décide).
+  `session_rpe` (RPE × minutes, un dérivé) et `perceived_exertion` (Strava) ne
+  sont pas des notes de séance. Hors échelle → null, jamais ramené au bord.
+- **Le ressenti se relit, le reste non.** On note souvent sa sortie après la
+  synchro : bouton et commande relisent `feel`/`icu_rpe` des activités connues de
+  leur plage (`IntervalsImporter::refreshRatings`), hors du lot de 40 et sans
+  stream. Rien d'autre d'une activité connue n'est réécrit.
+- **La note de la montre ne se recopie pas sur la séance.** Elle vit sur
+  `ImportedActivity` ; la valeur lue est celle de Kadens si elle existe, sinon
+  celle des activités rattachées (pire des deux si plusieurs), calculée à la
+  lecture (`ScheduledWorkoutRepository::ratingsFor`). Détacher retire donc la
+  note sans rien écrire, et une saisie Kadens prend le pas axe par axe.
 
 ## 6. Limites connues
 

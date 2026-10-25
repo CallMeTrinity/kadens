@@ -5,6 +5,7 @@
 {% block title %}{{ workout.title }}{% endblock %}
 
 {% block body %}
+    {% import 'components/_rating.html.twig' as ratings %}
     {# Vue de consultation auto-suffisante : aucun chargement AJAX post-rendu,
        condition du cache offline. Consomme PlanFlattener + WorkoutMetrics.
 
@@ -91,6 +92,9 @@
                                 </a>
                                 <div class="kd-list__meta">
                                     {{ scheduled.sourcePlanTemplate ? scheduled.sourcePlanTemplate.title : 'Posée au calendrier' }}
+                                    {% if instanceRatings[scheduled.id] is defined %}
+                                        · {{ ratings.badge(instanceRatings[scheduled.id]) }}
+                                    {% endif %}
                                 </div>
                             </div>
                         </li>

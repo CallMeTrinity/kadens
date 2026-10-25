@@ -37,6 +37,8 @@
                    pastille porte la marque « Libre »
      - statuses  : ScheduledStatus::cases()
      - detailed  : bool (optionnel) — carte haute de la vue semaine (méta + note)
+     - rating    : SessionRating|null (optionnel) — ressenti effectif, affiché
+                   sur la carte haute seulement
      - overdue   : bool (optionnel) — séance passée encore « prévue »
      - backFrom  : string|null (optionnel) — ancre de contexte de la vue appelante
                    (`cal-week-…` / `cal-month-…`), posée sur les liens sortants
@@ -47,7 +49,9 @@
                    traverse le flux Turbo par un champ caché, comme `detailed`.
    ============================================================================ #}
 {% import 'components/_activity.html.twig' as activity %}
+{% import 'components/_rating.html.twig' as ratings %}
 {% set fw = fw|default(null) %}
+{% set rating = rating|default(null) %}
 {% set backFrom = backFrom|default(null) %}
 {% set back = backFrom ? {from: backFrom} : {} %}
 {% set workout = scheduled.workout %}
@@ -86,6 +90,9 @@
                     <span class="kd-calevent__exos">{{ fw.exerciseCount }} exo{{ fw.exerciseCount > 1 ? 's' }}</span>
                 {% endif %}
             </span>
+        {% endif %}
+        {% if detailed and rating %}
+            <span class="kd-calevent__meta">{{ ratings.badge(rating) }}</span>
         {% endif %}
         {% if detailed and overdue %}
             <span class="kd-calevent__flag">{{ ux_icon('lucide:calendar-clock') }} En retard</span>
@@ -151,6 +158,15 @@
                     <div class="kd-field">
                         <textarea name="completionNotes" rows="2" class="kd-input kd-input--area" placeholder="Écart / ressenti (optionnel)">{{ scheduled.completionNotes }}</textarea>
                     </div>
+                    {# Le ressenti se consigne (LOG) : propriétaire seul. Il part
+                       avec le statut, et ne compte que si la séance est faite. #}
+                    {% if is_granted('SCHEDULED_WORKOUT_LOG', scheduled) %}
+                        <details class="kd-modal__rating"{{ scheduled.feeling or scheduled.sessionRpe ? ' open' }}>
+                            <summary class="kd-label">Ressenti</summary>
+                            {{ ratings.picker('feeling', scheduled.feeling, 'cal-' ~ scheduled.id) }}
+                            {{ ratings.picker('sessionRpe', scheduled.sessionRpe, 'cal-' ~ scheduled.id) }}
+                        </details>
+                    {% endif %}
                     <div class="kd-segmented" role="group" aria-label="Marquer le statut">
                         {% for status in statuses %}
                             <button type="submit" name="status" value="{{ status.value }}"

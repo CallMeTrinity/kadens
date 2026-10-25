@@ -90,6 +90,11 @@
         attachable: attachableActivities
     }, with_context = false) }}
 
+    {# Le ressenti (forme, difficulté) : consigner, propriétaire seul pour la
+       saisie, coach en lecture. Après le réalisé, avant « Boucler » : on note la
+       séance qu'on vient de lire. #}
+    {{ include('components/_scheduled_rating.html.twig', {scheduled: scheduled, rating: rating}, with_context = false) }}
+
     {# Boucler la séance : programmer, pas consigner. Bascule de statut, note
        d'écart léger, déplacement, retrait — tout ce que le coach fait aussi.
        Sortie en composant : c'est la cible du Turbo Stream renvoyé par le

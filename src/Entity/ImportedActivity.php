@@ -99,6 +99,18 @@ class ImportedActivity
     private ?int $averageWatts = null;
 
     /**
+     * Le ressenti noté sur la montre, tel que la source le rend mais **ramené à
+     * l'échelle Kadens** au mapping (forme 1-5 de « très faible » à « très en
+     * forme », difficulté 1-10) : la lecture n'a jamais à savoir d'où il vient.
+     * Relu à chaque synchronisation, puisqu'on le saisit souvent après coup.
+     */
+    #[ORM\Column(type: Types::SMALLINT, nullable: true)]
+    private ?int $feeling = null;
+
+    #[ORM\Column(type: Types::SMALLINT, nullable: true)]
+    private ?int $sessionRpe = null;
+
+    /**
      * Découpage au kilomètre, calculé depuis les streams à l'import.
      *
      * @var list<array{meters: int, seconds: int, averageHeartRate: ?int, elevationGain: ?int}>|null
@@ -299,6 +311,30 @@ class ImportedActivity
     public function setAverageWatts(?int $averageWatts): static
     {
         $this->averageWatts = $averageWatts;
+
+        return $this;
+    }
+
+    public function getFeeling(): ?int
+    {
+        return $this->feeling;
+    }
+
+    public function setFeeling(?int $feeling): static
+    {
+        $this->feeling = $feeling;
+
+        return $this;
+    }
+
+    public function getSessionRpe(): ?int
+    {
+        return $this->sessionRpe;
+    }
+
+    public function setSessionRpe(?int $sessionRpe): static
+    {
+        $this->sessionRpe = $sessionRpe;
 
         return $this;
     }

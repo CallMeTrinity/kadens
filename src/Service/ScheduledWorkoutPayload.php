@@ -45,7 +45,7 @@ use App\Entity\Workout;
  * @phpstan-type ApiBlock array{id: int|null, label: string|null, role: string|null, rounds: int|null, exercises: list<ApiPrescribed>}
  * @phpstan-type ApiLoggedSet array{uuid: string, position: int|null, type: string, reps: int|null, weightKg: float|null, durationSeconds: int|null, rpe: int|null, completedAt: string|null}
  * @phpstan-type ApiLoggedExercise array{exerciseId: int|null, name: string|null, sourcePrescribedId: int|null, position: int|null, skipped: bool, notes: string|null, sets: list<ApiLoggedSet>}
- * @phpstan-type ApiScheduledWorkout array{uuid: string, date: string|null, status: string|null, title: string, freeform: bool, startedAt: string|null, endedAt: string|null, completionNotes: string|null, plan: array{id: int|null, title: string|null}|null, blocks: list<ApiBlock>, log: list<ApiLoggedExercise>|null}
+ * @phpstan-type ApiScheduledWorkout array{uuid: string, date: string|null, status: string|null, title: string, freeform: bool, startedAt: string|null, endedAt: string|null, completionNotes: string|null, feeling: int|null, sessionRpe: int|null, plan: array{id: int|null, title: string|null}|null, blocks: list<ApiBlock>, log: list<ApiLoggedExercise>|null}
  */
 final class ScheduledWorkoutPayload
 {
@@ -78,6 +78,11 @@ final class ScheduledWorkoutPayload
             'startedAt' => $scheduled->getStartedAt()?->format(\DateTimeInterface::ATOM),
             'endedAt' => $scheduled->getEndedAt()?->format(\DateTimeInterface::ATOM),
             'completionNotes' => $scheduled->getCompletionNotes(),
+            // La saisie Kadens seule, pas la valeur effective : ce que le
+            // téléphone relit est ce qu'il peut réécrire. Les sorties notées sur
+            // la montre ne descendent pas (`TrackableSchedule`).
+            'feeling' => $scheduled->getFeeling(),
+            'sessionRpe' => $scheduled->getSessionRpe(),
             'plan' => null === $plan ? null : ['id' => $plan->getId(), 'title' => $plan->getTitle()],
             // Une séance libre n'a pas de programme, pas un programme vide à
             // deviner : la liste est simplement sans bloc.

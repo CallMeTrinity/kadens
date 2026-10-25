@@ -15,6 +15,7 @@
 
    Les zones sont celles du profil **au moment de l'import** : la légende le dit,
    pour qu'un écart avec les bornes actuelles ne passe pas pour un bug. #}
+{% import 'components/_rating.html.twig' as ratings %}
 {% if activities is not empty or attachable is not empty %}
     <section class="kd-wk__panel kd-actimport" aria-labelledby="wk-panel-cardio">
         <h2 class="kd-wk__paneltitle" id="wk-panel-cardio">Réalisé cardio</h2>
@@ -65,6 +66,9 @@
                             {{ ux_icon('lucide:activity') }}
                             {{ activity.sport }} · départ à {{ activity.startedAt|date('H\\hi') }} · {{ activity.entity.source.label }}
                         </p>
+                        {% if activity.rating %}
+                            <p class="kd-actimport__meta">{{ ratings.badge(activity.rating) }}</p>
+                        {% endif %}
                     </div>
                     {% if is_granted('SCHEDULED_WORKOUT_LOG', scheduled) %}
                         <form method="post" action="{{ path('app_imported_activity_detach', {id: scheduled.id, activityId: activity.entity.id}) }}">

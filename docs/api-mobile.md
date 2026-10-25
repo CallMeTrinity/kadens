@@ -271,6 +271,7 @@ Champ par champ, sur `PUT /api/schedule/{uuid}` :
 | `title` | écrit (nomme la séance libre) | **ignoré** |
 | `status` | `done` clôture, le reste est sans effet | idem — et rien ne **déclôture** |
 | `completionNotes` | écrite si présente | écrite si présente, **jamais effacée** |
+| `feeling`, `sessionRpe` | écrits si présents | écrits si présents, **jamais effacés** (axe par axe) |
 | `position`, `name` dérivé, tout champ calculé | posés par le serveur | posés par le serveur |
 
 Vérification, sur une séance déjà clôturée — un document qui essaie de tout
@@ -712,6 +713,8 @@ $ curl -sk https://127.0.0.1:8000/api/schedule/019fc483-3f9d-76af-8d5f-f789cddf7
   "startedAt": null,
   "endedAt": null,
   "completionNotes": null,
+  "feeling": null,
+  "sessionRpe": null,
   "plan": null,
   "blocks": [
     {
@@ -756,6 +759,7 @@ $ curl -sk https://127.0.0.1:8000/api/schedule/019fc483-3f9d-76af-8d5f-f789cddf7
 | `summary` | La **seule** valeur pré-formatée de l'API (« 4 × 8 @ 80 kg · RPE 8 »). Le cardio ne se saisit pas sur le mobile et ne s'y affiche qu'en lecture : réécrire la mise en forme en TypeScript pour une chaîne qu'on ne fait que peindre serait une duplication sans contrepartie. Les séries, elles, partent en valeurs brutes. |
 | `sets` (prescrit) | Une entrée par série, **rang réel** dans `index`. `null` pour un type de prescription qui ne compte pas de séries (`distance_pace`, `duration`…). |
 | `log` | `null` tant que rien n'a été consigné. |
+| `feeling`, `sessionRpe` | Le ressenti **saisi dans Kadens** (téléphone ou web), `null` sinon : forme 1-5 (très faible → très en forme), difficulté de la séance 1-10. Pas la valeur affichée sur le web, qui retombe sur la note de la montre quand une activité Intervals est rattachée : ce que le téléphone relit est ce qu'il peut réécrire. Champs **additifs** : un client qui les ignore n'en souffre pas, et `minimumVersionCode` n'a pas eu à bouger. Ne pas confondre `sessionRpe` avec le `rpe` d'une série : c'est un jugement global porté à la fin, pas une moyenne. |
 
 **Valeurs d'énumération**
 
@@ -786,6 +790,8 @@ remplacé sinon. Le partage d'autorité est décrit au §4.1, l'idempotence au �
 | `status` | enum | non | Seul `done` a un effet. Les autres valeurs passent la validation sans rien faire, pour qu'un client qui recopie le document reçu ne se prenne pas un 422. |
 | `startedAt`, `endedAt` | ISO 8601 | non | Écrasent. |
 | `completionNotes` | string | non | N'efface jamais l'existante. |
+| `feeling` | int | non | 1 – 5. Écrit si présent ; `null` ou absent ne l'efface pas — seul le web retire une note. |
+| `sessionRpe` | int | non | 1 – 10. Même règle. |
 | `log` | tableau | non | ≤ 100 exercices. Remplace **intégralement** le réalisé. |
 | `log[].exerciseId` | int | non | Doit désigner un exercice **visible**. Le rattachement à la bibliothèque est ce qui fait entrer le réalisé dans l'historique et les records. |
 | `log[].name` | string | non | ≤ 255. Rempli par le serveur depuis la référence quand il manque ; **requis** si aucune référence n'est donnée. |
@@ -1029,7 +1035,7 @@ Les gardes décrites ici sont tenues par des tests, pas par la bonne volonté :
 | `tests/Controller/ApiAuthEndpointsTest.php` | Connexion, déconnexion, `/api/me`, le 401 uniforme, le limiteur. |
 | `tests/Controller/ApiPairingTest.php` | L'appairage : usage unique, expiration, le compte qui vient du code. |
 | `tests/Controller/ApiBootstrapTest.php` | Le delta, la fenêtre, les pierres tombales, le budget de 1 Mo. |
-| `tests/Controller/ApiScheduleTest.php` | La lecture, l'upsert, l'idempotence à trois envois, le partage d'autorité. |
+| `tests/Controller/ApiScheduleTest.php` | La lecture, l'upsert, l'idempotence à trois envois, le partage d'autorité, le ressenti jamais effacé par le silence. |
 | `tests/Controller/ApiExerciseHistoryTest.php` | L'historique : périmètre, bornage, portée. |
 | `tests/Controller/ApiExerciseSetupTest.php` | Les réglages de machine : aller-retour avec le bootstrap, effacement, rejeu, portée privée, 404 sur un exercice invisible. |
 | `tests/Controller/ApiErrorResponseTest.php` | La forme RFC 9457 et l'absence de fuite interne. |

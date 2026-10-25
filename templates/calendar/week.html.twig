@@ -108,6 +108,7 @@
                                 fw: scheduled.workout ? flattened[scheduled.workout.id] : null,
                                 statuses: statuses,
                                 detailed: true,
+                                rating: ratings[scheduled.id] ?? null,
                                 overdue: day.isPast and scheduled.status.value == 'planned',
                                 backFrom: back_token('cal-week', monday|date('Y-m-d')),
                             }) }}

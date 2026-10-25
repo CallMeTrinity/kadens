@@ -2,14 +2,26 @@
    échapper à l'overflow de la grille. Auto-suffisant (aucun AJAX). Positionné en
    JS par le contrôleur porteur (`plangrid` en édition, `preview` en lecture).
 
-   Attend `fw` = sortie de PlanFlattener::flattenWorkout (workout + blocks).
+   Attend `fw` = sortie de PlanFlattener::flattenWorkout (workout + blocks), et
+   en option `feelings` (éditeur de trame seulement) : le ressenti des dernières
+   exécutions de la lignée, cf. PlanTemplateController::feelingSummary(). Jamais
+   passé par la page publique d'un plan : le réalisé n'y a pas sa place.
 
    Séries détaillées : même rendu que la vue séance (une ligne par groupe de
    séries, pastille de type en tête), pas le résumé compact d'une seule chaîne —
    il devenait illisible dès qu'une prescription mélangeait plusieurs types. #}
 {% import 'components/_set_type.html.twig' as settype %}
+{% import 'components/_rating.html.twig' as ratings %}
+{% set feelings = feelings|default(null) %}
 <div class="kd-planpreview" popover="manual" data-preview-target="panel">
     <p class="kd-planpreview__title">{{ fw.workout.title }}</p>
+    {% if feelings %}
+        <ul class="kd-planpreview__feel">
+            {% for e in feelings.entries %}
+                <li><span class="kd-planpreview__feeldate">{{ e.date|date('d/m') }}</span> {{ ratings.badge(e.rating) }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
     {% if fw.blocks is empty %}
         <p class="kd-planpreview__empty">Séance vide.</p>
     {% else %}

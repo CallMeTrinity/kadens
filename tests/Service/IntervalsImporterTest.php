@@ -57,6 +57,9 @@ final class IntervalsImporterTest extends KernelTestCase
     /** @var list<array<string, mixed>> activités ajoutées à la réponse de liste par un test */
     private array $extra = [];
 
+    /** @var array<string, array<string, mixed>> champs ajoutés à une activité de la liste, par identifiant */
+    private array $overrides = [];
+
     protected function setUp(): void
     {
         self::bootKernel();
@@ -193,6 +196,55 @@ final class IntervalsImporterTest extends KernelTestCase
         self::assertSame('2026-09-01', $connection->getSyncedThrough()?->format('Y-m-d'));
     }
 
+    /**
+     * On note souvent sa sortie après la synchro. Relancer relit le ressenti des
+     * activités connues, et seulement lui : aucun stream redemandé, rien de
+     * réimporté, et le lot de 40 n'est pas entamé.
+     */
+    public function testSyncingAgainRefreshesTheRatingOfAKnownActivity(): void
+    {
+        $this->importer()->sync($this->user, new \DateTimeImmutable('2026-09-14'));
+        $streamsBefore = \count(array_filter($this->requested, static fn (string $url): bool => str_contains($url, 'streams')));
+
+        $this->overrides = ['i1' => ['feel' => 2, 'icu_rpe' => 7]];
+        $this->em->clear();
+        $report = $this->importer()->sync($this->mustFind(User::class, $this->user->getId()), new \DateTimeImmutable('2026-09-14'));
+
+        self::assertSame(0, $report->imported);
+        self::assertSame(1, $report->rated);
+        self::assertStringContainsString('Ressenti mis à jour sur 1 activité.', $report->summary());
+        self::assertCount($streamsBefore, array_filter($this->requested, static fn (string $url): bool => str_contains($url, 'streams')));
+
+        $this->em->clear();
+        $run = $this->em->getRepository(ImportedActivity::class)->findOneBy(['externalId' => 'i1']);
+        self::assertNotNull($run);
+        // `feel` 2 chez Intervals (« Good ») = 4 chez Kadens (« En forme »).
+        self::assertSame(4, $run->getFeeling());
+        self::assertSame(7, $run->getSessionRpe());
+
+        $again = $this->importer()->sync($this->mustFind(User::class, $this->user->getId()), new \DateTimeImmutable('2026-09-14'));
+        self::assertSame(0, $again->rated, 'Une note inchangée ne compte pas.');
+    }
+
+    /** La reprise d'historique est le chemin pour noter un passé déjà importé. */
+    public function testHistoryRefreshesKnownRatingsAndTheDryRunKeepsThem(): void
+    {
+        $this->importer()->importHistory($this->user, new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-09-14'), freeSessions: false, dryRun: false);
+        $this->overrides = ['i2' => ['feel' => 5, 'icu_rpe' => 3]];
+        $this->em->clear();
+
+        $dry = $this->importer()->importHistory($this->mustFind(User::class, $this->user->getId()), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-09-14'), freeSessions: false, dryRun: true);
+        self::assertSame(1, $dry->rated);
+        self::assertNull($this->em->getRepository(ImportedActivity::class)->findOneBy(['externalId' => 'i2'])?->getFeeling());
+
+        $this->em->clear();
+        $real = $this->importer()->importHistory($this->mustFind(User::class, $this->user->getId()), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-09-14'), freeSessions: false, dryRun: false);
+        self::assertSame(1, $real->rated);
+
+        $this->em->clear();
+        self::assertSame(1, $this->em->getRepository(ImportedActivity::class)->findOneBy(['externalId' => 'i2'])?->getFeeling());
+    }
+
     public function testARefusedKeySurfacesAsAnAuthError(): void
     {
         $this->status = 401;
@@ -222,12 +274,12 @@ final class IntervalsImporterTest extends KernelTestCase
             }
 
             // Du plus récent au plus ancien, comme l'API.
-            return new MockResponse(json_encode([...[
+            return new MockResponse(json_encode(array_map(fn (array $a): array => ($this->overrides[$a['id']] ?? []) + $a, [...[
                 ['id' => 'i4', 'source' => 'GARMIN_CONNECT', 'type' => 'WeightTraining', 'start_date_local' => '2026-09-12T18:00:00', 'moving_time' => 2400],
                 ['id' => 'i3', 'source' => 'STRAVA', 'type' => 'Run', 'start_date_local' => '2026-09-13T12:00:00'],
                 ['id' => 'i2', 'source' => 'GARMIN_CONNECT', 'type' => 'Run', 'start_date_local' => '2026-09-13T08:00:00', 'distance' => 8000, 'moving_time' => 2700],
                 ['id' => 'i1', 'source' => 'GARMIN_CONNECT', 'type' => 'Run', 'start_date_local' => '2026-09-12T07:00:00', 'start_date' => '2026-09-12T05:00:00Z', 'distance' => 10000, 'moving_time' => 3000, 'average_heartrate' => 150],
-            ], ...$this->extra], \JSON_THROW_ON_ERROR));
+            ], ...$this->extra]), \JSON_THROW_ON_ERROR));
         }, 'https://intervals.icu/api/v1/');
 
         return new IntervalsImporter(

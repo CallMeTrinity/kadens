@@ -156,6 +156,15 @@ final class LogIngestor
         if (null !== $input->completionNotes && '' !== trim($input->completionNotes)) {
             $scheduled->setCompletionNotes($input->completionNotes);
         }
+
+        // Même règle que la note : le silence du document ne retire rien.
+        if (null !== $input->feeling) {
+            $scheduled->setFeeling($input->feeling);
+        }
+
+        if (null !== $input->sessionRpe) {
+            $scheduled->setSessionRpe($input->sessionRpe);
+        }
     }
 
     /**

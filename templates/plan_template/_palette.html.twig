@@ -14,6 +14,7 @@
    Contexte : paletteCards (chaque : workout, activities, exerciseCount, filterText),
    paletteCount, paletteActivities, template. #}
 {% import 'components/_activity.html.twig' as activity %}
+{% import 'components/_rating.html.twig' as ratings %}
 
 <div class="kd-libpanel kd-palette"
      data-plangrid-target="palette"
@@ -76,6 +77,28 @@
                     {% if card.lastDone %}
                         <span class="kd-palettecard__meta">
                             <span>{{ ux_icon('lucide:history') }} d'après le {{ card.lastDone|date('d/m') }}</span>
+                        </span>
+                    {% endif %}
+                    {# Comment ça s'est passé : la dernière fois, et en moyenne sur
+                       les dernières. La liste datée passe au survol (title) et au
+                       lecteur d'écran ; une carte est un bouton, elle ne peut pas
+                       contenir un second élément interactif. #}
+                    {% if card.feelings %}
+                        {% set f = card.feelings %}
+                        <span class="kd-palettecard__meta kd-palettecard__feel"
+                              title="{% for e in f.entries %}{{ e.date|date('d/m') }} : {{ e.rating.feeling ? e.rating.feelingLabel : '—' }}{{ e.rating.sessionRpe ? ', difficulté ' ~ e.rating.sessionRpe ~ '/10' }}{{ not loop.last ? "\n" }}{% endfor %}">
+                            <span>{{ ratings.badge(f.last) }}</span>
+                            {% if f.count > 1 %}
+                                <span class="kd-palettecard__avg">
+                                    moy. {{ f.count }} :
+                                    {{- f.feeling is not null ? ' ' ~ feeling_label(f.feeling)|lower }}
+                                    {{- f.feeling is not null and f.sessionRpe is not null ? ',' }}
+                                    {{- f.sessionRpe is not null ? ' ' ~ f.sessionRpe|number_format(1, ',', ' ') ~ '/10' }}
+                                </span>
+                            {% endif %}
+                            <span class="kd-sr-only">
+                                {%- for e in f.entries %} {{ e.date|date('d/m') }} : {{ e.rating.feeling ? e.rating.feelingLabel : 'forme non notée' }}{{ e.rating.sessionRpe ? ', difficulté ' ~ e.rating.sessionRpe ~ ' sur 10' }}.{% endfor -%}
+                            </span>
                         </span>
                     {% endif %}
                     {% if card.activities %}

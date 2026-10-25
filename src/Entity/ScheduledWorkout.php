@@ -85,6 +85,24 @@ class ScheduledWorkout
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $completionNotes = null;
 
+    /**
+     * Le ressenti **saisi dans Kadens** (mobile à la clôture, ou web) : forme
+     * 1-5 (`Feeling`) et difficulté de la séance 1-10, aux échelles de Garmin.
+     * Le RPE de séance n'est pas celui des séries (`LoggedSet::$rpe`) : c'est un
+     * jugement global, pas une moyenne.
+     *
+     * Ce ne sont pas les valeurs affichées : une course notée sur la montre
+     * porte les siennes sur son `ImportedActivity`, et la valeur lue est celle
+     * de Kadens si elle existe, sinon celle des activités rattachées
+     * (`ScheduledWorkoutRepository::ratingsFor()`). Rien n'est recopié, si bien
+     * que détacher une activité retire sa note sans rien écrire.
+     */
+    #[ORM\Column(type: Types::SMALLINT, nullable: true)]
+    private ?int $feeling = null;
+
+    #[ORM\Column(type: Types::SMALLINT, nullable: true)]
+    private ?int $sessionRpe = null;
+
     // Bornes réelles de l'exécution, écrites par le mobile. Distinctes de la date
     // planifiée : on peut faire à 19h une séance prévue pour la journée.
     #[ORM\Column(nullable: true)]
@@ -270,6 +288,30 @@ class ScheduledWorkout
     public function setCompletionNotes(?string $completionNotes): static
     {
         $this->completionNotes = $completionNotes;
+
+        return $this;
+    }
+
+    public function getFeeling(): ?int
+    {
+        return $this->feeling;
+    }
+
+    public function setFeeling(?int $feeling): static
+    {
+        $this->feeling = $feeling;
+
+        return $this;
+    }
+
+    public function getSessionRpe(): ?int
+    {
+        return $this->sessionRpe;
+    }
+
+    public function setSessionRpe(?int $sessionRpe): static
+    {
+        $this->sessionRpe = $sessionRpe;
 
         return $this;
     }

@@ -4,12 +4,14 @@ namespace App\Twig;
 
 use App\Entity\Exercise;
 use App\Entity\User;
+use App\Enum\Feeling;
 use App\Enum\PrescriptionType;
 use App\Form\UsernameType;
 use App\Http\BackTarget;
 use App\Service\ActivityPalette;
 use App\Service\BackLink;
 use App\Service\ExerciseNaming;
+use App\Service\SessionRating;
 use App\Service\UnitFormatter;
 use Symfony\Component\Form\FormFactoryInterface;
 use Symfony\Component\Form\FormView;
@@ -78,6 +80,11 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('back_token', [BackTarget::class, 'token']),
             new TwigFunction('activity_palette_css', [$this, 'activityPaletteCss'], ['is_safe' => ['html']]),
             new TwigFunction('username_prompt_form', [$this, 'usernamePromptForm']),
+            // Les libellés du ressenti de séance, pour une valeur ou une moyenne
+            // (le cran le plus proche) : un seul endroit les écrit, `Feeling` et
+            // `SessionRating`, et le sélecteur comme le badge les lisent ici.
+            new TwigFunction('feeling_label', [Feeling::class, 'labelOf']),
+            new TwigFunction('effort_label', [SessionRating::class, 'effortLabelOf']),
         ];
     }
 

@@ -7,6 +7,7 @@ namespace App\Service;
 use App\Entity\Exercise;
 use App\Entity\User;
 use App\Enum\ActivityType;
+use App\Enum\Feeling;
 use App\Enum\StatsRange;
 use App\Repository\ExerciseRepository;
 use App\Repository\ImportedActivityRepository;
@@ -49,6 +50,10 @@ use App\Repository\ScheduledWorkoutRepository;
  * (`EnduranceStats`). C'est ce qui rend « depuis le début » aussi tenable que
  * « quatre semaines » ; l'ancienne page remontait deux fois tout l'historique.
  *
+ * Le **ressenti** (forme, difficulté) ajoute une lecture scalaire, une ligne par
+ * séance faite : sa valeur effective (Kadens, sinon la montre) se résout en SQL,
+ * et ce sont ses moyennes, ses seaux et sa répartition qui se calculent ici.
+ *
  * @phpstan-import-type RegionShare from RegionBreakdown
  * @phpstan-import-type EnduranceRow from ImportedActivityRepository
  * @phpstan-import-type EndurancePair from EnduranceStats
@@ -61,6 +66,8 @@ use App\Repository\ScheduledWorkoutRepository;
  * @phpstan-type NewRecord array{name: string, weightKg: float, weightLabel: string, previousKg: float, previousLabel: string, gainKg: float, gainLabel: string}
  * @phpstan-type EnduranceSegment array{activity: ActivityType, seconds: int, meters: int, durationLabel: string, distanceLabel: string|null}
  * @phpstan-type EnduranceBucket array{label: string, short: string, seconds: int, durationLabel: string, heightPct: int, segments: list<EnduranceSegment>}
+ * @phpstan-type FeelingBucket array{label: string, short: string, sessions: int, feeling: float|null, sessionRpe: float|null, feelingLabel: string|null, effortLabel: string|null, feelingHeightPct: int, rpeHeightPct: int}
+ * @phpstan-type FeelingShare array{level: Feeling, sessions: int, percent: float, tone: string}
  * @phpstan-type PlanAdherence array{planId: int|null, planTitle: string, done: int, missed: int, planned: int, total: int, adherence: float|null}
  */
 final class TrainingStats
@@ -135,6 +142,7 @@ final class TrainingStats
                 $prescribed['pairs'],
                 $prescribed['coverage'] + ['unattached' => $this->importedActivities->countUnattachedEnduranceForOwnerIn($user, $period->start, $period->end)],
             ) + ['progression' => $this->enduranceProgression($prescribed['byDate'], $period)],
+            'feeling' => $this->feeling($this->scheduled->doneRatingsForOwner($user, $period->start, $period->end), $period),
             'bounds' => $bounds,
         ];
     }
@@ -771,6 +779,114 @@ final class TrainingStats
             'granularity' => $weekly ? 'week' : 'month',
             'truncated' => $truncated,
             'hasVolume' => $maxTonnage > 0,
+        ];
+    }
+
+    /**
+     * Le ressenti d'une fenêtre : moyennes, taux de séances notées, évolution
+     * par seau et répartition des niveaux de forme.
+     *
+     * Les deux axes sont **indépendants** : une séance notée en difficulté
+     * seulement entre dans la moyenne de difficulté, pas dans celle de forme. Le
+     * dénominateur du taux est l'ensemble des séances faites — c'est ce qui dit
+     * si les moyennes reposent sur assez de séances pour être lues.
+     *
+     * Les barres sont à **l'échelle absolue** (forme sur 5, difficulté sur 10),
+     * pas au maximum de la fenêtre comme le tonnage : un ressenti a ses bornes,
+     * et une semaine à 3/10 ne doit pas monter en haut du graphique parce que
+     * les autres étaient plus basses. Mêmes seaux que les autres rampes.
+     *
+     * @param list<array{date: \DateTimeImmutable, rating: SessionRating}> $rows triées par date croissante
+     *
+     * @return array{done: int, rated: int, coverage: float|null, feeling: float|null, feelingLabel: string|null, sessionRpe: float|null, effortLabel: string|null, points: list<FeelingBucket>, granularity: string, truncated: bool, distribution: list<FeelingShare>}
+     */
+    private function feeling(array $rows, StatsPeriod $period): array
+    {
+        $weekly = \in_array($period->range, [StatsRange::FOUR_WEEKS, StatsRange::MONTH], true);
+        $total = ['feeling' => [0, 0], 'rpe' => [0, 0]];
+        $levels = array_fill(Feeling::VERY_WEAK->value, 5, 0);
+        $buckets = [];
+        $rated = 0;
+
+        foreach ($rows as $row) {
+            $rating = $row['rating'];
+            if ($rating->isEmpty()) {
+                continue;
+            }
+
+            ++$rated;
+            $key = $weekly ? $row['date']->format('o-\WW') : $row['date']->format('Y-m');
+            $buckets[$key] ??= ['sessions' => 0, 'feeling' => [0, 0], 'rpe' => [0, 0]];
+            ++$buckets[$key]['sessions'];
+
+            if (null !== $rating->feeling) {
+                ++$levels[$rating->feeling];
+                $total['feeling'] = [$total['feeling'][0] + $rating->feeling, $total['feeling'][1] + 1];
+                $buckets[$key]['feeling'] = [$buckets[$key]['feeling'][0] + $rating->feeling, $buckets[$key]['feeling'][1] + 1];
+            }
+
+            if (null !== $rating->sessionRpe) {
+                $total['rpe'] = [$total['rpe'][0] + $rating->sessionRpe, $total['rpe'][1] + 1];
+                $buckets[$key]['rpe'] = [$buckets[$key]['rpe'][0] + $rating->sessionRpe, $buckets[$key]['rpe'][1] + 1];
+            }
+        }
+
+        $average = static fn (array $pair): ?float => $pair[1] > 0 ? round($pair[0] / $pair[1], 1) : null;
+
+        $keys = 0 === $rated ? [] : $this->bucketKeys($rows[0]['date'], $period, $weekly);
+        $truncated = \count($keys) > self::MAX_BUCKETS;
+        if ($truncated) {
+            $keys = \array_slice($keys, -self::MAX_BUCKETS);
+        }
+
+        $points = [];
+        foreach ($keys as $key) {
+            $bucket = $buckets[$key] ?? ['sessions' => 0, 'feeling' => [0, 0], 'rpe' => [0, 0]];
+            $feeling = $average($bucket['feeling']);
+            $rpe = $average($bucket['rpe']);
+            $points[] = [
+                'label' => $weekly ? $this->weekLabel($key) : StatsPeriod::monthLabel(new \DateTimeImmutable($key.'-01')),
+                'short' => $weekly ? 'S'.substr($key, 6) : substr($key, 5, 2).'/'.substr($key, 2, 2),
+                'sessions' => $bucket['sessions'],
+                'feeling' => $feeling,
+                'sessionRpe' => $rpe,
+                'feelingLabel' => Feeling::labelOf($feeling),
+                'effortLabel' => SessionRating::effortLabelOf($rpe),
+                'feelingHeightPct' => null === $feeling ? 0 : (int) round($feeling / SessionRating::FEELING_MAX * 100),
+                'rpeHeightPct' => null === $rpe ? 0 : (int) round($rpe / SessionRating::RPE_MAX * 100),
+            ];
+        }
+
+        // Du plus en forme au plus faible, en dégradé d'encre : l'ordinal se lit
+        // par la valeur de gris, le dernier cran en simple contour.
+        $tones = [5 => 'cat--1', 4 => 'cat--2', 3 => 'cat--3', 2 => 'cat--4', 1 => 'cat--outline'];
+        $feelingCount = $total['feeling'][1];
+        $distribution = [];
+        foreach ([Feeling::VERY_STRONG, Feeling::STRONG, Feeling::NORMAL, Feeling::WEAK, Feeling::VERY_WEAK] as $level) {
+            $distribution[] = [
+                'level' => $level,
+                'sessions' => $levels[$level->value],
+                'percent' => $feelingCount > 0 ? round($levels[$level->value] / $feelingCount * 100, 1) : 0.0,
+                'tone' => $tones[$level->value],
+            ];
+        }
+
+        $done = \count($rows);
+        $feeling = $average($total['feeling']);
+        $rpe = $average($total['rpe']);
+
+        return [
+            'done' => $done,
+            'rated' => $rated,
+            'coverage' => $done > 0 ? $rated / $done : null,
+            'feeling' => $feeling,
+            'feelingLabel' => Feeling::labelOf($feeling),
+            'sessionRpe' => $rpe,
+            'effortLabel' => SessionRating::effortLabelOf($rpe),
+            'points' => $points,
+            'granularity' => $weekly ? 'week' : 'month',
+            'truncated' => $truncated,
+            'distribution' => $distribution,
         ];
     }
 

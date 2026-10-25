@@ -37,6 +37,13 @@ final class ImportedActivityMapper
     ];
 
     /**
+     * `feel` Kadens = FEEL_FLIP − `feel` Intervals : l'échelle de la source est
+     * inversée (cf. `ratingsFromIntervals()`). Une seule constante, parce que
+     * c'est le seul endroit où le sens de lecture se décide.
+     */
+    private const int FEEL_FLIP = 6;
+
+    /**
      * Null quand l'activité est inexploitable : identifiant ou dates manquants,
      * ou activité **arrivée par Strava**. Intervals n'expose pas celles-là par son
      * API (conditions de Strava) et n'en rend qu'une coquille vide ; l'importer
@@ -67,6 +74,7 @@ final class ImportedActivityMapper
         $sportType = \is_string($payload['type'] ?? null) ? $payload['type'] : 'Other';
 
         $activity = new ImportedActivity($owner, ActivitySource::INTERVALS, (string) $id, $sportType, $startedAt, $localDate);
+        $ratings = self::ratingsFromIntervals($payload);
 
         return $activity
             ->setActivity(self::TYPES[$sportType] ?? null)
@@ -78,7 +86,37 @@ final class ImportedActivityMapper
             ->setAverageHeartRate(self::int($payload['average_heartrate'] ?? null))
             ->setMaxHeartRate(self::int($payload['max_heartrate'] ?? null))
             ->setAverageCadence(self::int($payload['average_cadence'] ?? null))
-            ->setAverageWatts(self::int($payload['icu_average_watts'] ?? null));
+            ->setAverageWatts(self::int($payload['icu_average_watts'] ?? null))
+            ->setFeeling($ratings['feeling'])
+            ->setSessionRpe($ratings['sessionRpe']);
+    }
+
+    /**
+     * Le ressenti noté sur la montre (ou dans Intervals), ramené à l'échelle
+     * Kadens. Relu seul sur une activité déjà importée : c'est la seule donnée
+     * qu'on corrige couramment après coup.
+     *
+     * - `icu_rpe` est déjà sur 1-10, à l'endroit.
+     * - `feel` est sur 1-5 mais **à l'envers** : chez Intervals, 1 vaut « Strong »
+     *   et 5 « Weak », quand Kadens (comme Garmin) monte vers la forme.
+     * - `session_rpe` est un dérivé (RPE × minutes) et `perceived_exertion` vient
+     *   de Strava : ni l'un ni l'autre n'est une note de séance.
+     *
+     * Hors échelle → null, plutôt qu'une valeur ramenée au bord : une note
+     * inventée fausserait une moyenne sans que rien ne le signale.
+     *
+     * @param array<string, mixed> $payload
+     *
+     * @return array{feeling: ?int, sessionRpe: ?int}
+     */
+    public static function ratingsFromIntervals(array $payload): array
+    {
+        $feel = SessionRating::boundFeeling(self::int($payload['feel'] ?? null));
+
+        return [
+            'feeling' => null === $feel ? null : self::FEEL_FLIP - $feel,
+            'sessionRpe' => SessionRating::boundRpe(self::int($payload['icu_rpe'] ?? null)),
+        ];
     }
 
     /**

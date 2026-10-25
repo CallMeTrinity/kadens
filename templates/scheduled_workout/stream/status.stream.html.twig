@@ -4,8 +4,9 @@
    si sa cible est absente du DOM, et `#cal-event-{id}` n'existe pas ici — c'est
    ce qui obligeait à recharger la page pour voir le nouveau statut.
 
-   Deux cibles, parce que le statut se lit à deux endroits : la pastille du hero
-   et la section « Réalisé » (libellé du bouton, statut posté, note d'écart). #}
+   Trois cibles, parce que le statut se lit à trois endroits : la pastille du
+   hero, la section « Boucler » (libellé du bouton, statut posté, note d'écart)
+   et le ressenti, qui n'apparaît que sur une séance faite. #}
 <turbo-stream action="replace" target="schedule-badge">
     <template>
         {{ include('components/_scheduled_badge.html.twig', {scheduled: scheduled}) }}
@@ -14,5 +15,10 @@
 <turbo-stream action="replace" target="schedule-done">
     <template>
         {{ include('components/_scheduled_done.html.twig', {scheduled: scheduled}) }}
+    </template>
+</turbo-stream>
+<turbo-stream action="replace" target="schedule-rating">
+    <template>
+        {{ include('components/_scheduled_rating.html.twig', {scheduled: scheduled, rating: rating}, with_context = false) }}
     </template>
 </turbo-stream>
