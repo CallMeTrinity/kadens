@@ -171,6 +171,16 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   retirer ferait passer une séance tenue pour « allégée ». À l'écran de clôture,
   elle se dit en légende (« + 1 sans valeur »), comme l'échauffement : hors du
   chiffre, mais jamais escamotée.
+- **Ressenti de séance : deux stockages, une valeur lue.** Forme 1-5 (`Feeling`)
+  et difficulté 1-10 (`sessionRpe`, à ne pas confondre avec le `rpe` d'une série)
+  vivent sur `ScheduledWorkout` (saisie Kadens : mobile à la clôture, ou web) et
+  sur `ImportedActivity` (la montre, ramenée à l'échelle Kadens au mapping). La
+  valeur affichée est celle de Kadens si elle existe, sinon celle des activités
+  rattachées, **calculée à la lecture** (`ScheduledWorkoutRepository::ratingsFor`),
+  jamais recopiée. Elle n'existe que sur une séance `DONE`. Saisir est
+  **consigner** (`LOG`, propriétaire seul), le coach lit. L'API l'écrit si
+  présente et ne l'efface jamais par un `null` : seul le web retire une note.
+  Jamais dans `PlanFlattener`, l'ICS ni une page publique.
 - **Progression = fork à la pose (règle ajustée).** Poser une séance dans un plan en
   crée une **copie privée** (`Workout.planLocal = true`), portée par le `PlanItem`.
   Éditer une séance placée (progression) ne touche ni la séance de bibliothèque ni
@@ -276,7 +286,10 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   redirection). Les routes `edit` de séance et de plan sont donc en **GET seul**.
 - **Pas d'inscription publique.** Les comptes se créent en console
   (`app:user:create`, rôle ROLE_USER), comme les promotions (`app:user:promote`,
-  `app:user:promote-coach`). L'app n'expose que ce que le titulaire du compte peut
+  `app:user:promote-coach`, `app:user:promote-super-admin`). Les rôles sont
+  **plats** (aucun `role_hierarchy`) : `ROLE_SUPER_ADMIN` n'ouvre que le
+  back-office `/admin` (messages programmés,
+  [`docs/feature-custom-messages.md`](./docs/feature-custom-messages.md)). L'app n'expose que ce que le titulaire du compte peut
   changer lui-même : son mot de passe et son pseudo, dans `/profile/settings`.
   L'email reste un identifiant fixe côté console.
 - **Le pseudo s'affiche, l'email identifie.** `User.username` est facultatif,

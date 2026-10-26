@@ -13,6 +13,7 @@ use App\Enum\StatsRange;
 use App\Enum\StatsTab;
 use App\Form\ProfileType;
 use App\Form\UsernameType;
+use App\Http\LocalPath;
 use App\Repository\ApiTokenRepository;
 use App\Repository\ImportedActivityRepository;
 use App\Repository\IntervalsConnectionRepository;
@@ -306,7 +307,7 @@ final class ProfileController extends AbstractController
         $form = $this->createForm(UsernameType::class, $user, ['required' => true]);
         $form->handleRequest($request);
 
-        $back = self::localPath($request->request->getString('_back', $request->query->getString('back')));
+        $back = LocalPath::orRoot($request->request->getString('_back', $request->query->getString('back')));
 
         if ($form->isSubmitted() && $form->isValid()) {
             $entityManager->flush();
@@ -341,7 +342,7 @@ final class ProfileController extends AbstractController
         $user->setUsernamePromptDismissedAt($user->getUsernamePromptDismissedAt() ?? new \DateTimeImmutable());
         $entityManager->flush();
 
-        return $this->redirect(self::localPath($request->getPayload()->getString('_back')));
+        return $this->redirect(LocalPath::orRoot($request->getPayload()->getString('_back')));
     }
 
     /**
@@ -513,18 +514,6 @@ final class ProfileController extends AbstractController
         if ($form->isSubmitted() && !$form->isValid()) {
             $entityManager->refresh($user);
         }
-    }
-
-    /**
-     * La page où revenir après l'invitation, réduite à un chemin local. Le champ
-     * vient du client : sans ce filtre, ce serait une redirection ouverte. Refusés,
-     * tout ce qui ne commence pas par un seul `/` (`//hote` et `/\hote` partent
-     * ailleurs) et les caractères de contrôle — un navigateur retire tabulations
-     * et retours à la ligne d'une URL, `/<TAB>/hote` deviendrait `//hote`.
-     */
-    private static function localPath(string $path): string
-    {
-        return 1 === preg_match('#^/(?![/\\\\])[^\x00-\x20\x7F]*$#', $path) ? $path : '/';
     }
 
     /**

@@ -7,7 +7,10 @@ namespace App\Enum;
 /**
  * Rubrique affichée par `/profile/stats` (`?tab=`).
  *
- * Trois rubriques et pas une par sport : la salle a sa page (tonnage, régions,
+ * Le **ressenti** (forme, difficulté) a la sienne : il traverse les sports au
+ * lieu de s'y ranger, et c'est sa lecture d'ensemble qui a du sens.
+ *
+ * Trois rubriques de volume et pas une par sport : la salle a sa page (tonnage, régions,
  * rampe, records), l'endurance aussi (volume, rampe, zones, records, prévu
  * contre réel), et course, vélo et natation y tiennent ensemble, distingués par
  * leur couleur. Un onglet par sport découperait une question unique — « combien
@@ -22,6 +25,7 @@ enum StatsTab: string
     case OVERVIEW = 'overview';
     case GYM = 'gym';
     case ENDURANCE = 'endurance';
+    case FEELING = 'feeling';
 
     public function getLabel(): string
     {
@@ -29,6 +33,7 @@ enum StatsTab: string
             self::OVERVIEW => 'Vue d\'ensemble',
             self::GYM => 'Salle',
             self::ENDURANCE => 'Endurance',
+            self::FEELING => 'Ressenti',
         };
     }
 
@@ -38,6 +43,7 @@ enum StatsTab: string
             self::OVERVIEW => 'lucide:gauge',
             self::GYM => 'lucide:dumbbell',
             self::ENDURANCE => 'lucide:footprints',
+            self::FEELING => 'lucide:heart-pulse',
         };
     }
 

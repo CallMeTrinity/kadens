@@ -1,0 +1,45 @@
+{# =========================== LE RESSENTI ===========================
+   Forme et difficulté d'une séance faite. Lues par le propriétaire et son coach
+   (VIEW) ; saisies ou corrigées par le propriétaire seul (LOG) : c'est
+   consigner, pas programmer, d'où une section et un endpoint distincts de
+   « Boucler la séance », que le coach possède.
+
+   Attendus :
+     scheduled  ScheduledWorkout (requis)
+     rating     SessionRating|null — la valeur EFFECTIVE (Kadens, sinon la
+                montre), null si la séance n'est pas faite ou pas notée
+
+   Les sélecteurs, eux, montrent la saisie Kadens (`scheduled.feeling`) : c'est
+   ce qu'on corrige. Une note venue de la montre s'annonce à côté, elle reste en
+   place tant qu'aucune saisie ne la remplace.
+
+   Toujours rendue, même vide, avec son id : c'est une cible de Turbo Stream, et
+   « Marquer fait » doit pouvoir la faire apparaître sans recharger la page. #}
+{% import 'components/_rating.html.twig' as ratings %}
+{% set canLog = is_granted('SCHEDULED_WORKOUT_LOG', scheduled) %}
+{% if scheduled.status.value == 'done' and (canLog or rating is not null) %}
+    <section id="schedule-rating" class="kd-wk__panel kd-ratingpanel" aria-labelledby="rating-title">
+        <h2 class="kd-wk__paneltitle" id="rating-title">Ressenti</h2>
+
+        {% if rating is not null %}
+            <dl class="kd-wk__kpis kd-wk__kpis--logged">{{ ratings.tiles(rating) }}</dl>
+        {% endif %}
+
+        {% if canLog %}
+            <form method="post" action="{{ path('app_scheduled_workout_rating', {id: scheduled.id}) }}" class="kd-ratingpanel__form">
+                <input type="hidden" name="_token" value="{{ csrf_token('rating' ~ scheduled.id) }}">
+                {% if rating is not null and rating.fromIntervals %}
+                    <p class="kd-card__note">Noté sur la montre. Une saisie ici prend le pas, axe par axe.</p>
+                {% endif %}
+                {{ ratings.picker('feeling', scheduled.feeling, 'rating-' ~ scheduled.id) }}
+                {{ ratings.picker('sessionRpe', scheduled.sessionRpe, 'rating-' ~ scheduled.id) }}
+                <button type="submit" class="kd-btn kd-btn--secondary">
+                    {{ ux_icon('lucide:check') }} Enregistrer le ressenti
+                </button>
+            </form>
+        {% endif %}
+    </section>
+{% else %}
+    {# Rien à lire ni à saisir : seule l'ancre du Turbo Stream reste. #}
+    <div id="schedule-rating" hidden></div>
+{% endif %}

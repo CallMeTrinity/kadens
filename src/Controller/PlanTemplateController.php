@@ -20,6 +20,7 @@ use App\Service\LineageSeed;
 use App\Service\PlanFlattener;
 use App\Service\PlanScheduler;
 use App\Service\PlanVolumeAggregator;
+use App\Service\SessionRating;
 use App\Service\ProgressionAggregator;
 use App\Service\SlugGenerator;
 use App\Service\WorkoutCloner;
@@ -35,6 +36,9 @@ use Symfony\UX\Turbo\TurboBundle;
 #[Route('/plan-template')]
 final class PlanTemplateController extends AbstractController
 {
+    /** Exécutions notées d'une lignée résumées sur une carte de palette. */
+    private const int PALETTE_RATINGS = 5;
+
     /**
      * Titre d'un brouillon créé en un clic. Sert aussi de repère pour savoir si le
      * slug mérite d'être régénéré au premier vrai renommage (cf. updateMeta).
@@ -800,10 +804,49 @@ final class PlanTemplateController extends AbstractController
      */
     private function gridContext(PlanTemplate $template): array
     {
+        $feelings = [];
+        foreach ($this->scheduledWorkoutRepository->recentRatingsByLineage($this->ownerOf($template), self::PALETTE_RATINGS) as $root => $entries) {
+            $feelings[$root] = self::feelingSummary($entries);
+        }
+
         return [
             'template' => $template,
             'flat' => $this->planFlattener->flattenPlanTemplate($template),
             'weekVolumes' => $this->volumeAggregator->byWeek($template),
+            // Le ressenti par racine de lignée, pour l'aperçu d'une case posée :
+            // la copie locale y renvoie par `origin`.
+            'lineageFeelings' => $feelings,
+        ];
+    }
+
+    /**
+     * Le ressenti d'une lignée sur la carte de palette : la dernière exécution
+     * notée, la moyenne de chaque axe sur les `PALETTE_RATINGS` dernières (un axe
+     * absent ne compte pas dans sa moyenne), et la liste datée pour le survol.
+     * Null quand rien n'a été noté : la carte n'annonce pas une absence.
+     *
+     * @param list<array{id: int, date: \DateTimeImmutable, rating: SessionRating}> $entries du plus récent au plus ancien
+     *
+     * @return array{last: SessionRating, feeling: float|null, sessionRpe: float|null, count: int, entries: list<array{id: int, date: \DateTimeImmutable, rating: SessionRating}>}|null
+     */
+    private static function feelingSummary(array $entries): ?array
+    {
+        if ([] === $entries) {
+            return null;
+        }
+
+        $average = static function (array $values): ?float {
+            $values = array_values(array_filter($values, static fn (?int $v): bool => null !== $v));
+
+            return [] === $values ? null : round(array_sum($values) / \count($values), 1);
+        };
+
+        return [
+            'last' => $entries[0]['rating'],
+            'feeling' => $average(array_map(static fn (array $e): ?int => $e['rating']->feeling, $entries)),
+            'sessionRpe' => $average(array_map(static fn (array $e): ?int => $e['rating']->sessionRpe, $entries)),
+            'count' => \count($entries),
+            'entries' => $entries,
         ];
     }
 
@@ -828,6 +871,9 @@ final class PlanTemplateController extends AbstractController
         // La pose part de la dernière réalisation : la carte le dit, pour que
         // les valeurs de la case ne changent pas de source en silence.
         $lastDone = $this->scheduledWorkoutRepository->lastDoneDateByLineage($owner);
+        // Et comment ça s'est passé : on compose la semaine suivante en sachant
+        // que « Upper A » a été vécue « faible » deux fois de suite.
+        $feelings = $this->scheduledWorkoutRepository->recentRatingsByLineage($owner, self::PALETTE_RATINGS);
 
         $cards = [];
         $countsByActivity = [];
@@ -846,6 +892,7 @@ final class PlanTemplateController extends AbstractController
                 'exerciseCount' => $this->workoutMetrics->exerciseCount($workout),
                 'filterText' => $filterText,
                 'lastDone' => $lastDone[(int) $workout->getId()] ?? null,
+                'feelings' => self::feelingSummary($feelings[(int) $workout->getId()] ?? []),
             ];
         }
 

@@ -3095,6 +3095,14 @@ a.kd-scope--link:hover {
     background: var(--color-cat-4);
 }
 
+/* Le dernier cran d'une échelle ordinale qui en compte cinq (la forme) : pas
+   de cinquième gris, un simple contour. */
+.kd-cat--outline {
+    background: var(--color-surface);
+    outline: 1px solid var(--color-border-strong);
+    outline-offset: -1px;
+}
+
 .kd-legend {
     display: flex;
     flex-wrap: wrap;
@@ -4941,6 +4949,50 @@ a.kd-planday__item:hover svg {
     margin: 0;
 }
 
+/* Message programmé (components/_custom_message.html.twig). Le texte est du
+   contenu saisi : Barlow, casse normale, jamais le condensé capitales. */
+.kd-message .kd-modal__head {
+    align-items: center;
+    margin-bottom: var(--kd-space-5);
+}
+
+.kd-message__eyebrow {
+    flex: 1 1 auto;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: var(--kd-tracking-eyebrow);
+}
+
+.kd-message__media {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 50vh;
+    object-fit: contain;
+    margin-bottom: var(--kd-space-6);
+    background: var(--color-surface-subtle);
+}
+
+.kd-message__body {
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.5;
+    color: var(--color-text-strong);
+    margin: 0 0 var(--kd-space-4);
+    overflow-wrap: anywhere;
+}
+
+.kd-message .kd-formactions {
+    justify-content: flex-end;
+}
+
+/* L'aperçu du back-office : la carte de la modale, posée dans le flux. */
+.kd-modal--preview {
+    display: block;
+    position: static;
+    margin: 0;
+}
+
 /* En-tête secondaire de modale : badge de statut + lien vers la séance. */
 .kd-modal__meta {
     display: flex;
@@ -5002,6 +5054,175 @@ a.kd-planday__item:hover svg {
     color: var(--color-status-missed);
     border-color: color-mix(in srgb, var(--color-status-missed) 45%, transparent);
     background: color-mix(in srgb, var(--color-status-missed) 9%, transparent);
+}
+
+/* ---- Ressenti de séance (components/_rating.html.twig) ----
+   Forme 1-5 à l'encre, difficulté 1-10 au rouge : la difficulté est de
+   l'intensité, la forme n'en est pas. Le sélecteur garde de vrais radios
+   (sans JS, au clavier) ; la case cochée se dessine par :has(:checked). */
+.kd-rating {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--kd-space-2) var(--kd-space-4);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--color-text-secondary);
+}
+
+.kd-rating__feel {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--kd-space-2);
+    color: var(--color-text);
+}
+
+.kd-rating__feel svg {
+    width: 13px;
+    height: 13px;
+}
+
+.kd-rating__rpe {
+    font-weight: var(--kd-weight-semibold);
+    color: var(--color-primary);
+}
+
+.kd-rating__src {
+    color: var(--color-text-secondary);
+}
+
+.kd-modal__rating {
+    margin: 0 0 var(--kd-space-5);
+}
+
+.kd-modal__rating > summary {
+    margin-bottom: var(--kd-space-4);
+    cursor: pointer;
+}
+
+.kd-ratingpanel__form {
+    margin-top: var(--kd-space-6);
+}
+
+.kd-ratingpick {
+    margin: 0 0 var(--kd-space-6);
+    padding: 0;
+    border: 0;
+    min-width: 0;
+}
+
+.kd-ratingpick legend {
+    margin-bottom: var(--kd-space-3);
+    padding: 0;
+}
+
+.kd-ratingpick__row {
+    display: flex;
+    gap: var(--kd-space-2);
+}
+
+.kd-ratingpick__opt {
+    position: relative;
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--kd-space-1);
+    min-height: 44px;
+    padding: var(--kd-space-2) var(--kd-space-1);
+    font-family: var(--font-body);
+    font-size: 12px;
+    font-weight: var(--kd-weight-medium);
+    text-align: center;
+    color: var(--color-text-secondary);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--kd-radius-md);
+    cursor: pointer;
+    transition: border-color .12s ease, background-color .12s ease, color .12s ease;
+}
+
+.kd-ratingpick__opt input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+.kd-ratingpick__opt:hover {
+    border-color: var(--color-border-strong);
+    background: var(--color-surface-raised);
+}
+
+.kd-ratingpick__opt:has(input:focus-visible) {
+    outline: 2px solid var(--color-text);
+    outline-offset: 2px;
+}
+
+.kd-ratingpick__opt--none {
+    flex: 0 0 44px;
+}
+
+.kd-ratingpick__num {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: var(--kd-weight-semibold);
+}
+
+.kd-ratingpick__txt {
+    font-size: 11px;
+    line-height: 1.2;
+}
+
+.kd-ratingpick__opt:has(input:checked) {
+    color: var(--color-on-ink);
+    background: var(--color-surface-ink);
+    border-color: var(--color-surface-ink);
+}
+
+.kd-ratingpick--rpe .kd-ratingpick__opt:has(input:checked) {
+    color: var(--color-on-primary);
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+}
+
+.kd-ratingpick__opt--none:has(input:checked) {
+    color: var(--color-text);
+    background: var(--color-surface-raised);
+    border-color: var(--color-border-strong);
+}
+
+.kd-ratingpick__scale {
+    display: flex;
+    justify-content: space-between;
+    margin: var(--kd-space-2) 0 0 calc(44px + var(--kd-space-2));
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-text-secondary);
+}
+
+/* Sous 560 : la forme garde ses cinq cases mais perd son texte (le titre le
+   porte), la difficulté passe sur deux rangées de cinq. */
+@media (max-width: 559px) {
+    .kd-ratingpick:not(.kd-ratingpick--rpe) .kd-ratingpick__txt {
+        display: none;
+    }
+
+    .kd-ratingpick--rpe .kd-ratingpick__row {
+        display: grid;
+        grid-template-columns: 44px repeat(5, 1fr);
+    }
+
+    /* 6 (septième enfant après « — ») repart sous le 1. */
+    .kd-ratingpick--rpe .kd-ratingpick__opt:nth-child(7) {
+        grid-column-start: 2;
+    }
+
+    .kd-ratingpick__scale {
+        display: none;
+    }
 }
 
 /* ----------------------------------------------------------------------------
@@ -7815,6 +8036,58 @@ textarea.kd-inlineedit__input {
 .kd-palettecard--btn .kd-libx__body {
     display: flex;
     flex-direction: column;
+}
+
+.kd-planpreview__feel {
+    list-style: none;
+    margin: 0 0 var(--kd-space-4);
+    padding: 0 0 var(--kd-space-3);
+    border-bottom: 1px solid var(--color-divider);
+}
+
+.kd-planpreview__feeldate {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--color-text-secondary);
+}
+
+/* Rampes du ressenti (onglet Ressenti de /profile/stats) : la forme à
+   l'encre, la difficulté au rouge de l'intensité. */
+.kd-feelbar--feel {
+    background: var(--color-surface-ink);
+}
+
+.kd-feelbar--rpe {
+    background: var(--color-primary);
+}
+
+.kd-feelteaser {
+    display: flex;
+    align-items: center;
+    gap: var(--kd-space-5);
+    color: var(--color-text);
+    text-decoration: none;
+}
+
+.kd-feelteaser:hover {
+    border-color: var(--color-border-strong);
+}
+
+.kd-feelteaser__body {
+    flex: 1;
+}
+
+.kd-feelteaser__go svg {
+    width: 16px;
+    height: 16px;
+}
+
+.kd-palettecard__feel .kd-rating {
+    font-size: 10px;
+}
+
+.kd-palettecard__avg {
+    color: var(--color-text-secondary);
 }
 
 .kd-palettecard--btn .kd-palettecard__meta {

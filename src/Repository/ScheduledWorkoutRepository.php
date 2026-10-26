@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Entity\ImportedActivity;
 use App\Entity\PlanItem;
 use App\Entity\PlanTemplate;
 use App\Entity\ScheduledWorkout;
@@ -9,6 +10,7 @@ use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\ScheduledStatus;
+use App\Service\SessionRating;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
@@ -262,17 +264,20 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
      * transcrite ici parce qu'on ne veut pas hydrater pour l'appliquer. Une
      * séance dont la source a été supprimée (FK en SET NULL) garde donc son nom.
      *
-     * @return list<array{id: int, date: \DateTimeImmutable, title: string}> triées du plus ancien au plus récent
+     * Le ressenti effectif vient avec, dans la même requête (cf. `ratingQuery()`) :
+     * l'historique en affiche la marque sans lecture de plus.
+     *
+     * @return list<array{id: int, date: \DateTimeImmutable, title: string, rating: SessionRating}> triées du plus ancien au plus récent
      */
     public function doneSessionsForOwner(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
     {
-        $qb = $this->createQueryBuilder('s')
-            ->select('s.id AS id', 's.scheduledDate AS date', 's.title AS title', 'w.title AS workoutTitle')
+        $qb = $this->ratingQuery()
+            ->addSelect('s.title AS title', 'w.title AS workoutTitle')
             ->leftJoin('s.workout', 'w')
             ->andWhere('s.owner = :owner')
-            ->andWhere('s.status = :done')
             ->setParameter('owner', $owner)
-            ->setParameter('done', \App\Enum\ScheduledStatus::DONE)
+            ->addGroupBy('s.title')
+            ->addGroupBy('w.title')
             ->orderBy('s.scheduledDate', 'ASC')
             ->addOrderBy('s.id', 'ASC');
 
@@ -284,6 +289,7 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
                 ? $row['date']
                 : new \DateTimeImmutable((string) $row['date']),
             'title' => (string) ($row['title'] ?? $row['workoutTitle'] ?? 'Séance'),
+            'rating' => self::ratingOf($row),
         ], $qb->getQuery()->getArrayResult()));
     }
 
@@ -951,6 +957,149 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
         }
 
         return $dates;
+    }
+
+    /**
+     * Le ressenti effectif d'un lot de séances, en une requête : la saisie
+     * Kadens si elle existe, sinon les activités rattachées (cf. `SessionRating`).
+     *
+     * Seules les séances **faites** répondent : une note n'a de sens que sur une
+     * séance qui a eu lieu, et elle survit à un statut repassé à « prévue » sans
+     * s'afficher. Une séance faite sans aucune note est absente du tableau.
+     *
+     * @param list<int> $ids
+     *
+     * @return array<int, SessionRating> id de la séance → ressenti
+     */
+    public function ratingsFor(array $ids): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        $rows = $this->ratingQuery()
+            ->andWhere('s.id IN (:ids)')
+            ->setParameter('ids', array_values(array_unique($ids)))
+            ->getQuery()
+            ->getArrayResult();
+
+        $ratings = [];
+        foreach ($rows as $row) {
+            $rating = self::ratingOf($row);
+            if (!$rating->isEmpty()) {
+                $ratings[(int) $row['id']] = $rating;
+            }
+        }
+
+        return $ratings;
+    }
+
+    /**
+     * Toutes les séances faites d'une fenêtre, notées ou non, avec leur ressenti
+     * effectif : une ligne scalaire par séance. C'est la matière des statistiques
+     * de ressenti, y compris le taux de séances notées — d'où les séances sans
+     * note, qui en sont le dénominateur.
+     *
+     * @return list<array{date: \DateTimeImmutable, rating: SessionRating}>
+     */
+    public function doneRatingsForOwner(User $owner, ?\DateTimeImmutable $start, ?\DateTimeImmutable $end): array
+    {
+        $qb = $this->ratingQuery()
+            ->andWhere('s.owner = :owner')
+            ->setParameter('owner', $owner)
+            ->orderBy('s.scheduledDate', 'ASC');
+        $this->applyDateWindow($qb, $start, $end);
+
+        return array_values(array_map(static fn (array $row): array => [
+            'date' => self::asDate($row['date']) ?? throw new \UnexpectedValueException('Séance faite sans date.'),
+            'rating' => self::ratingOf($row),
+        ], $qb->getQuery()->getArrayResult()));
+    }
+
+    /**
+     * Les `limit` derniers ressentis de chaque lignée d'une bibliothèque, du plus
+     * récent au plus ancien : la palette de l'éditeur de plan montre « comment
+     * ça s'est passé » sur chaque carte sans N+1. Seules les séances notées
+     * comptent ; la coupe par lignée se fait en PHP, MariaDB 10.4 n'ayant pas de
+     * fenêtrage commode à exprimer en DQL.
+     *
+     * @return array<int, list<array{id: int, date: \DateTimeImmutable, rating: SessionRating}>> racine → ressentis
+     */
+    public function recentRatingsByLineage(User $owner, int $limit = 5): array
+    {
+        $rows = $this->ratingQuery()
+            ->addSelect('COALESCE(IDENTITY(w.origin), w.id) AS root')
+            ->join('s.workout', 'w')
+            ->andWhere('s.owner = :owner')
+            ->setParameter('owner', $owner)
+            ->addGroupBy('root')
+            ->orderBy('s.scheduledDate', 'DESC')
+            ->addOrderBy('s.id', 'DESC')
+            ->getQuery()
+            ->getArrayResult();
+
+        $byRoot = [];
+        foreach ($rows as $row) {
+            $root = (int) $row['root'];
+            $rating = self::ratingOf($row);
+            if ($rating->isEmpty() || \count($byRoot[$root] ?? []) >= $limit) {
+                continue;
+            }
+
+            $byRoot[$root][] = [
+                'id' => (int) $row['id'],
+                'date' => self::asDate($row['date']) ?? throw new \UnexpectedValueException('Séance faite sans date.'),
+                'rating' => $rating,
+            ];
+        }
+
+        return $byRoot;
+    }
+
+    /**
+     * Le socle des lectures de ressenti : une ligne par séance faite, sa saisie
+     * propre et le pire de ses activités rattachées (forme la plus basse,
+     * difficulté la plus haute). Jointure non mappée : `ImportedActivity` pointe
+     * la séance, la séance ne connaît pas ses activités.
+     */
+    private function ratingQuery(): QueryBuilder
+    {
+        return $this->createQueryBuilder('s')
+            ->select(
+                's.id AS id',
+                's.scheduledDate AS date',
+                's.feeling AS ownFeeling',
+                's.sessionRpe AS ownRpe',
+                'MIN(a.feeling) AS activityFeeling',
+                'MAX(a.sessionRpe) AS activityRpe',
+            )
+            ->leftJoin(ImportedActivity::class, 'a', 'WITH', 'a.scheduledWorkout = s')
+            ->andWhere('s.status = :ratedStatus')
+            ->setParameter('ratedStatus', ScheduledStatus::DONE)
+            ->groupBy('s.id')
+            ->addGroupBy('s.scheduledDate')
+            ->addGroupBy('s.feeling')
+            ->addGroupBy('s.sessionRpe');
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private static function ratingOf(array $row): SessionRating
+    {
+        $own = [self::intOrNull($row['ownFeeling']), self::intOrNull($row['ownRpe'])];
+        $activity = [self::intOrNull($row['activityFeeling']), self::intOrNull($row['activityRpe'])];
+
+        return new SessionRating(
+            $own[0] ?? $activity[0],
+            $own[1] ?? $activity[1],
+            (null === $own[0] && null !== $activity[0]) || (null === $own[1] && null !== $activity[1]),
+        );
+    }
+
+    private static function intOrNull(mixed $value): ?int
+    {
+        return is_numeric($value) ? (int) $value : null;
     }
 
     /**

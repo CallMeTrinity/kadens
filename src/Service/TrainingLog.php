@@ -23,7 +23,8 @@ use App\Repository\ScheduledWorkoutRepository;
  *   même durée (les bornes d'exécution écrites par le mobile, null dès qu'il en
  *   manque une), même RPE pondéré par série. `LogMetrics` reste le service de
  *   la séance qu'on OUVRE ; celui-ci est celui de la liste qu'on PARCOURT.
- * - **Trois requêtes d'agrégat, quelle que soit la fenêtre.** C'est la
+ * - **Quatre requêtes d'agrégat, quelle que soit la fenêtre** (la quatrième
+ *   est le ressenti, par identifiants : une seule pour toute la liste). C'est la
  *   contrainte de coût du projet : « depuis le début » ne doit pas remonter
  *   l'historique entier. Une liste de 300 séances coûte ici ce que coûtaient
  *   dix séances fetch-jointes.
@@ -32,7 +33,7 @@ use App\Repository\ScheduledWorkoutRepository;
  *   travail et pas de tonnage, elle ne disparaît pas. C'est la même frontière
  *   qu'à l'écran de clôture du mobile : hors du chiffre, jamais escamotée.
  *
- * @phpstan-type LogEntry array{id: int, date: \DateTimeImmutable, title: string, status: \App\Enum\ScheduledStatus, workingSets: int, tonnageKg: float, durationSeconds: int|null, averageRpe: float|null, exercises: int, skipped: int}
+ * @phpstan-type LogEntry array{id: int, date: \DateTimeImmutable, title: string, status: \App\Enum\ScheduledStatus, workingSets: int, tonnageKg: float, durationSeconds: int|null, averageRpe: float|null, exercises: int, skipped: int, rating: SessionRating|null}
  */
 final readonly class TrainingLog
 {
@@ -128,6 +129,7 @@ final readonly class TrainingLog
         // sont simplement ignorées à la fusion.
         $volume = $this->loggedSets->gymTotalsByScheduledForOwner($owner, $start, $end);
         $counts = $this->loggedExercises->countsByScheduledForOwner($owner, $start, $end);
+        $ratings = $this->scheduledWorkouts->ratingsFor(array_column($rows, 'id'));
 
         $entries = [];
         foreach ($rows as $row) {
@@ -148,6 +150,7 @@ final readonly class TrainingLog
                 'averageRpe' => $vol['rpeCount'] > 0 ? round($vol['rpeSum'] / $vol['rpeCount'], 1) : null,
                 'exercises' => $count['exercises'],
                 'skipped' => $count['skipped'],
+                'rating' => $ratings[$id] ?? null,
             ];
         }
 

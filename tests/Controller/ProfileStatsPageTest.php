@@ -144,6 +144,7 @@ final class ProfileStatsPageTest extends WebTestCase
             '' => ['Vue d\'ensemble', 'Tenu, manqué, à venir', 'Où part le volume'],
             '&tab=gym' => ['Salle', 'Où part le volume', 'Tenu, manqué, à venir'],
             '&tab=endurance' => ['Endurance', 'Ce qui a été parcouru', 'Où part le volume'],
+            '&tab=feeling' => ['Ressenti', 'Comment ça s\'est passé', 'Où part le volume'],
         ];
 
         foreach ($cases as $query => [$label, $shown, $hidden]) {
@@ -157,7 +158,7 @@ final class ProfileStatsPageTest extends WebTestCase
             self::assertStringNotContainsString($hidden, $crawler->filter('body')->text());
         }
 
-        self::assertCount(3, $crawler->filter('.kd-stattab'));
+        self::assertCount(4, $crawler->filter('.kd-stattab'));
         // L'onglet par défaut garde la fenêtre et n'ajoute pas de `tab`.
         self::assertCount(1, $crawler->filter('a.kd-stattab[href="/profile/stats?range=all"]'));
     }

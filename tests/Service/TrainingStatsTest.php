@@ -517,6 +517,46 @@ final class TrainingStatsTest extends KernelTestCase
      * L'historique porte trois semaines faites : W24 (juin), puis W29 et W30
      * qui se suivent. Le record est donc de deux, pas d'une.
      */
+    /**
+     * Le ressenti : deux axes indépendants, la montre en repli de Kadens, des
+     * barres à l'échelle absolue, et un taux qui compte aussi les séances non
+     * notées — elles sont le dénominateur qui dit si la moyenne se lit.
+     */
+    public function testTheFeelingTabAveragesEachAxisOnItsOwn(): void
+    {
+        $exercise = (new Exercise())->setOwner($this->user)->setName('Tirage')->setActivity(ActivityType::GYM);
+        $this->em->persist($exercise);
+        $workout = $this->gymWorkout($exercise, 'Dos');
+
+        $this->schedule($workout, '2026-07-06', ScheduledStatus::DONE)->setFeeling(4)->setSessionRpe(6);
+        $this->schedule($workout, '2026-07-08', ScheduledStatus::DONE)->setFeeling(2);
+        $watch = $this->schedule($workout, '2026-07-21', ScheduledStatus::DONE);
+        $this->em->persist((new ImportedActivity($this->user, ActivitySource::INTERVALS, 'i-feel', 'Run', new \DateTimeImmutable('2026-07-21'), new \DateTimeImmutable('2026-07-21')))
+            ->setScheduledWorkout($watch)
+            ->setSessionRpe(9));
+        // Notée mais pas faite : hors de tout chiffre.
+        $this->schedule($workout, '2026-07-22', ScheduledStatus::PLANNED)->setFeeling(1);
+        $this->em->flush();
+
+        $feel = $this->stats->over($this->user, StatsPeriod::month(2026, 7))['feeling'];
+
+        self::assertSame(3, $feel['rated']);
+        self::assertGreaterThan($feel['rated'], $feel['done'], 'Les séances faites non notées comptent au dénominateur.');
+        self::assertSame(3.0, $feel['feeling']);
+        self::assertSame('Normal', $feel['feelingLabel']);
+        self::assertSame(7.5, $feel['sessionRpe'], 'La note de la montre entre dans la moyenne de difficulté.');
+
+        $byWeek = array_column($feel['points'], null, 'short');
+        self::assertCount(5, $feel['points'], 'Mêmes seaux que les autres rampes, semaines vides comprises.');
+        self::assertSame(3.0, $byWeek['S28']['feeling']);
+        self::assertSame(60, $byWeek['S28']['feelingHeightPct'], 'Échelle absolue : 3 sur 5, pas le maximum de la fenêtre.');
+        self::assertSame(90, $byWeek['S30']['rpeHeightPct']);
+        self::assertNull($byWeek['S30']['feeling']);
+
+        $levels = array_column(array_map(static fn (array $d): array => ['k' => $d['level']->value, 'n' => $d['sessions']], $feel['distribution']), 'n', 'k');
+        self::assertSame([5 => 0, 4 => 1, 3 => 0, 2 => 1, 1 => 0], $levels);
+    }
+
     public function testConsecutiveWeeksAreCountedAsAStreak(): void
     {
         $regularity = $this->stats->over(

@@ -189,7 +189,8 @@
 
                                         {# Aperçu au survol (top-layer via Popover API), positionné par le
                                            contrôleur plangrid pour échapper à l'overflow de la grille. #}
-                                        {{ include('components/_plan_preview.html.twig', {fw: entry.workout}) }}
+                                        {% set root = entry.item.workout.origin ?? entry.item.workout %}
+                                        {{ include('components/_plan_preview.html.twig', {fw: entry.workout, feelings: lineageFeelings[root.id] ?? null}) }}
                                     </div>
                                 {% endfor %}
                             </div>

@@ -192,8 +192,10 @@ final class CalendarController extends AbstractController
         $user = $this->getUser();
         $byDate = [];
         $flattened = [];
+        $ids = [];
         foreach ($scheduledWorkoutRepository->findByOwnerBetween($user, $monday, $sunday) as $scheduled) {
             $byDate[$scheduled->getScheduledDate()->format('Y-m-d')][] = $scheduled;
+            $ids[] = (int) $scheduled->getId();
             $workout = $scheduled->getWorkout();
             if (null !== $workout) {
                 $flattened[(int) $workout->getId()] ??= $planFlattener->flattenWorkout($workout);
@@ -233,6 +235,9 @@ final class CalendarController extends AbstractController
             'isoWeek' => (int) $monday->format('W'),
             'days' => $days,
             'flattened' => $flattened,
+            // Le ressenti des séances faites, sur la carte haute : une requête
+            // pour la semaine. La vue mois ne l'affiche pas, faute de place.
+            'ratings' => $scheduledWorkoutRepository->ratingsFor($ids),
             'nextGoal' => $goalRepository->findNextForOwner($user),
             'counts' => $counts,
             'sessionCount' => array_sum($counts),

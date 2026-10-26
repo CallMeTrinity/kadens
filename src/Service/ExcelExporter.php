@@ -106,9 +106,13 @@ final class ExcelExporter
      * Classeur d'un planning daté sur une période : un onglet, chaque séance
      * datée avec sa date réelle et son statut prévu/fait/manqué.
      *
-     * @param list<ScheduledWorkout> $scheduled déjà triées par date croissante
+     * Le ressenti d'une séance faite suit son statut sur la ligne de contexte :
+     * le réalisé appartient déjà à ce classeur, qui est celui du propriétaire.
+     *
+     * @param list<ScheduledWorkout>     $scheduled déjà triées par date croissante
+     * @param array<int, SessionRating> $ratings   ressenti effectif par séance (`ratingsFor()`)
      */
-    public function schedule(array $scheduled, string $periodLabel): Spreadsheet
+    public function schedule(array $scheduled, string $periodLabel, array $ratings = []): Spreadsheet
     {
         $spreadsheet = new Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
@@ -125,6 +129,13 @@ final class ExcelExporter
 
             $meta = ucfirst($item->getScheduledDate()->format('d/m/Y'))
                 .' · '.$item->getStatus()->getLabel();
+            $rating = $ratings[(int) $item->getId()] ?? null;
+            if (null !== $rating?->feeling) {
+                $meta .= ' · Forme : '.$rating->feelingLabel();
+            }
+            if (null !== $rating?->sessionRpe) {
+                $meta .= ' · Difficulté '.$rating->sessionRpe.'/10';
+            }
             if (null !== $item->getCompletionNotes() && '' !== $item->getCompletionNotes()) {
                 $meta .= ' · '.$item->getCompletionNotes();
             }

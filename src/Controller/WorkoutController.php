@@ -175,13 +175,18 @@ final class WorkoutController extends AbstractController
 
         $user = $this->getUser();
 
+        $instances = $workout->isPlanLocal() ? null : $scheduledRepository->findDoneInLineage($workout);
+
         return $this->render('workout/show.html.twig', [
             'flat' => $planFlattener->flattenWorkout($workout),
             'summary' => $metrics->summary($workout),
             'blockStats' => $metrics->blockBreakdown($workout),
             // Les réalisations se lisent sur la racine de la lignée : une copie
             // locale de plan n'en a pas à elle (null = section absente).
-            'instances' => $workout->isPlanLocal() ? null : $scheduledRepository->findDoneInLineage($workout),
+            'instances' => $instances,
+            // Le ressenti de chaque réalisation, en une requête : la lignée se
+            // lit comme « comment ça s'est passé », pas seulement « quand ».
+            'instanceRatings' => null === $instances ? [] : $scheduledRepository->ratingsFor(array_map(static fn (\App\Entity\ScheduledWorkout $s): int => (int) $s->getId(), $instances)),
         ] + $this->volumePanel->for($workout, $user instanceof User ? $user : null));
     }
 

@@ -20,11 +20,12 @@
    destinations) est calculé en tête de `body` ; le corps ne sait pas qui
    regarde.
 
-   Trois rubriques (`tab`, cf. StatsTab), chacune son lien `?tab=` : la vue
+   Quatre rubriques (`tab`, cf. StatsTab), chacune son lien `?tab=` : la vue
    d'ensemble (assiduité, répartition), la salle (volume soulevé, régions,
    rampe, records) et l'endurance (volume, rampe en durée, zones, records,
    prévu contre réel ; tout sauf le volume se lit sur le seul réel importé,
-   et le dit). Une rubrique ne
+   et le dit), et le ressenti (forme, difficulté, sur toutes les séances). Une
+   rubrique ne
    filtre aucun chiffre, elle choisit les blocs rendus : `stats` est le même
    agrégat quel que soit l'onglet. #}
 
@@ -38,6 +39,9 @@
     {% set vol = stats.volume %}
     {% set reg = stats.regularity %}
     {% set prog = stats.progression %}
+    {% set feel = stats.feeling %}
+    {% set statsRoute = subject ? 'app_coach_athlete_stats' : 'app_profile_stats' %}
+    {% set feelingPath = path(statsRoute, (subject ? {id: subject.id} : {})|merge({range: period.queryValue, tab: 'feeling'})) %}
 
     <div class="kd-pagehead">
         <div>
@@ -90,6 +94,21 @@
                 </div>
             {% endfor %}
         </div>
+
+        {# Le ressenti en une ligne, et le chemin vers son onglet. Absent tant que
+           rien n'est noté : la vue d'ensemble n'annonce pas un vide facultatif. #}
+        {% if feel.rated > 0 %}
+            <a href="{{ feelingPath }}" class="kd-card kd-feelteaser kd-section__block">
+                <span class="kd-metric__icon">{{ ux_icon('lucide:heart-pulse') }}</span>
+                <span class="kd-feelteaser__body">
+                    {% if feel.feeling is not null %}<strong>{{ feel.feelingLabel }}</strong> en moyenne{% endif %}
+                    {%- if feel.feeling is not null and feel.sessionRpe is not null %} · {% endif -%}
+                    {% if feel.sessionRpe is not null %}difficulté <strong>{{ feel.sessionRpe|number_format(1, ',', ' ') }}/10</strong>{% endif %}
+                    <span class="kd-deflist__note">({{ feel.rated }} séance{{ feel.rated > 1 ? 's' }} notée{{ feel.rated > 1 ? 's' }})</span>
+                </span>
+                <span class="kd-feelteaser__go">{{ ux_icon('lucide:arrow-right') }}</span>
+            </a>
+        {% endif %}
 
         {# ========================== OBSERVANCE + RÉGULARITÉ ===================== #}
         <section class="kd-section">
@@ -415,7 +434,7 @@
                 </div>
             </section>
         {% endif %}
-    {% else %}
+    {% elseif tab.value == 'endurance' %}
         {% set endu = stats.endurance %}
         {% set cov = endu.coverage %}
         {% set eprog = endu.progression %}
@@ -656,6 +675,125 @@
                     {% endif %}
                 </section>
             </div>
+        </section>
+    {% elseif tab.value == 'feeling' %}
+        {# ================================ RESSENTI ===============================
+           Forme 1-5 et difficulté 1-10, sur toutes les séances faites de la
+           fenêtre. Valeur effective : la saisie Kadens, sinon la note de la
+           montre (Intervals). Les deux axes se lisent séparément, et le taux de
+           séances notées dit sur combien de séances reposent les moyennes. #}
+        <section class="kd-section">
+            <div class="kd-pagehead kd-pagehead--sub">
+                <div>
+                    <p class="kd-eyebrow kd-eyebrow--accent">Ressenti</p>
+                    <h2 class="kd-title kd-title--sm">Comment ça s'est passé</h2>
+                </div>
+            </div>
+
+            {% if feel.rated == 0 %}
+                <div class="kd-card kd-empty kd-section__block">
+                    {{ ux_icon('lucide:heart-pulse') }}
+                    <div>
+                        Aucune séance notée sur cette période.
+                        La forme et la difficulté se saisissent à la fin d'une séance sur Kadens Live, sur la page d'une séance faite, ou sur la montre pour une sortie importée.
+                    </div>
+                </div>
+            {% else %}
+                <div class="kd-profile__tiles kd-section__block">
+                    {% if feel.feeling is not null %}
+                        <div class="kd-profile__tile">
+                            <span class="kd-profile__tileicon">{{ ux_icon('lucide:heart-pulse') }}</span>
+                            <div class="kd-stat__value">{{ feel.feelingLabel }}</div>
+                            <div class="kd-stat__label">Forme moyenne · {{ feel.feeling|number_format(1, ',', ' ') }}/5</div>
+                        </div>
+                    {% endif %}
+                    {% if feel.sessionRpe is not null %}
+                        <div class="kd-profile__tile">
+                            <span class="kd-profile__tileicon">{{ ux_icon('lucide:flame') }}</span>
+                            <div class="kd-stat__value">{{ feel.sessionRpe|number_format(1, ',', ' ') }}<span class="kd-wk__unit">/10</span></div>
+                            <div class="kd-stat__label">Difficulté moyenne · {{ feel.effortLabel|lower }}</div>
+                        </div>
+                    {% endif %}
+                    <div class="kd-profile__tile">
+                        <span class="kd-profile__tileicon">{{ ux_icon('lucide:clipboard-check') }}</span>
+                        <div class="kd-stat__value">{{ (feel.coverage * 100)|round }} %</div>
+                        <div class="kd-stat__label">Séances notées · {{ feel.rated }} sur {{ feel.done }}</div>
+                    </div>
+                </div>
+
+                {# Deux rampes côte à côte, à l'échelle absolue de leur axe : une
+                   barre pleine, c'est « très en forme » ou « maximal », pas la
+                   meilleure semaine de la fenêtre. #}
+                <div class="kd-grid kd-grid--2 kd-section__block">
+                    {% for axis in [
+                        {key: 'feeling', title: 'Forme', icon: 'lucide:heart-pulse', scale: 5, note: 'Forme moyenne, de très faible (1) à très en forme (5).'},
+                        {key: 'sessionRpe', title: 'Difficulté', icon: 'lucide:flame', scale: 10, note: 'Difficulté moyenne des séances, sur 10.'},
+                    ] %}
+                        <section class="kd-card">
+                            <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon(axis.icon) }} {{ axis.title }} {{ feel.granularity == 'week' ? 'semaine par semaine' : 'mois par mois' }}</h3>
+                            <p class="kd-card__note">{{ axis.note }}{% if feel.truncated %} Les 24 dernières seulement.{% endif %}</p>
+
+                            <div class="kd-statbars">
+                                <div class="kd-prog__bars">
+                                    {% for p in feel.points %}
+                                        {% set value = attribute(p, axis.key) %}
+                                        {% set height = axis.key == 'feeling' ? p.feelingHeightPct : p.rpeHeightPct %}
+                                        {% set label = axis.key == 'feeling' ? p.feelingLabel : p.effortLabel %}
+                                        <div class="kd-prog__col{{ value is null ? ' is-empty' }}">
+                                            <div class="kd-prog__track">
+                                                {% if value is not null %}
+                                                    <span class="kd-prog__bar {{ axis.key == 'sessionRpe' ? 'kd-feelbar--rpe' : 'kd-feelbar--feel' }}"
+                                                          style="height: {{ height }}%"
+                                                          title="{{ p.label }} · {{ value|number_format(1, ',', ' ') }}/{{ axis.scale }} ({{ label }}) · {{ p.sessions }} séance{{ p.sessions > 1 ? 's' }}"></span>
+                                                {% endif %}
+                                            </div>
+                                            <span class="kd-prog__wk">{{ p.short }}</span>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+
+                            <table class="kd-sr-only">
+                                <caption>{{ axis.title }} par {{ feel.granularity == 'week' ? 'semaine' : 'mois' }}</caption>
+                                <thead><tr><th>Période</th><th>{{ axis.title }}</th><th>Séances notées</th></tr></thead>
+                                <tbody>
+                                    {% for p in feel.points %}
+                                        {% set value = attribute(p, axis.key) %}
+                                        <tr><td>{{ p.label }}</td><td>{{ value is null ? '—' : value|number_format(1, ',', ' ') ~ ' sur ' ~ axis.scale }}</td><td>{{ p.sessions }}</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </section>
+                    {% endfor %}
+                </div>
+
+                {# Répartition de la forme : même barre empilée que les régions,
+                   en dégradé d'encre (le dernier cran en simple contour). #}
+                {% set feelTotal = feel.distribution|reduce((carry, d) => carry + d.sessions, 0) %}
+                {% if feelTotal > 0 %}
+                    <section class="kd-card kd-section__block">
+                        <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:pie-chart') }} Répartition de la forme</h3>
+                        <p class="kd-card__note">Part des séances notées en forme, par niveau.</p>
+
+                        <div class="kd-stack" role="img"
+                             aria-label="{% for d in feel.distribution %}{{ d.level.label }} {{ d.percent|number_format(0) }} %{{ not loop.last ? ', ' }}{% endfor %}">
+                            {% for d in feel.distribution|filter(d => d.sessions > 0) %}
+                                <span class="kd-stack__seg kd-{{ d.tone }}" style="width: {{ d.percent }}%"></span>
+                            {% endfor %}
+                        </div>
+
+                        <ul class="kd-legend">
+                            {% for d in feel.distribution %}
+                                <li class="kd-legend__item">
+                                    <span class="kd-legend__key kd-{{ d.tone }}" aria-hidden="true"></span>
+                                    {{ d.level.label }}
+                                    <span class="kd-legend__val">{{ d.sessions }} · {{ d.percent|number_format(0) }} %</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </section>
+                {% endif %}
+            {% endif %}
         </section>
     {% endif %}
 {% endblock %}

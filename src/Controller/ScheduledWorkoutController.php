@@ -19,10 +19,12 @@ use App\Service\LogComparator;
 use App\Service\LogMetrics;
 use App\Service\PlanFlattener;
 use App\Service\PlanScheduler;
+use App\Service\SessionRating;
 use App\Service\VolumePanel;
 use App\Service\WorkoutMetrics;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\InputBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
@@ -44,6 +46,7 @@ final class ScheduledWorkoutController extends AbstractController
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly RequestStack $requestStack,
+        private readonly ScheduledWorkoutRepository $scheduledWorkouts,
     ) {
     }
 
@@ -175,6 +178,7 @@ final class ScheduledWorkoutController extends AbstractController
             'comparison' => $comparison,
             'logSummary' => $logMetrics->summary($scheduled),
             'defaultTab' => $this->defaultTab($scheduled, $comparison),
+            'rating' => $this->ratingOf($scheduled),
         ] + $this->importedActivityContext($scheduled, $importedActivities, $activityPresenter) + [
             // Le volume PRÉVU, dans le HTML initial comme le reste de la page :
             // une vue de consultation ne charge rien après coup (cache offline).
@@ -267,6 +271,7 @@ final class ScheduledWorkoutController extends AbstractController
 
                 $notes = trim($payload->getString('completionNotes'));
                 $scheduled->setCompletionNotes('' === $notes ? null : $notes);
+                $this->applyRating($payload, $scheduled);
 
                 $this->entityManager->flush();
 
@@ -288,6 +293,73 @@ final class ScheduledWorkoutController extends AbstractController
         }
 
         return $this->redirectAfterMutation($request, $scheduled, $scheduled->getScheduledDate());
+    }
+
+    /**
+     * Le ressenti d'une séance faite, saisi ou corrigé sur le web : forme 1-5 et
+     * difficulté 1-10. C'est **consigner**, pas programmer : attribut LOG, le
+     * propriétaire seul, comme le réalisé série par série — personne ne dit à la
+     * place de l'athlète comment il s'est senti. Le coach le lit (VIEW).
+     */
+    #[Route('/{id}/rating', name: 'app_scheduled_workout_rating', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function rate(Request $request, ScheduledWorkout $scheduled): Response
+    {
+        $this->denyAccessUnlessGranted(ScheduledWorkoutVoter::LOG, $scheduled);
+
+        $payload = $request->getPayload();
+
+        if ($this->isCsrfTokenValid('rating'.$scheduled->getId(), $payload->getString('_token'))) {
+            $this->applyRating($payload, $scheduled);
+            $this->entityManager->flush();
+
+            if (TurboBundle::STREAM_FORMAT === $request->getPreferredFormat()) {
+                return $this->streamScheduleStatus($request, $scheduled);
+            }
+
+            $this->addFlash('success', 'Ressenti enregistré.');
+        }
+
+        return $this->redirectToRoute('app_scheduled_workout_show', ['id' => $scheduled->getId()]);
+    }
+
+    /**
+     * Écrit le ressenti posté, axe par axe, **si le formulaire le porte** et si
+     * le lecteur a le droit de consigner. Un formulaire sans sélecteur (celui du
+     * coach) ne touche donc à rien. Vide = « non renseigné », la seule façon de
+     * retirer une note, qui n'existe que sur le web ; une valeur hors échelle
+     * est ignorée plutôt que de retirer la note en silence.
+     *
+     * @param InputBag<bool|float|int|string> $payload
+     */
+    private function applyRating(InputBag $payload, ScheduledWorkout $scheduled): void
+    {
+        if (!$this->isGranted(ScheduledWorkoutVoter::LOG, $scheduled)) {
+            return;
+        }
+
+        if ($payload->has('feeling')) {
+            $raw = $payload->getString('feeling');
+            $value = SessionRating::boundFeeling('' === $raw ? null : (int) $raw);
+            if ('' === $raw || null !== $value) {
+                $scheduled->setFeeling($value);
+            }
+        }
+
+        if ($payload->has('sessionRpe')) {
+            $raw = $payload->getString('sessionRpe');
+            $value = SessionRating::boundRpe('' === $raw ? null : (int) $raw);
+            if ('' === $raw || null !== $value) {
+                $scheduled->setSessionRpe($value);
+            }
+        }
+    }
+
+    /** Le ressenti effectif (Kadens, sinon la montre) d'une séance faite, null sinon. */
+    private function ratingOf(ScheduledWorkout $scheduled): ?SessionRating
+    {
+        $id = $scheduled->getId();
+
+        return null === $id ? null : ($this->scheduledWorkouts->ratingsFor([$id])[$id] ?? null);
     }
 
     /**
@@ -342,6 +414,7 @@ final class ScheduledWorkoutController extends AbstractController
 
         return $this->render('scheduled_workout/stream/status.stream.html.twig', [
             'scheduled' => $scheduled,
+            'rating' => $this->ratingOf($scheduled),
         ]);
     }
 
@@ -366,6 +439,7 @@ final class ScheduledWorkoutController extends AbstractController
             'fw' => null === $workout ? null : $planFlattener->flattenWorkout($workout),
             'statuses' => ScheduledStatus::cases(),
             'detailed' => (bool) $request->getPayload()->getInt('detailed'),
+            'rating' => $this->ratingOf($scheduled),
             'overdue' => $overdue,
             // Ancre de contexte de la vue appelante, reconduite telle quelle : la
             // pastille re-rendue doit garder des liens qui savent d'où l'on vient.

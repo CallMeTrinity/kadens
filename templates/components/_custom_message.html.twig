@@ -1,0 +1,60 @@
+{#
+    Un message programmé (back-office super admin), posé par base.html.twig sur
+    la page où l'on arrive tant qu'il n'a pas été vu. Sert aussi d'aperçu dans
+    le back-office (`preview: true`) : même rendu, sans ouverture automatique ni
+    formulaire.
+
+    Attend :
+      - `message` : CustomMessage
+      - `preview` : bool, facultatif
+
+    Deux sorties, deux portées :
+      - « Fermer » ou la croix : vu, enregistré en base, le message ne revient
+        plus, ni ici ni sur le téléphone.
+      - Échap ou le fond : « plus tard ». Rien côté serveur ; le contrôleur
+        `dialog` ne la rouvre qu'à la prochaine session du navigateur.
+
+    `title` est un libellé interne : il ne s'affiche jamais ici. Le texte est du
+    texte brut, seuls ses sauts de ligne sont rendus.
+#}
+{% set preview = preview|default(false) %}
+{% set media_url = custom_message_media_url(message) %}
+{% set form_id = 'custom-message-seen-' ~ message.id %}
+
+{% set card %}
+    <div class="kd-modal__card kd-message">
+        <div class="kd-modal__head">
+            <p class="kd-modal__sub kd-message__eyebrow">Un mot pour toi</p>
+            {% if not preview %}
+                <button type="submit" form="{{ form_id }}" class="kd-modal__close" aria-label="Fermer">
+                    {{ ux_icon('lucide:x') }}
+                </button>
+            {% endif %}
+        </div>
+
+        {% if media_url %}
+            <img class="kd-message__media" src="{{ media_url }}" alt="">
+        {% endif %}
+
+        <p class="kd-message__body">{{ message.body|e|nl2br }}</p>
+
+        {% if not preview %}
+            <form id="{{ form_id }}" class="kd-formactions" method="post" action="{{ path('app_message_seen', {id: message.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('message_seen' ~ message.id) }}">
+                <input type="hidden" name="_back" value="{{ app.request.requestUri }}">
+                <button type="submit" class="kd-btn kd-btn--primary">Fermer</button>
+            </form>
+        {% endif %}
+    </div>
+{% endset %}
+
+{% if preview %}
+    <div class="kd-modal kd-modal--preview">{{ card }}</div>
+{% else %}
+    <div data-controller="dialog" data-dialog-open-once-value="kd-message-{{ message.id }}-{{ app.user.id }}">
+        <dialog class="kd-modal" data-dialog-target="dialog" data-action="click->dialog#backdrop"
+                aria-label="Message">
+            {{ card }}
+        </dialog>
+    </div>
+{% endif %}

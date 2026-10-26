@@ -21,6 +21,8 @@ final readonly class SyncReport
         public int $freeSessions = 0,
         /** Activités laissées à rattacher parce que plusieurs séances pouvaient leur correspondre. */
         public int $ambiguous = 0,
+        /** Activités déjà connues dont le ressenti a changé depuis la dernière relecture. */
+        public int $rated = 0,
     ) {
     }
 
@@ -41,6 +43,10 @@ final readonly class SyncReport
 
         if ($this->remaining > 0) {
             $sentence .= \sprintf(' %d restante%s : synchronise à nouveau pour continuer.', $this->remaining, $this->remaining > 1 ? 's' : '');
+        }
+
+        if ($this->rated > 0) {
+            $sentence .= \sprintf(' Ressenti mis à jour sur %d activité%s.', $this->rated, $this->rated > 1 ? 's' : '');
         }
 
         if ($this->skipped > 0) {

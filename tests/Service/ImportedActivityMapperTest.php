@@ -43,6 +43,41 @@ final class ImportedActivityMapperTest extends TestCase
         self::assertSame('2026-09-12', $activity->getLocalDate()->format('Y-m-d'));
     }
 
+    /**
+     * L'échelle `feel` d'Intervals est à l'envers de celle de Kadens (1 =
+     * « Strong ») ; `icu_rpe` est à l'endroit. Les dérivés et le champ Strava ne
+     * sont pas des notes de séance.
+     */
+    public function testTheRatingIsFlippedOntoTheKadensScale(): void
+    {
+        self::assertSame(['feeling' => 5, 'sessionRpe' => 8], ImportedActivityMapper::ratingsFromIntervals(['feel' => 1, 'icu_rpe' => 8, 'session_rpe' => 480, 'perceived_exertion' => 3.0]));
+        self::assertSame(['feeling' => 1, 'sessionRpe' => 1], ImportedActivityMapper::ratingsFromIntervals(['feel' => 5, 'icu_rpe' => 1]));
+        self::assertSame(['feeling' => 3, 'sessionRpe' => null], ImportedActivityMapper::ratingsFromIntervals(['feel' => 3]));
+    }
+
+    /** Hors échelle : rien, plutôt qu'une note ramenée au bord qui fausserait une moyenne. */
+    public function testARatingOutOfScaleIsDropped(): void
+    {
+        self::assertSame(['feeling' => null, 'sessionRpe' => null], ImportedActivityMapper::ratingsFromIntervals(['feel' => 7, 'icu_rpe' => 12]));
+        self::assertSame(['feeling' => null, 'sessionRpe' => null], ImportedActivityMapper::ratingsFromIntervals(['feel' => null, 'icu_rpe' => 0]));
+        self::assertSame(['feeling' => null, 'sessionRpe' => null], ImportedActivityMapper::ratingsFromIntervals([]));
+    }
+
+    public function testANewActivityCarriesItsRating(): void
+    {
+        $activity = (new ImportedActivityMapper())->fromIntervals(new User(), [
+            'id' => 'i77',
+            'type' => 'Run',
+            'start_date_local' => '2026-09-12T08:00:00',
+            'feel' => 2,
+            'icu_rpe' => 6,
+        ]);
+
+        self::assertNotNull($activity);
+        self::assertSame(4, $activity->getFeeling());
+        self::assertSame(6, $activity->getSessionRpe());
+    }
+
     /** Une activité arrivée par Strava n'est qu'une coquille côté API : on ne l'importe pas. */
     public function testAStravaStubIsNotImported(): void
     {

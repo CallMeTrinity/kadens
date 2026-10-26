@@ -102,6 +102,12 @@ hiérarchie de volume. Les activités n'y sont plus (cf. ci-dessous).
 | `--color-cat-3` | `#8a8a82` | `.kd-cat--3` |
 | `--color-cat-4` | `#c9c9c2` | `.kd-cat--4` |
 
+Une échelle **ordinale à cinq crans** (la forme ressentie, très faible → très en
+forme) ne réclame pas un cinquième gris : le cran le plus bas est un simple
+**contour** (`.kd-cat--outline`, fond papier, filet `--color-border-strong`).
+C'est l'axe plein/contour déjà utilisé par les types de série, pas une teinte de
+plus.
+
 ### Code activité — palette « Vif », personnalisable
 Issue de la maquette Claude Design « Couleurs activités » (issue #35, piste
 **1b**). Une activité se lit deux fois : par son **icône**, toujours présente,
@@ -522,6 +528,23 @@ décomposé en `_workout_program`, `_workout_sets_table`, `_workout_analysis`.
 - **Analyse** (`.kd-analysis`) : barre empilée + légende, barres horizontales,
   timeline de durée. Rendu 100 % serveur, aucune bibliothèque de graphiques.
 
+### Ressenti de séance (`components/_rating.html.twig`)
+Forme 1-5 et difficulté 1-10, une seule source de rendu : `badge()` pour une
+ligne de liste, `tiles()` pour la page d'une séance, `picker()` pour un
+formulaire. Libellés lus par `feeling_label()` / `effort_label()`, jamais écrits
+dans un template.
+
+- **La difficulté a droit au rouge, la forme non.** La première est de
+  l'intensité (même jauge `.kd-wk__gauge` que le RPE des séries), la seconde un
+  état : à l'encre. Case cochée du sélecteur : aplat encre pour la forme, aplat
+  rouge pour la difficulté.
+- **« Difficulté 7/10 », jamais « RPE 7 »** dans un badge : le journal affiche à
+  côté le RPE moyen des séries, et les deux se confondraient.
+- **Le sélecteur garde de vrais radios** (`.kd-ratingpick`), dessinés par
+  `:has(:checked)` : il marche sans JS et au clavier. Un premier choix « — » vaut
+  « non renseigné » (le web peut retirer une note, le mobile non). Sous 560 px,
+  la forme perd son texte et la difficulté passe sur deux rangées de cinq.
+
 ### Page de statistiques (`/profile/stats`)
 Même principe que l'analyse d'une séance, à l'échelle d'une fenêtre de temps :
 aucun graphique dessiné en JS, des `div` proportionnelles dont les hauteurs
@@ -532,7 +555,7 @@ de mise à l'échelle). Elle réutilise tel quel `.kd-stack`, `.kd-legend`,
 affiche déjà la même donnée ailleurs.
 
 - **Rubriques** (`.kd-stattabs`, `.kd-stattab`, `profile/_stats_tabs.html.twig`) :
-  vue d'ensemble / salle / endurance, en **liens** `?tab=` et non par le
+  vue d'ensemble / salle / endurance / ressenti, en **liens** `?tab=` et non par le
   contrôleur `tabs`. La fenêtre recharge déjà la page : des onglets côté client
   retomberaient sur le premier à chaque changement de fenêtre. Chaque onglet
   reconduit la fenêtre, le sélecteur de fenêtre reconduit l'onglet (paramètre
@@ -558,6 +581,12 @@ affiche déjà la même donnée ailleurs.
 - **Temps en zones** (`components/_zonebars.html.twig`) : une seule barre de
   zones, partagée par la page d'une séance et l'onglet Endurance
   (`ZoneBreakdown::shares()`). Le rouge n'y touche que Z4-Z5 : de l'intensité.
+- **Ressenti** (onglet `feeling`) : deux rampes `.kd-prog__bars` à **l'échelle
+  absolue** de leur axe (forme sur 5, difficulté sur 10), pas au maximum de la
+  fenêtre — un ressenti a ses bornes. La forme est à l'encre
+  (`.kd-feelbar--feel`), la difficulté au rouge (`.kd-feelbar--rpe`) : c'est de
+  l'intensité. Répartition de la forme en `.kd-stack` dégradé d'encre, dernier
+  cran en `.kd-cat--outline`.
 - **Rampe de volume** (`.kd-statbars`) : le graphique **déborde** dans son
   propre conteneur `overflow-x` plutôt que de se comprimer — vingt-quatre barres
   de trois pixels ne se lisent pas, et le `body` ne défile jamais

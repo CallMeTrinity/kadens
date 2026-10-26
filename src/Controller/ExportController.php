@@ -76,7 +76,7 @@ final class ExportController extends AbstractController
         $scheduled = $repository->findByOwnerBetween($user, $first, $last);
 
         return $this->xlsxResponse(
-            $this->exporter->schedule($scheduled, $periodLabel),
+            $this->exporter->schedule($scheduled, $periodLabel, $repository->ratingsFor(array_map(static fn (\App\Entity\ScheduledWorkout $s): int => (int) $s->getId(), $scheduled))),
             $this->filename('planning', sprintf('%04d-%02d', $year, $month)),
         );
     }

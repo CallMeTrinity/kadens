@@ -84,8 +84,9 @@ final class IntervalsImporter
             ? $today->modify(\sprintf('-%d days', self::FIRST_SYNC_DAYS))
             : $connection->getSyncedThrough()->modify(\sprintf('-%d days', self::OVERLAP_DAYS));
 
-        $fresh = $this->freshPayloads($apiKey, $oldest, $today);
+        [$fresh, $known] = $this->partition($user, $apiKey, $oldest, $today);
         $counts = $this->emptyCounts();
+        $counts['rated'] = $this->refreshRatings($known);
         $lastDate = null;
         $this->matcher->reset();
 
@@ -147,8 +148,9 @@ final class IntervalsImporter
     ): SyncReport {
         $connection = $this->connectionOf($user);
         $apiKey = $this->secretBox->open($connection->getSealedApiKey());
-        $fresh = $this->freshPayloads($apiKey, $since, $until);
+        [$fresh, $known] = $this->partition($user, $apiKey, $since, $until);
         $counts = $this->emptyCounts();
+        $counts['rated'] = $this->refreshRatings($known);
         $this->matcher->reset();
         $completed = false;
         $this->pacing = !$dryRun;
@@ -222,12 +224,14 @@ final class IntervalsImporter
     }
 
     /**
-     * Les activités de la plage que Kadens ne connaît pas encore, de la plus
-     * ancienne à la plus récente (l'API rend l'ordre inverse).
+     * Les activités de la plage, en deux parts : celles que Kadens ne connaît
+     * pas encore, de la plus ancienne à la plus récente (l'API rend l'ordre
+     * inverse), et celles qu'il connaît, avec leur payload pour relire ce qui
+     * peut changer après coup.
      *
-     * @return list<array<string, mixed>>
+     * @return array{0: list<array<string, mixed>>, 1: list<array{ImportedActivity, array<string, mixed>}>}
      */
-    private function freshPayloads(string $apiKey, \DateTimeImmutable $oldest, \DateTimeImmutable $newest): array
+    private function partition(User $user, string $apiKey, \DateTimeImmutable $oldest, \DateTimeImmutable $newest): array
     {
         $payloads = $this->client->activities($apiKey, $oldest, $newest);
 
@@ -237,12 +241,53 @@ final class IntervalsImporter
             static fn (array $p): ?string => isset($p['id']) && \is_scalar($p['id']) ? (string) $p['id'] : null,
             $payloads,
         )));
-        $known = array_flip($this->activities->knownExternalIds(ActivitySource::INTERVALS, $ids));
+        $known = $this->activities->findKnownForOwner($user, ActivitySource::INTERVALS, $ids);
 
-        return array_values(array_filter(
-            $payloads,
-            static fn (array $p): bool => isset($p['id']) && \is_scalar($p['id']) && !isset($known[(string) $p['id']]),
-        ));
+        $fresh = [];
+        $seen = [];
+        foreach ($payloads as $payload) {
+            if (!isset($payload['id']) || !\is_scalar($payload['id'])) {
+                continue;
+            }
+
+            $id = (string) $payload['id'];
+            if (isset($known[$id])) {
+                $seen[] = [$known[$id], $payload];
+            } else {
+                $fresh[] = $payload;
+            }
+        }
+
+        return [$fresh, $seen];
+    }
+
+    /**
+     * Relit le ressenti des activités déjà importées : on note souvent sa sortie
+     * après la synchro, sur la montre ou dans Intervals. Seul ce champ est relu —
+     * le reste d'une activité ne bouge pas, et ses streams coûtent du quota.
+     * Hors du lot de `BATCH` : une relecture ne demande rien de plus à l'API que
+     * la liste déjà reçue. En dry-run, l'écriture est jetée avec le reste.
+     *
+     * @param list<array{ImportedActivity, array<string, mixed>}> $known
+     *
+     * @return int le nombre d'activités dont le ressenti a changé
+     */
+    private function refreshRatings(array $known): int
+    {
+        $changed = 0;
+
+        foreach ($known as [$activity, $payload]) {
+            $ratings = ImportedActivityMapper::ratingsFromIntervals($payload);
+
+            if ($ratings['feeling'] === $activity->getFeeling() && $ratings['sessionRpe'] === $activity->getSessionRpe()) {
+                continue;
+            }
+
+            $activity->setFeeling($ratings['feeling'])->setSessionRpe($ratings['sessionRpe']);
+            ++$changed;
+        }
+
+        return $changed;
     }
 
     /**
@@ -276,11 +321,11 @@ final class IntervalsImporter
     }
 
     /**
-     * @return array{imported: int, attached: int, skipped: int, processed: int, freeSessions: int, ambiguous: int}
+     * @return array{imported: int, attached: int, skipped: int, processed: int, freeSessions: int, ambiguous: int, rated: int}
      */
     private function emptyCounts(): array
     {
-        return ['imported' => 0, 'attached' => 0, 'skipped' => 0, 'processed' => 0, 'freeSessions' => 0, 'ambiguous' => 0];
+        return ['imported' => 0, 'attached' => 0, 'skipped' => 0, 'processed' => 0, 'freeSessions' => 0, 'ambiguous' => 0, 'rated' => 0];
     }
 
     /**
@@ -288,6 +333,6 @@ final class IntervalsImporter
      */
     private function report(array $counts, int $remaining): SyncReport
     {
-        return new SyncReport($counts['imported'], $counts['attached'], $counts['skipped'], $remaining, $counts['freeSessions'], $counts['ambiguous']);
+        return new SyncReport($counts['imported'], $counts['attached'], $counts['skipped'], $remaining, $counts['freeSessions'], $counts['ambiguous'], $counts['rated']);
     }
 }

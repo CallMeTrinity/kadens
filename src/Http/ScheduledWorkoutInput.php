@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http;
 
 use App\Enum\ScheduledStatus;
+use App\Service\SessionRating;
 use Symfony\Component\Validator\Constraints as Assert;
 
 /**
@@ -37,6 +38,11 @@ use Symfony\Component\Validator\Constraints as Assert;
  *   celle qui existe : c'est la note de clôture de KL-33 côté téléphone, et la
  *   note d'écart du coach côté web. Le silence du premier n'est pas un ordre
  *   d'effacer la seconde.
+ * - `feeling` (forme 1-5) et `sessionRpe` (difficulté 1-10) suivent la même règle,
+ *   axe par axe : écrits s'ils sont présents, jamais effacés par un `null`. Le
+ *   téléphone note à la clôture, ou plus tard ; le web corrige, et c'est le seul
+ *   à pouvoir retirer une note. Une note sur une séance que le document ne
+ *   clôture pas est acceptée : elle ne s'affiche que sur une séance faite.
  */
 final class ScheduledWorkoutInput
 {
@@ -64,6 +70,10 @@ final class ScheduledWorkoutInput
         #[Assert\Regex(pattern: IsoDate::DATE_TIME_PATTERN, message: 'La date de fin doit être une date ISO 8601.')]
         public readonly ?string $endedAt = null,
         public readonly ?string $completionNotes = null,
+        #[Assert\Range(min: SessionRating::FEELING_MIN, max: SessionRating::FEELING_MAX, notInRangeMessage: 'La forme doit être comprise entre {{ min }} et {{ max }}.')]
+        public readonly ?int $feeling = null,
+        #[Assert\Range(min: SessionRating::RPE_MIN, max: SessionRating::RPE_MAX, notInRangeMessage: 'La difficulté doit être comprise entre {{ min }} et {{ max }}.')]
+        public readonly ?int $sessionRpe = null,
         #[Assert\Count(max: self::MAX_EXERCISES, maxMessage: 'Une séance ne peut pas porter plus de {{ limit }} exercices.')]
         #[Assert\Valid]
         public readonly array $log = [],

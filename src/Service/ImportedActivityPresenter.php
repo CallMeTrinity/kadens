@@ -50,6 +50,11 @@ final class ImportedActivityPresenter
             'watts' => $activity->getAverageWatts(),
             'zones' => $this->zones->shares($activity->getHrZoneSeconds()),
             'splits' => $this->splits($activity->getSplits(), $paceUnit),
+            // Ce que dit la montre, tel quel : la valeur retenue pour la séance
+            // (Kadens d'abord) se lit à part, dans la section Ressenti.
+            'rating' => null === $activity->getFeeling() && null === $activity->getSessionRpe()
+                ? null
+                : new SessionRating($activity->getFeeling(), $activity->getSessionRpe(), fromIntervals: true),
         ];
     }
 

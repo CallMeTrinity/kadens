@@ -120,6 +120,7 @@ provoque.
 | 6.8 | `PUT` | `/api/schedule/{uuid}` | oui | KL-16 |
 | 6.9 | `DELETE` | `/api/schedule/{uuid}` | oui | KL-16 |
 | 6.10 | `GET` | `/api/app-version` | **non** | KL-43 |
+| 6.12 | `PUT` | `/api/messages/{id}/seen` | oui | messages programmés |
 
 Deux routes **web** complètent le protocole d'appairage — elles vivent hors de
 `^/api`, sur la session du navigateur, et le mobile ne les appelle jamais :
@@ -271,6 +272,7 @@ Champ par champ, sur `PUT /api/schedule/{uuid}` :
 | `title` | écrit (nomme la séance libre) | **ignoré** |
 | `status` | `done` clôture, le reste est sans effet | idem — et rien ne **déclôture** |
 | `completionNotes` | écrite si présente | écrite si présente, **jamais effacée** |
+| `feeling`, `sessionRpe` | écrits si présents | écrits si présents, **jamais effacés** (axe par axe) |
 | `position`, `name` dérivé, tout champ calculé | posés par le serveur | posés par le serveur |
 
 Vérification, sur une séance déjà clôturée — un document qui essaie de tout
@@ -523,6 +525,7 @@ qu'il a descendu.
 | `schedule` | Les séances datées de la fenêtre **qui se consignent**, structure du §6.7. Voir juste en dessous. |
 | `history` | Dernière performance et record par exercice. **Toujours une liste**, jamais un objet indexé par identifiant. |
 | `setups` | Les réglages de machine **du porteur du jeton**, sur la bibliothèque visible (§6.11). Toujours entiers, comme `history`. |
+| `messages` | Les messages programmés **non vus** du porteur du jeton, en cours ou commençant sous 14 jours. Toujours entiers. Voir plus bas et §6.12. |
 | `deleted` | `{exercises: [id], schedule: [uuid]}` — ce que la base locale doit oublier. |
 
 **La fenêtre n'est pas tout le calendrier.** Le réalisé se logue en muscu, jamais
@@ -637,6 +640,19 @@ réglages qu'il n'a pas encore réussi à pousser. Un client qui ne connaît pas
 clé l'ignore ; un client qui la connaît doit tolérer son absence (serveur pas
 encore à jour) en ne touchant à rien.
 
+**`messages`** : `[{id, body, mediaUrl, startsOn, endsOn}]`, triés par début.
+`startsOn`/`endsOn` sont des dates seules, **bornes incluses** ; c'est le
+téléphone qui décide, à sa date locale, quel message montrer, ce qui lui permet
+de le faire hors réseau le jour venu. `body` est du texte brut (sauts de ligne
+conservés). `mediaUrl` est une URL **absolue et signée** (`_hash`,
+`_expiration`), ou `null` : elle se charge **sans** jeton, une balise image ne
+porte pas d'en-tête `Authorization`, et elle expire deux jours après `endsOn`.
+Le nom de fichier est dans le chemin, une image remplacée change donc d'URL. La
+liste part entière et **remplace** celle du client, sauf les messages dont le
+« vu » attend encore d'être poussé. Un client qui ne connaît pas la clé
+l'ignore ; un client qui la connaît doit tolérer son absence en ne touchant à
+rien. Le libellé interne du back-office ne sort jamais.
+
 **Budget** : la réponse est tenue sous **1 Mo** et son coût en requêtes SQL ne
 dépend pas du volume de données. Mesuré ci-dessus : 74,6 ko pour 241 exercices.
 
@@ -712,6 +728,8 @@ $ curl -sk https://127.0.0.1:8000/api/schedule/019fc483-3f9d-76af-8d5f-f789cddf7
   "startedAt": null,
   "endedAt": null,
   "completionNotes": null,
+  "feeling": null,
+  "sessionRpe": null,
   "plan": null,
   "blocks": [
     {
@@ -756,6 +774,7 @@ $ curl -sk https://127.0.0.1:8000/api/schedule/019fc483-3f9d-76af-8d5f-f789cddf7
 | `summary` | La **seule** valeur pré-formatée de l'API (« 4 × 8 @ 80 kg · RPE 8 »). Le cardio ne se saisit pas sur le mobile et ne s'y affiche qu'en lecture : réécrire la mise en forme en TypeScript pour une chaîne qu'on ne fait que peindre serait une duplication sans contrepartie. Les séries, elles, partent en valeurs brutes. |
 | `sets` (prescrit) | Une entrée par série, **rang réel** dans `index`. `null` pour un type de prescription qui ne compte pas de séries (`distance_pace`, `duration`…). |
 | `log` | `null` tant que rien n'a été consigné. |
+| `feeling`, `sessionRpe` | Le ressenti **saisi dans Kadens** (téléphone ou web), `null` sinon : forme 1-5 (très faible → très en forme), difficulté de la séance 1-10. Pas la valeur affichée sur le web, qui retombe sur la note de la montre quand une activité Intervals est rattachée : ce que le téléphone relit est ce qu'il peut réécrire. Champs **additifs** : un client qui les ignore n'en souffre pas, et `minimumVersionCode` n'a pas eu à bouger. Ne pas confondre `sessionRpe` avec le `rpe` d'une série : c'est un jugement global porté à la fin, pas une moyenne. |
 
 **Valeurs d'énumération**
 
@@ -786,6 +805,8 @@ remplacé sinon. Le partage d'autorité est décrit au §4.1, l'idempotence au �
 | `status` | enum | non | Seul `done` a un effet. Les autres valeurs passent la validation sans rien faire, pour qu'un client qui recopie le document reçu ne se prenne pas un 422. |
 | `startedAt`, `endedAt` | ISO 8601 | non | Écrasent. |
 | `completionNotes` | string | non | N'efface jamais l'existante. |
+| `feeling` | int | non | 1 – 5. Écrit si présent ; `null` ou absent ne l'efface pas — seul le web retire une note. |
+| `sessionRpe` | int | non | 1 – 10. Même règle. |
 | `log` | tableau | non | ≤ 100 exercices. Remplace **intégralement** le réalisé. |
 | `log[].exerciseId` | int | non | Doit désigner un exercice **visible**. Le rattachement à la bibliothèque est ce qui fait entrer le réalisé dans l'historique et les records. |
 | `log[].name` | string | non | ≤ 255. Rempli par le serveur depuis la référence quand il manque ; **requis** si aucune référence n'est donnée. |
@@ -995,6 +1016,22 @@ Après un effacement, `text` et `updatedAt` valent `null` :
 **Erreurs** : `401`, `404` pour un exercice **inconnu comme invisible** (même
 règle et même raison qu'au §6.6), `422` + `violations` sur un texte trop long.
 
+### 6.12 `PUT /api/messages/{id}/seen`
+
+Marque un message programmé comme vu par le porteur du jeton. La mémoire est
+**la même que sur le web** : fermer la modale d'un côté la retire de l'autre, et
+le message quitte `messages` au bootstrap suivant.
+
+Pas de corps. **Réponse `204`**, vide.
+
+- **Rejouable.** Marquer vu deux fois rend `204` deux fois, sans effet de plus.
+  Une file de mutations peut le rejouer après une réponse perdue.
+- **Ni les dates ni l'état actif n'entrent en compte** : un message vu la
+  veille de sa désactivation reste vu.
+
+**Erreurs** : `401`, `404` pour un message **inconnu ou adressé à quelqu'un
+d'autre** : l'identifiant est séquentiel, un `403` dirait qu'il existe.
+
 ---
 
 ## 7. Limites connues
@@ -1029,7 +1066,7 @@ Les gardes décrites ici sont tenues par des tests, pas par la bonne volonté :
 | `tests/Controller/ApiAuthEndpointsTest.php` | Connexion, déconnexion, `/api/me`, le 401 uniforme, le limiteur. |
 | `tests/Controller/ApiPairingTest.php` | L'appairage : usage unique, expiration, le compte qui vient du code. |
 | `tests/Controller/ApiBootstrapTest.php` | Le delta, la fenêtre, les pierres tombales, le budget de 1 Mo. |
-| `tests/Controller/ApiScheduleTest.php` | La lecture, l'upsert, l'idempotence à trois envois, le partage d'autorité. |
+| `tests/Controller/ApiScheduleTest.php` | La lecture, l'upsert, l'idempotence à trois envois, le partage d'autorité, le ressenti jamais effacé par le silence. |
 | `tests/Controller/ApiExerciseHistoryTest.php` | L'historique : périmètre, bornage, portée. |
 | `tests/Controller/ApiExerciseSetupTest.php` | Les réglages de machine : aller-retour avec le bootstrap, effacement, rejeu, portée privée, 404 sur un exercice invisible. |
 | `tests/Controller/ApiErrorResponseTest.php` | La forme RFC 9457 et l'absence de fuite interne. |
