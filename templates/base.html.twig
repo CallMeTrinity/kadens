@@ -46,9 +46,17 @@
             {% block body %}{% endblock %}
         </main>
 
+        {# Un message programmé à lire aujourd'hui, sur la page où l'on arrive.
+           Une modale à la fois : s'il y en a un, l'invitation à choisir un pseudo
+           attend la page suivante. Pas dans le back-office, où il s'écrit. #}
+        {% set custom_message = (app.request.attributes.get('_route') ?? '') starts with 'app_admin' ? null : pending_custom_message(app.user) %}
+        {% if custom_message %}
+            {{ include('components/_custom_message.html.twig', {message: custom_message}, with_context = false) }}
+        {% endif %}
+
         {# L'invitation à choisir un pseudo, sur la page où l'on arrive. Pas sur
            les deux pages qui portent déjà le champ : elle y ferait doublon. #}
-        {% if app.request.attributes.get('_route') not in ['app_profile_settings', 'app_profile_username'] %}
+        {% if not custom_message and app.request.attributes.get('_route') not in ['app_profile_settings', 'app_profile_username'] %}
             {% set username_prompt = username_prompt_form(app.user, path('app_profile_username')) %}
             {% if username_prompt %}
                 {{ include('components/_username_prompt.html.twig', {form: username_prompt}, with_context = false) }}

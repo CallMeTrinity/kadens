@@ -1006,6 +1006,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     }
 
     /**
+     * Rôle super admin (accordé par `app:user:promote-super-admin`). Plat, comme
+     * les autres : il n'implique pas ROLE_ADMIN et n'ouvre que `/admin`.
+     */
+    public function isSuperAdmin(): bool
+    {
+        return \in_array('ROLE_SUPER_ADMIN', $this->getRoles(), true);
+    }
+
+    /**
      * @return Collection<int, Coaching>
      */
     public function getCoachingAsCoach(): Collection

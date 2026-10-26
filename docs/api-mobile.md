@@ -120,6 +120,7 @@ provoque.
 | 6.8 | `PUT` | `/api/schedule/{uuid}` | oui | KL-16 |
 | 6.9 | `DELETE` | `/api/schedule/{uuid}` | oui | KL-16 |
 | 6.10 | `GET` | `/api/app-version` | **non** | KL-43 |
+| 6.12 | `PUT` | `/api/messages/{id}/seen` | oui | messages programmés |
 
 Deux routes **web** complètent le protocole d'appairage — elles vivent hors de
 `^/api`, sur la session du navigateur, et le mobile ne les appelle jamais :
@@ -524,6 +525,7 @@ qu'il a descendu.
 | `schedule` | Les séances datées de la fenêtre **qui se consignent**, structure du §6.7. Voir juste en dessous. |
 | `history` | Dernière performance et record par exercice. **Toujours une liste**, jamais un objet indexé par identifiant. |
 | `setups` | Les réglages de machine **du porteur du jeton**, sur la bibliothèque visible (§6.11). Toujours entiers, comme `history`. |
+| `messages` | Les messages programmés **non vus** du porteur du jeton, en cours ou commençant sous 14 jours. Toujours entiers. Voir plus bas et §6.12. |
 | `deleted` | `{exercises: [id], schedule: [uuid]}` — ce que la base locale doit oublier. |
 
 **La fenêtre n'est pas tout le calendrier.** Le réalisé se logue en muscu, jamais
@@ -637,6 +639,19 @@ chaque appel, et elle **remplace** celle du client — sauf, côté client, les
 réglages qu'il n'a pas encore réussi à pousser. Un client qui ne connaît pas la
 clé l'ignore ; un client qui la connaît doit tolérer son absence (serveur pas
 encore à jour) en ne touchant à rien.
+
+**`messages`** : `[{id, body, mediaUrl, startsOn, endsOn}]`, triés par début.
+`startsOn`/`endsOn` sont des dates seules, **bornes incluses** ; c'est le
+téléphone qui décide, à sa date locale, quel message montrer, ce qui lui permet
+de le faire hors réseau le jour venu. `body` est du texte brut (sauts de ligne
+conservés). `mediaUrl` est une URL **absolue et signée** (`_hash`,
+`_expiration`), ou `null` : elle se charge **sans** jeton, une balise image ne
+porte pas d'en-tête `Authorization`, et elle expire deux jours après `endsOn`.
+Le nom de fichier est dans le chemin, une image remplacée change donc d'URL. La
+liste part entière et **remplace** celle du client, sauf les messages dont le
+« vu » attend encore d'être poussé. Un client qui ne connaît pas la clé
+l'ignore ; un client qui la connaît doit tolérer son absence en ne touchant à
+rien. Le libellé interne du back-office ne sort jamais.
 
 **Budget** : la réponse est tenue sous **1 Mo** et son coût en requêtes SQL ne
 dépend pas du volume de données. Mesuré ci-dessus : 74,6 ko pour 241 exercices.
@@ -1000,6 +1015,22 @@ Après un effacement, `text` et `updatedAt` valent `null` :
 
 **Erreurs** : `401`, `404` pour un exercice **inconnu comme invisible** (même
 règle et même raison qu'au §6.6), `422` + `violations` sur un texte trop long.
+
+### 6.12 `PUT /api/messages/{id}/seen`
+
+Marque un message programmé comme vu par le porteur du jeton. La mémoire est
+**la même que sur le web** : fermer la modale d'un côté la retire de l'autre, et
+le message quitte `messages` au bootstrap suivant.
+
+Pas de corps. **Réponse `204`**, vide.
+
+- **Rejouable.** Marquer vu deux fois rend `204` deux fois, sans effet de plus.
+  Une file de mutations peut le rejouer après une réponse perdue.
+- **Ni les dates ni l'état actif n'entrent en compte** : un message vu la
+  veille de sa désactivation reste vu.
+
+**Erreurs** : `401`, `404` pour un message **inconnu ou adressé à quelqu'un
+d'autre** : l'identifiant est séquentiel, un `403` dirait qu'il existe.
 
 ---
 

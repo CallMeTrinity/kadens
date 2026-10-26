@@ -41,6 +41,14 @@
     { label: 'Paramètres',  icon: 'lucide:settings-2',  path: 'app_profile_settings', routes: ['app_profile_settings'] },
 ] %}
 
+{# Le back-office n'existe que pour ROLE_SUPER_ADMIN : ni ROLE_ADMIN ni personne
+   d'autre ne doit savoir qu'il y a des messages en attente. #}
+{% if is_granted('ROLE_SUPER_ADMIN') %}
+    {% set menuItems = menuItems|merge([
+        { label: 'Messages', icon: 'lucide:gift', path: 'app_admin_message_index', match: 'app_admin_message' },
+    ]) %}
+{% endif %}
+
 {# Le repère de page courante ne doit pas disparaître parce que la page est passée
    dans le menu : le déclencheur s'allume quand la route courante y appartient. #}
 {% set activeMenuItem = null %}

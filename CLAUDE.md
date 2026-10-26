@@ -286,7 +286,10 @@ Détail complet dans `ROADMAP.md §1`. L'essentiel :
   redirection). Les routes `edit` de séance et de plan sont donc en **GET seul**.
 - **Pas d'inscription publique.** Les comptes se créent en console
   (`app:user:create`, rôle ROLE_USER), comme les promotions (`app:user:promote`,
-  `app:user:promote-coach`). L'app n'expose que ce que le titulaire du compte peut
+  `app:user:promote-coach`, `app:user:promote-super-admin`). Les rôles sont
+  **plats** (aucun `role_hierarchy`) : `ROLE_SUPER_ADMIN` n'ouvre que le
+  back-office `/admin` (messages programmés,
+  [`docs/feature-custom-messages.md`](./docs/feature-custom-messages.md)). L'app n'expose que ce que le titulaire du compte peut
   changer lui-même : son mot de passe et son pseudo, dans `/profile/settings`.
   L'email reste un identifiant fixe côté console.
 - **Le pseudo s'affiche, l'email identifie.** `User.username` est facultatif,

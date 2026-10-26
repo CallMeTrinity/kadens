@@ -4,6 +4,7 @@ namespace App\Tests;
 
 use App\Entity\ApiToken;
 use App\Entity\Coaching;
+use App\Entity\CustomMessage;
 use App\Entity\DeletedEntity;
 use App\Entity\Exercise;
 use App\Entity\Goal;
@@ -43,6 +44,7 @@ trait PurgesDatabase
     private function purgeDatabase(EntityManagerInterface $em): void
     {
         $classes = [
+            CustomMessage::class,
             ImportedActivity::class,
             IntervalsConnection::class,
             ApiToken::class,

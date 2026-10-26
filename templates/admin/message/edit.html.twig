@@ -1,0 +1,46 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ message.title }} — Kadens{% endblock %}
+
+{% block body %}
+    {{ include('admin/message/_flashes.html.twig') }}
+
+    <a href="{{ path('app_admin_message_index') }}" class="kd-backlink">
+        {{ ux_icon('lucide:arrow-left') }} Messages
+    </a>
+
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow kd-eyebrow--accent">Back-office</p>
+            <h1 class="kd-title">{{ message.title }}</h1>
+            <p class="kd-lead">Vu par {{ message.seenBy|length }} compte{{ message.seenBy|length > 1 ? 's' }}.</p>
+        </div>
+    </div>
+
+    <div class="kd-card" style="max-width:640px;">
+        {{ include('admin/message/_form.html.twig', {button_label: 'Mettre à jour'}) }}
+    </div>
+
+    <section class="kd-section" style="max-width:640px;">
+        <div class="kd-pagehead kd-pagehead--sub">
+            <div>
+                <p class="kd-eyebrow">Aperçu</p>
+                <h2 class="kd-title kd-title--sm">Ce que verront les destinataires</h2>
+            </div>
+        </div>
+        {{ include('components/_custom_message.html.twig', {message: message, preview: true}, with_context = false) }}
+    </section>
+
+    <section class="kd-section" style="max-width:640px;">
+        <div class="kd-formactions">
+            <form method="post" action="{{ path('app_admin_message_reset_views', {id: message.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('reset_message_views' ~ message.id) }}">
+                <button type="submit" class="kd-btn kd-btn--ghost">{{ ux_icon('lucide:rotate-ccw') }} Remettre à zéro les vues</button>
+            </form>
+            <form method="post" action="{{ path('app_admin_message_delete', {id: message.id}) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('delete_message' ~ message.id) }}">
+                <button type="submit" class="kd-btn kd-btn--ghost">{{ ux_icon('lucide:trash-2') }} Supprimer</button>
+            </form>
+        </div>
+    </section>
+{% endblock %}

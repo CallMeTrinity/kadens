@@ -78,7 +78,15 @@ security:
         # utilisateur — c'est là que l'athlète répond aux demandes.
         - { path: ^/coaching, roles: ROLE_USER }
         - { path: ^/coach, roles: ROLE_COACH }
-        # - { path: ^/admin, roles: ROLE_ADMIN }
+        # Le back-office (messages programmés). ROLE_SUPER_ADMIN et non
+        # ROLE_ADMIN : un admin de la bibliothèque globale peut être destinataire
+        # d'un message, il ne doit pas pouvoir le lire avant le jour J.
+        - { path: ^/admin, roles: ROLE_SUPER_ADMIN }
+        # Le GIF d'un message, servi par URL signée : le téléphone ne peut pas
+        # poser son jeton sur une requête d'image. La signature fait office de
+        # droit de lecture (cf. CustomMessageMediaController).
+        - { path: ^/media/message, roles: PUBLIC_ACCESS }
+        - { path: ^/message, roles: ROLE_USER }
 
 when@test:
     security:

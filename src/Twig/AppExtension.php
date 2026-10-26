@@ -2,6 +2,7 @@
 
 namespace App\Twig;
 
+use App\Entity\CustomMessage;
 use App\Entity\Exercise;
 use App\Entity\User;
 use App\Enum\Feeling;
@@ -10,6 +11,7 @@ use App\Form\UsernameType;
 use App\Http\BackTarget;
 use App\Service\ActivityPalette;
 use App\Service\BackLink;
+use App\Service\CustomMessageInbox;
 use App\Service\ExerciseNaming;
 use App\Service\SessionRating;
 use App\Service\UnitFormatter;
@@ -45,6 +47,9 @@ use Twig\TwigFunction;
  * - `username_prompt_form()` fabrique le formulaire de l'invitation à choisir un
  *   pseudo, que `base.html.twig` pose sur toutes les pages : aucun contrôleur
  *   n'a à le passer. Null quand il n'y a rien à demander.
+ * - `pending_custom_message()` rend le message programmé à montrer aujourd'hui
+ *   (`base.html.twig`), `custom_message_media_url()` l'URL signée de son image
+ *   (modale et aperçu du back-office). Cf. `CustomMessageInbox`.
  */
 final class AppExtension extends AbstractExtension
 {
@@ -54,6 +59,7 @@ final class AppExtension extends AbstractExtension
         private readonly ActivityPalette $activityPalette,
         private readonly UnitFormatter $units,
         private readonly FormFactoryInterface $forms,
+        private readonly CustomMessageInbox $inbox,
     ) {
     }
 
@@ -80,6 +86,8 @@ final class AppExtension extends AbstractExtension
             new TwigFunction('back_token', [BackTarget::class, 'token']),
             new TwigFunction('activity_palette_css', [$this, 'activityPaletteCss'], ['is_safe' => ['html']]),
             new TwigFunction('username_prompt_form', [$this, 'usernamePromptForm']),
+            new TwigFunction('pending_custom_message', [$this, 'pendingCustomMessage']),
+            new TwigFunction('custom_message_media_url', [$this->inbox, 'mediaUrl']),
             // Les libellés du ressenti de séance, pour une valeur ou une moyenne
             // (le cran le plus proche) : un seul endroit les écrit, `Feeling` et
             // `SessionRating`, et le sélecteur comme le badge les lisent ici.
@@ -99,6 +107,12 @@ final class AppExtension extends AbstractExtension
         }
 
         return $this->forms->create(UsernameType::class, $user, ['required' => true, 'action' => $action])->createView();
+    }
+
+    /** Même règle : seul un `User` reçoit des messages. */
+    public function pendingCustomMessage(mixed $user): ?CustomMessage
+    {
+        return $user instanceof User ? $this->inbox->pendingFor($user) : null;
     }
 
     /**

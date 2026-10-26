@@ -7,6 +7,7 @@ namespace App\Tests\Controller;
 use App\Entity\ApiToken;
 use App\Entity\Block;
 use App\Entity\Coaching;
+use App\Entity\CustomMessage;
 use App\Entity\DeletedEntity;
 use App\Entity\Exercise;
 use App\Entity\LoggedExercise;
@@ -18,6 +19,7 @@ use App\Entity\User;
 use App\Entity\Workout;
 use App\Enum\ActivityType;
 use App\Enum\BlockRole;
+use App\Enum\MessageAudience;
 use App\Enum\PrescriptionType;
 use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
@@ -69,6 +71,7 @@ final class ApiEndpointMatrixTest extends WebTestCase
     private Exercise $exercise;
     private ScheduledWorkout $scheduled;
     private ScheduledWorkout $freeform;
+    private CustomMessage $message;
 
     protected function setUp(): void
     {
@@ -120,6 +123,7 @@ final class ApiEndpointMatrixTest extends WebTestCase
         yield 'GET /api/schedule/{uuid}' => ['GET', '/api/schedule/{scheduled}', null, 200, true];
         yield 'PUT /api/schedule/{uuid}' => ['PUT', '/api/schedule/{scheduled}', self::DOCUMENT, 200, true];
         yield 'DELETE /api/schedule/{uuid}' => ['DELETE', '/api/schedule/{freeform}', null, 204, true];
+        yield 'PUT /api/messages/{id}/seen' => ['PUT', '/api/messages/{message}/seen', null, 204, true];
         yield 'POST /api/auth/logout' => ['POST', '/api/auth/logout', null, 204, false];
     }
 
@@ -365,6 +369,7 @@ final class ApiEndpointMatrixTest extends WebTestCase
             '{exercise}' => (string) $this->exercise->getId(),
             '{scheduled}' => (string) $this->scheduled->getUuid(),
             '{freeform}' => (string) $this->freeform->getUuid(),
+            '{message}' => (string) $this->message->getId(),
         ]);
 
         $server = null === $secret ? [] : self::bearer($secret);
@@ -474,12 +479,20 @@ final class ApiEndpointMatrixTest extends WebTestCase
             ->setStatus(ScheduledStatus::DONE);
         $this->em->persist($this->freeform);
 
+        $this->message = (new CustomMessage())
+            ->setTitle('Noël')
+            ->setBody('Joyeux Noël')
+            ->setStartsOn(new \DateTimeImmutable('today'))
+            ->setEndsOn(new \DateTimeImmutable('today'))
+            ->setAudience(MessageAudience::ALL);
+        $this->em->persist($this->message);
+
         $this->em->flush();
     }
 
     private function purge(): void
     {
-        foreach ([ApiToken::class, ScheduledWorkout::class, Coaching::class, PlanTemplate::class, Workout::class, Exercise::class, User::class] as $class) {
+        foreach ([CustomMessage::class, ApiToken::class, ScheduledWorkout::class, Coaching::class, PlanTemplate::class, Workout::class, Exercise::class, User::class] as $class) {
             foreach ($this->em->getRepository($class)->findAll() as $entity) {
                 $this->em->remove($entity);
             }

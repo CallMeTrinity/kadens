@@ -1,0 +1,18 @@
+{{ form_start(form, {attr: {class: 'kd-form', novalidate: 'novalidate'}}) }}
+    {{ form_row(form.title) }}
+    {{ form_row(form.body) }}
+    {{ form_row(form.media) }}
+    {% if form.removeMedia is defined %}{{ form_row(form.removeMedia) }}{% endif %}
+    {{ form_row(form.startsOn) }}
+    {{ form_row(form.endsOn) }}
+    {{ form_row(form.audience) }}
+    {{ form_row(form.recipients) }}
+    {{ form_row(form.active) }}
+
+    <div class="kd-formactions">
+        <button type="submit" class="kd-btn kd-btn--primary">
+            {{ ux_icon('lucide:check') }} {{ button_label|default('Enregistrer') }}
+        </button>
+        <a href="{{ path('app_admin_message_index') }}" class="kd-btn kd-btn--ghost">Annuler</a>
+    </div>
+{{ form_end(form) }}

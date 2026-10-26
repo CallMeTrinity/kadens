@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Entity\CustomMessage;
 use App\Entity\Exercise;
 use App\Entity\User;
 use App\Repository\CoachingRepository;
@@ -69,8 +70,9 @@ use App\Repository\ScheduledWorkoutRepository;
  * @phpstan-import-type ApiHistoryEntry from PerformanceHistoryPayload
  * @phpstan-import-type ApiExerciseSetup from ExerciseSetupPayload
  *
+ * @phpstan-type ApiCustomMessage array{id: int, body: string, mediaUrl: string|null, startsOn: string, endsOn: string}
  * @phpstan-type ApiExercise array{id: int|null, name: string|null, nameEn: string|null, description: string|null, activity: string|null, targetAreas: list<string>, mediaUrl: string|null, global: bool, updatedAt: string|null}
- * @phpstan-type ApiBootstrap array{serverTime: string, since: string|null, exerciseLanguage: string, window: array{from: string, to: string}, exercises: list<ApiExercise>, schedule: list<ApiScheduledWorkout>, history: list<ApiHistoryEntry>, setups: list<ApiExerciseSetup>, deleted: array{exercises: list<int>, schedule: list<string>}}
+ * @phpstan-type ApiBootstrap array{serverTime: string, since: string|null, exerciseLanguage: string, window: array{from: string, to: string}, exercises: list<ApiExercise>, schedule: list<ApiScheduledWorkout>, history: list<ApiHistoryEntry>, setups: list<ApiExerciseSetup>, messages: list<ApiCustomMessage>, deleted: array{exercises: list<int>, schedule: list<string>}}
  */
 final class BootstrapPayload
 {
@@ -87,6 +89,7 @@ final class BootstrapPayload
         private readonly ExerciseSetupRepository $setups,
         private readonly ScheduledWorkoutPayload $scheduledWorkouts,
         private readonly TrackableSchedule $trackable,
+        private readonly CustomMessageInbox $inbox,
     ) {
     }
 
@@ -140,7 +143,27 @@ final class BootstrapPayload
             'schedule' => $schedule,
             'history' => $this->historyPayloads($user, $libraryIds),
             'setups' => $this->setupPayloads($user, $libraryIds),
+            // Les messages programmés non vus, en cours ou à venir sous quinze
+            // jours : le téléphone les garde et les montre le jour venu, hors
+            // réseau compris. Entiers, comme les réglages : un message vu ou
+            // retiré disparaît de la liste, et le client remplace la sienne.
+            // `title` ne part pas, c'est un libellé du back-office.
+            'messages' => array_map($this->messagePayload(...), $this->inbox->upcomingFor($user, $today)),
             'deleted' => $this->deletedPayloads($user, $owners, $since),
+        ];
+    }
+
+    /**
+     * @return ApiCustomMessage
+     */
+    private function messagePayload(CustomMessage $message): array
+    {
+        return [
+            'id' => (int) $message->getId(),
+            'body' => (string) $message->getBody(),
+            'mediaUrl' => $this->inbox->mediaUrl($message),
+            'startsOn' => $message->getStartsOn()?->format('Y-m-d') ?? '',
+            'endsOn' => $message->getEndsOn()?->format('Y-m-d') ?? '',
         ];
     }
 

@@ -4949,6 +4949,50 @@ a.kd-planday__item:hover svg {
     margin: 0;
 }
 
+/* Message programmé (components/_custom_message.html.twig). Le texte est du
+   contenu saisi : Barlow, casse normale, jamais le condensé capitales. */
+.kd-message .kd-modal__head {
+    align-items: center;
+    margin-bottom: var(--kd-space-5);
+}
+
+.kd-message__eyebrow {
+    flex: 1 1 auto;
+    margin: 0;
+    text-transform: uppercase;
+    letter-spacing: var(--kd-tracking-eyebrow);
+}
+
+.kd-message__media {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 50vh;
+    object-fit: contain;
+    margin-bottom: var(--kd-space-6);
+    background: var(--color-surface-subtle);
+}
+
+.kd-message__body {
+    font-family: var(--font-body);
+    font-size: 17px;
+    line-height: 1.5;
+    color: var(--color-text-strong);
+    margin: 0 0 var(--kd-space-4);
+    overflow-wrap: anywhere;
+}
+
+.kd-message .kd-formactions {
+    justify-content: flex-end;
+}
+
+/* L'aperçu du back-office : la carte de la modale, posée dans le flux. */
+.kd-modal--preview {
+    display: block;
+    position: static;
+    margin: 0;
+}
+
 /* En-tête secondaire de modale : badge de statut + lien vers la séance. */
 .kd-modal__meta {
     display: flex;

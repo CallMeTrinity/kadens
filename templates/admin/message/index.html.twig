@@ -1,0 +1,56 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Messages — Kadens{% endblock %}
+
+{% block body %}
+    {{ include('admin/message/_flashes.html.twig') }}
+
+    <div class="kd-pagehead">
+        <div>
+            <p class="kd-eyebrow kd-eyebrow--accent">Back-office</p>
+            <h1 class="kd-title">Messages programmés</h1>
+            <p class="kd-lead">Un mot et un GIF, montrés une fois, à une date, à qui tu veux.</p>
+        </div>
+        <a href="{{ path('app_admin_message_new') }}" class="kd-btn kd-btn--primary">
+            {{ ux_icon('lucide:plus') }} Nouveau message
+        </a>
+    </div>
+
+    <div class="kd-card">
+        {% if messages is empty %}
+            <div class="kd-empty">
+                {{ ux_icon('lucide:gift') }}
+                <div>Aucun message. <a href="{{ path('app_admin_message_new') }}">Programme le premier</a>.</div>
+            </div>
+        {% else %}
+            <ul class="kd-list">
+                {% for message in messages %}
+                    {% if not message.active %}
+                        {% set status = 'Inactif' %}
+                    {% elseif message.endsOn < today %}
+                        {% set status = 'Passé' %}
+                    {% elseif message.startsOn > today %}
+                        {% set status = 'À venir' %}
+                    {% else %}
+                        {% set status = 'En cours' %}
+                    {% endif %}
+                    <li class="kd-list__row">
+                        <div class="kd-list__date">
+                            <div class="kd-list__date-day">{{ message.startsOn|date('d') }}</div>
+                            <div class="kd-list__date-mon">{{ message.startsOn|date('m/y') }}</div>
+                        </div>
+                        <div class="kd-list__main">
+                            <a class="kd-list__title" href="{{ path('app_admin_message_edit', {id: message.id}) }}">{{ message.title }}</a>
+                            <div class="kd-list__meta">
+                                {{ message.startsOn|date('d/m/Y') }}{% if message.endsOn != message.startsOn %} → {{ message.endsOn|date('d/m/Y') }}{% endif %}
+                                · {{ message.audience.value == 'all' ? 'Tout le monde' : message.recipients|map(u => u.displayName)|join(', ') }}
+                                · vu par {{ message.seenBy|length }}
+                            </div>
+                        </div>
+                        <span class="kd-badge{{ status == 'En cours' ? ' kd-badge--accent' }}">{{ status }}</span>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+{% endblock %}

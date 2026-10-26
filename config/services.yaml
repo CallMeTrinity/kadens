@@ -51,6 +51,10 @@ parameters:
     # de l'app qui ne sont pas en base.
     app.goal_photos_dir: "%kernel.project_dir%/var/uploads/goal-photos"
 
+    # Les images des messages programmés (back-office super admin). Même
+    # emplacement, même raison, **même sauvegarde** que les photos de récit.
+    app.message_media_dir: "%kernel.project_dir%/var/uploads/messages"
+
 services:
     # default configuration for services in *this* file
     _defaults:
@@ -80,7 +84,12 @@ services:
         arguments:
             $directory: "%app.goal_photos_dir%"
 
+    App\Service\MessageMediaStorage:
+        arguments:
+            $directory: "%app.message_media_dir%"
+
 # Les tests écrivent de vraies photos : jamais dans le dossier de dev.
 when@test:
     parameters:
         app.goal_photos_dir: "%kernel.project_dir%/var/test-uploads/goal-photos"
+        app.message_media_dir: "%kernel.project_dir%/var/test-uploads/messages"
