@@ -97,6 +97,23 @@ class ScheduledWorkoutRepository extends ServiceEntityRepository
     }
 
     /**
+     * La même fenêtre, **prescrit seul** : ce que lit l'export Excel d'un mois.
+     *
+     * Une requête au lieu d'un chargement paresseux par séance (blocs, exercices,
+     * séries détaillées), et c'est tout. Ne pas y ajouter `withLog` : l'export
+     * ne lit que le programme (cf. `ExcelExporter`), et ne pas charger le réalisé
+     * est la façon la plus sûre de garantir qu'il n'en écrira rien.
+     *
+     * @return list<ScheduledWorkout>
+     */
+    public function findWindowWithContent(User $owner, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        return $this->withPrescribed($this->windowQueryBuilder($owner, $from, $to))
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * La même chose pour **une** séance datée, désignée par son identifiant
      * client : ce que rend `GET /api/schedule/{uuid}` (KL-15) et ce que relit
      * `PUT /api/schedule/{uuid}` (KL-16).

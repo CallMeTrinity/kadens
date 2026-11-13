@@ -3,7 +3,10 @@
 namespace App\Controller;
 
 use App\Entity\PlanTemplate;
+use App\Entity\ScheduledWorkout;
+use App\Entity\User;
 use App\Entity\Workout;
+use App\Repository\PlanTemplateRepository;
 use App\Repository\ScheduledWorkoutRepository;
 use App\Security\Voter\PlanTemplateVoter;
 use App\Security\Voter\WorkoutVoter;
@@ -17,7 +20,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Export Excel (Phase 8) : sort une séance, un plan ou un planning daté en .xlsx.
+ * Export Excel : sort une séance, un plan ou un planning daté en .xlsx.
  *
  * Le contrôleur reste mince : toute la mise en forme vit dans {@see ExcelExporter},
  * qui consomme lui-même {@see \App\Service\PlanFlattener} (source unique de mise à
@@ -49,12 +52,16 @@ final class ExportController extends AbstractController
     }
 
     #[Route('/plan-template/{id}', name: 'app_export_plan_template', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function planTemplate(PlanTemplate $template): Response
+    public function planTemplate(PlanTemplate $template, PlanTemplateRepository $repository): Response
     {
         $this->denyAccessUnlessGranted(PlanTemplateVoter::VIEW, $template);
 
+        // Tout le contenu en une requête, comme la page du plan : la mise à plat
+        // parcourt chaque case, chaque bloc, chaque exercice (anti-N+1).
+        $loaded = $repository->findWithContent((int) $template->getId()) ?? $template;
+
         return $this->xlsxResponse(
-            $this->exporter->planTemplate($template),
+            $this->exporter->planTemplate($loaded),
             $this->filename('plan', $template->getSlug() ?? (string) $template->getId()),
         );
     }
@@ -66,17 +73,20 @@ final class ExportController extends AbstractController
             throw $this->createNotFoundException('Mois invalide.');
         }
 
-        /** @var \App\Entity\User $user */
+        /** @var User $user */
         $user = $this->getUser();
 
         $first = new \DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month));
         $last = $first->modify('last day of this month');
         $periodLabel = self::MONTH_NAMES[$month].' '.$year;
 
-        $scheduled = $repository->findByOwnerBetween($user, $first, $last);
+        // Le programme de chaque séance du mois en une requête. Le réalisé n'est
+        // pas chargé : l'export n'en écrit rien.
+        $scheduled = $repository->findWindowWithContent($user, $first, $last);
+        $ratings = $repository->ratingsFor(array_map(static fn (ScheduledWorkout $s): int => (int) $s->getId(), $scheduled));
 
         return $this->xlsxResponse(
-            $this->exporter->schedule($scheduled, $periodLabel, $repository->ratingsFor(array_map(static fn (\App\Entity\ScheduledWorkout $s): int => (int) $s->getId(), $scheduled))),
+            $this->exporter->schedule($scheduled, $periodLabel, $ratings),
             $this->filename('planning', sprintf('%04d-%02d', $year, $month)),
         );
     }
