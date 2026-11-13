@@ -89,6 +89,13 @@ Tous ces tokens sont garantis **≥ 4.5:1 sur `--color-surface-raised`**.
 > **s'éclaircir** au survol (le foncer le referme), un texte rouge doit
 > **foncer**. Confondre les deux donne un bouton primaire qui s'éteint.
 
+**Rampe d'intensité 1-10** (`.kd-step[data-step]`, qui pose `--heat` et
+`--step`) : de `--color-primary-track` à `--color-primary` sur les sept premiers
+crans, puis jusqu'à `--color-primary-on-tint`. Trois tokens mélangés par
+`color-mix()`, aucune teinte de plus. Elle peint l'escalier de difficulté et la
+jauge du RPE ; c'est la même que l'app mobile (`EffortSelector`), dérivée des
+mêmes tokens.
+
 ### Échelle catégorielle
 Pour les catégories qui se **comparent en volume** : régions anatomiques, rôles
 de bloc. Elle sert aux **séries d'un graphique** et aux aplats de catégorie,
@@ -469,6 +476,15 @@ Classes `.kd-*` dans `assets/styles/components.css`.
   natif + contrôleur `dismiss` (clic extérieur, Échap) pour le seul confort.
   Panneau à contour encre.
 - **Modale** : `<dialog>` natif, contour encre.
+- **Record : la couronne** (`lucide:crown`, classe `.kd-icon--solid`). Seule
+  icône peinte **pleine** de l'app : le CSS remplit le tracé importé, le fichier
+  reste celui de Lucide. Elle marque un record battu (historique d'exercice,
+  « Nouveaux records ») — le trophée garde les classements (« Top charges »),
+  qui ne sont pas des records battus. Même couronne sur le mobile.
+- **Bonhommes de forme** (`ux_icon('kadens:feeling-1..5')`, `.kd-figure`) : les
+  seuls dessins propres à Kadens, figés dans `assets/icons/kadens/` et recopiés
+  tels quels par le mobile (`Figure.tsx`). Une posture par cran, d'avachi à bras
+  en l'air : c'est la silhouette qui se lit, le visage ne fait que confirmer.
 
 ### Page de consultation d'une séance
 Composant partagé avec la page publique : `components/_workout_read.html.twig`,
@@ -535,15 +551,24 @@ formulaire. Libellés lus par `feeling_label()` / `effort_label()`, jamais écri
 dans un template.
 
 - **La difficulté a droit au rouge, la forme non.** La première est de
-  l'intensité (même jauge `.kd-wk__gauge` que le RPE des séries), la seconde un
-  état : à l'encre. Case cochée du sélecteur : aplat encre pour la forme, aplat
-  rouge pour la difficulté.
+  l'intensité : un **escalier** de dix marches qui rougit en montant (rampe
+  `.kd-step`), le même que la jauge `.kd-wk__gauge` du RPE des séries. La
+  seconde est un état : cinq **bonhommes** à l'encre (`.kd-figure`), dessinés
+  aussi dans la tuile « Forme ». Maquette Claude Design « Éléments plus
+  chaleureux », écrans 2b-2c.
+- **Le cran retenu se dit sans inversion.** Forme : le bonhomme et son filet
+  passent à l'encre, les autres restent en encre douce — un dessin au trait
+  inversé se lirait en négatif. Difficulté : les marches jusqu'au cran
+  s'allument, les suivantes s'éteignent (sélecteur de frères `~`), la marche
+  retenue prend un filet d'encre.
 - **« Difficulté 7/10 », jamais « RPE 7 »** dans un badge : le journal affiche à
   côté le RPE moyen des séries, et les deux se confondraient.
 - **Le sélecteur garde de vrais radios** (`.kd-ratingpick`), dessinés par
   `:has(:checked)` : il marche sans JS et au clavier. Un premier choix « — » vaut
   « non renseigné » (le web peut retirer une note, le mobile non). Sous 560 px,
-  la forme perd son texte et la difficulté passe sur deux rangées de cinq.
+  la forme perd son texte ; l'escalier reste sur **une** ligne — coupé en deux
+  rangées, il cesserait d'en être un — et chaque colonne (marche + chiffre, une
+  seule cible) compense sa largeur par sa hauteur.
 
 ### Page de statistiques (`/profile/stats`)
 Même principe que l'analyse d'une séance, à l'échelle d'une fenêtre de temps :

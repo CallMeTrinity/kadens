@@ -403,7 +403,7 @@
                     </section>
 
                     <section class="kd-card">
-                        <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:medal') }} Nouveaux records</h3>
+                        <h3 class="kd-card__title kd-profile__grouphead">{{ ux_icon('lucide:crown', {class: 'kd-icon--solid'}) }} Nouveaux records</h3>
                         {% if not stats.records.comparable %}
                             {# « Depuis le début » n'a pas de passé antérieur : tous ses
                                maximums sont des records par construction. On le dit
@@ -415,7 +415,7 @@
                             </div>
                         {% elseif stats.records.new is empty %}
                             <div class="kd-empty">
-                                {{ ux_icon('lucide:medal') }}
+                                {{ ux_icon('lucide:crown', {class: 'kd-icon--solid'}) }}
                                 <div>Aucune charge battue sur cette période.</div>
                             </div>
                         {% else %}
