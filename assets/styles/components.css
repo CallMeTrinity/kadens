@@ -689,6 +689,45 @@ turbo-frame {
 }
 
 /* ----------------------------------------------------------------------------
+   Icône pleine, rampe d'intensité, bonhomme de forme — classes porteuses
+   Issues de la maquette Claude Design « Éléments plus chaleureux » (écrans
+   2a-2c), partagées avec l'app mobile.
+   ---------------------------------------------------------------------------- */
+
+/* La couronne du record se peint PLEINE : à 12-16 px, un contour de 2 bouche
+   ses pointes. Le fichier importé (lucide:crown) reste intact, c'est le CSS qui
+   remplit — un style l'emporte sur l'attribut `fill="none"` du tracé. Réservé à
+   la couronne : le contraste plein / contour est ce qui la distingue. */
+.kd-icon--solid path {
+    fill: currentColor;
+}
+
+/* La rampe d'intensité 1-10 : de --color-primary-track à --color-primary sur
+   les sept premiers crans, puis jusqu'à --color-primary-on-tint. Trois tokens
+   mélangés, aucune teinte écrite. Un élément la porte par `.kd-step` et
+   `data-step="1..10"`, et lit `--heat` (la teinte) et `--step` (le rang, pour
+   les hauteurs). Pourcentages écrits en dur plutôt que calculés : `calc()` dans
+   un `color-mix()` n'est pas tenu partout. */
+.kd-step[data-step="1"]  { --step: 1;  --heat: var(--color-primary-track); }
+.kd-step[data-step="2"]  { --step: 2;  --heat: color-mix(in srgb, var(--color-primary) 16.67%, var(--color-primary-track)); }
+.kd-step[data-step="3"]  { --step: 3;  --heat: color-mix(in srgb, var(--color-primary) 33.33%, var(--color-primary-track)); }
+.kd-step[data-step="4"]  { --step: 4;  --heat: color-mix(in srgb, var(--color-primary) 50%, var(--color-primary-track)); }
+.kd-step[data-step="5"]  { --step: 5;  --heat: color-mix(in srgb, var(--color-primary) 66.67%, var(--color-primary-track)); }
+.kd-step[data-step="6"]  { --step: 6;  --heat: color-mix(in srgb, var(--color-primary) 83.33%, var(--color-primary-track)); }
+.kd-step[data-step="7"]  { --step: 7;  --heat: var(--color-primary); }
+.kd-step[data-step="8"]  { --step: 8;  --heat: color-mix(in srgb, var(--color-primary-on-tint) 33.33%, var(--color-primary)); }
+.kd-step[data-step="9"]  { --step: 9;  --heat: color-mix(in srgb, var(--color-primary-on-tint) 66.67%, var(--color-primary)); }
+.kd-step[data-step="10"] { --step: 10; --heat: var(--color-primary-on-tint); }
+
+/* Le bonhomme de forme (ux_icon('kadens:feeling-N')), au rapport 3:4 de son
+   dessin. Il prend la couleur du texte qui l'entoure. */
+.kd-figure {
+    flex: none;
+    width: 30px;
+    height: 40px;
+}
+
+/* ----------------------------------------------------------------------------
    Stat (gros chiffre + label mono)
    ---------------------------------------------------------------------------- */
 .kd-stat__value {
@@ -2398,21 +2437,30 @@ a.kd-scope--link:hover {
     color: var(--color-text-secondary);
 }
 
-/* Jauge d'intensité : 10 crans, à l'échelle du RPE. */
+/* Jauge d'intensité : 10 crans à l'échelle du RPE, en escalier qui monte et
+   rougit (rampe `.kd-step`) — la même que le sélecteur de difficulté. */
 .kd-wk__gauge {
     display: flex;
+    align-items: flex-end;
     gap: 3px;
     margin: var(--kd-space-4) 0 0;
 }
 
 .kd-wk__gaugetick {
     width: 14px;
-    height: 6px;
-    background: var(--color-primary-track);
+    height: calc(4px + (var(--step) - 1) * 1.2px);
+    background: var(--color-track);
 }
 
 .kd-wk__gaugetick.is-on {
-    background: var(--color-primary);
+    background: var(--heat);
+}
+
+/* La forme : le bonhomme devant son libellé. */
+.kd-wk__feel {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--kd-space-4);
 }
 
 /* ---- Onglets ---- */
@@ -5176,51 +5224,124 @@ a.kd-planday__item:hover svg {
     line-height: 1.2;
 }
 
-.kd-ratingpick__opt:has(input:checked) {
-    color: var(--color-on-ink);
-    background: var(--color-surface-ink);
-    border-color: var(--color-surface-ink);
-}
-
-.kd-ratingpick--rpe .kd-ratingpick__opt:has(input:checked) {
-    color: var(--color-on-primary);
-    background: var(--color-primary);
-    border-color: var(--color-primary);
-}
-
 .kd-ratingpick__opt--none:has(input:checked) {
     color: var(--color-text);
     background: var(--color-surface-raised);
     border-color: var(--color-border-strong);
 }
 
+/* Forme : cinq bonhommes. Les crans non retenus en encre douce, le retenu à
+   l'encre, filet compris — pas d'inversion, un dessin au trait se lirait en
+   négatif. Le bonhomme retenu sautille une fois à l'appui (`:focus`, donc pas
+   au chargement de la page ; base.css coupe le mouvement si on l'a réduit). */
+.kd-ratingpick--feel .kd-ratingpick__opt:not(.kd-ratingpick__opt--none) {
+    justify-content: flex-end;
+    min-height: 96px;
+    padding: var(--kd-space-3) var(--kd-space-1);
+    color: var(--color-text-soft);
+    background: var(--color-surface-raised);
+    border-color: var(--color-border-pill);
+}
+
+.kd-ratingpick--feel .kd-ratingpick__opt:not(.kd-ratingpick__opt--none):hover {
+    border-color: var(--color-border-strong);
+}
+
+.kd-ratingpick--feel .kd-figure {
+    width: 40px;
+    height: 53px;
+}
+
+.kd-ratingpick--feel .kd-ratingpick__opt:not(.kd-ratingpick__opt--none):has(input:checked) {
+    color: var(--color-text);
+    border-color: var(--color-text);
+}
+
+.kd-ratingpick--feel .kd-ratingpick__opt:has(input:checked:focus) .kd-figure {
+    animation: kd-bob .45s ease-out;
+}
+
+@keyframes kd-bob {
+    0% { transform: translateY(0); }
+    40% { transform: translateY(-6px); }
+    70% { transform: translateY(1px); }
+    100% { transform: translateY(0); }
+}
+
+/* Difficulté : dix marches qui montent. Toutes portent leur teinte de rampe ;
+   celles qui suivent le cran coché s'éteignent (sélecteur de frères `~`, qui
+   couvre aussi « — » coché). La marche retenue prend un filet d'encre. Une
+   colonne = une cible : la marche et son chiffre, sur toute la hauteur. */
+.kd-ratingpick--rpe .kd-ratingpick__row {
+    align-items: flex-end;
+    gap: var(--kd-space-1);
+}
+
+.kd-ratingpick__step {
+    position: relative;
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: var(--kd-space-2);
+    min-width: 0;
+    cursor: pointer;
+}
+
+.kd-ratingpick__step input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    margin: 0;
+    cursor: pointer;
+}
+
+.kd-ratingpick__bar {
+    height: calc(18px + (var(--step) - 1) * 7.4px);
+    background: var(--heat);
+    border: 1px solid var(--heat);
+    transition: background-color .2s ease, border-color .2s ease;
+}
+
+.kd-ratingpick__row > :has(input:checked) ~ .kd-ratingpick__step .kd-ratingpick__bar {
+    background: var(--color-track);
+    border-color: var(--color-track);
+}
+
+.kd-ratingpick__step:has(input:checked) .kd-ratingpick__bar {
+    border-color: var(--color-text);
+}
+
+.kd-ratingpick__step .kd-ratingpick__num {
+    font-size: 11px;
+    text-align: center;
+    color: var(--color-text-secondary);
+}
+
+.kd-ratingpick__step:hover .kd-ratingpick__num,
+.kd-ratingpick__step:has(input:checked) .kd-ratingpick__num {
+    color: var(--color-text);
+}
+
+.kd-ratingpick__step:has(input:focus-visible) {
+    outline: 2px solid var(--color-text);
+    outline-offset: 2px;
+}
+
 .kd-ratingpick__scale {
     display: flex;
     justify-content: space-between;
-    margin: var(--kd-space-2) 0 0 calc(44px + var(--kd-space-2));
+    margin: var(--kd-space-2) 0 0 calc(44px + var(--kd-space-1));
     font-family: var(--font-mono);
     font-size: 10px;
     color: var(--color-text-secondary);
 }
 
-/* Sous 560 : la forme garde ses cinq cases mais perd son texte (le titre le
-   porte), la difficulté passe sur deux rangées de cinq. */
+/* Sous 560 : la forme garde ses cinq bonhommes mais perd son texte (le titre
+   et le bonhomme le portent). L'escalier reste sur une ligne : coupé en deux
+   rangées, il cesserait d'en être un ; chaque colonne compense en hauteur. */
 @media (max-width: 559px) {
-    .kd-ratingpick:not(.kd-ratingpick--rpe) .kd-ratingpick__txt {
-        display: none;
-    }
-
-    .kd-ratingpick--rpe .kd-ratingpick__row {
-        display: grid;
-        grid-template-columns: 44px repeat(5, 1fr);
-    }
-
-    /* 6 (septième enfant après « — ») repart sous le 1. */
-    .kd-ratingpick--rpe .kd-ratingpick__opt:nth-child(7) {
-        grid-column-start: 2;
-    }
-
-    .kd-ratingpick__scale {
+    .kd-ratingpick--feel .kd-ratingpick__txt {
         display: none;
     }
 }

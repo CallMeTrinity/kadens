@@ -33,6 +33,9 @@ Intervals.icu ; celui de la muscu, lui, se logue série par série — cf. §3.
   (traits fins, cohérent « Carnet clair »). Icônes **figées en local** dans
   `assets/icons/lucide/` (`php bin/console ux:icons:import lucide:<nom>`) : pas de
   fetch réseau en prod/offline. Toute nouvelle icône doit être importée localement.
+  Seule exception au jeu Lucide : les dessins propres à Kadens (bonhommes de
+  forme), dans `assets/icons/kadens/` (`ux_icon('kadens:feeling-4')`), recopiés
+  tels quels par le mobile. Détail : `docs/design-system.md` §7.
 - **Doctrine ORM** + **MariaDB 10.4** (même version dev et prod).
 - **`endroid/qr-code`** pour le QR d'appairage (KL-47), en **writer SVG** :
   aucune extension PHP requise (`ext-gd` ne sert qu'aux writers image), donc

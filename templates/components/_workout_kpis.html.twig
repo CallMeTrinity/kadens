@@ -58,11 +58,12 @@
             <dt>Intensité moyenne</dt>
             <dd>RPE {{ summary.averageRpe|number_format(1, ',', ' ') }}</dd>
             {# Jauge de 10 crans : le RPE se lit sur 1..10, une jauge
-               à cette échelle évite toute conversion mentale. #}
+               à cette échelle évite toute conversion mentale. Un escalier qui
+               rougit en montant, le même que la difficulté de séance. #}
             <p class="kd-wk__gauge" role="img"
                aria-label="RPE moyen {{ summary.averageRpe|number_format(1, ',', ' ') }} sur 10">
                 {% for i in 1..10 %}
-                    <span class="kd-wk__gaugetick{{ i <= summary.averageRpe|round ? ' is-on' }}"></span>
+                    <span class="kd-wk__gaugetick kd-step{{ i <= summary.averageRpe|round ? ' is-on' }}" data-step="{{ i }}"></span>
                 {% endfor %}
             </p>
         </div>

@@ -5,9 +5,11 @@
    (Feeling, SessionRating), jamais écrits ici.
 
    Le sens des couleurs suit la règle du projet : la DIFFICULTÉ est de
-   l'intensité, elle a droit au rouge (jauge comme le RPE des séries) ; la FORME
-   n'en est pas, elle reste à l'encre. Une note n'existe que sur une séance
-   faite : `ScheduledWorkoutRepository::ratingsFor()` ne rend rien d'autre.
+   l'intensité, elle a droit au rouge (un escalier qui rougit en montant, comme
+   la jauge du RPE des séries) ; la FORME n'en est pas, elle reste à l'encre et
+   se dessine en bonhommes (`assets/icons/kadens/feeling-{1..5}.svg`, les mêmes
+   que l'app mobile). Une note n'existe que sur une séance faite :
+   `ScheduledWorkoutRepository::ratingsFor()` ne rend rien d'autre.
 
    Usage :
      {% import 'components/_rating.html.twig' as rating %}
@@ -41,7 +43,7 @@
         {%- if value.feeling -%}
             <div class="kd-wk__kpi">
                 <dt>Forme</dt>
-                <dd>{{ value.feelingLabel }}</dd>
+                <dd class="kd-wk__feel">{{ ux_icon('kadens:feeling-' ~ value.feeling, {class: 'kd-figure', 'aria-hidden': 'true'}) }}{{ value.feelingLabel }}</dd>
                 <p class="kd-wk__kpimeta">{{ value.feeling }}/5{{ value.fromIntervals ? ' · montre' }}</p>
             </div>
         {%- endif -%}
@@ -51,7 +53,7 @@
                 <dd>{{ value.sessionRpe }}<span class="kd-wk__unit">/10</span></dd>
                 <p class="kd-wk__gauge" role="img" aria-label="Difficulté {{ value.sessionRpe }} sur 10, {{ value.effortLabel }}">
                     {%- for i in 1..10 -%}
-                        <span class="kd-wk__gaugetick{{ i <= value.sessionRpe ? ' is-on' }}"></span>
+                        <span class="kd-wk__gaugetick kd-step{{ i <= value.sessionRpe ? ' is-on' }}" data-step="{{ i }}"></span>
                     {%- endfor -%}
                 </p>
                 <p class="kd-wk__kpimeta">{{ value.effortLabel }}</p>
@@ -63,28 +65,53 @@
 {#- Un groupe radio par axe. Le premier choix, « — », vaut « non renseigné » :
     sur le web, retirer une note est un geste permis (le téléphone, lui, ne
     peut que noter). Les radios restent de vrais `<input>` : le formulaire marche
-    sans JS et au clavier, la case active se dessine par `:has(:checked)`. -#}
+    sans JS et au clavier, le cran retenu se dessine par `:has(:checked)`.
+
+    La forme : cinq bonhommes, d'avachi à bras en l'air. Le cran retenu passe à
+    l'encre, filet compris ; pas d'inversion, un dessin au trait se lirait en
+    négatif. La difficulté : dix marches qui montent ; celles jusqu'au cran
+    retenu s'allument (rampe `.kd-step`), les suivantes s'éteignent par le
+    sélecteur de frères `~`, ce qui marche aussi quand « — » est coché. -#}
 {%- macro picker(axis, current, id_prefix) -%}
     {%- set is_rpe = axis == 'sessionRpe' -%}
-    {%- set max = is_rpe ? 10 : 5 -%}
-    <fieldset class="kd-ratingpick{{ is_rpe ? ' kd-ratingpick--rpe' }}">
-        <legend class="kd-label">{{ is_rpe ? 'Difficulté de la séance' : 'Comment tu t\'es senti ?' }}</legend>
-        <div class="kd-ratingpick__row">
-            <label class="kd-ratingpick__opt kd-ratingpick__opt--none">
-                <input type="radio" name="{{ axis }}" value="" {{ current is null ? 'checked' }}>
-                <span aria-hidden="true">—</span><span class="kd-sr-only">Non renseigné</span>
-            </label>
-            {%- for i in 1..max -%}
-                {%- set label = is_rpe ? effort_label(i) : feeling_label(i) -%}
-                <label class="kd-ratingpick__opt" title="{{ i }} · {{ label }}">
-                    <input type="radio" name="{{ axis }}" value="{{ i }}" id="{{ id_prefix }}-{{ axis }}-{{ i }}" {{ current == i ? 'checked' }}>
-                    <span class="kd-ratingpick__num">{{ i }}</span>
-                    {%- if not is_rpe %}<span class="kd-ratingpick__txt">{{ label }}</span>{% else %}<span class="kd-sr-only">{{ label }}</span>{% endif -%}
+    {%- if is_rpe -%}
+        <fieldset class="kd-ratingpick kd-ratingpick--rpe">
+            <legend class="kd-label">Difficulté de la séance</legend>
+            <div class="kd-ratingpick__row">
+                <label class="kd-ratingpick__opt kd-ratingpick__opt--none">
+                    <input type="radio" name="{{ axis }}" value="" {{ current is null ? 'checked' }}>
+                    <span aria-hidden="true">—</span><span class="kd-sr-only">Non renseigné</span>
                 </label>
-            {%- endfor -%}
-        </div>
-        {%- if is_rpe -%}
-            <p class="kd-ratingpick__scale" aria-hidden="true"><span>Très léger</span><span>Modéré</span><span>Maximal</span></p>
-        {%- endif -%}
-    </fieldset>
+                {%- for i in 1..10 -%}
+                    {%- set label = effort_label(i) -%}
+                    <label class="kd-ratingpick__step kd-step" data-step="{{ i }}" title="{{ i }} · {{ label }}">
+                        <input type="radio" name="{{ axis }}" value="{{ i }}" id="{{ id_prefix }}-{{ axis }}-{{ i }}" {{ current == i ? 'checked' }}>
+                        <span class="kd-ratingpick__bar" aria-hidden="true"></span>
+                        <span class="kd-ratingpick__num">{{ i }}</span>
+                        <span class="kd-sr-only">{{ label }}</span>
+                    </label>
+                {%- endfor -%}
+            </div>
+            <p class="kd-ratingpick__scale" aria-hidden="true"><span>Très léger</span><span>Maximal</span></p>
+        </fieldset>
+    {%- else -%}
+        <fieldset class="kd-ratingpick kd-ratingpick--feel">
+            <legend class="kd-label">Comment tu t'es senti ?</legend>
+            <div class="kd-ratingpick__row">
+                <label class="kd-ratingpick__opt kd-ratingpick__opt--none">
+                    <input type="radio" name="{{ axis }}" value="" {{ current is null ? 'checked' }}>
+                    <span aria-hidden="true">—</span><span class="kd-sr-only">Non renseigné</span>
+                </label>
+                {%- for i in 1..5 -%}
+                    {%- set label = feeling_label(i) -%}
+                    <label class="kd-ratingpick__opt" title="{{ i }} · {{ label }}">
+                        <input type="radio" name="{{ axis }}" value="{{ i }}" id="{{ id_prefix }}-{{ axis }}-{{ i }}" {{ current == i ? 'checked' }}>
+                        {{ ux_icon('kadens:feeling-' ~ i, {class: 'kd-figure', 'aria-hidden': 'true'}) }}
+                        <span class="kd-ratingpick__num">{{ i }}</span>
+                        <span class="kd-ratingpick__txt">{{ label }}</span>
+                    </label>
+                {%- endfor -%}
+            </div>
+        </fieldset>
+    {%- endif -%}
 {%- endmacro -%}

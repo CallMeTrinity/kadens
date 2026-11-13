@@ -58,6 +58,11 @@ final class ScheduledWorkoutRatingTest extends WebTestCase
         $this->client->followRedirect();
         self::assertSelectorTextContains('#schedule-rating', 'En forme');
         self::assertSelectorTextContains('#schedule-rating', 'Difficile');
+        // La forme se lit aussi en bonhomme (tuile + cinq dans le sélecteur), la
+        // difficulté en escalier : dix marches, la huitième retenue.
+        self::assertSelectorCount(6, '#schedule-rating .kd-figure');
+        self::assertSelectorCount(10, '#schedule-rating .kd-ratingpick__step');
+        self::assertSelectorExists('#schedule-rating .kd-ratingpick__step[data-step="8"] input:checked');
 
         $form = $this->client->getCrawler()->filter('#schedule-rating form')->form(['feeling' => '']);
         $this->client->submit($form);
