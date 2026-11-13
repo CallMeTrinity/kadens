@@ -19,6 +19,7 @@ use App\Enum\PrescriptionType;
 use App\Enum\ScheduledStatus;
 use App\Enum\SetType;
 use App\Tests\FindsEntities;
+use App\Tests\ReadsSpreadsheets;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -40,6 +41,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 final class ScheduledWorkoutLogTest extends WebTestCase
 {
     use FindsEntities;
+    use ReadsSpreadsheets;
 
     private KernelBrowser $client;
     private EntityManagerInterface $em;
@@ -352,10 +354,16 @@ final class ScheduledWorkoutLogTest extends WebTestCase
         self::assertStringNotContainsString('123,5', (string) $this->client->getResponse()->getContent());
         self::assertSelectorNotExists('.kd-settable--compared');
 
-        // 4. L'export Excel du mois.
+        // 4. L'export Excel du mois. Le classeur est rouvert : la réponse est
+        // streamée (`getResponse()->getContent()` vaut false) et un .xlsx est une
+        // archive zip, chercher dans les octets ne trouverait jamais rien. La
+        // présence du titre prouve qu'on lit bien le contenu.
         $this->client->request('GET', '/export/schedule/2026/7');
         self::assertResponseIsSuccessful();
-        self::assertStringNotContainsString('123,5', (string) $this->client->getResponse()->getContent());
+        $workbook = $this->spreadsheetText($this->readSpreadsheet((string) $this->client->getInternalResponse()->getContent()));
+        self::assertStringContainsString('Haut du corps', $workbook);
+        self::assertStringNotContainsString('123,5', $workbook);
+        self::assertStringNotContainsString('123.5', $workbook);
 
         // 5. Le flux ICS.
         $this->client->request('GET', '/feed/'.$user->getCalendarFeedToken().'.ics');
