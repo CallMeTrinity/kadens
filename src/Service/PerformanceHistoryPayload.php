@@ -36,13 +36,23 @@ use App\Entity\User;
  * chiffres avec ses propres unités (§0.4 du cadrage). Les séries partent en
  * `reps` / `weightKg` / `durationSeconds`.
  *
+ * ## Deux records, et pas un seul qui saurait tout dire
+ *
+ * `best` est le record de **charge** : il n'existe pas sans kilos. `bestReps`
+ * est celui du **poids du corps** : le plus de répétitions enchaînées sans
+ * charge. Une pompe n'a que le second, un squat que le premier, une traction
+ * parfois les deux — lestée, on lit des kilos ; à vide, on compte. Fondre les
+ * deux dans un même champ obligerait le client à deviner lequel il lit.
+ *
  * @phpstan-import-type BestSet from PerformanceHistory
+ * @phpstan-import-type BestRepMax from PerformanceHistory
  * @phpstan-import-type LastPerformance from PerformanceHistory
  *
  * @phpstan-type ApiPerformance array{date: string, workingSets: int, tonnageKg: float, topWeightKg: float|null, sets: list<array{type: string, count: int, reps: int|null, weightKg: float|null, durationSeconds: int|null, firstIndex: int, lastIndex: int}>}
  * @phpstan-type ApiBestSet array{date: string, type: string, reps: int|null, weightKg: float, durationSeconds: int|null}
- * @phpstan-type ApiHistoryEntry array{exerciseId: int, last: ApiPerformance|null, best: ApiBestSet|null}
- * @phpstan-type ApiExerciseHistory array{exerciseId: int, last: ApiPerformance|null, best: ApiBestSet|null, sessions: list<ApiPerformance>}
+ * @phpstan-type ApiBestRepMax array{date: string, type: string, reps: int}
+ * @phpstan-type ApiHistoryEntry array{exerciseId: int, last: ApiPerformance|null, best: ApiBestSet|null, bestReps: ApiBestRepMax|null}
+ * @phpstan-type ApiExerciseHistory array{exerciseId: int, last: ApiPerformance|null, best: ApiBestSet|null, bestReps: ApiBestRepMax|null, sessions: list<ApiPerformance>}
  */
 final class PerformanceHistoryPayload
 {
@@ -77,6 +87,7 @@ final class PerformanceHistoryPayload
             'exerciseId' => (int) $exercise->getId(),
             'last' => isset($sessions[0]) ? self::performance($sessions[0]) : null,
             'best' => self::best($this->history->bestSet($user, $exercise)),
+            'bestReps' => self::bestReps($this->history->bestRepMax($user, $exercise)),
             'sessions' => array_map(self::performance(...), $sessions),
         ];
     }
@@ -92,15 +103,17 @@ final class PerformanceHistoryPayload
      *
      * @param LastPerformance|null $last
      * @param BestSet|null         $best
+     * @param BestRepMax|null      $bestReps
      *
      * @return ApiHistoryEntry
      */
-    public static function entry(int $exerciseId, ?array $last, ?array $best): array
+    public static function entry(int $exerciseId, ?array $last, ?array $best, ?array $bestReps): array
     {
         return [
             'exerciseId' => $exerciseId,
             'last' => null === $last ? null : self::performance($last),
             'best' => self::best($best),
+            'bestReps' => self::bestReps($bestReps),
         ];
     }
 
@@ -145,6 +158,23 @@ final class PerformanceHistoryPayload
             'reps' => $best['reps'],
             'weightKg' => $best['weightKg'],
             'durationSeconds' => $best['durationSeconds'],
+        ];
+    }
+
+    /**
+     * Le record au poids du corps. Ni charge ni durée : la valeur est un compte
+     * de répétitions, et c'est tout ce qu'il y a à comparer.
+     *
+     * @param BestRepMax|null $best
+     *
+     * @return ApiBestRepMax|null
+     */
+    private static function bestReps(?array $best): ?array
+    {
+        return null === $best ? null : [
+            'date' => $best['date']->format('Y-m-d'),
+            'type' => $best['type']->value,
+            'reps' => $best['reps'],
         ];
     }
 }

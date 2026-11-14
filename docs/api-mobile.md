@@ -523,7 +523,7 @@ qu'il a descendu.
 | `window` | `{from, to}` — J-30 → J+14. **Fait autorité** (§4.5). |
 | `exercises` | La bibliothèque visible : la sienne, la globale, celle de ses coachs et de ses athlètes acceptés. |
 | `schedule` | Les séances datées de la fenêtre **qui se consignent**, structure du §6.7. Voir juste en dessous. |
-| `history` | Dernière performance et record par exercice. **Toujours une liste**, jamais un objet indexé par identifiant. |
+| `history` | Dernière performance et records (`best` en charge, `bestReps` au poids du corps) par exercice, forme du §6.6 sans `sessions`. **Toujours une liste**, jamais un objet indexé par identifiant. |
 | `setups` | Les réglages de machine **du porteur du jeton**, sur la bibliothèque visible (§6.11). Toujours entiers, comme `history`. |
 | `messages` | Les messages programmés **non vus** du porteur du jeton, en cours ou commençant sous 14 jours. Toujours entiers. Voir plus bas et §6.12. |
 | `deleted` | `{exercises: [id], schedule: [uuid]}` — ce que la base locale doit oublier. |
@@ -683,6 +683,7 @@ $ curl -sk https://127.0.0.1:8000/api/exercises/106/history -H "Authorization: B
     ]
   },
   "best": { "date": "2026-08-02", "type": "normal", "reps": 8, "weightKg": 80, "durationSeconds": null },
+  "bestReps": null,
   "sessions": [ /* … même forme que `last`, dix entrées au plus, la plus récente d'abord */ ]
 }
 ```
@@ -695,8 +696,14 @@ $ curl -sk https://127.0.0.1:8000/api/exercises/106/history -H "Authorization: B
 - **Périmètre** : échauffement exclu, exercice sauté exclu, statut de la séance
   non filtré (le réalisé est un fait dès qu'il est écrit), et **portée du seul
   porteur du jeton**.
-- Pas de record sans kilos : une série au poids du corps a une dernière perf, pas
-  de `best`.
+- **Deux records, sur deux séries disjointes.** `best` est le record de
+  **charge** : la série chargée la plus lourde (`weightKg > 0`), départagée aux
+  répétitions. `bestReps` est le record **au poids du corps** : le plus de
+  répétitions sur une série sans charge (`weightKg` nul ou à 0), sous la forme
+  `{date, type, reps}`. Une pompe n'a que `bestReps`, un squat que `best`, une
+  traction parfois les deux. Un gainage chronométré n'a ni l'un ni l'autre.
+- `bestReps` est arrivé après `best` : un client doit lire son **absence** comme
+  `null` (« rien à battre »), un serveur plus ancien ne l'envoie pas.
 - Aucun identifiant de séance n'est renvoyé : c'est une trajectoire, pas une
   liste de liens.
 

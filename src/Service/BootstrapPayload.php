@@ -33,7 +33,7 @@ use App\Repository\ScheduledWorkoutRepository;
  *   qui corrige le programme de la semaine sur le web. Une fenêtre de 45 jours
  *   est bornée par construction ; un programme périmé sur le téléphone ne l'est
  *   pas.
- * - **L'historique est déjà borné et déjà bon marché** : deux requêtes quel que
+ * - **L'historique est déjà borné et déjà bon marché** : trois requêtes quel que
  *   soit le nombre d'exercices, c'est précisément ce pour quoi
  *   `PerformanceHistory::bulkFor()` a été écrit (KL-04). Le rendre partiel
  *   laisserait un second appareil, ou une suppression de réalisé faite sur le
@@ -273,7 +273,7 @@ final class BootstrapPayload
         $entries = [];
 
         foreach ($this->history->bulkForIds($user, $libraryIds) as $exerciseId => $entry) {
-            $entries[] = PerformanceHistoryPayload::entry($exerciseId, $entry['last'], $entry['best']);
+            $entries[] = PerformanceHistoryPayload::entry($exerciseId, $entry['last'], $entry['best'], $entry['bestReps']);
         }
 
         return $entries;

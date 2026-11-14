@@ -212,7 +212,7 @@ final class PerformanceHistoryTest extends KernelTestCase
         self::assertSame(6, $best['reps']);
     }
 
-    /** Une série au poids du corps ne fait pas un record : il n'y en a pas sans kilos. */
+    /** Une série sans charge ne fait pas un record de charge : il n'y en a pas sans kilos. */
     public function testBodyweightSetsProduceNoRecord(): void
     {
         $user = $this->createUser('owner@example.com');
@@ -283,10 +283,11 @@ final class PerformanceHistoryTest extends KernelTestCase
 
     /**
      * Le point dur du ticket : le bootstrap mobile appelle bulkFor sur toute la
-     * bibliothèque. Deux requêtes, quel que soit le nombre d'exercices — sinon
-     * l'endpoint est inutilisable.
+     * bibliothèque. Trois requêtes (dernière perf, record de charge, record au
+     * poids du corps), quel que soit le nombre d'exercices — sinon l'endpoint
+     * est inutilisable.
      */
-    public function testBulkForStaysAtTwoQueries(): void
+    public function testBulkForStaysAtThreeQueries(): void
     {
         $user = $this->createUser('owner@example.com');
 
@@ -308,7 +309,7 @@ final class PerformanceHistoryTest extends KernelTestCase
         $bulk = $this->history->bulkFor($user, $exercises);
 
         $queries = $holder->getData()['default'] ?? [];
-        self::assertCount(2, $queries, 'bulkFor doit tenir en deux requêtes, quel que soit le nombre d\'exercices.');
+        self::assertCount(3, $queries, 'bulkFor doit tenir en trois requêtes, quel que soit le nombre d\'exercices.');
 
         // L'exercice jamais fait est ABSENT, pas présent à null.
         self::assertCount(12, $bulk);
@@ -320,6 +321,8 @@ final class PerformanceHistoryTest extends KernelTestCase
         self::assertNotNull($first['best']);
         self::assertSame(51.0, $first['best']['weightKg']);
         self::assertSame(2, $first['last']['workingSets']);
+        // Toutes chargées : aucun record au poids du corps.
+        self::assertNull($first['bestReps']);
     }
 
     // --- KL-17 : la trajectoire ----------------------------------------------
@@ -438,6 +441,67 @@ final class PerformanceHistoryTest extends KernelTestCase
         self::assertArrayHasKey($exercise->getId(), $bulk);
         self::assertNotNull($bulk[$exercise->getId()]['last']);
         self::assertNull($bulk[$exercise->getId()]['best']);
+        // Une durée n'est pas un compte de répétitions.
+        self::assertNull($bulk[$exercise->getId()]['bestReps']);
+    }
+
+    /**
+     * Le cas qui manquait au téléphone : une pompe n'a jamais de kilos, donc pas
+     * de `best`, et sans `bestReps` la séance n'avait rien à battre — 15 pompes
+     * après 14 passaient sans couronne.
+     */
+    public function testBulkCarriesTheBodyweightRepRecord(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise('Pompe');
+
+        $this->log($user, $exercise, new \DateTimeImmutable('2026-03-01'), [
+            [SetType::NORMAL, 14, null],
+            [SetType::NORMAL, 12, null],
+        ]);
+        // 0 kg vaut sans charge : ni record de charge « 0 kg », ni série
+        // écartée du compte à vide.
+        $this->log($user, $exercise, new \DateTimeImmutable('2026-03-08'), [
+            [SetType::WARMUP, 30, null],
+            [SetType::NORMAL, 11, 0.0],
+        ]);
+
+        $entry = $this->history->bulkFor($user, [$exercise])[(int) $exercise->getId()] ?? null;
+
+        self::assertNotNull($entry);
+        self::assertNull($entry['best']);
+        self::assertNotNull($entry['bestReps']);
+        // Tous temps, échauffement exclu : les 30 de la mise en route ne
+        // comptent pas, les 14 de la semaine d'avant si.
+        self::assertSame(14, $entry['bestReps']['reps']);
+        self::assertSame('2026-03-01', $entry['bestReps']['date']->format('Y-m-d'));
+    }
+
+    /**
+     * Les répétitions faites sous charge ne nourrissent pas le record au poids du
+     * corps : 20 dips à 10 kg ne disent rien d'un maximum à vide. Et
+     * réciproquement, une série à vide ne touche pas au record de charge.
+     */
+    public function testLoadedAndUnloadedRecordsStayApart(): void
+    {
+        $user = $this->createUser('owner@example.com');
+        $exercise = $this->createExercise('Dips');
+
+        $this->log($user, $exercise, new \DateTimeImmutable('2026-03-01'), [
+            [SetType::NORMAL, 20, 10.0],
+            [SetType::NORMAL, 12, null],
+        ]);
+
+        $entry = $this->history->bulkFor($user, [$exercise])[(int) $exercise->getId()] ?? null;
+
+        self::assertNotNull($entry);
+        self::assertNotNull($entry['best']);
+        self::assertSame(10.0, $entry['best']['weightKg']);
+        self::assertSame(20, $entry['best']['reps']);
+        self::assertNotNull($entry['bestReps']);
+        self::assertSame(12, $entry['bestReps']['reps']);
+        // assertEquals : la date est un objet, relu par une seconde requête.
+        self::assertEquals($entry['bestReps'], $this->history->bestRepMax($user, $exercise));
     }
 
     private function createUser(string $email): User

@@ -1205,7 +1205,7 @@ final class WorkoutController extends AbstractController
      * par identifiant d'exercice : record et dernière performance. Alimente
      * `workout/_exo_history.html.twig`, sous le panneau de paramètres.
      *
-     * `bulkForIds` et non `ExerciseTrajectory::for()` : **deux requêtes quel que
+     * `bulkForIds` et non `ExerciseTrajectory::for()` : **trois requêtes quel que
      * soit le nombre d'exercices**, là où la trajectoire complète en fait autant
      * que d'exercices. Le compositeur rend le panneau de CHAQUE exercice dès le
      * chargement (masqué), un N+1 y serait immédiat. La trajectoire détaillée
@@ -1221,7 +1221,7 @@ final class WorkoutController extends AbstractController
      *
      * @param list<int|null> $exerciseIds identifiants bruts, nulls et doublons admis
      *
-     * @return array<int, array{last: array<string, mixed>|null, best: array<string, mixed>|null}>
+     * @return array<int, array{last: array<string, mixed>|null, best: array<string, mixed>|null, bestReps: array<string, mixed>|null}>
      */
     private function historyFor(Workout $workout, array $exerciseIds): array
     {
