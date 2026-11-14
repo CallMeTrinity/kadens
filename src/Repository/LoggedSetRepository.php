@@ -78,7 +78,10 @@ class LoggedSetRepository extends ServiceEntityRepository
      * L'échauffement est exclu par construction (workingSetRows) : c'est la
      * règle qu'un mauvais filtre casserait en premier, un échauffement lourd
      * deviendrait un record. Les séries sans charge (poids du corps, série en
-     * durée) sont écartées : il n'y a pas de record sans kilos.
+     * durée) sont écartées : il n'y a pas de record de charge sans kilos. Et
+     * « sans charge » se lit comme dans `unloaded()` — nulle **ou** à zéro : un
+     * prescrit posé à 0 kg ne fait pas de 14 pompes un record « 0 kg », qui
+     * doublonnerait celui au poids du corps (`findMostRepsUnloaded…`).
      *
      * Plusieurs séries peuvent porter la même charge maximale ; toutes sont
      * renvoyées, c'est à l'appelant de les départager.
@@ -95,7 +98,7 @@ class LoggedSetRepository extends ServiceEntityRepository
 
         $qb = $this->workingSetRows($owner, $exerciseIds);
 
-        $qb->andWhere('ls.weightKg IS NOT NULL')
+        $qb->andWhere('ls.weightKg > 0')
             ->andWhere(sprintf(
                 'ls.weightKg = (SELECT MAX(ls2.weightKg) %s)',
                 $this->correlatedFrom(),

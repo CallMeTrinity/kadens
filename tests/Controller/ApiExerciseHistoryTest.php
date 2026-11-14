@@ -27,7 +27,7 @@ use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
  *
  * 1. `testHistoryRendersTheSameShapeAsTheBootstrap` — l'exigence « un seul
  *    désérialiseur côté client » de KL-14/KL-15, appliquée à la performance :
- *    `last` et `best` sont comparés champ pour champ à l'entrée `history` du
+ *    `last`, `best` et `bestReps` sont comparés champ pour champ à l'entrée `history` du
  *    bootstrap. Le test échoue le jour où l'un des deux producteurs dérive.
  * 2. `testOnlyTheTenMostRecentSessionsAreReturned` — la borne du ticket, et
  *    l'ordre qui la rend lisible (la plus récente d'abord).
@@ -100,9 +100,11 @@ final class ApiExerciseHistoryTest extends WebTestCase
         self::assertSame($fromBootstrap['exerciseId'], $alone['exerciseId']);
         self::assertSame($fromBootstrap['last'], $alone['last']);
         self::assertSame($fromBootstrap['best'], $alone['best']);
+        self::assertSame($fromBootstrap['bestReps'], $alone['bestReps']);
 
         // Ce que l'endpoint ajoute, et lui seul : la trajectoire.
-        self::assertSame(['exerciseId', 'last', 'best', 'sessions'], array_keys($alone));
+        self::assertSame(['exerciseId', 'last', 'best', 'bestReps', 'sessions'], array_keys($alone));
+        self::assertSame(['exerciseId', 'last', 'best', 'bestReps'], array_keys($fromBootstrap));
         self::assertCount(2, $alone['sessions']);
         // `last` EST le premier point : dérivé de la même lecture, pas relu.
         self::assertSame($alone['sessions'][0], $alone['last']);
@@ -215,6 +217,27 @@ final class ApiExerciseHistoryTest extends WebTestCase
         self::assertNull($payload['best']);
     }
 
+    /**
+     * Une pompe n'a pas de kilos : pas de `best`, mais un `bestReps` — le record
+     * que le téléphone compare pendant la séance.
+     */
+    public function testABodyweightExerciseCarriesItsRepRecord(): void
+    {
+        $user = $this->createUser('athlete@example.com');
+        $exercise = $this->createExercise('Pompe', $user);
+
+        $this->log($user, $exercise, new \DateTimeImmutable('-8 days'), [[SetType::NORMAL, 14, null]]);
+        $this->log($user, $exercise, new \DateTimeImmutable('-1 day'), [[SetType::NORMAL, 12, null]]);
+
+        $payload = $this->get('/api/exercises/'.$exercise->getId().'/history', $this->issueToken($user));
+
+        self::assertNull($payload['best']);
+        self::assertSame(
+            ['date' => (new \DateTimeImmutable('-8 days'))->format('Y-m-d'), 'type' => 'normal', 'reps' => 14],
+            $payload['bestReps'],
+        );
+    }
+
     /** Jamais fait : des champs nuls et une liste vide, pas une erreur. */
     public function testAnExerciseWithoutHistoryRendersEmptyFields(): void
     {
@@ -226,6 +249,7 @@ final class ApiExerciseHistoryTest extends WebTestCase
         self::assertSame($exercise->getId(), $payload['exerciseId']);
         self::assertNull($payload['last']);
         self::assertNull($payload['best']);
+        self::assertNull($payload['bestReps']);
         self::assertSame([], $payload['sessions']);
     }
 

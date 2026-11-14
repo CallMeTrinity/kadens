@@ -31,7 +31,7 @@ use App\Repository\LoggedSetRepository;
  * @phpstan-type BestSet array{scheduledWorkoutId: int, date: \DateTimeImmutable, weightKg: float, reps: int|null, durationSeconds: int|null, type: SetType, detail: string}
  * @phpstan-type BestHold array{scheduledWorkoutId: int, date: \DateTimeImmutable, durationSeconds: int, reps: int|null, type: SetType, detail: string}
  * @phpstan-type BestRepMax array{scheduledWorkoutId: int, date: \DateTimeImmutable, reps: int, type: SetType, detail: string}
- * @phpstan-type ExerciseHistory array{last: LastPerformance|null, best: BestSet|null}
+ * @phpstan-type ExerciseHistory array{last: LastPerformance|null, best: BestSet|null, bestReps: BestRepMax|null}
  */
 final class PerformanceHistory
 {
@@ -93,9 +93,10 @@ final class PerformanceHistory
     }
 
     /**
-     * Le record : la série de travail la plus lourde jamais faite sur cet
-     * exercice. null quand il n'a jamais été chargé (poids du corps, série en
-     * durée) — il n'y a pas de record sans kilos.
+     * Le record de charge : la série de travail la plus lourde jamais faite sur
+     * cet exercice. null quand il n'a jamais été chargé (poids du corps, série
+     * en durée) — il n'y a pas de record de **charge** sans kilos. Le poids du
+     * corps a le sien, en répétitions : `bestRepMax()`.
      *
      * @return BestSet|null
      */
@@ -107,6 +108,23 @@ final class PerformanceHistory
         }
 
         return $this->bestByExercise($user, [$id])[$id] ?? null;
+    }
+
+    /**
+     * Le record au poids du corps : la plus longue série de travail jamais
+     * enchaînée **sans charge** sur cet exercice. `bestRepMaxesForIds()` pour un
+     * seul exercice, ce que `PerformanceHistoryPayload::build()` sert à la fiche.
+     *
+     * @return BestRepMax|null
+     */
+    public function bestRepMax(User $user, Exercise $exercise): ?array
+    {
+        $id = $exercise->getId();
+        if (null === $id) {
+            return null;
+        }
+
+        return $this->bestRepMaxesForIds($user, [$id])[$id] ?? null;
     }
 
     /**
@@ -203,10 +221,17 @@ final class PerformanceHistory
     }
 
     /**
-     * Dernière performance et record pour tout un jeu d'exercices, indexés par
-     * identifiant d'exercice. **Deux requêtes, quel que soit le nombre
+     * Dernière performance et records pour tout un jeu d'exercices, indexés par
+     * identifiant d'exercice. **Trois requêtes, quel que soit le nombre
      * d'exercices** : le bootstrap mobile (KL-14) l'appelle sur la bibliothèque
      * entière, un N+1 le rendrait inutilisable.
+     *
+     * Deux records, parce que deux questions : `best` est la charge la plus
+     * lourde, `bestReps` le plus de répétitions **au poids du corps**. C'est ce
+     * second-là qui fait qu'une pompe, une traction ou un dips peut être battu
+     * en séance — sans lui, le téléphone n'a rien à comparer et la couronne ne
+     * s'allume jamais sur un mouvement qu'on ne charge pas. Même lecture que la
+     * case « Pompes » de la fiche athlète (`AthleteRecords`, `RecordMetric::REPS`).
      *
      * Les exercices sans aucun historique sont **absents** du tableau : rien à
      * dire n'est pas la même chose qu'un zéro, et le transporter jusqu'au
@@ -243,6 +268,7 @@ final class PerformanceHistory
     {
         $last = $this->lastByExercise($user, $ids);
         $best = $this->bestByExercise($user, $ids);
+        $bestReps = $this->bestRepMaxesForIds($user, $ids);
 
         $history = [];
         foreach ($ids as $id) {
@@ -253,6 +279,7 @@ final class PerformanceHistory
             $history[$id] = [
                 'last' => $last[$id] ?? null,
                 'best' => $best[$id] ?? null,
+                'bestReps' => $bestReps[$id] ?? null,
             ];
         }
 
